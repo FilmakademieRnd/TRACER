@@ -29,10 +29,7 @@ The TRACER Foundation itself is developed in C#, thereby it is well suited to ta
 
 ## Additional resources
 
-* [VPET Web Site](https://animationsinstitut.de/en/research/tools/tracer)
-* [Presentation Video](https://youtu.be/6FssNOPKcnc)
-* [VPET Youtube Playlist](https://www.youtube.com/embed/videoseries?list=PLFSxFMrrXJM4PNNejIBy3ztEnA0xYLBwl)
-
+* [TRACER Web Site](https://animationsinstitut.de/en/research/tools/tracer)
 
 
 ## About
