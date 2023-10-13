@@ -140,6 +140,16 @@ namespace tracer
         public event EventHandler<EventArgs> sceneReset;
 
         //!
+        //! Event emitted when a scene object has been locked.
+        //!
+        public event EventHandler<SceneObject> sceneObjectLocked;
+
+        //!
+        //! Event emitted when a scene object has been unlocked.
+        //!
+        public event EventHandler<SceneObject> sceneObjectUnlocked;
+
+        //!
         //! Getter returning a reference to the TRACER scene root.
         //!
         //! @return A reference to the TRACER scene root.
@@ -220,6 +230,26 @@ namespace tracer
 
 
             sceneReset?.Invoke(this, EventArgs.Empty);
+        }
+        
+        //!
+        //! Function to lock a SceneObject.
+        //!
+        //! @param sceneObject The SceneObject to be locked.
+        //!
+        internal void LockSceneObject(SceneObject sceneObject)
+        {
+            sceneObjectLocked.Invoke(this, sceneObject);
+        }
+
+        //!
+        //! Function to unlock a SceneObject.
+        //!
+        //! @param sceneObject The SceneObject to be unlocked.
+        //!
+        internal void UnlockSceneObject(SceneObject sceneObject)
+        {
+            sceneObjectUnlocked.Invoke(this, sceneObject);
         }
     }
 }

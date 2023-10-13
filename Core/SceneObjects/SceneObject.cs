@@ -40,7 +40,7 @@ namespace tracer
         //!
         //! Is the sceneObject locked?
         //!
-        public bool _lock = false;
+        public bool _lock { get; } = false;
         //!
         //! Previous lock state for highlighting the sceneObject.
         //!
@@ -121,6 +121,18 @@ namespace tracer
             position.hasChanged -= updatePosition;
             rotation.hasChanged -= updateRotation;
             scale.hasChanged -= updateScale;
+        }
+
+        //!
+        //! Function to lock or unlock the SceneObject.
+        //!
+        public void lockObject(bool l)
+        {
+            SceneManager sceneManager = core.getManager<SceneManager>();
+            if (l)
+                sceneManager.LockSceneObject(this);
+            else
+                sceneManager.UnlockSceneObject(this);
         }
 
         //!

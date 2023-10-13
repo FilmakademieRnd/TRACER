@@ -121,6 +121,10 @@ namespace tracer
             uiManager.selectionAdded += lockSceneObject;
             uiManager.selectionRemoved += unlockSceneObject;
 
+            SceneManager sceneManager = core.getManager<SceneManager>();
+            sceneManager.sceneObjectLocked += lockSceneObject;
+            sceneManager.sceneObjectUnlocked += unlockSceneObject;
+
             core.syncEvent += queuePingMessage;
 
             if (core.isServer)
