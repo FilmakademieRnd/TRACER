@@ -32,6 +32,7 @@ namespace tracer
 {
     public class MenuButton
     {
+        private static int s_id = 0;
         //!
         //! The unique id of the MenuButton.
         //!
@@ -94,6 +95,7 @@ namespace tracer
         //!
         public MenuButton(string caption = "", Action action = null, List<UIManager.Roles> roles = null)
         {
+            id = s_id++;
             m_caption = caption;
             m_action = action;
             if (roles != null)
