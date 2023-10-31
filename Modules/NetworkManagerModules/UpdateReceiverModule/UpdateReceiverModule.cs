@@ -31,6 +31,8 @@ using System;
 using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
+using System.Diagnostics;
+using UnityEngine;
 
 namespace tracer
 {
@@ -89,7 +91,6 @@ namespace tracer
 
             m_sceneManager = core.getManager<SceneManager>();
             m_sceneManager.sceneReady += connectAndStart;
-
         }
 
 
@@ -184,7 +185,11 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void decodeSyncMessage(byte[] message)
         {
-            core.time = message[1];
+            byte coreTime = core.time;
+            byte syncTime = message[1];
+
+            if (Mathf.Abs(coreTime - syncTime) > 2)
+                core.time = syncTime;
         }
 
         //! 
@@ -244,7 +249,7 @@ namespace tracer
             // dhType 0 = client connection status update
             if (dhType == 0 && 
                 cID != manager.cID)
-                manager.clientConnectionUpdate(status, cID);
+                manager.ClientConnectionUpdate(status, cID);
         }
 
         //!

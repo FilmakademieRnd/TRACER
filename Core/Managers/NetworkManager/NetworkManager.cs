@@ -51,9 +51,19 @@ namespace tracer
         public static int threadCount = 0;
 
         //!
+        //! The average ping rtt from the client to the server.
+        //!
+        public int pingRTT = 0;
+
+        //!
         //! number of disposed network worker threads
         //!
         private int m_disposeCount = 0;
+
+        //!
+        //! Event that is invoket to send an server command.
+        //!
+        public event EventHandler<byte[]> sendServerCommand;
 
         //!
         //! Event that is invoket when a client has left the network session.
@@ -170,12 +180,17 @@ namespace tracer
         //! @param connectionStatus Wether a client has been connected or disconnected.
         //! @param clientID The ID of the client that has been connected or disconnected.
         //!
-        public void clientConnectionUpdate(bool connectionStatus, byte clientID)
+        public void ClientConnectionUpdate(bool connectionStatus, byte clientID)
         {
             if (connectionStatus)
                 clientRegistered?.Invoke(this, clientID);
             else
                 clientLost?.Invoke(this, clientID);
+        }
+
+        public void SendServerCommand(byte[] command)
+        {
+            sendServerCommand?.Invoke(this, command);
         }
     }
 }

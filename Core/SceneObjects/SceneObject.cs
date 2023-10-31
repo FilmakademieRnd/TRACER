@@ -40,7 +40,7 @@ namespace tracer
         //!
         //! Is the sceneObject locked?
         //!
-        public bool _lock { get; } = false;
+        public bool _lock = false;
         //!
         //! Previous lock state for highlighting the sceneObject.
         //!

@@ -94,7 +94,6 @@ namespace tracer
         //!
         public int buttonID;
 
-
         //!
         //! Event emitted when value has changed
         //!
