@@ -28,6 +28,7 @@ if not go to https://opensource.org/licenses/MIT
 
 using System.Collections.Generic;
 using System;
+using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
@@ -74,6 +75,15 @@ namespace tracer
         //! The list containing currently selected scene objects.
         //!
         private List<SceneObject> m_selectedObjects;
+        public List<SceneObject> SelectedObjects
+        {
+            get { return m_selectedObjects; }
+        }
+        //!
+        //! Event when the clolor select Game Object is Active
+        //!
+        public event EventHandler<GameObject> colorSelectGameObject; 
+        
         //!
         //! Event emitted when the scene selection has changed.
         //!
@@ -205,6 +215,11 @@ namespace tracer
                 .End();
         }
 
+        public void ColorGameObjectActive(GameObject go)
+        {
+            colorSelectGameObject?.Invoke(this, go);
+        }
+
         //!
         //! function called before Unity destroys the TRACER core.
         //! 
@@ -311,6 +326,16 @@ namespace tracer
 
             menu.id = m_menus.Count - 1;
             menusUpdated?.Invoke(this, EventArgs.Empty);
+        }
+
+        //!
+        //! Returns a button based on the given name.
+        //!
+        //! @param buttonName name of the button to be returned.
+        //!
+        public MenuButton getButton(string buttonName) 
+        {
+            return m_buttons.FirstOrDefault(targetButton =>targetButton.name == buttonName);
         }
 
         //!

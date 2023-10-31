@@ -81,6 +81,9 @@ namespace tracer
             set => m_caption = value;
             get => m_caption;
         }
+        
+        public string name { get; }
+        
         //!
         //! The optional icon for an MenuButton.
         //!
@@ -93,8 +96,9 @@ namespace tracer
         //!
         //! Constructor
         //!
-        public MenuButton(string caption = "", Action action = null, List<UIManager.Roles> roles = null)
+        public MenuButton(string caption = "", Action action = null, List<UIManager.Roles> roles = null, string name = "")
         {
+            this.name = name;
             id = s_id++;
             m_caption = caption;
             m_action = action;

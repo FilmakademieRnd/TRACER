@@ -142,7 +142,10 @@ namespace tracer
                     node = ParseMesh(trans, ref sceneData);
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
+                        {
                             sceneObject = gameObject.AddComponent<SceneObject>();
+                            manager.simpleSceneObjectList.Add((SceneObject)sceneObject);
+                        }
                 }
                 else if (trans.GetComponent<SkinnedMeshRenderer>() != null)
                 {
@@ -159,9 +162,12 @@ namespace tracer
                 }
                 else
                 {
-                    if (gameObject.tag == "editable")
+                    if (gameObject.CompareTag("editable"))
                         if (core.isServer && !sceneObject)
+                        {
                             sceneObject = gameObject.AddComponent<SceneObject>();
+                            manager.simpleSceneObjectList.Add((SceneObject)sceneObject);
+                        }
                 }
 
                 Animator animator = trans.GetComponent<Animator>();

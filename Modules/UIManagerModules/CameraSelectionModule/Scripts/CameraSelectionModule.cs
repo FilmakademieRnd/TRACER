@@ -66,6 +66,11 @@ namespace tracer
         //! The UI button for logging the camera to an object.
         //!
         private MenuButton m_cameraSelectButton;
+
+        public MenuButton cameraSelectButton()
+        {
+            return m_cameraSelectButton;
+        }
         //!
         //! The currently selected object.
         //!
@@ -78,6 +83,10 @@ namespace tracer
         //! A reference to the input manager.
         //!
         private InputManager m_inputManager;
+        //!
+        //! Reference to UIManager
+        //!
+        UIManager m_uiManager;
         //!
         //! The preloaded prafab of the safe frame overlay game object.
         //!
@@ -115,7 +124,7 @@ namespace tracer
         //! @param core Reference to the TRACER core
         //!
         public CameraSelectionModule(string name, Manager manager) : base(name, manager)
-        {        
+        {
         }
 
         //! 
@@ -128,6 +137,7 @@ namespace tracer
         {
             base.Start(sender, e);
 
+            m_uiManager = core.getManager<UIManager>();
             m_sceneManager = core.getManager<SceneManager>();
             m_inputManager = core.getManager<InputManager>();
 
@@ -139,13 +149,12 @@ namespace tracer
             cameraSelectButton.setIcon("Images/button_camera");
             cameraSelectButton.isToggle = true;
 
-            core.getManager<UIManager>().addButton(m_safeFrameButton);
-            core.getManager<UIManager>().addButton(cameraSelectButton);
+            m_uiManager.addButton(m_safeFrameButton);
+            m_uiManager.addButton(cameraSelectButton);
 
-            m_sceneManager.sceneReady += copyCamera;
-            core.getManager<UIManager>().selectionChanged += createButtons;
+            m_sceneManager.sceneReady += initCameraOnce;
+            m_uiManager.selectionChanged += selection;
 
-            core.syncEvent += updateTrigger;
             m_inputManager.cameraControlChanged += updateSafeFrame;
         }
 
@@ -159,36 +168,42 @@ namespace tracer
         {
             base.Cleanup(sender, e);
 
-            m_sceneManager.sceneReady -= copyCamera;
-            core.getManager<UIManager>().selectionChanged -= createButtons;
-            core.syncEvent -= updateTrigger;
+            m_sceneManager.sceneReady -= initCameraOnce;
+            m_uiManager.selectionChanged -= selection;
             m_inputManager.cameraControlChanged -= updateSafeFrame;
         }
 
         //!
-        //! Function that creates the camera selection ui buttons. Called every time a scene object has been selected.
+        //! Function that creates the camera selection ui buttons & handles selection changes. Called every time a scene object has been selected.
         //!
         //! @param sender The UI manager.
         //! @param sceneObjects a list of the currently selected objects.
         //!
-        private void createButtons(object sender, List<SceneObject> sceneObjects)
+        private void selection(object sender, List<SceneObject> sceneObjects)
         {
-            UIManager uiManager = core.getManager<UIManager>();
-
             if (m_cameraSelectButton != null)
             {
-                uiManager.removeButton(m_cameraSelectButton);
+                m_uiManager.removeButton(m_cameraSelectButton);
                 m_cameraSelectButton = null;
             }
 
             if (sceneObjects.Count > 0)
             {
+                if (sceneObjects[0].GetType() == typeof(SceneObjectCamera))
+                {
+                    m_cameraIndex = m_sceneManager.sceneCameraList.FindIndex(x => x.Equals((SceneObjectCamera)sceneObjects[0]));
+                }
+                else
+                {
+                    m_cameraIndex = -1;
+                }
+
                 m_selectedObject = sceneObjects[0];
                 if (sceneObjects[0].GetType() == typeof(SceneObjectCamera) ||
                     sceneObjects[0].GetType() == typeof(SceneObjectDirectionalLight) ||
                     sceneObjects[0].GetType() == typeof(SceneObjectSpotLight))
                 {
-                    m_cameraSelectButton = new MenuButton("", lookThrough);
+                    m_cameraSelectButton = new MenuButton("", lookThrough, null, "CameraSelectionButton");
                     m_cameraSelectButton.setIcon("Images/button_lookTrough");
                 }
                 else
@@ -196,9 +211,9 @@ namespace tracer
                     m_cameraSelectButton = new MenuButton("", lockToCamera);
                     m_cameraSelectButton.setIcon("Images/button_lockToCamera");
                 }
-                uiManager.addButton(m_cameraSelectButton);
+                m_uiManager.addButton(m_cameraSelectButton);
             }
-            else 
+            else
             {
                 if (m_isLocked)
                 {
@@ -215,8 +230,10 @@ namespace tracer
         //!
         //! The function that moves the main camera to the selected object and parants it to the camera.
         //!
-        private void lookThrough()
+        public void lookThrough()
         {
+            copyCamera();
+
             if (m_selectedObject != null)
             {
                 InputManager inputManager = core.getManager<InputManager>();
@@ -224,7 +241,10 @@ namespace tracer
                 if (m_isLocked)
                 {
                     core.updateEvent -= updateLookThrough;
+                    m_oldSOCamera.hasChanged -= updateCamera;
                     m_isLocked = false;
+                    Camera.main.fieldOfView = 60;
+                    Camera.main.transform.position -= Camera.main.transform.forward;
                 }
                 else
                 {
@@ -319,12 +339,6 @@ namespace tracer
             }
         }
 
-        private void updateTrigger(object sender, byte data)
-        {
-            if (m_oldSOCamera)
-                updateCamera(m_oldSOCamera, null);
-        }
-
         //!
         //! Function for updating the aspect ratio of the safe frame based on the currently selected camera.
         //!
@@ -355,6 +369,7 @@ namespace tracer
         //!
         private void selectNextCamera()
         {
+            m_uiManager.clearSelectedObject();
             m_cameraIndex++;
 
             if (m_isLocked)
@@ -371,7 +386,7 @@ namespace tracer
                 m_cameraIndex = 0;
 
             // copy properties to main camera and set it use display 1 (0)
-            copyCamera(this, EventArgs.Empty);
+            copyCamera();
 
             InputManager inputManager = core.getManager<InputManager>();
             if (inputManager.cameraControl == InputManager.CameraControl.ATTITUDE)
@@ -381,7 +396,7 @@ namespace tracer
         //!
         //! Function that copies the selected cameras attributes to the main camera.
         //!
-        private void copyCamera(object sender, EventArgs e)
+        private void copyCamera()
         {
             if (m_sceneManager.sceneCameraList.Count > 0)
             {
@@ -407,6 +422,25 @@ namespace tracer
 
                 // announce the UI operation to the input manager
                 m_inputManager.updateCameraCommand();
+            }
+        }
+
+        //!
+        //! Function that copies the first camera's attributes to the main camera once
+        //!
+        private void initCameraOnce(object sender, EventArgs e)
+        {
+            if (m_sceneManager.sceneCameraList.Count > 0)
+            {
+                Camera mainCamera = Camera.main;
+                float aspect = mainCamera.aspect;
+                SceneObjectCamera soCamera = m_sceneManager.sceneCameraList[0];
+                mainCamera.enabled = false;
+                mainCamera.CopyFrom(soCamera.GetComponent<Camera>());
+                mainCamera.aspect = aspect;
+                mainCamera.enabled = true;
+
+                updateCamera(soCamera, null);
             }
         }
 

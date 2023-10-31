@@ -118,6 +118,19 @@ namespace tracer
             get { return m_sceneCameraList; }
             set { m_sceneCameraList = value; }
         }
+        
+        //!
+        //! The list storing scene object that are not lights or cameras.
+        //!
+        private List<SceneObject> m_simpleSceneObjectList = new List<SceneObject>();
+        //!
+        //! Setter and getter to List holding references to all scene objects that are not lights or cameras.
+        //!
+        public List<SceneObject> simpleSceneObjectList
+        {
+            get { return m_simpleSceneObjectList; }
+            set { m_simpleSceneObjectList = value; }
+        }
 
         //!
         //! A reference to the TRACER scene root.
@@ -227,6 +240,7 @@ namespace tracer
 
             m_sceneCameraList.Clear();
             m_sceneLightList.Clear();
+            m_simpleSceneObjectList.Clear();
 
 
             sceneReset?.Invoke(this, EventArgs.Empty);

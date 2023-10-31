@@ -94,6 +94,7 @@ namespace tracer
         //!
         public int buttonID;
 
+
         //!
         //! Event emitted when value has changed
         //!
@@ -184,6 +185,19 @@ namespace tracer
         //! @param data Data of the drag event e.g. postion, delta, ...
         //!
         public void OnPointerUp(PointerEventData data)
+        {
+            clicked?.Invoke(this, this);
+            clickAction?.Invoke();
+            if (isToggle)
+            {
+                txt.color = uiSettings.colors.ElementSelection_Default;
+                if (image)
+                    if (image.sprite)
+                        image.color = uiSettings.colors.ElementSelection_Default;
+            }
+        }
+
+        public void ControllerClick()
         {
             clicked?.Invoke(this, this);
             clickAction?.Invoke();
