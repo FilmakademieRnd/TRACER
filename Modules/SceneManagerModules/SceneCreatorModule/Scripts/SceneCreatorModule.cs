@@ -77,14 +77,13 @@ namespace tracer
         protected override void Cleanup(object sender, EventArgs e)
         {
             base.Cleanup(sender, e);
-            if (!core.isServer)
-            {
-                NetworkManager networkManager = core.getManager<NetworkManager>();
-                SceneReceiverModule sceneReceiverModule = networkManager.getModule<SceneReceiverModule>();
-                SceneStorageModule sceneStorageModule = manager.getModule<SceneStorageModule>();
+
+            NetworkManager networkManager = core.getManager<NetworkManager>();
+            SceneReceiverModule sceneReceiverModule = networkManager.getModule<SceneReceiverModule>();
+            SceneStorageModule sceneStorageModule = manager.getModule<SceneStorageModule>();
+            if (sceneReceiverModule != null)
                 sceneReceiverModule.m_sceneReceived -= CreateScene;
-                sceneStorageModule.sceneLoaded -= CreateScene;
-            }
+            sceneStorageModule.sceneLoaded -= CreateScene;
         }
 
         //!

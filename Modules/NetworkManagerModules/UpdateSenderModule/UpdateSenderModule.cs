@@ -80,11 +80,6 @@ namespace tracer
                 uiManager.selectionRemoved -= unlockSceneObject;
             }
 
-            core.syncEvent -= queuePingMessage;
-
-            if (core.isServer)
-                core.syncEvent -= queueSyncMessage;
-
             foreach (SceneObject sceneObject in sceneManager.getAllSceneObjects())
             {
                 sceneObject.hasChanged -= queueModifiedParameter;
@@ -124,11 +119,6 @@ namespace tracer
             SceneManager sceneManager = core.getManager<SceneManager>();
             sceneManager.sceneObjectLocked += lockSceneObject;
             sceneManager.sceneObjectUnlocked += unlockSceneObject;
-
-            core.syncEvent += queuePingMessage;
-
-            if (core.isServer)
-                core.syncEvent += queueSyncMessage;
 
             foreach (SceneObject sceneObject in ((SceneManager)sender).getAllSceneObjects())
             {
@@ -193,45 +183,6 @@ namespace tracer
             m_mre.Set();
         }
 
-
-        //!
-        //! Function that creates a ping message and adds it to the message queue for sending.
-        //!
-        //! @param sender The TRACER core.
-        //! @param time The clients global time.
-        //!
-        private void queuePingMessage(object sender, byte time)
-        {
-            m_controlMessage = new byte[3];
-
-            // header
-            m_controlMessage[0] = manager.cID;
-            m_controlMessage[1] = time;
-            m_controlMessage[2] = (byte)MessageType.PING;
-
-            m_mre.Set();
-        }
-
-        //!
-        //! Function that creates a sync message and adds it to the message queue for sending.
-        //!
-        //! @param sender The TRACER core.
-        //! @param time The clients global time.
-        //!
-        private void queueSyncMessage(object sender, byte time)
-        {
-            m_controlMessage = new byte[3];
-
-            lock (m_controlMessage)
-            {
-                // header
-                m_controlMessage[0] = manager.cID;
-                m_controlMessage[1] = time;
-                m_controlMessage[2] = (byte)MessageType.SYNC;
-            }
-
-            m_mre.Set();
-        }
 
         //!
         //! Function that creates a undo redo message.

@@ -187,9 +187,14 @@ namespace tracer
         {
             byte coreTime = core.time;
             byte syncTime = message[1];
+            float runtime = manager.pingRTT * 0.5f;
 
-            if (Mathf.Abs(coreTime - syncTime) > 2)
-                core.time = syncTime;
+            if (Mathf.Abs(coreTime - syncTime) > 4 + runtime)  // *0.5 to convert rtt to one way
+            {
+                core.time = (byte) (Mathf.RoundToInt(syncTime + runtime) % core.timesteps);
+                UnityEngine.Debug.Log("Core time updated to: " + core.time);
+            }
+            //UnityEngine.Debug.Log("Time delta: " + (coreTime - syncTime) + " RTT: " + manager.pingRTT);
         }
 
         //! 

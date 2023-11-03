@@ -151,17 +151,17 @@ namespace tracer
             {
                 m_commandRequest = new byte[3];
 
+                m_pingStartTime = time;
+
                 lock (m_commandRequest)
                 {
                     // header
                     m_commandRequest[0] = manager.cID;
                     m_commandRequest[1] = time;
                     m_commandRequest[2] = (byte)MessageType.PING;
-
-                    m_pingStartTime = time;
-
-                    m_mre.Set();
                 }
+                
+                m_mre.Set();
             }
         }
 
@@ -187,9 +187,7 @@ namespace tracer
                 rttSum += rtts[i];
 
             lock (manager)
-                manager.pingRTT = rttSum / pingCount;
-
-            Debug.Log("RTT: " + manager.pingRTT);
+                manager.pingRTT = Mathf.RoundToInt(rttSum / (float) pingCount);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -221,7 +219,6 @@ namespace tracer
                         m_commandResponse = requester.ReceiveFrameBytes();
                         if (m_commandResponse != null)
                         {
-                            Debug.Log("TryReceiveFrameBytes");
                             if (m_commandResponse[0] != manager.cID)
                             {
                                 switch ((MessageType)m_commandResponse[2])

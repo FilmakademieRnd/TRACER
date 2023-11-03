@@ -111,16 +111,16 @@ namespace tracer
                         switch (light.type)
                         {
                             case LightType.Point:
-                                sceneObject = gameObject.AddComponent<SceneObjectPointLight>();
+                                sceneObject = SceneObjectPointLight.Attach(gameObject, networkManager.cID);
                                 break;
                             case LightType.Directional:
-                                sceneObject = gameObject.AddComponent<SceneObjectDirectionalLight>();
+                                sceneObject = SceneObjectDirectionalLight.Attach(gameObject, networkManager.cID);
                                 break;
                             case LightType.Spot:
-                                sceneObject = gameObject.AddComponent<SceneObjectSpotLight>();
+                                sceneObject = SceneObjectSpotLight.Attach(gameObject, networkManager.cID);
                                 break;
                             case LightType.Area:
-                                sceneObject = gameObject.AddComponent<SceneObjectAreaLight>();
+                                sceneObject = SceneObjectAreaLight.Attach(gameObject, networkManager.cID);
                                 break;
                         }
                         manager.sceneLightList.Add((SceneObjectLight)sceneObject);
@@ -132,7 +132,7 @@ namespace tracer
                     node = ParseCamera(trans.GetComponent<Camera>());
                     if (core.isServer && !sceneObject)
                     {
-                        sceneObject = gameObject.AddComponent<SceneObjectCamera>();
+                        sceneObject = SceneObjectCamera.Attach(gameObject, networkManager.cID);
                         manager.sceneCameraList.Add((SceneObjectCamera)sceneObject);
                         gameObject.tag = "editable";
                     }
@@ -143,7 +143,7 @@ namespace tracer
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
                         {
-                            sceneObject = gameObject.AddComponent<SceneObject>();
+                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
                             manager.simpleSceneObjectList.Add((SceneObject)sceneObject);
                         }
                 }
@@ -152,20 +152,20 @@ namespace tracer
                     node = ParseSkinnedMesh(trans, ref gameObjects, ref sceneData);
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                            sceneObject = gameObject.AddComponent<SceneObject>();
+                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
                 }
                 else if (trans.GetComponent<Animator>() != null)
                 {
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                            sceneObject = gameObject.AddComponent<SceneCharacterObject>();
+                            sceneObject = SceneCharacterObject.Attach(gameObject, networkManager.cID);
                 }
                 else
                 {
                     if (gameObject.CompareTag("editable"))
                         if (core.isServer && !sceneObject)
                         {
-                            sceneObject = gameObject.AddComponent<SceneObject>();
+                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
                             manager.simpleSceneObjectList.Add((SceneObject)sceneObject);
                         }
                 }
