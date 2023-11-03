@@ -147,13 +147,12 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void queuePingMessage(object sender, byte time)
         {
-            if (m_commandRequest == null)
+            // if (m_commandRequest == null)
             {
                 m_commandRequest = new byte[3];
-                
+
                 lock (m_commandRequest)
                 {
-
                     // header
                     m_commandRequest[0] = manager.cID;
                     m_commandRequest[1] = time;
@@ -162,7 +161,6 @@ namespace tracer
                     m_pingStartTime = time;
 
                     m_mre.Set();
-                    Debug.Log("Ping set");
                 }
             }
         }
@@ -217,10 +215,13 @@ namespace tracer
                 m_mre.WaitOne();
                 if (m_commandRequest != null)
                 {
-                    requester.SendFrame(m_commandRequest);
-                    if (requester.TryReceiveFrameBytes(System.TimeSpan.FromSeconds(1), out m_commandResponse))
+                    lock (m_commandRequest)
                     {
+                        requester.SendFrame(m_commandRequest);
+                        m_commandResponse = requester.ReceiveFrameBytes();
                         if (m_commandResponse != null)
+                        {
+                            Debug.Log("TryReceiveFrameBytes");
                             if (m_commandResponse[0] != manager.cID)
                             {
                                 switch ((MessageType)m_commandResponse[2])
@@ -234,9 +235,9 @@ namespace tracer
                                     default:
                                         break;
                                 }
-                                lock (m_commandRequest)
-                                    m_commandRequest = null;
+                                m_commandRequest = null;
                             }
+                        }
                     }
                 }
                 // reset to stop the thread after one loop is done

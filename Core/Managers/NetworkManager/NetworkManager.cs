@@ -186,6 +186,8 @@ namespace tracer
                 clientRegistered?.Invoke(this, clientID);
             else
                 clientLost?.Invoke(this, clientID);
+            
+            UnityEngine.Debug.Log("ClientConnectionUpdate ID: " + clientID + "Status: " + connectionStatus.ToString());
         }
 
         public void SendServerCommand(byte[] command)
