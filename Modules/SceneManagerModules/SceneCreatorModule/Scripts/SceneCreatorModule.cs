@@ -209,6 +209,9 @@ namespace tracer
                                 float f = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
                                 dataIdx += SceneManager.SceneDataHandler.size_float;
                                 mat.SetFloat(shaderPropertyId, f);
+                                // chenge render queue order for transparent materials (i=23 is mode, f=3 is trasparent, f=2 is cutout)
+                                if (i == 23 && (f == 3 || f == 2))
+                                    mat.renderQueue = 3000;
                                 break;
                             // Texture
                             case 4:
