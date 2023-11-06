@@ -205,6 +205,7 @@ namespace tracer
             m_isRunning = true;
             AsyncIO.ForceDotNet.Force();
             RequestSocket requester = new RequestSocket();
+            m_socket = requester;
 
             requester.Connect("tcp://" + m_ip + ":" + m_port);
             Helpers.Log("Command Module connected: " + "tcp://" + m_ip + ":" + m_port);
@@ -216,7 +217,7 @@ namespace tracer
                     lock (m_commandRequest)
                     {
                         requester.SendFrame(m_commandRequest);
-                        m_commandResponse = requester.ReceiveFrameBytes();
+                        try { m_commandResponse = requester.ReceiveFrameBytes(); } catch { }
                         if (m_commandResponse != null)
                         {
                             if (m_commandResponse[0] != manager.cID)
@@ -241,20 +242,6 @@ namespace tracer
                 m_mre.Reset();
 
                 Thread.Yield();
-            }
-            try
-            {
-                requester.Disconnect("tcp://" + m_ip + ":" + m_port);
-                requester.Close();
-                requester.Dispose();
-                // wait until sender is disposed
-                while (!requester.IsDisposed)
-                    Thread.Sleep(25);
-                Helpers.Log(this.name + " disposed.");
-                m_disposed?.Invoke();
-            }
-            catch
-            {
             }
         }
     }

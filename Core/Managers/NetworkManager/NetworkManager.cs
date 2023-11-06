@@ -120,6 +120,12 @@ namespace tracer
             }
         }
 
+        //! 
+        //! Cleanup function called before Unity destroys the TRACER core.
+        //! 
+        //! @param sender A reference to the TRACER core.
+        //! @param e Arguments for these event. 
+        //! 
         protected override void Cleanup(object sender, EventArgs e)
         {
             base.Cleanup(sender, e);

@@ -25,7 +25,9 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 28.10.2021
 
+using NetMQ;
 using System;
+using System.Diagnostics;
 using System.Threading;
 
 namespace tracer
@@ -80,7 +82,9 @@ namespace tracer
         //!
         //! Reset event for stopping and resetting the run thread.
         //!
-        protected ManualResetEvent m_mre; 
+        protected ManualResetEvent m_mre;
+
+        protected NetMQSocket m_socket;
 
         //!
         //! Ret the manager of this module.
@@ -147,6 +151,15 @@ namespace tracer
         {
             m_isRunning = false;
             m_mre.Set();
+            if (m_socket != null)
+            {
+                    m_socket.Disconnect("tcp://" + m_ip + ":" + m_port);
+                    //m_socket.Unbind("tcp://" + m_ip + ":" + m_port);
+                    m_socket.Close();
+                    m_socket.Dispose();
+                    Helpers.Log(this.name + " disposed.");
+                    m_disposed?.Invoke();
+            }
         }
     }
 }

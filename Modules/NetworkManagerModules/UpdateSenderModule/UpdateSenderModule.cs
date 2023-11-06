@@ -131,11 +131,23 @@ namespace tracer
             core.timeEvent += sendParameterMessages;
         }
 
+        //!
+        //! Function to add a scene object to the network sync.
+        //!
+        //! @param sender The network manager.
+        //! @param sceneObject The scene object to be added to the network sync.
+        //!
         private void AddSceneObject(object sender, SceneObject sceneObject)
         {
             sceneObject.hasChanged += queueModifiedParameter;
         }
 
+        //!
+        //! Function to remove a scene object from the network sync.
+        //!
+        //! @param sender The network manager.
+        //! @param sceneObject The scene object to be added to the network sync.
+        //!
         private void RemoveSceneObject(object sender, SceneObject sceneObject)
         {
             sceneObject.hasChanged -= queueModifiedParameter;
@@ -326,6 +338,7 @@ namespace tracer
             m_isRunning = true;
             AsyncIO.ForceDotNet.Force();
             var sender = new PublisherSocket();
+            m_socket = sender;
 
             sender.Connect("tcp://" + m_ip + ":" + m_port);
             Helpers.Log("Update sender connected: " + "tcp://" + m_ip + ":" + m_port);
@@ -336,7 +349,7 @@ namespace tracer
                 {
                     lock (m_controlMessage)
                     {
-                        sender.SendFrame(m_controlMessage, false); // true not wait 
+                        try { sender.SendFrame(m_controlMessage, false); } catch { } // true not wait 
                         m_controlMessage = null;
                     }
                 }
@@ -344,7 +357,7 @@ namespace tracer
                 {
                     lock (m_modifiedParameters)
                     {
-                        sender.SendFrame(createParameterMessage(), false); // true not wait
+                        try { sender.SendFrame(createParameterMessage(), false); } catch { } // true not wait
                         m_modifiedParameters.Clear();
                         m_modifiedParametersDataSize = 0;
                     }
@@ -353,20 +366,6 @@ namespace tracer
                 m_mre.Reset();
 
                 Thread.Yield();
-            }
-            try
-            {
-                sender.Disconnect("tcp://" + m_ip + ":" + m_port);
-                sender.Close();
-                sender.Dispose();
-                // wait until sender is disposed
-                while (!sender.IsDisposed)
-                    Thread.Sleep(25);
-                Helpers.Log(this.name + " disposed.");
-                m_disposed?.Invoke();
-            }
-            catch
-            {
             }
         }
 

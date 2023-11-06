@@ -54,11 +54,6 @@ namespace tracer
         private MenuTree m_menu;
 
         //!
-        //! A local reference to the netMQ scene receiver socket.
-        //!
-        private RequestSocket m_sceneReceiver;
-
-        //!
         //! Constructor
         //!
         //! @param  name  The  name of the module.
@@ -150,7 +145,6 @@ namespace tracer
         protected override void start(string ip, string port)
         {
             m_ip = ip;
-            Helpers.Log(ip);
             m_port = port;
 
             NetworkManager.threadCount++;
@@ -185,82 +179,48 @@ namespace tracer
         }
 
         //!
-        //! Function for cleanup. Stopping the receiver thread and dispose
-        //! the netMQ sockets.
-        //!
-        public override void Dispose()
-        {
-            base.Dispose();
-
-            disposeReceiver();
-            m_disposed?.Invoke();   // does stall for some reason [REVIEW]
-        }
-
-        //!
-        //! Funcrtion for dispoising the netMQ sockets of the receiver.
-        //!
-        private void disposeReceiver()
-        {
-
-            try
-            {
-                if ((m_sceneReceiver != null) && !m_sceneReceiver.IsDisposed)
-                {
-                    m_sceneReceiver.Disconnect("tcp://" + m_ip + ":" + m_port);
-                    m_sceneReceiver.Close();
-                    m_sceneReceiver.Dispose();
-                    // wait until receiver is disposed
-                    while (!m_sceneReceiver.IsDisposed)
-                        System.Threading.Thread.Sleep(25);
-                    Helpers.Log(this.name + " disposed.");
-                }
-            }
-            catch { }
-        }
-
-        //!
         //! Function, requesting scene packages and receiving package data (executed in separate thread).
         //! As soon as all requested packages are received, a signal is emited that triggers the scene cration.
         //!
         protected override void run()
         {
             AsyncIO.ForceDotNet.Force();
-            m_sceneReceiver = new RequestSocket();
+            RequestSocket sceneReceiver = new RequestSocket();
+            m_socket = sceneReceiver;
 
             SceneManager sceneManager = core.getManager<SceneManager>();
-            m_sceneReceiver.Connect("tcp://" + m_ip + ":" + m_port);
+            sceneReceiver.Connect("tcp://" + m_ip + ":" + m_port);
             SceneManager.SceneDataHandler sceneDataHandler = sceneManager.sceneDataHandler;
 
             try
             {
                 foreach (string request in m_requests)
                 {
-                    m_sceneReceiver.SendFrame(request);
+                    sceneReceiver.SendFrame(request);
                     switch (request)
                     {
                         case "header":
-                            sceneDataHandler.headerByteData = m_sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.headerByteData = sceneReceiver.ReceiveFrameBytes();
                             break;
                         case "nodes":
-                            sceneDataHandler.nodesByteData = m_sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.nodesByteData = sceneReceiver.ReceiveFrameBytes();
                             break;
                         case "objects":
-                            sceneDataHandler.objectsByteData = m_sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.objectsByteData = sceneReceiver.ReceiveFrameBytes();
                             break;
                         case "characters":
-                            sceneDataHandler.characterByteData = m_sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.characterByteData = sceneReceiver.ReceiveFrameBytes();
                             break;
                         case "textures":
-                            sceneDataHandler.texturesByteData = m_sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.texturesByteData = sceneReceiver.ReceiveFrameBytes();
                             break;
                         case "materials":
-                            sceneDataHandler.materialsByteData = m_sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.materialsByteData = sceneReceiver.ReceiveFrameBytes();
                             break;
                     }
                 }
             }
             catch { }
-            disposeReceiver();
         }
 
 

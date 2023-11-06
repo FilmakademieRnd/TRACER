@@ -121,6 +121,7 @@ namespace tracer
             m_isRunning = true;
             AsyncIO.ForceDotNet.Force();
             var dataSender = new ResponseSocket();
+            m_socket = dataSender;
 
             dataSender.Bind("tcp://" + m_ip + ":" + m_port);
             Debug.Log("Enter while.. ");
@@ -131,29 +132,17 @@ namespace tracer
                 dataSender.TryReceiveFrameString(out message);       // TryReceiveFrameString returns null if no message has been received!
                 if (message != null)
                 {
-                    if (m_responses.ContainsKey(message))
-                        dataSender.SendFrame(m_responses[message]);
-                    else
-                        dataSender.SendFrame(new byte[0]);
+                    try
+                    {
+                        if (m_responses.ContainsKey(message))
+                            dataSender.SendFrame(m_responses[message]);
+                        else
+                            dataSender.SendFrame(new byte[0]);
+                    }
+                    catch { }
 
                 }
                 Thread.Sleep(100);
-            }
-
-            // TODO: check first if closed
-            try
-            {
-                dataSender.Disconnect("tcp://" + m_ip + ":" + m_port);
-                dataSender.Close();
-                dataSender.Dispose();
-                // wait until sender is disposed
-                while (!dataSender.IsDisposed)
-                    Thread.Sleep(25);
-                Helpers.Log(this.name + " disposed.");
-                m_disposed?.Invoke();
-            }
-            catch
-            {
             }
         }
 

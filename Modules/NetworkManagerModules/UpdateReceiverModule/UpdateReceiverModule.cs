@@ -118,62 +118,53 @@ namespace tracer
             m_isRunning = true;
             AsyncIO.ForceDotNet.Force();
             var receiver = new SubscriberSocket();
+            m_socket = receiver;
             receiver.SubscribeToAnyTopic();
             receiver.Connect("tcp://" + m_ip + ":" + m_port);
             Helpers.Log("Update receiver connected: " + "tcp://" + m_ip + ":" + m_port);
             byte[] message = null;
             while (m_isRunning)
             {
-                if (receiver.TryReceiveFrameBytes(System.TimeSpan.FromSeconds(1), out message))
+                try
                 {
-                    if (message != null)
-                        if (message[0] != manager.cID)
-                        {
-                            switch ((MessageType)message[2])
+                    if (receiver.TryReceiveFrameBytes(System.TimeSpan.FromSeconds(1), out message))
+                    {
+                        if (message != null)
+                            if (message[0] != manager.cID)
                             {
-                                case MessageType.LOCK:
-                                    decodeLockMessage(message);
-                                    break;
-                                case MessageType.SYNC:
-                                    decodeSyncMessage(message);
-                                    break;
-                                case MessageType.RESETOBJECT:
-                                    decodeResetMessage(message);
-                                    break;
-                                case MessageType.UNDOREDOADD:
-                                    decodeUndoRedoMessage(message);
-                                    break;
-                                case MessageType.DATAHUB:
-                                    decodeDataHubMessage(message);
-                                    break;
-                                case MessageType.PARAMETERUPDATE:
-                                    // make shure that producer and consumer exclude eachother
-                                    lock (m_messageBuffer)
-                                    {
-                                        // message[1] is time
-                                        m_messageBuffer[message[1]].Add(message);
-                                    }
-                                    break;
-                                default:
-                                    break;
+                                switch ((MessageType)message[2])
+                                {
+                                    case MessageType.LOCK:
+                                        decodeLockMessage(message);
+                                        break;
+                                    case MessageType.SYNC:
+                                        decodeSyncMessage(message);
+                                        break;
+                                    case MessageType.RESETOBJECT:
+                                        decodeResetMessage(message);
+                                        break;
+                                    case MessageType.UNDOREDOADD:
+                                        decodeUndoRedoMessage(message);
+                                        break;
+                                    case MessageType.DATAHUB:
+                                        decodeDataHubMessage(message);
+                                        break;
+                                    case MessageType.PARAMETERUPDATE:
+                                        // make shure that producer and consumer exclude eachother
+                                        lock (m_messageBuffer)
+                                        {
+                                            // message[1] is time
+                                            m_messageBuffer[message[1]].Add(message);
+                                        }
+                                        break;
+                                    default:
+                                        break;
+                                }
                             }
-                        }
+                    }
                 }
+                catch { }
                 Thread.Yield();
-            }
-            try
-            {
-                receiver.Disconnect("tcp://" + m_ip + ":" + m_port);
-                receiver.Close();
-                receiver.Dispose();
-                // wait until receiver is disposed
-                while (!receiver.IsDisposed)
-                    Thread.Sleep(25);
-                Helpers.Log(this.name + " disposed.");
-                m_disposed?.Invoke();
-            }
-            catch
-            {
             }
         }
 
