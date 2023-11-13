@@ -51,6 +51,7 @@ namespace tracer
         //!
         protected override void Start(object sender, EventArgs e)
         {
+            manager.loadDemoSceneUsingQr += QrSceneLoad;
             base.Start(sender, e);
 
             Parameter<Action> loadButton = new Parameter<Action>(LoadScene, "Load");
@@ -84,6 +85,15 @@ namespace tracer
                 .End();
 
             //uiManager.showMenu(m_menu);
+        }
+
+        private void QrSceneLoad(object sender,string sceneName)
+        {
+            if (sceneName.Equals("Demo"))
+            {
+                LoadDemoScene();
+            }
+            
         }
 
         //!

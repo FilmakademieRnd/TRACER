@@ -56,11 +56,22 @@ namespace tracer
         {
             if (!string.IsNullOrEmpty(Application.absoluteURL))
             {
-                string ip = Application.absoluteURL.Split('?')[1];
-                if (CheckIP(ip))
+                if (Application.absoluteURL.Contains("?"))
                 {
-                    manager.ConnectUsingQrCode(ip);
-                    core.updateEvent -= UpdateEvent;
+                    string ip = Application.absoluteURL.Split('?')[1];
+                    if (CheckIP(ip))
+                    {
+                        manager.ConnectUsingQrCode(ip);
+                        core.updateEvent -= UpdateEvent;
+                    }
+                }
+
+                if (Application.absoluteURL.Contains("#"))
+                {
+                    string loadScene = Application.absoluteURL.Split('#')[1];
+
+                        core.getManager<SceneManager>().InvokeQrLoadEvent(loadScene);
+                        core.updateEvent -= UpdateEvent;
                 }
             }
         }
