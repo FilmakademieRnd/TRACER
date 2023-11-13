@@ -238,6 +238,7 @@ namespace tracer
 
         public void ReceiveSceneUsingQr(object o, string ip)
         {
+            core.getManager<UIManager>().hideMenu();
             receiveScene(ip, "5555");
         }
     }

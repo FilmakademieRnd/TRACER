@@ -46,33 +46,22 @@ namespace tracer
 {
     public class DeepLinkModule : NetworkManagerModule
     {
-        //Constants
-        private const string DefaultPort = "5555";
-        
-        public static DeepLinkModule Instance { get; private set; }
-        public string deeplinkURL;
  
         protected override void Init(object sender, EventArgs e)
         {
-            if (!string.IsNullOrEmpty(core.deepLink))
-            {
-                onDeepLinkActivated(Application.absoluteURL);
-
-            }
-                // Initialize DeepLink Manager global variable.
-                else deeplinkURL = "[none]";
+            core.updateEvent += UpdateEvent;
         }
-        
-        private void onDeepLinkActivated(string url)
+
+        private void UpdateEvent(object sendre, EventArgs e)
         {
-            // Update DeepLink Manager global variable, so URL can be accessed from anywhere.
-            deeplinkURL = url;
-            // Decode the URL to determine action. 
-            // In this example, the application expects a link formatted like this:
-            string ip = url.Split('?')[1];
-            if (CheckIP(ip))
+            if (!string.IsNullOrEmpty(Application.absoluteURL))
             {
-                manager.ConnectUsingQrCode(ip);
+                string ip = Application.absoluteURL.Split('?')[1];
+                if (CheckIP(ip))
+                {
+                    manager.ConnectUsingQrCode(ip);
+                    core.updateEvent -= UpdateEvent;
+                }
             }
         }
         
