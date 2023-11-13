@@ -277,6 +277,7 @@ namespace tracer
 
             for (int i = 0; i < urls.Length; i++)
             {
+                statusDialog.caption = "Trying HTTP receive";
                 using (UnityWebRequest webRequest = UnityWebRequest.Get(url + "." + urls[i]))
                 {
                     // Send the request and wait for the response
@@ -284,7 +285,7 @@ namespace tracer
 
                     if (webRequest.result == UnityWebRequest.Result.ConnectionError || webRequest.result == UnityWebRequest.Result.ProtocolError)
                     {
-                        Debug.LogError("Error: " + webRequest.error);
+                        statusDialog.caption = "Error: " + webRequest.error;
                     }
                     else
                     {
