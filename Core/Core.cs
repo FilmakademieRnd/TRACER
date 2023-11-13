@@ -101,6 +101,8 @@ namespace tracer
         {
             get => m_timesteps;
         }
+
+        public string deepLink;
         //!
         //! The global dictionary of parameter objects.
         //! The structure is Dictionary<client/scene ID, Dictionary<ParameterObject ID, ParameterObject>>
@@ -164,6 +166,11 @@ namespace tracer
             Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
             Debug.unityLogger.logEnabled = false;
 #endif
+            
+            if (!string.IsNullOrEmpty(Application.absoluteURL))
+            {
+                deepLink = Application.absoluteURL;
+            }
 
             _settings = new coreSettings();
             m_timesteps = (byte)((s_timestepsBase / settings.framerate) * settings.framerate);

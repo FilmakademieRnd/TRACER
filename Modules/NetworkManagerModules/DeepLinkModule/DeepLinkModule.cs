@@ -54,12 +54,11 @@ namespace tracer
  
         protected override void Init(object sender, EventArgs e)
         {
-                Application.deepLinkActivated += onDeepLinkActivated;
-                if (!string.IsNullOrEmpty(Application.absoluteURL))
-                {
-                    // Cold start and Application.absoluteURL not null so process Deep Link.
-                    onDeepLinkActivated(Application.absoluteURL);
-                }
+            if (!string.IsNullOrEmpty(core.deepLink))
+            {
+                onDeepLinkActivated(Application.absoluteURL);
+
+            }
                 // Initialize DeepLink Manager global variable.
                 else deeplinkURL = "[none]";
         }
