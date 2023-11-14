@@ -173,7 +173,8 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void decodePongMessage(byte[] message)
         {
-            byte rtt = (byte)Mathf.Abs(core.time - m_pingStartTime);
+            //byte rtt = (byte)Mathf.Abs(core.time - m_pingStartTime);
+            byte rtt = (byte)Helpers.DeltaTime(core.time, m_pingStartTime, core.timesteps);
             int pingCount = m_pingTimes.Count;
             int rttSum = 0;
 

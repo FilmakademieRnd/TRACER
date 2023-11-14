@@ -197,7 +197,7 @@ namespace tracer
             awakeEvent?.Invoke(this, new EventArgs());
             lateAwakeEvent?.Invoke(this, new EventArgs());
         }
-
+        
         //!
         //! Unity's Start callback, used for Late initialization.
         //!
@@ -210,7 +210,7 @@ namespace tracer
             m_orientation = Input.deviceOrientation;
 
             InvokeRepeating("checkDeviceOrientation", 0f, 1f);
-            InvokeRepeating("updateTime", 0f, 1f/settings.framerate);
+            InvokeRepeating("updateTime", 0f, Mathf.FloorToInt(1000f/settings.framerate) / 1000f); // computation to match the ms int scala of an QtTimer used in SyncServer
 
             startEvent?.Invoke(this, new EventArgs());
         }

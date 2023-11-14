@@ -176,16 +176,18 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void decodeSyncMessage(byte[] message)
         {
-            byte coreTime = core.time;
-            byte syncTime = message[1];
-            float runtime = manager.pingRTT * 0.5f;
+            int runtime = Mathf.FloorToInt(manager.pingRTT * 0.5f);  // *0.5 to convert rtt to one way
+            int coreTime = core.time;
+            int syncTime = message[1] + runtime;
+            int deltaTime = Helpers.DeltaTime(core.time, message[1] + runtime, core.timesteps);
 
-            if (Mathf.Abs(coreTime - syncTime) > 4 + runtime)  // *0.5 to convert rtt to one way
+            if (deltaTime > 3)  
             {
-                core.time = (byte) (Mathf.RoundToInt(syncTime + runtime) % core.timesteps);
-                UnityEngine.Debug.Log("Core time updated to: " + core.time);
+                core.time = (byte)(Mathf.RoundToInt(syncTime) % core.timesteps);
+                UnityEngine.Debug.Log("Core time updated to: " + coreTime);
             }
-            //UnityEngine.Debug.Log("Time delta: " + (coreTime - syncTime) + " RTT: " + manager.pingRTT);
+            
+            //UnityEngine.Debug.Log("Time delta: " + deltaTime);
         }
 
         //! 

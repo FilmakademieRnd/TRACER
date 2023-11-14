@@ -175,5 +175,19 @@ namespace tracer
         {
             return input.Replace("\0", "");
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int DeltaTime(int startTime, int endTime, int length)
+        {
+            return Mathf.Min( 
+                mod((startTime - endTime), length), 
+                mod((endTime - startTime), length) );
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int mod(float a, float b)
+        {
+            return Mathf.RoundToInt(a - b * Mathf.Floor(a / b));
+        }
     }
 }
