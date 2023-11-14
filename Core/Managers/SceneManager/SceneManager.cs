@@ -162,6 +162,13 @@ namespace tracer
         //!
         public event EventHandler<SceneObject> sceneObjectUnlocked;
 
+        public event EventHandler<string> loadDemoSceneUsingQr;
+
+        public void InvokeQrLoadEvent(string loadScene)
+        {
+            loadDemoSceneUsingQr?.Invoke(this, loadScene);
+        }
+
         //!
         //! Getter returning a reference to the TRACER scene root.
         //!

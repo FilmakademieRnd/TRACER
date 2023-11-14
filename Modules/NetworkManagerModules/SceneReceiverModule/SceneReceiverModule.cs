@@ -84,6 +84,7 @@ namespace tracer
         //! 
         protected override void Start(object sender, EventArgs e)
         {
+            manager.connectUsingQrCode += ReceiveSceneUsingQr;
             Parameter<Action> button = new Parameter<Action>(Connect, "Connect");
 
             List<AbstractParameter> parameterList1 = new List<AbstractParameter>
@@ -233,6 +234,12 @@ namespace tracer
         {
             m_requests = new List<string>() { "header", "nodes", "objects", "characters", "textures", "materials" };
             start(ip, port);
+        }
+
+        public void ReceiveSceneUsingQr(object o, string ip)
+        {
+            core.getManager<UIManager>().hideMenu();
+            receiveScene(ip, "5555");
         }
     }
 

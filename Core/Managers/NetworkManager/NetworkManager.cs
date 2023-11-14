@@ -84,6 +84,11 @@ namespace tracer
         //! Event that is invoket when a new scene object has been removed.
         //!
         public event EventHandler<SceneObject> sceneObjectRemoved;
+        
+        //!
+        //! Event that is invoket when the app is startet with a qr code and an ip address.
+        //!
+        public event EventHandler<string> connectUsingQrCode;
 
         //!
         //! Cast for accessing the settings variable with the correct type.
@@ -199,6 +204,11 @@ namespace tracer
         public void SendServerCommand(byte[] command)
         {
             sendServerCommand?.Invoke(this, command);
+        }
+
+        public void ConnectUsingQrCode(string ip)
+        {
+            connectUsingQrCode?.Invoke(this, ip);
         }
     }
 }

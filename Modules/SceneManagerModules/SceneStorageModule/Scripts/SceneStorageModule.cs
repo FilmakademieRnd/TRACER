@@ -28,6 +28,7 @@ using UnityEngine;
 using System;
 using System.Collections;
 using System.IO;
+using UnityEngine.Networking;
 
 namespace tracer
 {
@@ -51,6 +52,7 @@ namespace tracer
         //!
         protected override void Start(object sender, EventArgs e)
         {
+            manager.loadDemoSceneUsingQr += QrSceneLoad;
             base.Start(sender, e);
 
             Parameter<Action> loadButton = new Parameter<Action>(LoadScene, "Load");
@@ -84,6 +86,17 @@ namespace tracer
                 .End();
 
             //uiManager.showMenu(m_menu);
+        }
+
+        private void QrSceneLoad(object sender,string sceneName)
+        {
+            if (sceneName.Equals("Demo"))
+            {
+                LoadDemoScene();
+                return;
+            }
+            
+            LoadHTTPScene(sceneName);
         }
 
         //!
@@ -230,6 +243,83 @@ namespace tracer
             statusDialog.progress += 14;
 
             UImanager.showDialog(null);   
+        }
+        
+        //!
+        //! Function that starts the coroutine to load and create the scene stored on an http space
+        //!
+        //! @param url URL to the scene (without package name endings)
+        //!
+        public void LoadHTTPScene(string url)
+        {
+            if (manager.sceneDataHandler != null)
+                core.StartCoroutine(LoadHTTPCoroutine(url));
+        }
+        
+        //!
+        //! Coproutine that loads and creates the scene stored with the given from the persistent data path.
+        //!
+        private IEnumerator LoadHTTPCoroutine(string url = "")
+        {
+            Dialog statusDialog = new Dialog();
+            UIManager UImanager = core.getManager<UIManager>();
+            UImanager.showDialog(statusDialog);
+
+            core.getManager<UIManager>().hideMenu();
+
+            string[] urls = new string[6];
+            urls[0] = "header";
+            urls[1] = "nodes";
+            urls[2] = "objects";
+            urls[3] = "characters";
+            urls[4] = "textures";
+            urls[5] = "materials";
+
+            for (int i = 0; i < urls.Length; i++)
+            {
+                statusDialog.caption = "Trying HTTP receive";
+                using (UnityWebRequest webRequest = UnityWebRequest.Get(url + "." + urls[i]))
+                {
+                    // Send the request and wait for the response
+                    yield return webRequest.SendWebRequest();
+
+                    if (webRequest.result == UnityWebRequest.Result.ConnectionError || webRequest.result == UnityWebRequest.Result.ProtocolError)
+                    {
+                        statusDialog.caption = "Error: " + webRequest.error;
+                    }
+                    else
+                    {
+                        statusDialog.caption = "Loading package " + i;
+                        yield return null;
+                        switch (i)
+                        {
+                            case 0:
+                                manager.sceneDataHandler.headerByteData = webRequest.downloadHandler.data;
+                                break;
+                            case 1:
+                                manager.sceneDataHandler.nodesByteData = webRequest.downloadHandler.data;
+                                break;
+                            case 2:
+                                manager.sceneDataHandler.objectsByteData = webRequest.downloadHandler.data;
+                                break;
+                            case 3:
+                                manager.sceneDataHandler.characterByteData = webRequest.downloadHandler.data;
+                                break;
+                            case 4:
+                                manager.sceneDataHandler.texturesByteData = webRequest.downloadHandler.data;
+                                break;
+                            case 5:
+                                manager.sceneDataHandler.materialsByteData = webRequest.downloadHandler.data;
+                                break;
+                            default:
+                                break;
+                        }
+                        statusDialog.progress += 14;
+                    }
+                }
+            }
+            sceneLoaded?.Invoke(this, EventArgs.Empty);
+            UImanager.showDialog(null);
         }
 
     }
