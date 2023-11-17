@@ -338,6 +338,8 @@ namespace tracer
             m_isRunning = true;
             AsyncIO.ForceDotNet.Force();
             var sender = new PublisherSocket();
+            sender.Options.Linger = TimeSpan.FromMilliseconds(0);
+            sender.Options.Backlog = 10;
             m_socket = sender;
 
             sender.Connect("tcp://" + m_ip + ":" + m_port);

@@ -53,7 +53,7 @@ namespace tracer
         //! @param _data The byte _data to be deserialized and copyed to the parameters value.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void deSerialize(byte[] data, int offset)
+        public override void deSerialize(Span<byte> data, int offset)
         {
             base.deSerialize(data, offset);
             m_action.Invoke(_value);
@@ -82,7 +82,7 @@ namespace tracer
         //! @param _data The byte _data to be deserialized and copyed to the parameters value. (not used)
         //! @param _offset The start offset in the given data array. (not used)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void deSerialize(byte[] data, int offset)
+        public override void deSerialize(Span<byte> data, int offset)
         {
             _networkLock = true;
             InvokeHasChanged();

@@ -188,7 +188,10 @@ namespace tracer
                 rttSum += rtts[i];
 
             lock (manager)
-                manager.pingRTT = Mathf.RoundToInt(rttSum / (float) pingCount);
+            {
+                //manager.pingRTT = Mathf.RoundToInt(rttSum / (float)pingCount);
+                manager.pingRTT = rtt;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

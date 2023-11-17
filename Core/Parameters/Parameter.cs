@@ -30,6 +30,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using System.Runtime.InteropServices;
 
 namespace tracer
 {
@@ -174,7 +175,7 @@ namespace tracer
         //! 
         //! @param data The byte data to be deserialized and copyed to the parameters value.
         //! 
-        public abstract void deSerialize(byte[] data, int offset);
+        public abstract void deSerialize(Span<byte> data, int offset);
 
         //!
         //! Abstract definition of function called to copy value of other parameter
@@ -457,45 +458,45 @@ namespace tracer
         //! @param _offset The start offset in the given data array.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void deSerialize(byte[] data, int offset)
+        public override void deSerialize(Span<byte> data, int offset)
         {
             switch (_type)
             {
                 case ParameterType.BOOL:
-                    _value = (T)(object)BitConverter.ToBoolean(data, offset);
+                    _value = (T)(object)MemoryMarshal.Read<bool>(data.Slice(offset));
                     break;
                 case ParameterType.INT:
-                    _value = (T)(object)BitConverter.ToInt32(data, offset);
+                    _value = (T)(object)MemoryMarshal.Read<int>(data.Slice(offset));
                     break;
                 case ParameterType.FLOAT:
-                    _value = (T)(object)BitConverter.ToSingle(data, offset);
+                    _value = (T)(object)MemoryMarshal.Read<float>(data.Slice(offset));
                     break;
                 case ParameterType.VECTOR2:
-                    _value = (T)(object)new Vector2(BitConverter.ToSingle(data, offset),
-                                                    BitConverter.ToSingle(data, offset + 4));
+                    _value = (T)(object)new Vector2(MemoryMarshal.Read<float>(data.Slice(offset)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 4)));
                     break;
                 case ParameterType.VECTOR3:
-                    _value = (T)(object)new Vector3(BitConverter.ToSingle(data, offset),
-                                                    BitConverter.ToSingle(data, offset + 4),
-                                                    BitConverter.ToSingle(data, offset + 8));
+                    _value = (T)(object)new Vector3(MemoryMarshal.Read<float>(data.Slice(offset)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 4)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 8)));
                     break;
                 case ParameterType.VECTOR4:
-                    _value = (T)(object)new Vector4(BitConverter.ToSingle(data, offset),
-                                                    BitConverter.ToSingle(data, offset + 4),
-                                                    BitConverter.ToSingle(data, offset + 8),
-                                                    BitConverter.ToSingle(data, offset + 12));
+                    _value = (T)(object)new Vector4(MemoryMarshal.Read<float>(data.Slice(offset)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 4)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 8)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 12)));
                     break;
                 case ParameterType.QUATERNION:
-                    _value = (T)(object)new Quaternion(BitConverter.ToSingle(data, offset),
-                                                     BitConverter.ToSingle(data, offset + 4),
-                                                     BitConverter.ToSingle(data, offset + 8),
-                                                     BitConverter.ToSingle(data, offset + 12));
+                    _value = (T)(object)new Quaternion(MemoryMarshal.Read<float>(data.Slice(offset)),
+                                                     MemoryMarshal.Read<float>(data.Slice(offset + 4)),
+                                                     MemoryMarshal.Read<float>(data.Slice(offset + 8)),
+                                                     MemoryMarshal.Read<float>(data.Slice(offset + 12)));
                     break;
                 case ParameterType.COLOR:
-                    _value = (T)(object)new Color(BitConverter.ToSingle(data, offset),
-                                                    BitConverter.ToSingle(data, offset + 4),
-                                                    BitConverter.ToSingle(data, offset + 8),
-                                                    BitConverter.ToSingle(data, offset + 12));
+                    _value = (T)(object)new Color(MemoryMarshal.Read<float>(data.Slice(offset)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 4)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 8)),
+                                                    MemoryMarshal.Read<float>(data.Slice(offset + 12)));
                     break;
                 case ParameterType.STRING:
                     _value = (T)(object)new string(Encoding.UTF8.GetString(data));

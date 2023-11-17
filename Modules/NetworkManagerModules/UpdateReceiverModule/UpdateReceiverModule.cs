@@ -33,6 +33,7 @@ using NetMQ;
 using NetMQ.Sockets;
 using System.Diagnostics;
 using UnityEngine;
+using System.Runtime.InteropServices;
 
 namespace tracer
 {
@@ -179,9 +180,9 @@ namespace tracer
             int runtime = Mathf.FloorToInt(manager.pingRTT * 0.5f);  // *0.5 to convert rtt to one way
             int coreTime = core.time;
             int syncTime = message[1] + runtime;
-            int deltaTime = Helpers.DeltaTime(core.time, message[1] + runtime, core.timesteps);
+            int deltaTime = Helpers.DeltaTime(core.time, message[1], core.timesteps);
 
-            if (deltaTime > 3)  
+            if (deltaTime > 3 && runtime < 10)  
             {
                 core.time = (byte)(Mathf.RoundToInt(syncTime) % core.timesteps);
                 UnityEngine.Debug.Log("Core time updated to: " + coreTime);
@@ -266,15 +267,17 @@ namespace tracer
                 byte oldSceneID = 0;
                 short oldParameterObjectID = 0;
                 ParameterObject parameterObject = null;
-                for (int i = 0; i < m_messageBuffer[bufferTime].Count; i++)
+                List<byte[]> timeSlotBuffer = m_messageBuffer[bufferTime];
+
+                for (int i = 0; i < timeSlotBuffer.Count; i++)
                 {
-                    byte[] message = m_messageBuffer[bufferTime][i];
+                    Span<byte> message = timeSlotBuffer[i];
 
                     if ((MessageType)message[2] == MessageType.LOCK)
                     {
                         byte sceneID = message[3];
-                        short parameterObjectID = BitConverter.ToInt16(message, 4);
-                        bool lockState = BitConverter.ToBoolean(message, 6);
+                        short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(4));
+                        bool lockState = MemoryMarshal.Read<bool>(message.Slice(6));
 
                         SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, parameterObjectID);
                         sceneObject._lock = lockState;
@@ -285,8 +288,8 @@ namespace tracer
                         while (start < message.Length)
                         {
                             byte sceneID = message[start];
-                            short parameterObjectID = BitConverter.ToInt16(message, start + 1);
-                            short parameterID = BitConverter.ToInt16(message, start + 3);
+                            short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(start + 1));
+                            short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3));
                             int length = message[start + 6];
 
                             if (sceneID != oldSceneID ||
@@ -303,7 +306,7 @@ namespace tracer
                     }
                 }
 
-                m_messageBuffer[bufferTime].Clear();
+                timeSlotBuffer.Clear();
             }
         }
 
