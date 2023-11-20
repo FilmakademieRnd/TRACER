@@ -88,7 +88,7 @@ namespace tracer
             // initialize message buffer
             m_messageBuffer = new List<byte[]>[core.timesteps];
             for (int i = 0; i < core.timesteps; i++)
-                m_messageBuffer[i] = new List<byte[]>(128);
+                m_messageBuffer[i] = new List<byte[]>(64);
 
             m_sceneManager = core.getManager<SceneManager>();
             m_sceneManager.sceneReady += connectAndStart;
@@ -155,7 +155,9 @@ namespace tracer
                                         lock (m_messageBuffer)
                                         {
                                             // message[1] is time
-                                            m_messageBuffer[message[1]].Add(message);
+                                            int time = (message[1] + manager.pingRTT) % core.timesteps;
+                                            m_messageBuffer[time].Add(message);
+                                            //m_messageBuffer[message[1]].Add(message);
                                         }
                                         break;
                                     default:
@@ -182,12 +184,13 @@ namespace tracer
             int syncTime = message[1] + runtime;
             int deltaTime = Helpers.DeltaTime(core.time, message[1], core.timesteps);
 
-            if (deltaTime > 3 && runtime < 10)  
+            if (deltaTime > 10 ||
+                 deltaTime > 3 && runtime < 8)
             {
                 core.time = (byte)(Mathf.RoundToInt(syncTime) % core.timesteps);
                 UnityEngine.Debug.Log("Core time updated to: " + coreTime);
             }
-            
+
             //UnityEngine.Debug.Log("Time delta: " + deltaTime);
         }
 
@@ -246,7 +249,7 @@ namespace tracer
             byte cID = message[5];
 
             // dhType 0 = client connection status update
-            if (dhType == 0 && 
+            if (dhType == 0 &&
                 cID != manager.cID)
                 manager.ClientConnectionUpdate(status, cID);
         }
@@ -260,7 +263,7 @@ namespace tracer
             // define the buffer size by defining the time offset in the ringbuffer
             // % time steps to take ring (0 to core.timesteps) into account
             // set to 1/10 second
-            int bufferTime = (((core.time - core.settings.framerate / 10) + core.timesteps) % core.timesteps);
+            int bufferTime = (((core.time - core.settings.framerate / 6) + core.timesteps) % core.timesteps);
             lock (m_messageBuffer)
             {
                 // caching the ParameterObject
@@ -300,7 +303,7 @@ namespace tracer
                                 parameterObject.parameterList[parameterID].deSerialize(message, start + 7);
 
                             start += length;
-                            oldSceneID = sceneID; 
+                            oldSceneID = sceneID;
                             oldParameterObjectID = parameterObjectID;
                         }
                     }

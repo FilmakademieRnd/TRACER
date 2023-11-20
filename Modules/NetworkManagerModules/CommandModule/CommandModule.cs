@@ -124,7 +124,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void queueCommandMessage(object sender, byte[] command)
         {
-            m_commandRequest = new byte[3+command.Length];
+            m_commandRequest = new byte[3 + command.Length];
 
             // header
             m_commandRequest[0] = manager.cID;
@@ -160,7 +160,7 @@ namespace tracer
                     m_commandRequest[1] = time;
                     m_commandRequest[2] = (byte)MessageType.PING;
                 }
-                
+
                 m_mre.Set();
             }
         }
@@ -173,7 +173,6 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void decodePongMessage(byte[] message)
         {
-            //byte rtt = (byte)Mathf.Abs(core.time - m_pingStartTime);
             byte rtt = (byte)Helpers.DeltaTime(core.time, m_pingStartTime, core.timesteps);
             int pingCount = m_pingTimes.Count;
             int rttSum = 0;
@@ -184,13 +183,18 @@ namespace tracer
             m_pingTimes.Enqueue(rtt);
 
             byte[] rtts = m_pingTimes.ToArray();
+            byte rttMax = 0;
             for (int i = 0; i < pingCount; i++)
-                rttSum += rtts[i];
+            {
+                byte curr = rtts[i];
+                if (rttMax < curr) rttMax = curr;
+                rttSum += curr;
+            }
 
             lock (manager)
             {
-                //manager.pingRTT = Mathf.RoundToInt(rttSum / (float)pingCount);
-                manager.pingRTT = rtt;
+                manager.pingRTT = Mathf.RoundToInt((rttSum - rttMax) / (float)(pingCount - 1));
+                //manager.pingRTT = rtt;
             }
         }
 
