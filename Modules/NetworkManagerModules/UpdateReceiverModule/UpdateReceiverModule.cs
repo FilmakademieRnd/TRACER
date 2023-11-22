@@ -188,7 +188,7 @@ namespace tracer
                  deltaTime > 3 && runtime < 8)
             {
                 core.time = (byte)(Mathf.RoundToInt(syncTime) % core.timesteps);
-                UnityEngine.Debug.Log("Core time updated to: " + coreTime);
+               // UnityEngine.Debug.Log("Core time updated to: " + coreTime);
             }
 
             //UnityEngine.Debug.Log("Time delta: " + deltaTime);
