@@ -155,9 +155,9 @@ namespace tracer
                                         lock (m_messageBuffer)
                                         {
                                             // message[1] is time
-                                            int time = (message[1] + manager.pingRTT) % core.timesteps;
-                                            m_messageBuffer[time].Add(message);
-                                            //m_messageBuffer[message[1]].Add(message);
+                                            //int time = (message[1] + manager.pingRTT) % core.timesteps;
+                                            //m_messageBuffer[time].Add(message);
+                                            m_messageBuffer[message[1]].Add(message);
                                         }
                                         break;
                                     default:
