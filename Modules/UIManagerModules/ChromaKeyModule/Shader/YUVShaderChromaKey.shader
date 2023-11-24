@@ -1,6 +1,6 @@
 ﻿Shader "TRACER/ARCameraShaderChromaKey"
 {
-/*
+
 	Properties
 	{
     	_textureY ("TextureY", 2D) = "white" {}
@@ -128,5 +128,5 @@
 			ENDCG
 		}
 	}
-*/
+
 }

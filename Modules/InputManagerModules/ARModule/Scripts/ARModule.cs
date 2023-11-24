@@ -53,30 +53,37 @@ namespace tracer
         //! The origin of the AR Tracking (parent of main camera)
         //!
         private XROrigin m_arOrigin;
+
         //!
         //! The session of the tracking
         //!
         private ARSession arSession;
+
         //!
         //! The AR camera manager (component of main camera)
         //!
         private ARCameraManager m_camManager;
+
         //!
         //! The AR pose driver actually moving the camera (component of main camera)
         //!
         private TrackedPoseDriver m_poseDriver;
+
         //!
         //! The camera background used for displaying the real world camera image
         //!
         private ARCameraBackground m_cameraBg;
+
         //!
         //! The AR occlusion manager, adding depth based occlusions if available and activated (component of main camera)
         //!
         private AROcclusionManager m_occlusionManager;
+
         //!
         //! the root of the scene
         //!
         private Transform sceneRoot;
+
         //!
         //! The AR image manager, holding the library of tracked markers (component of main camera)
         //!
@@ -86,27 +93,38 @@ namespace tracer
         //! UI menu for AR
         //!
         private MenuTree _menu;
+
         //!
         //! user setting available in the UI
         //! enable / disable AR tracking
         //!
         private Parameter<bool> enableAR;
+
         //!
         //! user setting available in the UI
         //! enable / disable depth based occlusion mapping
         //!
         private Parameter<bool> enableOcclusionMapping;
+
         //!
         //! user setting available in the UI
         //! enable / disable marker tracking
         //!
         private Parameter<bool> enableMarkerTracking;
 
+        private Parameter<bool> enableMatte;
+        private GameObject mattGameObjectPrefab;
+        private GameObject mattGameObject;
+
         //!
         //! is AR setup correctly and tracking in place
         //!
         private bool _arActive;
-        public bool arActive { get => _arActive; }
+
+        public bool arActive
+        {
+            get => _arActive;
+        }
 
         //!
         //! Constructor
@@ -119,8 +137,10 @@ namespace tracer
             sceneRoot = core.getManager<SceneManager>().scnRoot.transform;
             _arActive = false;
 
+            
             GameObject arSessionPrefab = Resources.Load<GameObject>("Prefabs/ARSession");
-            arSession = SceneObject.Instantiate(arSessionPrefab, Vector3.zero, Quaternion.identity).GetComponent<ARSession>();
+            arSession = SceneObject.Instantiate(arSessionPrefab, Vector3.zero, Quaternion.identity)
+                .GetComponent<ARSession>();
 
             switch (ARSession.state)
             {
@@ -201,7 +221,10 @@ namespace tracer
         {
             //Instanciate XROrigin from Prefab
             GameObject arSessionOriginPrefab = Resources.Load<GameObject>("Prefabs/ARSessionOrigin");
-            m_arOrigin = SceneObject.Instantiate(arSessionOriginPrefab, Vector3.zero, Quaternion.identity).GetComponent<XROrigin>();
+            m_arOrigin = SceneObject.Instantiate(arSessionOriginPrefab, Vector3.zero, Quaternion.identity)
+                .GetComponent<XROrigin>();
+            
+            mattGameObjectPrefab = Resources.Load<GameObject>("Prefabs/ARMattGameObject");
 
             //m_arOrigin.GetComponent<PlaceScene>().scene = core.getManager<SceneManager>().scnRoot;
 
@@ -221,7 +244,8 @@ namespace tracer
 
             //Add Marker Tracking
             arImgManager = arSession.gameObject.AddComponent<ARTrackedImageManager>();
-            RuntimeReferenceImageLibrary imgLib = arImgManager.CreateRuntimeLibrary(Resources.Load<XRReferenceImageLibrary>("ReferenceImageLibrary"));
+            RuntimeReferenceImageLibrary imgLib =
+                arImgManager.CreateRuntimeLibrary(Resources.Load<XRReferenceImageLibrary>("ReferenceImageLibrary"));
             arImgManager.referenceLibrary = imgLib;
             arImgManager.requestedMaxNumberOfMovingImages = 1;
             arImgManager.trackedImagesChanged += MarkerTrackingChanged;
@@ -231,21 +255,26 @@ namespace tracer
             enableAR = new Parameter<bool>(false, "enableAR");
             enableOcclusionMapping = new Parameter<bool>(false, "enableOcclusion");
             enableMarkerTracking = new Parameter<bool>(false, "enableMarkerTracking");
+            enableMatte = new Parameter<bool>(false, "enableMatte");
 
             _menu = new MenuTree()
                 .Begin(MenuItem.IType.VSPLIT)
-                    .Begin(MenuItem.IType.HSPLIT)
-                         .Add("AR Tracking")
-                         .Add(enableAR)
-                     .End()
-                     .Begin(MenuItem.IType.HSPLIT)
-                         .Add("Occlusion Mapping")
-                         .Add(enableOcclusionMapping)
-                     .End()
-                     .Begin(MenuItem.IType.HSPLIT)
-                         .Add("Marker Tracking")
-                         .Add(enableMarkerTracking)
-                     .End()
+                .Begin(MenuItem.IType.HSPLIT)
+                .Add("AR Tracking")
+                .Add(enableAR)
+                .End()
+                .Begin(MenuItem.IType.HSPLIT)
+                .Add("Occlusion Mapping")
+                .Add(enableOcclusionMapping)
+                .End()
+                .Begin(MenuItem.IType.HSPLIT)
+                .Add("Marker Tracking")
+                .Add(enableMarkerTracking)
+                .End()
+                .Begin(MenuItem.IType.HSPLIT)
+                .Add("Matte")
+                .Add(enableMatte)
+                .End()
                 .End();
             _menu.caption = "AR";
             _menu.iconResourceLocation = "Images/button_ar";
@@ -255,11 +284,13 @@ namespace tracer
             enableAR.hasChanged += changeActive;
             enableOcclusionMapping.hasChanged += changeOcclusion;
             enableMarkerTracking.hasChanged += changeMarkerTracking;
+            enableMatte.hasChanged += changeMatte;
 
             //initialise state
             changeActive(this, false);
             changeOcclusion(this, false);
             changeMarkerTracking(this, false);
+            changeMatte(this, false);
 
             //enable AR tracking
             _arActive = true;
@@ -316,6 +347,7 @@ namespace tracer
                 manager.enableAttitudeSensor();
                 manager.setCameraAttitudeOffsets();
             }
+
             if (arSession)
                 arSession.enabled = b;
             if (m_cameraBg)
@@ -331,7 +363,8 @@ namespace tracer
             if (b)
             {
                 m_arOrigin.transform.position = Camera.main.transform.position;
-                m_arOrigin.transform.rotation = Quaternion.AngleAxis(Camera.main.transform.rotation.eulerAngles.y, new Vector3(0, 1f, 0));
+                m_arOrigin.transform.rotation = Quaternion.AngleAxis(Camera.main.transform.rotation.eulerAngles.y,
+                    new Vector3(0, 1f, 0));
             }
 
         }
@@ -362,6 +395,7 @@ namespace tracer
             {
                 arTrackedImageManager = Camera.main.gameObject.AddComponent<ARTrackedImageManager>();
             }
+
             arTrackedImageManager.enabled = b;
 
             if (b)
@@ -374,17 +408,74 @@ namespace tracer
             }
         }
 
+        private void changeMatte(object sender, bool b)
+        {
+            //TODO MATTE CODE
+
+            Material camMaterial = Camera.main.gameObject.GetComponent<ARCameraBackground>().material;
+            
+            mattGameObject = GameObject.Find("ARMattGameObject");
+
+            if (mattGameObject != null)
+                mattGameObject.SetActive(true);
+
+            Material matteMaterial = mattGameObject.GetComponent<Renderer>().material;
+            
+            if (b)
+            {
+                
+                if (matteMaterial != null)
+                {
+                    matteMaterial.SetTexture("_textureY", camMaterial.GetTexture("_textureY"));
+                    matteMaterial.SetTexture("_textureCbCr", camMaterial.GetTexture("_textureCbCr"));
+                    matteMaterial.SetMatrix("_DisplayTransform", camMaterial.GetMatrix("_DisplayTransform"));
+
+                    float displayRatio = Camera.main.aspect; //2.1653
+                    float videoRatio = 16.0f / 9.0f;
+                    if (camMaterial)
+                        videoRatio = (float)camMaterial.GetTexture("_textureY").width /
+                                     (float)camMaterial.GetTexture("_textureY").height;
+                    float cropScaleHorizontal = 0, cropScaleVertical = 0;
+
+                    if (displayRatio < videoRatio)
+                    {
+                        cropScaleHorizontal = 1.0f - (displayRatio / videoRatio);
+                        cropScaleVertical = 0.0f;
+                    }
+                    else
+                    {
+                        cropScaleHorizontal = 0.0f;
+                        cropScaleVertical = 1.0f - (videoRatio / displayRatio);
+                    }
+
+                    matteMaterial.SetFloat("_cropScaleX", cropScaleHorizontal);
+                    matteMaterial.SetFloat("_cropScaleY", cropScaleVertical);
+                }
+            }
+            else
+            {
+                if (matteMaterial != null)
+                {
+                    matteMaterial.SetTexture("_textureY", null);
+                    matteMaterial.SetTexture("_textureCbCr", null);
+                    // matteMaterial.SetMatrix("_DisplayTransform", arkitScreen.m_ClearMaterial.GetMatrix("_DisplayTransform"));
+                }
+            }
+        }
+
         void OnTrackedImageChanged(ARTrackedImagesChangedEventArgs eventArgs)
         {
             foreach (ARTrackedImage newImage in eventArgs.added)
             {
-                XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, newImage.transform.position, newImage.transform.rotation);
+                XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, newImage.transform.position,
+                    newImage.transform.rotation);
             }
 
             foreach (ARTrackedImage updatedImage in eventArgs.updated)
             {
                 // Handle updated event
-                XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, updatedImage.transform.position, updatedImage.transform.rotation);
+                XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, updatedImage.transform.position,
+                    updatedImage.transform.rotation);
 
             }
         }
@@ -398,56 +489,59 @@ namespace tracer
         {
             XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, pos, rot);
         }
+
     }
 
     //!
-    //! extension class to XROrigin to reimplement MakeContentAppearAt function
-    //!
-    public static class XROriginExtensions
-    {
+        //! extension class to XROrigin to reimplement MakeContentAppearAt function
         //!
-        //! function to move XROrigin so that scene appears at given location relative to camera
-        //! @param origin XROrigin the location offset is applied to
-        //! @param content scene to be moved
-        //! @param position position the scene shall be moved to
-        //! @param rotation rotation the scene shall be rotated to
-        //!
-        public static void MakeContentAppearAt(this XROrigin origin, Transform content, Vector3 position, Quaternion rotation)
+        public static class XROriginExtensions
         {
-            MakeContentAppearAt(origin, content, position);
-            MakeContentAppearAt(origin, content, rotation);
+            //!
+            //! function to move XROrigin so that scene appears at given location relative to camera
+            //! @param origin XROrigin the location offset is applied to
+            //! @param content scene to be moved
+            //! @param position position the scene shall be moved to
+            //! @param rotation rotation the scene shall be rotated to
+            //!
+            public static void MakeContentAppearAt(this XROrigin origin, Transform content, Vector3 position,
+                Quaternion rotation)
+            {
+                MakeContentAppearAt(origin, content, position);
+                MakeContentAppearAt(origin, content, rotation);
+            }
+
+            //!
+            //! function to reposition XROrigin so that scene appears at given location relative to camera
+            //! @param origin XROrigin the location offset is applied to
+            //! @param content scene to be moved
+            //! @param position position the scene shall be moved to
+            //!
+            private static void MakeContentAppearAt(this XROrigin origin, Transform content, Vector3 position)
+            {
+                if (content == null)
+                    throw new ArgumentNullException(nameof(content));
+
+                var originTransform = origin.transform;
+
+                origin.CameraFloorOffsetObject.transform.position += originTransform.position - position;
+
+                originTransform.position = content.position;
+            }
+
+            //!
+            //! function to rotate XROrigin so that scene appears at intended rotation
+            //! @param origin XROrigin the location offset is applied to
+            //! @param content scene to be moved
+            //! @param rotation rotation the scene shall be rotated to
+            //!
+            private static void MakeContentAppearAt(this XROrigin origin, Transform content, Quaternion rotation)
+            {
+                if (content == null)
+                    throw new ArgumentNullException(nameof(content));
+
+                origin.transform.rotation = Quaternion.Inverse(rotation) * content.rotation;
+            }
         }
-
-        //!
-        //! function to reposition XROrigin so that scene appears at given location relative to camera
-        //! @param origin XROrigin the location offset is applied to
-        //! @param content scene to be moved
-        //! @param position position the scene shall be moved to
-        //!
-        private static void MakeContentAppearAt(this XROrigin origin, Transform content, Vector3 position)
-        {
-            if (content == null)
-                throw new ArgumentNullException(nameof(content));
-
-            var originTransform = origin.transform;
-
-            origin.CameraFloorOffsetObject.transform.position += originTransform.position - position;
-
-            originTransform.position = content.position;
-        }
-
-        //!
-        //! function to rotate XROrigin so that scene appears at intended rotation
-        //! @param origin XROrigin the location offset is applied to
-        //! @param content scene to be moved
-        //! @param rotation rotation the scene shall be rotated to
-        //!
-        private static void MakeContentAppearAt(this XROrigin origin, Transform content, Quaternion rotation)
-        {
-            if (content == null)
-                throw new ArgumentNullException(nameof(content));
-
-            origin.transform.rotation = Quaternion.Inverse(rotation) * content.rotation;
-        }
-    }
+    
 }

@@ -113,6 +113,7 @@ namespace tracer
         //!
         MenuButton m_safeFrameButton = null;
 
+        private MenuButton nextCameraButton;
         //!
         //! Event emitted when camera operations are in action
         //!
@@ -145,17 +146,18 @@ namespace tracer
             m_safeFrameButton = new MenuButton("", showSafeFrame, new List<UIManager.Roles>() { UIManager.Roles.DOP });
             m_safeFrameButton.setIcon("Images/button_safeFrames");
 
-            MenuButton cameraSelectButton = new MenuButton("", selectNextCamera, new List<UIManager.Roles>() { UIManager.Roles.DOP });
-            cameraSelectButton.setIcon("Images/button_camera");
-            cameraSelectButton.isToggle = true;
+            nextCameraButton = new MenuButton("", selectNextCamera, new List<UIManager.Roles>() { UIManager.Roles.DOP });
+            nextCameraButton.setIcon("Images/button_camera");
+            nextCameraButton.isToggle = true;
 
             m_uiManager.addButton(m_safeFrameButton);
-            m_uiManager.addButton(cameraSelectButton);
+            m_uiManager.addButton(nextCameraButton);
 
             m_sceneManager.sceneReady += initCameraOnce;
             m_uiManager.selectionChanged += selection;
 
             m_inputManager.cameraControlChanged += updateSafeFrame;
+            m_inputManager.cameraControlChanged += updateSelectCamera;
         }
 
         //! 
@@ -171,6 +173,7 @@ namespace tracer
             m_sceneManager.sceneReady -= initCameraOnce;
             m_uiManager.selectionChanged -= selection;
             m_inputManager.cameraControlChanged -= updateSafeFrame;
+            m_inputManager.cameraControlChanged -= updateSelectCamera;
         }
 
         //!
@@ -338,6 +341,24 @@ namespace tracer
                     core.getManager<UIManager>().addButton(m_safeFrameButton);
             }
         }
+        
+        //!
+        //! update selectCamera
+        //!
+        private void updateSelectCamera(object sender, InputManager.CameraControl c)
+        {
+            if (c == InputManager.CameraControl.AR)
+            {
+                nextCameraButton.showHighlighted(false);
+                core.getManager<UIManager>().removeButton(nextCameraButton);
+
+            }
+            else
+            {
+                if(!core.getManager<UIManager>().getButtons().Contains(nextCameraButton))
+                    core.getManager<UIManager>().addButton(nextCameraButton);
+            }
+        }
 
         //!
         //! Function for updating the aspect ratio of the safe frame based on the currently selected camera.
@@ -482,6 +503,7 @@ namespace tracer
                 case InputManager.CameraControl.ATTITUDE:
                 case InputManager.CameraControl.AR:
                 case InputManager.CameraControl.TOUCH:
+                case InputManager.CameraControl.NONE:
                     Quaternion camRotationOffset = camTransform.rotation * m_inverseOldCamRotation;
                     Vector3 newPosition = camRotationOffset * (m_oldPosition - camTransform.position) + camTransform.position;
                     m_selectedObject.position.setValue(objTransform.parent.InverseTransformPoint(newPosition));
