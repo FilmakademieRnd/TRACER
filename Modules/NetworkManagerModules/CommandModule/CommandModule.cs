@@ -196,6 +196,8 @@ namespace tracer
                 manager.pingRTT = Mathf.RoundToInt((rttSum - rttMax) / (float)(pingCount - 1));
                 //manager.pingRTT = rtt;
             }
+
+            //Debug.Log("Pong received! RTT: " + rtt);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
