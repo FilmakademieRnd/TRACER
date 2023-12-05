@@ -1,21 +1,30 @@
 /*
-TRACER FOUNDATION - 
-Toolset for Realtime Animation, Collaboration & Extended Reality
-tracer.research.animationsinstitut.de
-https://github.com/FilmakademieRnd/TRACER
+VPET - Virtual Production Editing Tools
+vpet.research.animationsinstitut.de
+https://github.com/FilmakademieRnd/VPET
 
 Copyright (c) 2023 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Lab
 
-TRACER is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut
-R&D Labs in the scope of the EU funded project MAX-R (101070072) and funding on
-the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace
-(610005) and SAUCE (780470) have inspired the TRACER development.
+This project has been initiated in the scope of the EU funded project
+Dreamspace (http://dreamspaceproject.eu/) under grant agreement no 610005 2014-2016.
+
+Post Dreamspace the project has been further developed on behalf of the
+research and development activities of Animationsinstitut.
+
+In 2018 some features (Character Animation Interface and USD support) were
+addressed in the scope of the EU funded project SAUCE (https://www.sauceproject.eu/)
+under grant agreement no 780470, 2018-2022
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the MIT License as published by the Open Source Initiative.
 
 This program is distributed in the hope that it will be useful, but WITHOUT
 ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the MIT License for more details.
-You should have received a copy of the MIT License along with this program; 
-if not go to https://opensource.org/licenses/MIT
+
+You should have received a copy of the MIT License along with
+this program; if not go to
+https://opensource.org/licenses/MIT
 */
 
 //! @file "SceneDataHandler.cs"
@@ -31,7 +40,7 @@ using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace tracer
+namespace vpet
 {
     //!
     //! Class handling Unity scene parsing and serialisation.
@@ -111,16 +120,16 @@ namespace tracer
                         switch (light.type)
                         {
                             case LightType.Point:
-                                sceneObject = SceneObjectPointLight.Attach(gameObject, networkManager.cID);
+                                sceneObject = gameObject.AddComponent<SceneObjectPointLight>();
                                 break;
                             case LightType.Directional:
-                                sceneObject = SceneObjectDirectionalLight.Attach(gameObject, networkManager.cID);
+                                sceneObject = gameObject.AddComponent<SceneObjectDirectionalLight>();
                                 break;
                             case LightType.Spot:
-                                sceneObject = SceneObjectSpotLight.Attach(gameObject, networkManager.cID);
+                                sceneObject = gameObject.AddComponent<SceneObjectSpotLight>();
                                 break;
                             case LightType.Area:
-                                sceneObject = SceneObjectAreaLight.Attach(gameObject, networkManager.cID);
+                                sceneObject = gameObject.AddComponent<SceneObjectAreaLight>();
                                 break;
                         }
                         manager.sceneLightList.Add((SceneObjectLight)sceneObject);
@@ -132,7 +141,7 @@ namespace tracer
                     node = ParseCamera(trans.GetComponent<Camera>());
                     if (core.isServer && !sceneObject)
                     {
-                        sceneObject = SceneObjectCamera.Attach(gameObject, networkManager.cID);
+                        sceneObject = gameObject.AddComponent<SceneObjectCamera>();
                         manager.sceneCameraList.Add((SceneObjectCamera)sceneObject);
                         gameObject.tag = "editable";
                     }
@@ -142,32 +151,26 @@ namespace tracer
                     node = ParseMesh(trans, ref sceneData);
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                        {
-                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
-                            manager.simpleSceneObjectList.Add((SceneObject)sceneObject);
-                        }
+                            sceneObject = gameObject.AddComponent<SceneObject>();
                 }
                 else if (trans.GetComponent<SkinnedMeshRenderer>() != null)
                 {
                     node = ParseSkinnedMesh(trans, ref gameObjects, ref sceneData);
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
+                            sceneObject = gameObject.AddComponent<SceneObject>();
                 }
                 else if (trans.GetComponent<Animator>() != null)
                 {
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                            sceneObject = SceneCharacterObject.Attach(gameObject, networkManager.cID);
+                            sceneObject = gameObject.AddComponent<SceneCharacterObject>();
                 }
                 else
                 {
-                    if (gameObject.CompareTag("editable"))
+                    if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                        {
-                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
-                            manager.simpleSceneObjectList.Add((SceneObject)sceneObject);
-                        }
+                            sceneObject = gameObject.AddComponent<SceneObject>();
                 }
 
                 Animator animator = trans.GetComponent<Animator>();
@@ -207,9 +210,9 @@ namespace tracer
         }
 
         //!
-        //! Function for creating a TRACER light node out of an Unity light object.
+        //! Function for creating a VPET light node out of an Unity light object.
         //!
-        //! @param light The Unity light for which a TRACER node will be created.
+        //! @param light The Unity light for which a VPET node will be created.
         //! @return The created light node.
         //!
         private SceneManager.SceneNode ParseLight(Light light)
@@ -225,9 +228,9 @@ namespace tracer
         }
 
         //!
-        //! Function for creating a TRACER camera node out of an Unity camera object.
+        //! Function for creating a VPET camera node out of an Unity camera object.
         //!
-        //! @param camera The Unity light for which a TRACER node will be created.
+        //! @param camera The Unity light for which a VPET node will be created.
         //! @return The created camera node.
         //!
         private SceneManager.SceneNode ParseCamera(Camera camera)
@@ -245,7 +248,7 @@ namespace tracer
         }
 
         //!
-        //! Function for creating a TRACER geo node out of an Unity object.
+        //! Function for creating a VPET geo node out of an Unity object.
         //!
         //! @param transform The transform from the Unity mesh object.
         //! @param sceneData A reference to the structure that will store the serialised scene data. 
@@ -266,7 +269,7 @@ namespace tracer
         }
 
         //!
-        //! Function for creating a TRACER skinned geo node out of an skinned Unity object.
+        //! Function for creating a VPET skinned geo node out of an skinned Unity object.
         //!
         //! @param transform The transform from the Unity mesh object.
         //! @param gameObjectList A reference to the list of the traversed Unity Game Object tree.       
@@ -344,7 +347,7 @@ namespace tracer
         }
 
         //!
-        //! Function that adds a TRACER nods material properties.
+        //! Function that adds a VPET nods material properties.
         //!
         //! @param node The node to which the properties will be added.
         //! @material The Unity material containing the properties to be added.
@@ -475,7 +478,7 @@ namespace tracer
         }
 
         //!
-        //! Serialises a Unity mesh into a TRACER Object Package and adds it to the given 
+        //! Serialises a Unity mesh into a VPET Object Package and adds it to the given 
         //! list, if it does not already contain the mesh. Otherweise returns the reference ID of the
         //! already existing mesh. 
         //!
@@ -562,7 +565,7 @@ namespace tracer
         }
 
         //!
-        //! Serialises a Unity texture into a TRACER Texture Package and adds it to the given 
+        //! Serialises a Unity texture into a VPET Texture Package and adds it to the given 
         //! list, if it does not already contain the texture. Otherwise returns the reference ID of the
         //! already existing texture. 
         //!
@@ -597,7 +600,7 @@ namespace tracer
         }
 
         //!
-        //! Serialises a Unity skinned object into a TRACER Character Package and adds it to the given list.
+        //! Serialises a Unity skinned object into a VPET Character Package and adds it to the given list.
         //!
         //! @animator The Unity animator containing the skinned object.
         //! @characterList The list to add the serialised skinned object to.
@@ -607,6 +610,10 @@ namespace tracer
         {
             SceneManager.CharacterPackage chrPack = new SceneManager.CharacterPackage();
             chrPack.rootId = gameObjectList.IndexOf(animator.transform.gameObject);
+            chrPack.sceneObjectId = animator.transform.gameObject.GetComponent<SceneCharacterObject>().id;
+            chrPack.sceneObjectName = new byte[256];
+            byte[] tmpName = Encoding.ASCII.GetBytes(animator.transform.name);
+            Buffer.BlockCopy(tmpName, 0, chrPack.sceneObjectName, 0, Math.Min(tmpName.Length, 256));
 
             HumanBone[] boneArray = animator.avatar.humanDescription.human;
             chrPack.bMSize = Enum.GetNames(typeof(HumanBodyBones)).Length;

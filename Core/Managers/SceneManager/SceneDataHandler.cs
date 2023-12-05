@@ -1,21 +1,30 @@
 ﻿/*
-TRACER FOUNDATION - 
-Toolset for Realtime Animation, Collaboration & Extended Reality
-tracer.research.animationsinstitut.de
-https://github.com/FilmakademieRnd/TRACER
+VPET - Virtual Production Editing Tools
+vpet.research.animationsinstitut.de
+https://github.com/FilmakademieRnd/VPET
 
 Copyright (c) 2023 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Lab
 
-TRACER is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut
-R&D Labs in the scope of the EU funded project MAX-R (101070072) and funding on
-the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace
-(610005) and SAUCE (780470) have inspired the TRACER development.
+This project has been initiated in the scope of the EU funded project
+Dreamspace (http://dreamspaceproject.eu/) under grant agreement no 610005 2014-2016.
+
+Post Dreamspace the project has been further developed on behalf of the
+research and development activities of Animationsinstitut.
+
+In 2018 some features (Character Animation Interface and USD support) were
+addressed in the scope of the EU funded project SAUCE (https://www.sauceproject.eu/)
+under grant agreement no 780470, 2018-2022
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the MIT License as published by the Open Source Initiative.
 
 This program is distributed in the hope that it will be useful, but WITHOUT
 ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the MIT License for more details.
-You should have received a copy of the MIT License along with this program; 
-if not go to https://opensource.org/licenses/MIT
+
+You should have received a copy of the MIT License along with
+this program; if not go to
+https://opensource.org/licenses/MIT
 */
 
 //! @file "SceneDataHandler.cs"
@@ -30,8 +39,9 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
-namespace tracer
+namespace vpet
 {
     //!
     //! Class handling scene data deserialisation.
@@ -41,7 +51,7 @@ namespace tracer
         public class SceneDataHandler
         {
             //!
-            //! Class for storing TRACER scene object information.
+            //! Class for storing VPET scene object information.
             //!
             public class SceneData
             {
@@ -246,7 +256,7 @@ namespace tracer
             }
 
             //!
-            //! Function to convert byte arrays into TRACER SceneData.
+            //! Function to convert byte arrays into VPET SceneData.
             //! Make shure to set the respective byte arrays before calling this function!
             //!
             public SceneData getSceneData()
@@ -290,7 +300,7 @@ namespace tracer
             //! Function to convert SceneData into byte arrays.
             //! SceneData will be deleted during this process!
             //! 
-            //! @param sceneData the scruct containing the TRACER scene data.
+            //! @param sceneData the scruct containing the VPET scene data.
             //!
             public void setSceneData(ref SceneData sceneData)
             {
@@ -536,6 +546,10 @@ namespace tracer
                     characterPack.sSize = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
 
+                    // get scene object ID
+                    characterPack.sceneObjectId = BitConverter.ToInt32(m_characterByteData, dataIdx);
+                    dataIdx += size_int;
+
                     // get root dag path
                     characterPack.rootId = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
@@ -593,6 +607,11 @@ namespace tracer
                         characterPack.boneScale[i * 3 + 2] = BitConverter.ToSingle(m_characterByteData, dataIdx);
                         dataIdx += size_float;
                     }
+
+                    // get character name (Marshalled with SizeConst = 256)
+                    ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_characterByteData, dataIdx, 256);
+                    characterPack.sceneObjectName = Encoding.ASCII.GetBytes(nameByte.ToString());
+                    dataIdx += 256;
 
                     characterList.Add(characterPack);
                 }
@@ -681,7 +700,7 @@ namespace tracer
             }
 
             //!
-            //! Function that concatinates all serialised TRACER nodes to a byte array.
+            //! Function that concatinates all serialised VPET nodes to a byte array.
             //!
             private void getNodesByteArray(ref List<SceneManager.SceneNode> nodeList)
             {
@@ -727,7 +746,7 @@ namespace tracer
             }
 
             //!
-            //! Function that concatinates all serialised TRACER meshes to a byte array.
+            //! Function that concatinates all serialised VPET meshes to a byte array.
             //!
             //! @param objectList The list that contains the serialised meshes to be concatinated.
             //!
@@ -780,7 +799,7 @@ namespace tracer
             }
 
             //!
-            //! Function that concatinates all serialised TRACER skinned meshes to a byte array.
+            //! Function that concatinates all serialised VPET skinned meshes to a byte array.
             //!
             //! @param characterList The list that contains the serialised skinned meshes to be concatinated.
             //!
@@ -789,7 +808,7 @@ namespace tracer
                 m_characterByteData = new byte[0];
                 foreach (CharacterPackage chrPack in characterList)
                 {
-                    byte[] characterByteData = new byte[SceneDataHandler.size_int * 3 +
+                    byte[] characterByteData = new byte[SceneDataHandler.size_int * 4 +
                                                     chrPack.boneMapping.Length * SceneDataHandler.size_int +
                                                     chrPack.skeletonMapping.Length * SceneDataHandler.size_int +
                                                     chrPack.sSize * SceneDataHandler.size_float * 10];
@@ -800,6 +819,10 @@ namespace tracer
 
                     // skeleton mapping size
                     BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.sSize);
+                    dstIdx += SceneDataHandler.size_int;
+
+                    // scene object id
+                    BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.sceneObjectId);
                     dstIdx += SceneDataHandler.size_int;
 
                     // root dag id
@@ -826,13 +849,16 @@ namespace tracer
                     Buffer.BlockCopy(chrPack.boneScale, 0, characterByteData, dstIdx, chrPack.sSize * 3 * SceneDataHandler.size_float);
                     dstIdx += chrPack.sSize * 3 * SceneDataHandler.size_float;
 
-                    // concate
+                    // scene object Name
+                    characterByteData = Concat<byte>(characterByteData, chrPack.sceneObjectName);
+
+                    // concatenating character byte data to serialised character array
                     m_characterByteData = Concat<byte>(m_characterByteData, characterByteData);
                 }
             }
 
             //!
-            //! Function that concatinates all serialised TRACER textures to a byte array.
+            //! Function that concatinates all serialised VPET textures to a byte array.
             //!
             //! @param textureList The list that contains the serialised textures to be concatinated.
             //!
@@ -866,7 +892,7 @@ namespace tracer
             }
 
             //!
-            //! Function that concatinates all serialised TRACER materials to a byte array.
+            //! Function that concatinates all serialised VPET materials to a byte array.
             //!
             //! @param materialList The list that contains the serialised materials to be concatinated.
             //!
