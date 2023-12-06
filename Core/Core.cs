@@ -155,7 +155,8 @@ namespace tracer
         public event EventHandler<byte> syncEvent;
 
         public event  EventHandler<string> QrCodeReady;
-        
+        [SerializeField] public bool useRandomCID = false;
+
         //!
         //! Unity's Awake callback, used for Initialization of all Managers and modules.
         //!

@@ -114,12 +114,12 @@ namespace tracer
             {
                 if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                 {
-                    //if (core.isServer)
-                    //{
-                    //    // prevent equal cIDs if server and client running on the same machine
-                    //    m_cID = 255;
-                    //}
-                    //else
+                    if (core.useRandomCID)
+                    {
+                        // prevent equal cIDs if server and client running on the same machine
+                        m_cID = (byte)UnityEngine.Random.Range(2, 250);
+                    }
+                    else
                         m_cID = byte.Parse(ip.ToString().Split('.')[3]);
                 }
             }
