@@ -1,5 +1,5 @@
 ﻿/*
-TRACER FOUNDATION - 
+TRACER FOUNDATION -
 Toolset for Realtime Animation, Collaboration & Extended Reality
 tracer.research.animationsinstitut.de
 https://github.com/FilmakademieRnd/TRACER
@@ -14,8 +14,9 @@ the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspac
 This program is distributed in the hope that it will be useful, but WITHOUT
 ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the MIT License for more details.
-You should have received a copy of the MIT License along with this program; 
-if not go to https://opensource.org/licenses/MIT
+You should have received a copy of the MIT License along with
+this program; if not go to
+https://opensource.org/licenses/MIT
 */
 
 //! @file "SceneDataDefinition.cs"
@@ -41,7 +42,7 @@ namespace tracer
 
         //!
         //! Data structure for serialising basic SceneNodes.
-        //! The struct layout and array size for mashaling  has to be fixed
+        //! The struct layout and array size for marshaling has to be fixed
         //! to be compatible with unmanaged code.
         //!
         [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
@@ -49,19 +50,19 @@ namespace tracer
         {
             //! Flag that determines whether a node is editable or not. 
             public bool editable;
-            //! The Nuber of childes the node have. 
+            //! The Number of childes the node have. 
             public int childCount;
-            //! The position of the node in world space, stored as float array with the legth of 3.
+            //! The position of the node in world space, stored as float array with the length of 3.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
             public float[] position;
-            //! The scale of the node in world space, stored as float array with the legth of 3.
+            //! The scale of the node in world space, stored as float array with the length of 3.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
             public float[] scale;
-            //! The rotation of the node in world space, stored as float array with the legth of 4.
+            //! The rotation of the node in world space, stored as float array with the length of 4.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
             public float[] rotation;
-            //! The name of the node, stored as byte array with the legth of 64.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
+            //! The name of the node, stored as byte array with the length of 256.
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
             public byte[] name;
         };
 
@@ -76,7 +77,7 @@ namespace tracer
             public int geoId;
             //! The ID for referencing the associated material data.
             public int materialId;
-            //! The color if the node has no material assigned, stored as float array with the legth of 4.
+            //! The color if the node has no material assigned, stored as float array with the length of 4.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
             public float[] color;
         };
@@ -92,10 +93,10 @@ namespace tracer
             public int bindPoseLength;
             //! The ID for referencing the associated root bone.
             public int rootBoneID;
-            //! The bounds if the skinned mesh in world space, stored as float array with ihe legth of 3.
+            //! The bounds if the skinned mesh in world space, stored as float array with the length of 3.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
             public float[] boundExtents;
-            //! The center if the skinned mesh in world space, stored as float array with ihe legth of 3.
+            //! The center if the skinned mesh in world space, stored as float array with the length of 3.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
             public float[] boundCenter;
             //! The bind poses of the skinned mesh stored as 99 4x4 matrices in a float array.
@@ -148,7 +149,7 @@ namespace tracer
         };
 
         //!
-        //! Data structure for serialising the TRACER header,
+        //! Data structure for serialising the VPET header,
         //! containing scene relevant informations.
         //!
         [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
@@ -160,7 +161,7 @@ namespace tracer
         }
 
         //!
-        //! TRACER structure used to hold mesh data.
+        //! VPET structure used to hold mesh data.
         //! This sructure is used for saving to disk or sending via network.
         //!
         public class ObjectPackage
@@ -192,7 +193,7 @@ namespace tracer
         };
 
         //!
-        //! TRACER structure used to hold additional skinned mesh data.
+        //! VPET structure used to hold additional skinned mesh data.
         //! This sructure is used for saving to disk or sending via network.
         //!
         public class CharacterPackage
@@ -201,6 +202,8 @@ namespace tracer
             public int bMSize;
             //! The size of the skeleton array.
             public int sSize;
+            //! The ID of the scene character object (as displayed in the SceneCharacterObject in the Unity UI)
+            public int sceneObjectId;
             //! The object ID of the root bone.
             public int rootId;
             //! The array of IDs for referencing the associated bone objects.
@@ -213,10 +216,13 @@ namespace tracer
             public float[] boneRotation;
             //! The array of bone scales for this character as vec3[].
             public float[] boneScale;
+            //! The name of the scene object (as displayed in the Unity UI)
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+            public byte[] sceneObjectName;
         };
 
         //!
-        //! TRACER structure used to hold texture data.
+        //! VPET structure used to hold texture data.
         //! This sructure is used for saving to disk or sending via network.
         //!
         public class TexturePackage
@@ -236,7 +242,7 @@ namespace tracer
         };
 
         //!
-        //! TRACER structure used to hold material data.
+        //! VPET structure used to hold material data.
         //! This sructure is used for saving to disk or sending via network.
         //!
         public class MaterialPackage

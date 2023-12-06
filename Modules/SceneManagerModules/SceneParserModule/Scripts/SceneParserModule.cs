@@ -111,16 +111,16 @@ namespace tracer
                         switch (light.type)
                         {
                             case LightType.Point:
-                                sceneObject = SceneObjectPointLight.Attach(gameObject, networkManager.cID);
+                                sceneObject = gameObject.AddComponent<SceneObjectPointLight>();
                                 break;
                             case LightType.Directional:
-                                sceneObject = SceneObjectDirectionalLight.Attach(gameObject, networkManager.cID);
+                                sceneObject = gameObject.AddComponent<SceneObjectDirectionalLight>();
                                 break;
                             case LightType.Spot:
-                                sceneObject = SceneObjectSpotLight.Attach(gameObject, networkManager.cID);
+                                sceneObject = gameObject.AddComponent<SceneObjectSpotLight>();
                                 break;
                             case LightType.Area:
-                                sceneObject = SceneObjectAreaLight.Attach(gameObject, networkManager.cID);
+                                sceneObject = gameObject.AddComponent<SceneObjectAreaLight>();
                                 break;
                         }
                         manager.sceneLightList.Add((SceneObjectLight)sceneObject);
@@ -132,7 +132,7 @@ namespace tracer
                     node = ParseCamera(trans.GetComponent<Camera>());
                     if (core.isServer && !sceneObject)
                     {
-                        sceneObject = SceneObjectCamera.Attach(gameObject, networkManager.cID);
+                        sceneObject = gameObject.AddComponent<SceneObjectCamera>();
                         manager.sceneCameraList.Add((SceneObjectCamera)sceneObject);
                         gameObject.tag = "editable";
                     }
@@ -142,32 +142,26 @@ namespace tracer
                     node = ParseMesh(trans, ref sceneData);
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                        {
-                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
-                            manager.simpleSceneObjectList.Add((SceneObject)sceneObject);
-                        }
+                            sceneObject = gameObject.AddComponent<SceneObject>();
                 }
                 else if (trans.GetComponent<SkinnedMeshRenderer>() != null)
                 {
                     node = ParseSkinnedMesh(trans, ref gameObjects, ref sceneData);
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
+                            sceneObject = gameObject.AddComponent<SceneObject>();
                 }
                 else if (trans.GetComponent<Animator>() != null)
                 {
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                            sceneObject = SceneCharacterObject.Attach(gameObject, networkManager.cID);
+                            sceneObject = gameObject.AddComponent<SceneCharacterObject>();
                 }
                 else
                 {
-                    if (gameObject.CompareTag("editable"))
+                    if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
-                        {
-                            sceneObject = SceneObject.Attach(gameObject, networkManager.cID);
-                            manager.simpleSceneObjectList.Add((SceneObject)sceneObject);
-                        }
+                            sceneObject = gameObject.AddComponent<SceneObject>();
                 }
 
                 Animator animator = trans.GetComponent<Animator>();
@@ -607,6 +601,10 @@ namespace tracer
         {
             SceneManager.CharacterPackage chrPack = new SceneManager.CharacterPackage();
             chrPack.rootId = gameObjectList.IndexOf(animator.transform.gameObject);
+            chrPack.sceneObjectId = animator.transform.gameObject.GetComponent<SceneCharacterObject>().id;
+            chrPack.sceneObjectName = new byte[256];
+            byte[] tmpName = Encoding.ASCII.GetBytes(animator.transform.name);
+            Buffer.BlockCopy(tmpName, 0, chrPack.sceneObjectName, 0, Math.Min(tmpName.Length, 256));
 
             HumanBone[] boneArray = animator.avatar.humanDescription.human;
             chrPack.bMSize = Enum.GetNames(typeof(HumanBodyBones)).Length;

@@ -14,8 +14,9 @@ the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspac
 This program is distributed in the hope that it will be useful, but WITHOUT
 ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the MIT License for more details.
-You should have received a copy of the MIT License along with this program; 
-if not go to https://opensource.org/licenses/MIT
+You should have received a copy of the MIT License along with
+this program; if not go to
+https://opensource.org/licenses/MIT
 */
 
 //! @file "SceneDataHandler.cs"
@@ -30,6 +31,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace tracer
 {
@@ -536,6 +538,10 @@ namespace tracer
                     characterPack.sSize = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
 
+                    // get scene object ID
+                    characterPack.sceneObjectId = BitConverter.ToInt32(m_characterByteData, dataIdx);
+                    dataIdx += size_int;
+
                     // get root dag path
                     characterPack.rootId = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
@@ -593,6 +599,11 @@ namespace tracer
                         characterPack.boneScale[i * 3 + 2] = BitConverter.ToSingle(m_characterByteData, dataIdx);
                         dataIdx += size_float;
                     }
+
+                    // get character name (Marshalled with SizeConst = 256)
+                    ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_characterByteData, dataIdx, 256);
+                    characterPack.sceneObjectName = Encoding.ASCII.GetBytes(nameByte.ToString());
+                    dataIdx += 256;
 
                     characterList.Add(characterPack);
                 }
@@ -789,7 +800,7 @@ namespace tracer
                 m_characterByteData = new byte[0];
                 foreach (CharacterPackage chrPack in characterList)
                 {
-                    byte[] characterByteData = new byte[SceneDataHandler.size_int * 3 +
+                    byte[] characterByteData = new byte[SceneDataHandler.size_int * 4 +
                                                     chrPack.boneMapping.Length * SceneDataHandler.size_int +
                                                     chrPack.skeletonMapping.Length * SceneDataHandler.size_int +
                                                     chrPack.sSize * SceneDataHandler.size_float * 10];
@@ -800,6 +811,10 @@ namespace tracer
 
                     // skeleton mapping size
                     BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.sSize);
+                    dstIdx += SceneDataHandler.size_int;
+
+                    // scene object id
+                    BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.sceneObjectId);
                     dstIdx += SceneDataHandler.size_int;
 
                     // root dag id
@@ -826,7 +841,10 @@ namespace tracer
                     Buffer.BlockCopy(chrPack.boneScale, 0, characterByteData, dstIdx, chrPack.sSize * 3 * SceneDataHandler.size_float);
                     dstIdx += chrPack.sSize * 3 * SceneDataHandler.size_float;
 
-                    // concate
+                    // scene object Name
+                    characterByteData = Concat<byte>(characterByteData, chrPack.sceneObjectName);
+
+                    // concatenating character byte data to serialised character array
                     m_characterByteData = Concat<byte>(m_characterByteData, characterByteData);
                 }
             }
