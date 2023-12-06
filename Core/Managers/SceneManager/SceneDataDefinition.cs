@@ -1,34 +1,26 @@
 ﻿/*
-VPET - Virtual Production Editing Tools
-vpet.research.animationsinstitut.de
-https://github.com/FilmakademieRnd/VPET
+TRACER FOUNDATION -
+Toolset for Realtime Animation, Collaboration & Extended Reality
+tracer.research.animationsinstitut.de
+https://github.com/FilmakademieRnd/TRACER
 
 Copyright (c) 2023 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Lab
 
-This project has been initiated in the scope of the EU funded project
-Dreamspace (http://dreamspaceproject.eu/) under grant agreement no 610005 2014-2016.
-
-Post Dreamspace the project has been further developed on behalf of the
-research and development activities of Animationsinstitut.
-
-In 2018 some features (Character Animation Interface and USD support) were
-addressed in the scope of the EU funded project SAUCE (https://www.sauceproject.eu/)
-under grant agreement no 780470, 2018-2022
-
-This program is free software; you can redistribute it and/or modify it under
-the terms of the MIT License as published by the Open Source Initiative.
+TRACER is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut
+R&D Labs in the scope of the EU funded project MAX-R (101070072) and funding on
+the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace
+(610005) and SAUCE (780470) have inspired the TRACER development.
 
 This program is distributed in the hope that it will be useful, but WITHOUT
 ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the MIT License for more details.
-
 You should have received a copy of the MIT License along with
 this program; if not go to
 https://opensource.org/licenses/MIT
 */
 
 //! @file "SceneDataDefinition.cs"
-//! @brief definition of VPET scene data structure
+//! @brief definition of TRACER scene data structure
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @version 0
@@ -37,14 +29,14 @@ https://opensource.org/licenses/MIT
 using UnityEngine;
 using System.Runtime.InteropServices;
 
-namespace vpet
+namespace tracer
 {
     public partial class SceneManager : Manager
     {
         public static string[] shaderKeywords = { "_NORMALMAP", "_ALPHATEST_ON", "_ALPHABLEND_ON", "_ALPHAPREMULTIPLY_ON", "_EMISSION", "_PARALLAXMAP", "_DETAIL_MULX2", "_METALLICGLOSSMAP", "_SPECGLOSSMAP" };
 
         //!
-        //! Enumeration defining VPET node Types.
+        //! Enumeration defining TRACER node Types.
         //!
         public enum NodeType { GROUP, GEO, LIGHT, CAMERA, SKINNEDMESH }
 

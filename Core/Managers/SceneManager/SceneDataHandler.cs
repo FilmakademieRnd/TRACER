@@ -1,27 +1,19 @@
 ﻿/*
-VPET - Virtual Production Editing Tools
-vpet.research.animationsinstitut.de
-https://github.com/FilmakademieRnd/VPET
+TRACER FOUNDATION - 
+Toolset for Realtime Animation, Collaboration & Extended Reality
+tracer.research.animationsinstitut.de
+https://github.com/FilmakademieRnd/TRACER
 
 Copyright (c) 2023 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Lab
 
-This project has been initiated in the scope of the EU funded project
-Dreamspace (http://dreamspaceproject.eu/) under grant agreement no 610005 2014-2016.
-
-Post Dreamspace the project has been further developed on behalf of the
-research and development activities of Animationsinstitut.
-
-In 2018 some features (Character Animation Interface and USD support) were
-addressed in the scope of the EU funded project SAUCE (https://www.sauceproject.eu/)
-under grant agreement no 780470, 2018-2022
-
-This program is free software; you can redistribute it and/or modify it under
-the terms of the MIT License as published by the Open Source Initiative.
+TRACER is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut
+R&D Labs in the scope of the EU funded project MAX-R (101070072) and funding on
+the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace
+(610005) and SAUCE (780470) have inspired the TRACER development.
 
 This program is distributed in the hope that it will be useful, but WITHOUT
 ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the MIT License for more details.
-
 You should have received a copy of the MIT License along with
 this program; if not go to
 https://opensource.org/licenses/MIT
@@ -41,7 +33,7 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-namespace vpet
+namespace tracer
 {
     //!
     //! Class handling scene data deserialisation.
@@ -51,7 +43,7 @@ namespace vpet
         public class SceneDataHandler
         {
             //!
-            //! Class for storing VPET scene object information.
+            //! Class for storing TRACER scene object information.
             //!
             public class SceneData
             {
@@ -256,7 +248,7 @@ namespace vpet
             }
 
             //!
-            //! Function to convert byte arrays into VPET SceneData.
+            //! Function to convert byte arrays into TRACER SceneData.
             //! Make shure to set the respective byte arrays before calling this function!
             //!
             public SceneData getSceneData()
@@ -300,7 +292,7 @@ namespace vpet
             //! Function to convert SceneData into byte arrays.
             //! SceneData will be deleted during this process!
             //! 
-            //! @param sceneData the scruct containing the VPET scene data.
+            //! @param sceneData the scruct containing the TRACER scene data.
             //!
             public void setSceneData(ref SceneData sceneData)
             {
@@ -700,7 +692,7 @@ namespace vpet
             }
 
             //!
-            //! Function that concatinates all serialised VPET nodes to a byte array.
+            //! Function that concatinates all serialised TRACER nodes to a byte array.
             //!
             private void getNodesByteArray(ref List<SceneManager.SceneNode> nodeList)
             {
@@ -746,7 +738,7 @@ namespace vpet
             }
 
             //!
-            //! Function that concatinates all serialised VPET meshes to a byte array.
+            //! Function that concatinates all serialised TRACER meshes to a byte array.
             //!
             //! @param objectList The list that contains the serialised meshes to be concatinated.
             //!
@@ -799,7 +791,7 @@ namespace vpet
             }
 
             //!
-            //! Function that concatinates all serialised VPET skinned meshes to a byte array.
+            //! Function that concatinates all serialised TRACER skinned meshes to a byte array.
             //!
             //! @param characterList The list that contains the serialised skinned meshes to be concatinated.
             //!
@@ -858,7 +850,7 @@ namespace vpet
             }
 
             //!
-            //! Function that concatinates all serialised VPET textures to a byte array.
+            //! Function that concatinates all serialised TRACER textures to a byte array.
             //!
             //! @param textureList The list that contains the serialised textures to be concatinated.
             //!
@@ -892,7 +884,7 @@ namespace vpet
             }
 
             //!
-            //! Function that concatinates all serialised VPET materials to a byte array.
+            //! Function that concatinates all serialised TRACER materials to a byte array.
             //!
             //! @param materialList The list that contains the serialised materials to be concatinated.
             //!

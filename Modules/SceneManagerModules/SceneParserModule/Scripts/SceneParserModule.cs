@@ -1,30 +1,21 @@
 /*
-VPET - Virtual Production Editing Tools
-vpet.research.animationsinstitut.de
-https://github.com/FilmakademieRnd/VPET
+TRACER FOUNDATION - 
+Toolset for Realtime Animation, Collaboration & Extended Reality
+tracer.research.animationsinstitut.de
+https://github.com/FilmakademieRnd/TRACER
 
 Copyright (c) 2023 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Lab
 
-This project has been initiated in the scope of the EU funded project
-Dreamspace (http://dreamspaceproject.eu/) under grant agreement no 610005 2014-2016.
-
-Post Dreamspace the project has been further developed on behalf of the
-research and development activities of Animationsinstitut.
-
-In 2018 some features (Character Animation Interface and USD support) were
-addressed in the scope of the EU funded project SAUCE (https://www.sauceproject.eu/)
-under grant agreement no 780470, 2018-2022
-
-This program is free software; you can redistribute it and/or modify it under
-the terms of the MIT License as published by the Open Source Initiative.
+TRACER is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut
+R&D Labs in the scope of the EU funded project MAX-R (101070072) and funding on
+the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace
+(610005) and SAUCE (780470) have inspired the TRACER development.
 
 This program is distributed in the hope that it will be useful, but WITHOUT
 ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the MIT License for more details.
-
-You should have received a copy of the MIT License along with
-this program; if not go to
-https://opensource.org/licenses/MIT
+You should have received a copy of the MIT License along with this program; 
+if not go to https://opensource.org/licenses/MIT
 */
 
 //! @file "SceneDataHandler.cs"
@@ -40,7 +31,7 @@ using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace vpet
+namespace tracer
 {
     //!
     //! Class handling Unity scene parsing and serialisation.
@@ -210,9 +201,9 @@ namespace vpet
         }
 
         //!
-        //! Function for creating a VPET light node out of an Unity light object.
+        //! Function for creating a TRACER light node out of an Unity light object.
         //!
-        //! @param light The Unity light for which a VPET node will be created.
+        //! @param light The Unity light for which a TRACER node will be created.
         //! @return The created light node.
         //!
         private SceneManager.SceneNode ParseLight(Light light)
@@ -228,9 +219,9 @@ namespace vpet
         }
 
         //!
-        //! Function for creating a VPET camera node out of an Unity camera object.
+        //! Function for creating a TRACER camera node out of an Unity camera object.
         //!
-        //! @param camera The Unity light for which a VPET node will be created.
+        //! @param camera The Unity light for which a TRACER node will be created.
         //! @return The created camera node.
         //!
         private SceneManager.SceneNode ParseCamera(Camera camera)
@@ -248,7 +239,7 @@ namespace vpet
         }
 
         //!
-        //! Function for creating a VPET geo node out of an Unity object.
+        //! Function for creating a TRACER geo node out of an Unity object.
         //!
         //! @param transform The transform from the Unity mesh object.
         //! @param sceneData A reference to the structure that will store the serialised scene data. 
@@ -269,7 +260,7 @@ namespace vpet
         }
 
         //!
-        //! Function for creating a VPET skinned geo node out of an skinned Unity object.
+        //! Function for creating a TRACER skinned geo node out of an skinned Unity object.
         //!
         //! @param transform The transform from the Unity mesh object.
         //! @param gameObjectList A reference to the list of the traversed Unity Game Object tree.       
@@ -347,7 +338,7 @@ namespace vpet
         }
 
         //!
-        //! Function that adds a VPET nods material properties.
+        //! Function that adds a TRACER nods material properties.
         //!
         //! @param node The node to which the properties will be added.
         //! @material The Unity material containing the properties to be added.
@@ -478,7 +469,7 @@ namespace vpet
         }
 
         //!
-        //! Serialises a Unity mesh into a VPET Object Package and adds it to the given 
+        //! Serialises a Unity mesh into a TRACER Object Package and adds it to the given 
         //! list, if it does not already contain the mesh. Otherweise returns the reference ID of the
         //! already existing mesh. 
         //!
@@ -565,7 +556,7 @@ namespace vpet
         }
 
         //!
-        //! Serialises a Unity texture into a VPET Texture Package and adds it to the given 
+        //! Serialises a Unity texture into a TRACER Texture Package and adds it to the given 
         //! list, if it does not already contain the texture. Otherwise returns the reference ID of the
         //! already existing texture. 
         //!
@@ -600,7 +591,7 @@ namespace vpet
         }
 
         //!
-        //! Serialises a Unity skinned object into a VPET Character Package and adds it to the given list.
+        //! Serialises a Unity skinned object into a TRACER Character Package and adds it to the given list.
         //!
         //! @animator The Unity animator containing the skinned object.
         //! @characterList The list to add the serialised skinned object to.
