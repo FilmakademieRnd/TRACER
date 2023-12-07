@@ -26,6 +26,7 @@ https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 11.03.2022
 
+using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
 
@@ -219,6 +220,10 @@ namespace tracer
             //! The name of the scene object (as displayed in the Unity UI)
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
             public byte[] sceneObjectName;
+
+            public List<string> boneMapOrder;
+            public int offsetBone;
+
         };
 
         //!

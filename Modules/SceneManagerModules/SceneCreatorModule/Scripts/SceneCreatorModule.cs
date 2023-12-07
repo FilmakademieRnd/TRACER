@@ -419,7 +419,7 @@ namespace tracer
                 
                 avatar.name = obj.name;
                 Animator animator = obj.AddComponent<Animator>();
-                animator.avatar = avatar;
+                animator.avatar = avatar; 
                 animator.applyRootMotion = true;
                 
                 

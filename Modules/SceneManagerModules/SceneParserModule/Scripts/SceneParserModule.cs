@@ -604,6 +604,7 @@ namespace tracer
             chrPack.sceneObjectId = animator.transform.gameObject.GetComponent<SceneCharacterObject>().id;
             chrPack.sceneObjectName = new byte[256];
             byte[] tmpName = Encoding.ASCII.GetBytes(animator.transform.name);
+            GameObject GO = animator.gameObject;
             Buffer.BlockCopy(tmpName, 0, chrPack.sceneObjectName, 0, Math.Min(tmpName.Length, 256));
 
             HumanBone[] boneArray = animator.avatar.humanDescription.human;
@@ -646,6 +647,9 @@ namespace tracer
                 chrPack.boneScale[i * 3 + 1] = skeletonArray[i].scale.y;
                 chrPack.boneScale[i * 3 + 2] = skeletonArray[i].scale.z;
             }
+
+            chrPack.boneMapOrder = GO.GetComponent<SceneCharacterObject>().boneNamesOrder;
+            
             characterList.Add(chrPack);
         }
     }

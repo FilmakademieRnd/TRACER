@@ -45,6 +45,7 @@ namespace tracer
         //! The array of bone transforms from the SkinnedMeshRenderer
         //!
         private Transform[] bones;
+        public List<string> boneNamesOrder;
 
         //!
         //! Factory to create a new SceneObject and do it's initialisation.
@@ -85,7 +86,10 @@ namespace tracer
         {
             // Get the array of bone transforms from the SkinnedMeshRenderer component.
             bones = GetComponentInChildren<SkinnedMeshRenderer>().bones;
+
+            boneNamesOrder = new List<string>();
             // Loop through each bone transform obtained from the SkinnedMeshRenderer.
+            
             for (int i = 0; i < bones.Length; i++)
             {
                 Transform boneTransform = bones[i];
@@ -101,6 +105,8 @@ namespace tracer
                     // Use the parameter's ID as the key to store the bone transform in the dictionary.
                     var id = localBoneRotationParameter.id;
                     boneMap.Add(id, boneTransform);
+                    boneNamesOrder.Add(boneTransform.name);
+                    Debug.LogError(id+"-"+boneTransform.name);
                 }
             }
         }

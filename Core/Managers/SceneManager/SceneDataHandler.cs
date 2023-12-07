@@ -604,6 +604,8 @@ namespace tracer
                     ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_characterByteData, dataIdx, 256);
                     characterPack.sceneObjectName = Encoding.ASCII.GetBytes(nameByte.ToString());
                     dataIdx += 256;
+                    
+                    //TODO SERIALIZE boneMapOrder
 
                     characterList.Add(characterPack);
                 }
