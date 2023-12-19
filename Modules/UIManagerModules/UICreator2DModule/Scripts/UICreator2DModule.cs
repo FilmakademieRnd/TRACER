@@ -283,7 +283,7 @@ namespace tracer
             }
 
             AbstractParameter abstractParam = mainSelection.parameterList[index];
-            AbstractParameter.ParameterType type = abstractParam.vpetType;
+            AbstractParameter.ParameterType type = abstractParam.tracerType;
 
             switch (type)
             {

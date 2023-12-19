@@ -26,7 +26,6 @@ https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 11.03.2022
 
-using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
 
@@ -62,8 +61,8 @@ namespace tracer
             //! The rotation of the node in world space, stored as float array with the length of 4.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
             public float[] rotation;
-            //! The name of the node, stored as byte array with the length of 256.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+            //! The name of the node, stored as byte array with the length of 64.
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
             public byte[] name;
         };
 
@@ -150,11 +149,11 @@ namespace tracer
         };
 
         //!
-        //! Data structure for serialising the VPET header,
+        //! Data structure for serialising the TRACER header,
         //! containing scene relevant informations.
         //!
         [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
-        public class VpetHeader
+        public class TracerHeader
         {
             //! Global factor for light intensity scaling. 
             public float lightIntensityFactor;
@@ -162,7 +161,7 @@ namespace tracer
         }
 
         //!
-        //! VPET structure used to hold mesh data.
+        //! TRACER structure used to hold mesh data.
         //! This sructure is used for saving to disk or sending via network.
         //!
         public class ObjectPackage
@@ -194,7 +193,7 @@ namespace tracer
         };
 
         //!
-        //! VPET structure used to hold additional skinned mesh data.
+        //! TRACER structure used to hold additional skinned mesh data.
         //! This sructure is used for saving to disk or sending via network.
         //!
         public class CharacterPackage
@@ -218,16 +217,12 @@ namespace tracer
             //! The array of bone scales for this character as vec3[].
             public float[] boneScale;
             //! The name of the scene object (as displayed in the Unity UI)
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 256)]
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
             public byte[] sceneObjectName;
-
-            public List<string> boneMapOrder;
-            public int offsetBone;
-
         };
 
         //!
-        //! VPET structure used to hold texture data.
+        //! TRACER structure used to hold texture data.
         //! This sructure is used for saving to disk or sending via network.
         //!
         public class TexturePackage
@@ -247,7 +242,7 @@ namespace tracer
         };
 
         //!
-        //! VPET structure used to hold material data.
+        //! TRACER structure used to hold material data.
         //! This sructure is used for saving to disk or sending via network.
         //!
         public class MaterialPackage

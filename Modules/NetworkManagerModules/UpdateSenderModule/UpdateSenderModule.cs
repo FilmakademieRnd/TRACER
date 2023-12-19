@@ -223,7 +223,7 @@ namespace tracer
                 Helpers.copyArray(BitConverter.GetBytes(parameter.parent.sceneID), 0, m_controlMessage, 3, 1);  // SceneID
                 Helpers.copyArray(BitConverter.GetBytes(parameter.parent.id), 0, m_controlMessage, 4, 2);  // SceneObjectID
                 Helpers.copyArray(BitConverter.GetBytes(parameter.id), 0, m_controlMessage, 6, 2);  // ParameterID
-                m_controlMessage[8] = (byte)parameter.vpetType;  // ParameterType
+                m_controlMessage[8] = (byte)parameter.tracerType;  // ParameterType
             }
 
             m_mre.Set();
@@ -318,7 +318,7 @@ namespace tracer
                     newSpan[0] = parameter.parent.sceneID;  // SceneID
                     BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter.parent.id);  // SceneObjectID
                     BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter.id);  // ParameterID
-                    newSpan[5] = (byte)parameter.vpetType;  // ParameterType
+                    newSpan[5] = (byte)parameter.tracerType;  // ParameterType
                     newSpan[6] = (byte)newSpan.Length;  // Parameter message length
                     parameter.Serialize(newSpan.Slice(7)); // Parameter data
 

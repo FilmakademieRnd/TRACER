@@ -82,7 +82,7 @@ namespace tracer
         {
             if (_currentHistoryPos < _history.Count - 1)
                 _history.RemoveRange(_currentHistoryPos + 1, (_history.Count - _currentHistoryPos - 1));
-            switch (a.vpetType)
+            switch (a.tracerType)
             {
                 case AbstractParameter.ParameterType.BOOL:
                     _history.Add(new Parameter<bool>((Parameter<bool>)a));

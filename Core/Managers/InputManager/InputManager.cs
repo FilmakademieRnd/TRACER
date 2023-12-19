@@ -219,7 +219,7 @@ namespace tracer
         //!
         //! Constructor initializing member variables.
         //!
-        public InputManager(Type moduleType, Core vpetCore) : base(moduleType, vpetCore)
+        public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             // Enable input
             m_inputs = new Inputs();

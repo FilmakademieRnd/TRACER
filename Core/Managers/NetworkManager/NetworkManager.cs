@@ -99,9 +99,9 @@ namespace tracer
         //! Constructor initializing member variables.
         //!
         //! @param  moduleType  type of modules to be loaded by this manager
-        //! @param vpetCore A reference to the TRACER core.
+        //! @param tracerCore A reference to the TRACER core.
         //!
-        public NetworkManager(Type moduleType, Core vpetCore) : base(moduleType, vpetCore)
+        public NetworkManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             settings.ipAddress = new Parameter<string>("127.0.0.1", "ipAddress");
 

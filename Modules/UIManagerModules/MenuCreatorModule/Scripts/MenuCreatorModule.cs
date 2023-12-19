@@ -237,7 +237,7 @@ namespace tracer
                     }
                     break;
                 case MenuItem.IType.PARAMETER:
-                    switch (item.Parameter.vpetType) 
+                    switch (item.Parameter.tracerType) 
                     {
                         case AbstractParameter.ParameterType.ACTION:
                             {

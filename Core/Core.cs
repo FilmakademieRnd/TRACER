@@ -19,7 +19,7 @@ if not go to https://opensource.org/licenses/MIT
 */
 
 //! @file "core.cs"
-//! @brief TRACER core implementation. Central class for TRACER initalization. Manages all VPETManagers and their modules.
+//! @brief TRACER core implementation. Central class for TRACER initalization. Manages all Tracer Managers and their modules.
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @version 0
@@ -35,7 +35,7 @@ namespace tracer
 {
     //!
     //! Central class for TRACER initalization.
-    //! Manages all VPETManagers and their modules.
+    //! Manages all Tracer Managers and their modules.
     //!
     public class Core : CoreInterface
     {
@@ -142,7 +142,7 @@ namespace tracer
         //!
         public event EventHandler destroyEvent;
         //!
-        //! Event invoked when VPETs global timer ticks.
+        //! Event invoked when Tracer's global timer ticks.
         //!
         public event EventHandler timeEvent;
         //!

@@ -194,7 +194,7 @@ namespace tracer
         //! @param  name    Name of the scene manager
         //! @param  moduleType  Type of module to add to this manager 
         //!
-        public SceneManager(Type moduleType, Core vpetCore) : base(moduleType, vpetCore)
+        public SceneManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_sceneDataHandler = new SceneDataHandler();
             settings.sceneFilepath = new Parameter<string>("VPETdefaultScene", "Filepath");

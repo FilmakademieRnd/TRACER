@@ -25,7 +25,7 @@ using TMPro;
 
 namespace tracer
 {
-    [CreateAssetMenu(fileName = "DATA_VPET_UI", menuName = "TRACER/Create TRACER UI settings file", order = 1)]
+    [CreateAssetMenu(fileName = "DATA_VPET_UI", menuName = "TRACER/Create VPET UI settings file", order = 1)]
     public class VPETUISettings : ScriptableObject
     {
         public TMP_FontAsset defaultFont;

@@ -34,12 +34,12 @@ namespace tracer
 {
     //!
     //! Central class for TRACER initalization.
-    //! Manages all VPETManagers and their modules.
+    //! Manages all Tracer Managers and their modules.
     //!
     public class CoreInterface : MonoBehaviour
     {
         //!
-        //! List of all registered VPETManagers.
+        //! List of all registered Tracer Managers.
         //!
         protected Dictionary<Type,Manager> m_managerList;
 

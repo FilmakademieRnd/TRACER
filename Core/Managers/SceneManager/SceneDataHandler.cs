@@ -47,7 +47,7 @@ namespace tracer
             //!
             public class SceneData
             {
-                public VpetHeader header;
+                public TracerHeader header;
                 public List<SceneNode> nodeList;
                 public List<ObjectPackage> objectList;
                 public List<CharacterPackage> characterList;
@@ -56,7 +56,7 @@ namespace tracer
 
                 public SceneData()
                 {
-                    header = new VpetHeader();
+                    header = new TracerHeader();
                     nodeList = new List<SceneNode>();
                     objectList = new List<ObjectPackage>();
                     characterList = new List<CharacterPackage>();
@@ -318,10 +318,10 @@ namespace tracer
             //!
             //! The function deserialises a header byte stream and stores it as scene defaults.
             //!
-            private VpetHeader convertHeaderByteStream()
+            private TracerHeader convertHeaderByteStream()
             {
                 int offset = 0;
-                return ByteArrayToStructure<VpetHeader>(ref m_headerByteData, ref offset);
+                return ByteArrayToStructure<TracerHeader>(ref m_headerByteData, ref offset);
             }
 
             //!
@@ -600,12 +600,10 @@ namespace tracer
                         dataIdx += size_float;
                     }
 
-                    // get character name (Marshalled with SizeConst = 256)
-                    ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_characterByteData, dataIdx, 256);
+                    // get character name (Marshalled with SizeConst = 64)
+                    ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_characterByteData, dataIdx, 64);
                     characterPack.sceneObjectName = Encoding.ASCII.GetBytes(nameByte.ToString());
-                    dataIdx += 256;
-                    
-                    //TODO SERIALIZE boneMapOrder
+                    dataIdx += 64;
 
                     characterList.Add(characterPack);
                 }

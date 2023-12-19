@@ -84,12 +84,12 @@ namespace tracer
         //!
         //! Constructor
         //! @param  moduleType The type of modules to be loaded by this manager.
-        //! @param vpetCore A reference to the TRACER core.
+        //! @param tracerCore A reference to the TRACER core.
         //!
-        public Manager(Type moduleType, Core vpetCore)
+        public Manager(Type moduleType, Core tracerCore)
         {
             m_modules = new Dictionary<Type, Module>();
-            m_core = vpetCore;
+            m_core = tracerCore;
             Type[] modules = Helpers.GetAllTypes(AppDomain.CurrentDomain, moduleType);
 
             m_core.awakeEvent += Init;

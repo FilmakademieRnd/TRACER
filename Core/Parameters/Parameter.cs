@@ -63,7 +63,7 @@ namespace tracer
                                                                           typeof(int) 
         };
         //!
-        //! Definition of VPETs parameter types
+        //! Definition of Tracer's parameter types
         //!
         public enum ParameterType : byte { NONE, ACTION, BOOL, INT, FLOAT, VECTOR2, VECTOR3, VECTOR4, QUATERNION, COLOR, STRING, LIST, UNKNOWN = 100 }
         //!
@@ -112,7 +112,7 @@ namespace tracer
         //!
         //! Getter for parameters TRACER type.
         //!
-        public ParameterType vpetType
+        public ParameterType tracerType
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _type;
@@ -155,7 +155,7 @@ namespace tracer
         //! @param t The TRACER type from which the C# type is to be determined. 
         //! @return The determined TRACER type.
         //!
-        protected static ParameterType toVPETType(Type t)
+        protected static ParameterType toTracerType(Type t)
         {
             int idx = _paramTypes.FindIndex(item => item.Equals(t));
             if (idx == -1)
@@ -239,7 +239,7 @@ namespace tracer
             _value = value;
             _name = name;
             _parent = parent;
-            _type = toVPETType(typeof(T));
+            _type = toTracerType(typeof(T));
             _distribute = distribute;
             _initialValue = value;
 

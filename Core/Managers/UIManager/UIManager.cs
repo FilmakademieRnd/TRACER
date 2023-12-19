@@ -157,7 +157,7 @@ namespace tracer
         //!
         //! Constructor initializing member variables.
         //!
-        public UIManager(Type moduleType, Core vpetCore) : base(moduleType, vpetCore)
+        public UIManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_selectedObjects = new List<SceneObject>();
             m_menus = new List<MenuTree>();

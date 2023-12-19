@@ -39,7 +39,7 @@ namespace tracer
         private float m_time;
         public float time { get => m_time; }
         public event EventHandler<float> animationUpdate;
-        public AnimationManager(Type moduleType, Core vpetCore) : base(moduleType, vpetCore)
+        public AnimationManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_time = 0;
         }

@@ -85,7 +85,7 @@ namespace tracer
             _snapSelect.uiSettings = _manager.uiAppearanceSettings;
             _snapSelect.manager = _manager;
 
-            AbstractParameter.ParameterType type = abstractParam.vpetType;
+            AbstractParameter.ParameterType type = abstractParam.tracerType;
 
             switch (type)
             {
@@ -186,7 +186,7 @@ namespace tracer
         //!
         private void setValue(object sender, float val)
         {
-            AbstractParameter.ParameterType type = abstractParam.vpetType;
+            AbstractParameter.ParameterType type = abstractParam.tracerType;
             switch (type)
             {
                 case AbstractParameter.ParameterType.FLOAT:
