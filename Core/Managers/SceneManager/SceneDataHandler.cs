@@ -28,6 +28,7 @@ https://opensource.org/licenses/MIT
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
@@ -973,6 +974,7 @@ namespace tracer
             //! @param dstIdx The the destination intex within the destination array.
             //! @return The new destination index after copying the source data.
             //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int serialize<T>(T[] srcData, ref byte[] dstData, int dstIdx)
             {
                 int typeSize = Marshal.SizeOf(typeof(T));
@@ -988,6 +990,7 @@ namespace tracer
             //! @param bytearray The byte stream to be deserialised.
             //! @param offset The offset in bytes used to interate over the array.
             //! 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static T ByteArrayToStructure<T>(ref byte[] bytearray, ref int offset) where T : new()
             {
                 T str = new T();
@@ -1011,6 +1014,7 @@ namespace tracer
             //! @param first The array field to be appended to.
             //! @param arrays The arrays to be append.
             //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static T[] Concat<T>(T[] first, params T[][] arrays)
             {
                 int length = first.Length;
@@ -1037,6 +1041,7 @@ namespace tracer
             //! @param first The array field to be appended to.
             //! @param arrays The arrays to be append.
             //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static T[] Concat<T>(T[] first, params T[] array)
             {
                 T[] result = new T[first.Length + array.Length];
@@ -1052,6 +1057,7 @@ namespace tracer
             //! 
             //! @param obj The object to be serialised.
             //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static byte[] StructureToByteArray(object obj)
             {
                 int size = Marshal.SizeOf(obj);
