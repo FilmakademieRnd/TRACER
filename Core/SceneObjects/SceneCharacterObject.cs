@@ -106,7 +106,7 @@ namespace tracer
                     var id = localBoneRotationParameter.id;
                     boneMap.Add(id, boneTransform);
                     boneNamesOrder.Add(boneTransform.name);
-                    Debug.LogError(id+"-"+boneTransform.name);
+                    //Debug.Log(id+"-"+boneTransform.name);
                 }
             }
         }

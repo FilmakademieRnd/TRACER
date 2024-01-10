@@ -91,12 +91,10 @@ namespace tracer
         {
             //! The length of the array storing the bind poses.
             public int bindPoseLength;
-            //! The ID for referencing the associated root bone.
-            public int rootBoneID;
-            //! The bounds if the skinned mesh in world space, stored as float array with the length of 3.
+            //! The bounds of the skinned mesh in world space, stored as float array with the length of 3.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
             public float[] boundExtents;
-            //! The center if the skinned mesh in world space, stored as float array with the length of 3.
+            //! The center of the skinned mesh in world space, stored as float array with the length of 3.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
             public float[] boundCenter;
             //! The bind poses of the skinned mesh stored as 99 4x4 matrices in a float array.
@@ -202,10 +200,8 @@ namespace tracer
             public int bMSize;
             //! The size of the skeleton array.
             public int sSize;
-            //! The ID of the scene character object (as displayed in the SceneCharacterObject in the Unity UI)
-            public int sceneObjectId;
-            //! The object ID of the root bone.
-            public int rootId;
+            //! The object ID of the root bone of the character in the scenegraph.
+            public int characterRootId;
             //! The array of IDs for referencing the associated bone objects.
             public int[] boneMapping;
             //! The array of IDs for referencing the sceleton objects.
@@ -216,9 +212,6 @@ namespace tracer
             public float[] boneRotation;
             //! The array of bone scales for this character as vec3[].
             public float[] boneScale;
-            //! The name of the scene object (as displayed in the Unity UI)
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
-            public byte[] sceneObjectName;
         };
 
         //!

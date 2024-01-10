@@ -539,12 +539,8 @@ namespace tracer
                     characterPack.sSize = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get scene object ID
-                    characterPack.sceneObjectId = BitConverter.ToInt32(m_characterByteData, dataIdx);
-                    dataIdx += size_int;
-
                     // get root dag path
-                    characterPack.rootId = BitConverter.ToInt32(m_characterByteData, dataIdx);
+                    characterPack.characterRootId = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
 
                     // get bone mapping
@@ -600,11 +596,6 @@ namespace tracer
                         characterPack.boneScale[i * 3 + 2] = BitConverter.ToSingle(m_characterByteData, dataIdx);
                         dataIdx += size_float;
                     }
-
-                    // get character name (Marshalled with SizeConst = 64)
-                    ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_characterByteData, dataIdx, 64);
-                    characterPack.sceneObjectName = Encoding.ASCII.GetBytes(nameByte.ToString());
-                    dataIdx += 64;
 
                     characterList.Add(characterPack);
                 }
@@ -801,7 +792,7 @@ namespace tracer
                 m_characterByteData = new byte[0];
                 foreach (CharacterPackage chrPack in characterList)
                 {
-                    byte[] characterByteData = new byte[SceneDataHandler.size_int * 4 +
+                    byte[] characterByteData = new byte[SceneDataHandler.size_int * 3 +
                                                     chrPack.boneMapping.Length * SceneDataHandler.size_int +
                                                     chrPack.skeletonMapping.Length * SceneDataHandler.size_int +
                                                     chrPack.sSize * SceneDataHandler.size_float * 10];
@@ -814,12 +805,8 @@ namespace tracer
                     BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.sSize);
                     dstIdx += SceneDataHandler.size_int;
 
-                    // scene object id
-                    BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.sceneObjectId);
-                    dstIdx += SceneDataHandler.size_int;
-
                     // root dag id
-                    BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.rootId);
+                    BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.characterRootId);
                     dstIdx += SceneDataHandler.size_int;
 
                     // bone mapping
@@ -841,9 +828,6 @@ namespace tracer
                     //skelton bone scales
                     Buffer.BlockCopy(chrPack.boneScale, 0, characterByteData, dstIdx, chrPack.sSize * 3 * SceneDataHandler.size_float);
                     dstIdx += chrPack.sSize * 3 * SceneDataHandler.size_float;
-
-                    // scene object Name
-                    characterByteData = Concat<byte>(characterByteData, chrPack.sceneObjectName);
 
                     // concatenating character byte data to serialised character array
                     m_characterByteData = Concat<byte>(m_characterByteData, characterByteData);

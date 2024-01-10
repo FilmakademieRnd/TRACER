@@ -368,7 +368,7 @@ namespace tracer
             //setup characters
             foreach (SceneManager.CharacterPackage cp in characterList)
             {
-                GameObject obj = gameObjectList[cp.rootId];
+                GameObject obj = gameObjectList[cp.characterRootId];
                 Transform parentBackup = obj.transform.parent;
                 obj.transform.parent = GameObject.Find("Scene").transform.parent;
                 HumanBone[] human = new HumanBone[cp.bMSize];
@@ -639,7 +639,7 @@ namespace tracer
                         bool isCharacter = false;
                         foreach (var VARIABLE in sceneData.characterList)
                         {
-                            if (VARIABLE.rootId == gameObjectList.Count)
+                            if (VARIABLE.characterRootId == gameObjectList.Count)
                             {
                                 isCharacter = true;
                             }

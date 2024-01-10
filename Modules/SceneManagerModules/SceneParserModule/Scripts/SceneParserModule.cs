@@ -281,7 +281,6 @@ namespace tracer
 
             nodeGeo.color = new float[4] { 0, 0, 0, 1 };
             nodeGeo.geoId = processGeometry(sRenderer.sharedMesh, ref sceneData);
-            nodeGeo.rootBoneID = gameObjectList.IndexOf(sRenderer.rootBone.gameObject);
             nodeGeo.boundCenter = new float[3] { sRenderer.localBounds.center.x, sRenderer.localBounds.center.y, sRenderer.localBounds.center.z };
             nodeGeo.boundExtents = new float[3] { sRenderer.localBounds.extents.x, sRenderer.localBounds.extents.y, sRenderer.localBounds.extents.z };
             nodeGeo.bindPoseLength = sRenderer.sharedMesh.bindposes.Length;
@@ -606,11 +605,7 @@ namespace tracer
         private void processCharacter(Animator animator, ref List<GameObject> gameObjectList, ref List<SceneManager.CharacterPackage> characterList)
         {
             SceneManager.CharacterPackage chrPack = new SceneManager.CharacterPackage();
-            chrPack.rootId = gameObjectList.IndexOf(animator.transform.gameObject);
-            chrPack.sceneObjectId = animator.transform.gameObject.GetComponent<SceneCharacterObject>().id;
-            chrPack.sceneObjectName = new byte[64];
-            byte[] tmpName = Encoding.ASCII.GetBytes(animator.transform.name);
-            Buffer.BlockCopy(tmpName, 0, chrPack.sceneObjectName, 0, Math.Min(tmpName.Length, 64));
+            chrPack.characterRootId = gameObjectList.IndexOf(animator.transform.gameObject);
 
             HumanBone[] boneArray = animator.avatar.humanDescription.human;
             chrPack.bMSize = Enum.GetNames(typeof(HumanBodyBones)).Length;
