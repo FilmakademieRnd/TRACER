@@ -345,6 +345,9 @@ namespace tracer
                         case NodeType.GROUP:
                             node = SceneDataHandler.ByteArrayToStructure<SceneNode>(ref m_nodesByteData, ref dataIdx);
                             break;
+                        case NodeType.CHARACTER:
+                            node = SceneDataHandler.ByteArrayToStructure<SceneNodeCharacter>(ref m_nodesByteData, ref dataIdx);
+                            break;
                         case NodeType.GEO:
                             node = SceneDataHandler.ByteArrayToStructure<SceneNodeGeo>(ref m_nodesByteData, ref dataIdx);
                             break;
@@ -716,6 +719,12 @@ namespace tracer
                         nodeTypeBinary = BitConverter.GetBytes((int)NodeType.CAMERA);
                         SceneManager.SceneNodeCam nodeCam = (SceneManager.SceneNodeCam)Convert.ChangeType(node, typeof(SceneManager.SceneNodeCam));
                         nodeBinary = StructureToByteArray(nodeCam);
+                    }
+                    else if (node.GetType() == typeof(SceneManager.SceneNodeCharacter))
+                    {
+                        nodeTypeBinary = BitConverter.GetBytes((int)NodeType.CHARACTER);
+                        SceneManager.SceneNodeCharacter nodeChar = (SceneManager.SceneNodeCharacter)Convert.ChangeType(node, typeof(SceneManager.SceneNodeCharacter));
+                        nodeBinary = StructureToByteArray(nodeChar);
                     }
                     else
                     {

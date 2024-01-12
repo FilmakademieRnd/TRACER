@@ -38,7 +38,7 @@ namespace tracer
         //!
         //! Enumeration defining TRACER node Types.
         //!
-        public enum NodeType { GROUP, GEO, LIGHT, CAMERA, SKINNEDMESH }
+        public enum NodeType { GROUP, GEO, LIGHT, CAMERA, SKINNEDMESH, CHARACTER }
 
         //!
         //! Data structure for serialising basic SceneNodes.
@@ -67,6 +67,16 @@ namespace tracer
         };
 
         //!
+        //! Data structure for serialising basic character SceneNodes.
+        //! The struct layout and array size for marshaling has to be fixed
+        //! to be compatible with unmanaged code.
+        //!
+        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
+        public class SceneNodeCharacter : SceneNode
+        {
+        }
+
+        //!
         //! Data structure for serialising SceneNodes representing Unity
         //! game objects containing 3d scene components like meshes and materials.
         //!
@@ -91,6 +101,8 @@ namespace tracer
         {
             //! The length of the array storing the bind poses.
             public int bindPoseLength;
+            //! The ID for referencing the associated character root.
+            public int characterRootID;
             //! The bounds of the skinned mesh in world space, stored as float array with the length of 3.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
             public float[] boundExtents;

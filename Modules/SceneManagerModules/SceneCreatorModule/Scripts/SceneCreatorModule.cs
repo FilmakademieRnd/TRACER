@@ -333,7 +333,7 @@ namespace tracer
             SceneManager.SceneNode node = sceneData.nodeList[idx];
 
             // process all registered build callbacks
-            GameObject obj = CreateObject(ref sceneData,node, parent);
+            GameObject obj = CreateObject(node, parent);
             obj.layer = LayerMask.NameToLayer("LodMixed");
 
             gameObjectList.Add(obj);
@@ -363,7 +363,7 @@ namespace tracer
             List<SceneManager.CharacterPackage> characterList = sceneData.characterList;
 
             if (characterList.Count > 0)
-                createSkinnedRendererIter(ref sceneData, root);
+                createSkinnedRendererIter(ref sceneData);
 
             //setup characters
             foreach (SceneManager.CharacterPackage cp in characterList)
@@ -409,35 +409,32 @@ namespace tracer
                 humanDescription.legStretch = 0.05f;
                 humanDescription.feetSpacing = 0.0f;
                 humanDescription.hasTranslationDoF = false;
-                
+
                 Avatar avatar = AvatarBuilder.BuildHumanAvatar(obj, humanDescription);
                 if (avatar.isValid == false || avatar.isHuman == false)
                 {
                     Helpers.Log(GetType().FullName + ": Unable to create source Avatar for retargeting. Check that your Skeleton Asset Name and Bone Naming Convention are configured correctly.", Helpers.logMsgType.ERROR);
                     return;
                 }
-                
+
                 avatar.name = obj.name;
                 Animator animator = obj.AddComponent<Animator>();
-                animator.avatar = avatar; 
+                animator.avatar = avatar;
                 animator.applyRootMotion = true;
-                
-                
 
-                
                 obj.transform.parent = parentBackup;
                 animator.Rebind();
             }
 
         }
-        
+
         //!
         //! Creates an GameObject from an TRACER SceneNode beneath the parent transform.
         //! @param node TRACER SceneNode to be parsed.
         //! @param parentTransform Unity parent transform of the GameObject to-be created.
         //! @return The created GameObject.
         //!
-        private GameObject CreateObject(ref SceneManager.SceneDataHandler.SceneData sceneData, SceneManager.SceneNode node, Transform parentTransform)
+        private GameObject CreateObject(SceneManager.SceneNode node, Transform parentTransform)
         {
             GameObject objMain;
 
@@ -631,30 +628,22 @@ namespace tracer
                         manager.sceneCameraList.Add(sco);
                     }
                 }
+                else if (node.GetType() == typeof(SceneManager.SceneNodeCharacter))
+                {
+                    if (node.editable)
+                    {
+                        objMain.tag = "editable";
+                        SceneObject sdo = SceneCharacterObject.Attach(objMain, m_senderID);
+                    }
+                }
                 else
                 {
                     if (node.editable)
                     {
                         objMain.tag = "editable";
-                        bool isCharacter = false;
-                        foreach (var VARIABLE in sceneData.characterList)
-                        {
-                            if (VARIABLE.characterRootId == gameObjectList.Count)
-                            {
-                                isCharacter = true;
-                            }
 
-                        }
-
-                        if (!isCharacter)
-                        {
-                            SceneObject sdo = SceneObject.Attach(objMain, m_senderID);
-                            manager.simpleSceneObjectList.Add(sdo);
-                        }
-                        else
-                        {
-                            SceneObject sdo = SceneCharacterObject.Attach(objMain, m_senderID);
-                        }
+                        SceneObject sdo = SceneObject.Attach(objMain, m_senderID);
+                        manager.simpleSceneObjectList.Add(sdo);
                     }
                 }
 
@@ -692,30 +681,40 @@ namespace tracer
         //! @param sceneData A reference to the TRACER sceneData.
         //! @param parent the parent Unity transform.
         //!
-        private void createSkinnedRendererIter(ref SceneManager.SceneDataHandler.SceneData sceneData, Transform parent)
+        private void createSkinnedRendererIter(ref SceneManager.SceneDataHandler.SceneData sceneData)
         {
+            int characterRootID = -1;
+            int skinnedRendererCount = 0;
+            SkinnedMeshRenderer[] renderers = new SkinnedMeshRenderer[0];
+
             for (int it = 0; it < sceneData.nodeList.Count; it++)
             {
-                SceneManager.SceneNode sceneNode = sceneData.nodeList[it];
-                if (sceneNode.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
+                SceneManager.SceneNodeSkinnedGeo node = sceneData.nodeList[it] as SceneManager.SceneNodeSkinnedGeo;
+                if (node != null)
                 {
-                    SceneManager.SceneNodeSkinnedGeo node = (SceneManager.SceneNodeSkinnedGeo)sceneNode;
-
-                    Transform trans = Helpers.FindDeepChild(parent,
-                        Helpers.RemoveNullCharacters(Encoding.UTF8.GetString(node.name)));
-                    SkinnedMeshRenderer renderer = trans.gameObject.GetComponent<SkinnedMeshRenderer>();
-                    if (renderer)
+                    if (characterRootID != node.characterRootID)
                     {
-                        renderer.rootBone = trans;
-                        Transform[] meshBones = new Transform[node.skinnedMeshBoneIDs.Length];
-                        for (int i = 0; i < node.skinnedMeshBoneIDs.Length; i++)
+                        characterRootID = node.characterRootID;
+                        skinnedRendererCount = 0;
+                        renderers = gameObjectList[characterRootID].GetComponentsInChildren<SkinnedMeshRenderer>();
+                    }
+                    if (renderers.Length >= skinnedRendererCount)
+                    {
+                        SkinnedMeshRenderer renderer = renderers[skinnedRendererCount];
+                        if (renderer)
                         {
-                            if (node.skinnedMeshBoneIDs[i] != -1)
-                                meshBones[i] = gameObjectList[node.skinnedMeshBoneIDs[i]].transform;
-                        }
+                            renderer.rootBone = renderer.gameObject.transform;
+                            Transform[] meshBones = new Transform[node.skinnedMeshBoneIDs.Length];
+                            for (int i = 0; i < node.skinnedMeshBoneIDs.Length; i++)
+                            {
+                                if (node.skinnedMeshBoneIDs[i] != -1)
+                                    meshBones[i] = gameObjectList[node.skinnedMeshBoneIDs[i]].transform;
+                            }
 
-                        renderer.bones = meshBones;
-                        renderer.updateWhenOffscreen = true;
+                            renderer.bones = meshBones;
+                            renderer.updateWhenOffscreen = true;
+                        }
+                        skinnedRendererCount++;
                     }
                 }
             }

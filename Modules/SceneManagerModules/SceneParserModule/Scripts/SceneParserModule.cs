@@ -156,6 +156,7 @@ namespace tracer
                 }
                 else if (trans.GetComponent<Animator>() != null)
                 {
+                    node = ParseCharacer();
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
                             sceneObject = SceneCharacterObject.Attach(gameObject, networkManager.cID);
@@ -266,6 +267,19 @@ namespace tracer
         }
 
         //!
+        //! Function for creating a TRACER light node out of an Unity light object.
+        //!
+        //! @param light The Unity light for which a TRACER node will be created.
+        //! @return The created light node.
+        //!
+        private SceneManager.SceneNodeCharacter ParseCharacer()
+        {
+            // empty so far...
+
+            return new SceneManager.SceneNodeCharacter();
+        }
+
+        //!
         //! Function for creating a TRACER skinned geo node out of an skinned Unity object.
         //!
         //! @param transform The transform from the Unity mesh object.
@@ -281,6 +295,7 @@ namespace tracer
 
             nodeGeo.color = new float[4] { 0, 0, 0, 1 };
             nodeGeo.geoId = processGeometry(sRenderer.sharedMesh, ref sceneData);
+            nodeGeo.characterRootID = gameObjectList.IndexOf(location.GetComponentInParent<Animator>().gameObject);
             nodeGeo.boundCenter = new float[3] { sRenderer.localBounds.center.x, sRenderer.localBounds.center.y, sRenderer.localBounds.center.z };
             nodeGeo.boundExtents = new float[3] { sRenderer.localBounds.extents.x, sRenderer.localBounds.extents.y, sRenderer.localBounds.extents.z };
             nodeGeo.bindPoseLength = sRenderer.sharedMesh.bindposes.Length;
