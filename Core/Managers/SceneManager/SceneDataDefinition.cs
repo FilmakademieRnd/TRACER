@@ -212,7 +212,7 @@ namespace tracer
             public int bMSize;
             //! The size of the skeleton array.
             public int sSize;
-            //! The object ID of the root bone of the character in the scenegraph.
+            //! The object ID of the root of the character in the scenegraph.
             public int characterRootId;
             //! The array of IDs for referencing the associated bone objects.
             public int[] boneMapping;
