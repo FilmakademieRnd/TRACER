@@ -93,6 +93,8 @@ namespace tracer
 
             sceneData.header.lightIntensityFactor = 1f;
 
+            sceneData.header.frameRate = (byte) core.settings.framerate;
+
             List<GameObject> gameObjects = new List<GameObject>();
             recursiveGameObjectIdExtract(scene, ref gameObjects, getLowLayer, getHighLayer, getMixedLayer);
 

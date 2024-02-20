@@ -57,6 +57,9 @@ namespace tracer
         //! The client ID from the scene sender, used as SceneObject's sceneID.
         private byte m_senderID;
 
+        //! The scene senders framerate in fps.
+        private byte m_frameRate;
+
 
         //!
         //! Constructor
@@ -112,6 +115,7 @@ namespace tracer
 
             m_LightScale = sceneData.header.lightIntensityFactor;
             m_senderID = sceneData.header.senderID;
+            m_frameRate = sceneData.header.frameRate;
 
             if (manager.settings.loadTextures)
                 createTextures(ref sceneData);

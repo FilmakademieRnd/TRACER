@@ -167,7 +167,10 @@ namespace tracer
         {
             //! Global factor for light intensity scaling. 
             public float lightIntensityFactor;
+            //! The client ID from the scene sender, used as SceneObject's sceneID.
             public byte senderID;
+            //! The current framerate in fps.
+            public byte frameRate;
         }
 
         //!

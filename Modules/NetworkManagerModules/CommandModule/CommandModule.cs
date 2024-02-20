@@ -18,7 +18,7 @@ You should have received a copy of the MIT License along with this program;
 if not go to https://opensource.org/licenses/MIT
 */
 
-//! @file "UpdateSenderModule.cs"
+//! @file "CommandModule.cs"
 //! @brief Implementation of the update sender module, sending parameter updates to clients.
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
