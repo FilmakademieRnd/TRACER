@@ -156,7 +156,13 @@ namespace tracer
                 {
                     Material _mat = new Material(Shader.Find("Standard"));
                     _mat.name = matPack.name;
+                    if (matPack.textureIds.Length > 0)
+                    {
+                        _mat.mainTexture = SceneTextureList[matPack.textureIds[0]];
+                    }
+
                     SceneMaterialList.Add(_mat);
+                    
                 }
                 else if (matPack.type == 0)
                 {
