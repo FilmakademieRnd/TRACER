@@ -54,6 +54,7 @@ namespace tracer
                 public List<CharacterPackage> characterList;
                 public List<TexturePackage> textureList;
                 public List<MaterialPackage> materialList;
+                public List<ParameterObjectPackage> parameterObjectList;
 
                 public SceneData()
                 {
@@ -63,6 +64,7 @@ namespace tracer
                     characterList = new List<CharacterPackage>();
                     textureList = new List<TexturePackage>();
                     materialList = new List<MaterialPackage>();
+                    parameterObjectList = new List<ParameterObjectPackage>();
                 }
 
                 ~SceneData() { clear(); }
@@ -74,6 +76,7 @@ namespace tracer
                     characterList.Clear();
                     textureList.Clear();
                     materialList.Clear();
+                    parameterObjectList.Clear();
                 }
             }
 
@@ -223,6 +226,29 @@ namespace tracer
             {
                 set { m_materialsByteData = value; }
             }
+
+            //!
+            //! The list containing the serialised ParameterObjects.
+            //!
+            private byte[] m_parameterObjectsByteData;
+            //!
+            //! Getter function returning a reference to the byte array  
+            //! containing the serialised ParameterObjects data.
+            //!
+            //! @return A reference to the serialised ParameterObjects data.
+            //!
+            public ref byte[] m_parameterObjectsByteDataRef
+            {
+                get { return ref m_parameterObjectsByteData; }
+            }
+            //!
+            //! Setter function for setting a the byte array,
+            //! containing the serialised material data.
+            //!
+            public byte[] parameterObjectsByteData
+            {
+                set { m_parameterObjectsByteData = value; }
+            }
             //!
             //! Initialisation of the lists storing deserialised the scene data.
             //!
@@ -246,6 +272,7 @@ namespace tracer
                 m_characterByteData = new byte[0];
                 m_texturesByteData = new byte[0];
                 m_materialsByteData = new byte[0];
+                m_parameterObjectsByteData = new byte[0];
             }
 
             //!
@@ -284,7 +311,12 @@ namespace tracer
                 if (m_materialsByteData != null && m_materialsByteData.Length > 0)
                     sceneData.materialList = convertMaterialsByteStream();
                 else
-                    Helpers.Log("SceneDataHandler: Materieal byte array null or empty!", Helpers.logMsgType.WARNING);
+                    Helpers.Log("SceneDataHandler: Materieals byte array null or empty!", Helpers.logMsgType.WARNING);
+                
+                if (m_parameterObjectsByteData != null && m_parameterObjectsByteData.Length > 0)
+                    sceneData.parameterObjectList = convertParameterObjectsByteStream();
+                else
+                    Helpers.Log("SceneDataHandler: Parameter Objects byte array null or empty!", Helpers.logMsgType.WARNING);
 
                 return sceneData;
             }
@@ -314,6 +346,9 @@ namespace tracer
 
                 getMaterialsByteArray(ref sceneData.materialList);
                 sceneData.materialList.Clear();
+
+                getParameterObjectsByteArray(ref sceneData.parameterObjectList);
+                sceneData.parameterObjectList.Clear();
             }
 
             //!
@@ -451,37 +486,115 @@ namespace tracer
                 return materialList;
             }
 
-            private int deserialize(byte[] srcData, out bool[] dstData, int srcOffset, int length)
+            //!
+            //! Helper for deserialization of bool lists
+            //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static int deserialize(in byte[] srcData, out bool[] dstData, int srcOffset, int length)
             {
                 dstData = new bool[length];
                 for (int i = 0; i < length; i++)
                 {
-                    dstData[i] = BitConverter.ToBoolean(m_materialsByteData, srcOffset);
+                    dstData[i] = BitConverter.ToBoolean(srcData, srcOffset);
                     srcOffset++;
                 }
                 return srcOffset;
             }
 
-            private int deserialize(byte[] srcData, out int[] dstData, int srcOffset, int length)
+            //!
+            //! Helper for deserialization of int lists
+            //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static int deserialize(in byte[] srcData, out int[] dstData, int srcOffset, int length)
             {
                 dstData = new int[length];
                 for (int i = 0; i < length; i++)
                 {
-                    dstData[i] = BitConverter.ToInt32(m_materialsByteData, srcOffset);
+                    dstData[i] = BitConverter.ToInt32(srcData, srcOffset);
                     srcOffset += size_int;
                 }
                 return srcOffset;
             }
 
-            private int deserialize(byte[] srcData, out float[] dstData, int srcOffset, int length)
+            //!
+            //! Helper for deserialization of float lists
+            //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static int deserialize(in byte[] srcData, out float[] dstData, int srcOffset, int length)
             {
                 dstData = new float[length];
                 for (int i = 0; i < length; i++)
                 {
-                    dstData[i] = BitConverter.ToSingle(m_materialsByteData, srcOffset);
+                    dstData[i] = BitConverter.ToSingle(srcData, srcOffset);
                     srcOffset += size_float;
                 }
                 return srcOffset;
+            }
+
+            //!
+            //! Helper for deserialization of string lists
+            //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static int deserialize(in ReadOnlySpan<byte> srcData, out string[] dstData, int srcOffset, int length)
+            {
+                dstData = new string[length];
+                for (int i = 0; i < length; i++)
+                {
+                    int jLength = MemoryMarshal.Read<int>(srcData.Slice(srcOffset));
+                    srcOffset += size_int;
+
+                    dstData[i] = Encoding.ASCII.GetString(srcData.Slice(srcOffset, jLength));
+                    srcOffset += jLength;
+                }
+                return srcOffset;
+            }
+
+            //!
+            //! The function deserialises a ParameterObjects byte stream and stores it into the ParameterObjects list.
+            //!
+            private List<ParameterObjectPackage> convertParameterObjectsByteStream()
+            {
+                List<ParameterObjectPackage> parameterObjectList = new List<ParameterObjectPackage>();
+
+                int dataIdx = 0;
+                while (dataIdx < m_parameterObjectsByteData.Length - 1)
+                {
+                    ParameterObjectPackage poPack = new ParameterObjectPackage();
+
+                    // get id
+                    int intValue = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
+                    poPack.id = intValue;
+                    dataIdx += size_int;
+
+                    // get parameter object name length
+                    intValue = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
+                    dataIdx += size_int;
+
+                    // get parameter object name
+                    ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_parameterObjectsByteData, dataIdx, intValue);
+                    poPack.name = Encoding.ASCII.GetString(nameByte);
+                    dataIdx += intValue;
+
+                    // get nbr of parameters 
+                    intValue = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
+                    dataIdx += size_int;
+
+                    // parameter types
+                    dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pTypes, dataIdx, intValue);
+                   
+                    // parameter IDs
+                    dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pIDs, dataIdx, intValue);
+                    
+                    // parameter is RPC
+                    dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pRPC, dataIdx, intValue);
+                    
+                    // parameter names
+                    dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pNames, dataIdx, intValue);
+
+                    parameterObjectList.Add(poPack);
+                }
+
+                return parameterObjectList;
             }
 
             //!
@@ -960,10 +1073,67 @@ namespace tracer
             }
 
             //!
+            //! Function that concatinates all serialised TRACER ParameterObjects to a byte array.
+            //!
+            //! @param parameterObjectList The list that contains the serialised materials to be concatinated.
+            //!
+            private void getParameterObjectsByteArray(ref List<ParameterObjectPackage> parameterObjectList)
+            {
+                m_parameterObjectsByteData = new byte[0];
+
+
+                foreach (ParameterObjectPackage poPack in parameterObjectList)
+                {
+                    // count characters in srings
+                    int charLength = 0;
+                    foreach (string s in poPack.pNames)
+                        charLength += s.Length;
+
+                    byte[] poByteData = new byte[
+                        3 * SceneDataHandler.size_int +
+                        poPack.name.Length +
+                        poPack.pTypes.Length * SceneDataHandler.size_int +
+                        poPack.pIDs.Length * SceneDataHandler.size_float +
+                        poPack.pRPC.Length * SceneDataHandler.size_float +
+                        poPack.pNames.Length * SceneDataHandler.size_int +
+                        charLength];
+                    
+                    int dstIdx = 0;
+                    
+                    // id (int)
+                    dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.id), ref poByteData, dstIdx);
+
+                    // name length (int)
+                    dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.name.Length), ref poByteData, dstIdx);
+
+                    // name (byte[])
+                    dstIdx = serialize<byte>(Encoding.ASCII.GetBytes(poPack.name), ref poByteData, dstIdx);
+
+                    // nbr parameters (int)
+                    dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.pIDs.Length), ref poByteData, dstIdx);
+
+                    // prameter types (int[])
+                    dstIdx = serialize<int>(poPack.pTypes, ref poByteData, dstIdx);
+
+                    // prameter ID's (int[])
+                    dstIdx = serialize<int>(poPack.pIDs, ref poByteData, dstIdx);
+
+                    // prameter RPC properties (bool[])
+                    dstIdx = serialize<bool>(poPack.pRPC, ref poByteData, dstIdx);
+
+                    // prameter names (string[])
+                    dstIdx = serialize<string>(poPack.pNames, ref poByteData, dstIdx);
+
+                    // concate
+                    m_parameterObjectsByteData = Concat<byte>(m_parameterObjectsByteData, poByteData);
+                }
+            }
+
+            //!
             //! Function that serializes an arbitrary formated array into a byte array.
             //!
             //! @param srcData The arbitrary source data array.
-            //! @param srcData The byte formated destination array.
+            //! @param dstData The byte formated destination array.
             //! @param dstIdx The the destination intex within the destination array.
             //! @return The new destination index after copying the source data.
             //!
@@ -975,6 +1145,30 @@ namespace tracer
                     typeSize = 1;
                 Buffer.BlockCopy(srcData, 0, dstData, dstIdx, srcData.Length * typeSize);
                 return dstIdx + srcData.Length * typeSize;
+            }
+
+            //!
+            //! Function that serializes an array of strings into a byte array.
+            //!
+            //! @param srcData The source string array.
+            //! @param dstData The byte formated destination array.
+            //! @param dstIdx The the destination intex within the destination array.
+            //! @return The new destination index after copying the source data.
+            //!
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static int serialize(string[] srcData, ref byte[] dstData, int dstIdx)
+            {
+                for (int i = 0; i < srcData.Length; i++)
+                {
+                    int sLength = srcData.Length;
+
+                    Buffer.BlockCopy(BitConverter.GetBytes(sLength), 0, dstData, dstIdx, size_int);
+                    dstIdx += size_int;
+                    Buffer.BlockCopy(Encoding.ASCII.GetBytes(srcData[i]), 0, dstData, dstIdx, sLength);
+                    dstIdx += sLength;
+                }
+
+                return dstIdx;
             }
 
             //! 

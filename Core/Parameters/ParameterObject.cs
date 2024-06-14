@@ -51,6 +51,10 @@ namespace tracer
         //!
         protected byte _sceneID = 254;
         //!
+        //! The name of this parameter object.
+        //!
+        protected string _name = "";
+        //!
         //! The unique ID of this parameter object.
         //!
         public short id
@@ -63,6 +67,13 @@ namespace tracer
         public byte sceneID
         {
             get => _sceneID;
+        }
+        //!
+        //! The name of this parameter object.
+        //!
+        public ref string objectName
+        {
+            get => ref _name;
         }
         //!
         //! A reference to the tracer core.
@@ -127,7 +138,7 @@ namespace tracer
         //!
         //! Initialisation
         //!
-        protected void Init(byte sceneID)
+        public void Init(byte sceneID)
         {
             _core.removeParameterObject(this);
             _sceneID = sceneID;

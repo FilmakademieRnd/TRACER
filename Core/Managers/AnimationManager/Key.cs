@@ -56,10 +56,10 @@ namespace tracer
         public Key(float time, T value, float tangentTime = 0, T tangentValue = default(T), KeyType type = KeyType.LINEAR)
         {
             this.time = time;
+            this.type = type;
             this.value = value;
             this.tangentTime = tangentTime;
             this.tangentValue = tangentValue;
-            this.type = KeyType.LINEAR;
         }
 
         //!
@@ -69,9 +69,9 @@ namespace tracer
         {
             this.time = time;
             this.value = value;
+            this.type = KeyType.LINEAR;
             this.tangentTime = 0;
             this.tangentValue = default(T);
-            this.type = KeyType.LINEAR;
         }
     }
 }

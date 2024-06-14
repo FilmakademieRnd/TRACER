@@ -30,12 +30,12 @@ namespace tracer
     //!
     public class RPCParameter<T> : Parameter<T>
     {
-        public RPCParameter(T parameterValue, string name, ParameterObject parent, bool distribute = true) : base(parameterValue, name, parent, distribute) { }
+        public RPCParameter(T parameterValue, string name, ParameterObject parent, bool distribute = true) : base(parameterValue, name, parent, distribute) { _rpc = true; }
 
         //!
         //! Action that will be executed when the parameter is evaluated.
         //!
-        private Action<T> m_action;
+        protected Action<T> m_action;
 
         //!
         //! Function to set the action to be executed.
@@ -53,17 +53,26 @@ namespace tracer
         //! @param _data The byte _data to be deserialized and copyed to the parameters value.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void deSerialize(Span<byte> data, int offset)
+        public override void deSerialize(ReadOnlySpan<byte> data)
         {
-            base.deSerialize(data, offset);
+            base.deSerialize(data);
             m_action.Invoke(_value);
         }
 
         //!
         //! Function to call the action associated with the Parameter. 
         //!
-        public void Call()
+        public void Call(T value)
         {
+            _value = value;
+            InvokeHasChanged();
+        }
+
+        public void Call(T value, bool local)
+        {
+            _value = value;
+            if (local)
+                m_action?.Invoke(_value);
             InvokeHasChanged();
         }
     }
@@ -74,7 +83,7 @@ namespace tracer
     public class RPCParameter : RPCParameter<object>
     {
         //! Simple constructor without RPC parameter.
-        public RPCParameter(string name, ParameterObject parent, bool distribute = true) : base(parent, name, parent, distribute) { }
+        public RPCParameter(string name, ParameterObject parent, bool distribute = true) : base(parent, name, parent, distribute) { _rpc = true;  }
 
         //!
         //! Overrides the Parameters deserialization functionality, because we do not have a payload.
@@ -82,11 +91,26 @@ namespace tracer
         //! @param _data The byte _data to be deserialized and copyed to the parameters value. (not used)
         //! @param _offset The start offset in the given data array. (not used)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void deSerialize(Span<byte> data, int offset)
+        public override void deSerialize(ReadOnlySpan<byte> data)
         {
             _networkLock = true;
             InvokeHasChanged();
             _networkLock = false;
+        }
+
+        //!
+        //! Function to call the action associated with the Parameter. 
+        //!
+        public void Call()
+        {
+            InvokeHasChanged();
+        }
+        public void Call(bool local)
+        {
+            _value = value;
+            if (local)
+                m_action?.Invoke(null);
+            InvokeHasChanged();
         }
     }
 

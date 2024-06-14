@@ -319,5 +319,25 @@ namespace tracer
             //! All available shader parameter values as a byte stream.
             public byte[] shaderProperties;
         };
+        //!
+        //! TRACER structure used to hold material data.
+        //! This sructure is used for saving to disk or sending via network.
+        //!
+        public class ParameterObjectPackage
+        {
+            //! The id of the parameter object
+            public int id;
+            //! The name of the parameter object.
+            public string name;
+            //// List os Parameters
+            //! The types of the parameters inside the parameter object.
+            public int[] pTypes;
+            //! The IDs of the parameters inside the parameter object.
+            public int[] pIDs;  // <-- is this rteally needed???, do we need a dafault value? [REVIEW]
+            //! Flag determines wether a parameter is an RPC parameter.
+            public bool[] pRPC;
+            //! The names of the parameters inside the parameter object.
+            public string[] pNames;
+        };
     }
 }

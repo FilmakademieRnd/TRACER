@@ -45,7 +45,8 @@ namespace tracer
             PARAMETERUPDATE, LOCK, // node
             SYNC, PING, RESENDUPDATE, // sync
             UNDOREDOADD, RESETOBJECT, // undo redo
-            DATAHUB // DataHub
+            DATAHUB, // DataHub
+            RPC // RPC
         }
 
 

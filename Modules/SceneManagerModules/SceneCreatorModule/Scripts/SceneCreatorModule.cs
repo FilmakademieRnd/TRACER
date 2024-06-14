@@ -29,8 +29,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
+using UnityEditor;
+
 //using UnityEditor.Animations;
 using UnityEngine;
+using static tracer.AbstractParameter;
 
 namespace tracer
 {
@@ -111,7 +114,7 @@ namespace tracer
             SceneManager.SceneDataHandler sceneDataHandler = manager.sceneDataHandler;
             SceneManager.SceneDataHandler.SceneData sceneData = sceneDataHandler.getSceneData();
 
-            Helpers.Log(string.Format("Build scene from: {0} objects, {1} textures, {2} materials, {3} nodes", sceneData.objectList.Count, sceneData.textureList.Count, sceneData.materialList.Count, sceneData.nodeList.Count));
+            Helpers.Log(string.Format("Build scene from: {0} objects, {1} textures, {2} materials, {3} nodes, {4} parameter objects", sceneData.objectList.Count, sceneData.textureList.Count, sceneData.materialList.Count, sceneData.nodeList.Count, sceneData.parameterObjectList.Count));
 
             m_LightScale = sceneData.header.lightIntensityFactor;
             m_senderID = sceneData.header.senderID;
@@ -119,6 +122,8 @@ namespace tracer
 
             if (manager.settings.loadTextures)
                 createTextures(ref sceneData);
+
+            createParameterObjects(ref sceneData);
 
             createMaterials(ref sceneData);
 
@@ -234,6 +239,61 @@ namespace tracer
                     SceneMaterialList.Add(mat);
                 }
             }
+        }
+
+        //!
+        //! Function that creates the Tracer ParameterObjects.
+        //!
+        //! @param sceneData A reference to the TRACER sceneData.
+        //!
+        private void createParameterObjects(ref SceneManager.SceneDataHandler.SceneData sceneData)
+        {
+            if (sceneData.parameterObjectList.Count == 0)
+                return;
+
+            MenuTree customMenue = new MenuTree();
+
+            //customMenue.iconResourceLocation = "Images/button_network";
+            customMenue.caption = "Custom Menue";
+            UIManager uiManager = core.getManager<UIManager>();
+
+            customMenue = customMenue.Begin(MenuItem.IType.VSPLIT);   // <<< begin VSPLIT
+            
+            foreach (SceneManager.ParameterObjectPackage po in sceneData.parameterObjectList)
+            {
+                // [REVIEW]
+                // create ParameterObjects
+                ParameterObject obj = new ParameterObject();
+                obj.objectName = po.name;
+                obj.Init(255);
+
+                customMenue = customMenue.Add(po.name, true);
+                customMenue = customMenue.Add(MenuItem.IType.SPACE);
+
+                // create the ParameterObject's parameters
+                for (int i=0; i<po.pTypes.Length; i++)
+                {
+                    Type type = toCType((ParameterType) po.pTypes[i]);
+                    Type paramType;
+                    if (po.pRPC[i])
+                        paramType = typeof(RPCParameter<>).MakeGenericType(type);
+                    else
+                        paramType = typeof(Parameter<>).MakeGenericType(type);
+
+                    customMenue = customMenue.Begin(MenuItem.IType.HSPLIT);  // <<< start HSPLIT
+
+                    customMenue.Add(po.pNames[i]);
+                    customMenue.Add((AbstractParameter)Activator.CreateInstance(paramType, Activator.CreateInstance(type), po.pNames[i], obj, true));
+
+                    customMenue.End();  // <<< end HSPLIT
+                }
+               
+                
+            }
+
+            customMenue = customMenue.End();     // <<< end VSPLIT
+
+            uiManager.addMenu(customMenue);
         }
 
         //!

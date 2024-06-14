@@ -30,6 +30,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using System.Diagnostics;
+using static tracer.AbstractParameter;
 
 namespace tracer
 {
@@ -164,7 +166,7 @@ namespace tracer
         {
             // enable/disable logging
 #if UNITY_EDITOR
-            Debug.unityLogger.logEnabled = true;
+            UnityEngine.Debug.unityLogger.logEnabled = true;
 #else
             Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
             Debug.unityLogger.logEnabled = false;

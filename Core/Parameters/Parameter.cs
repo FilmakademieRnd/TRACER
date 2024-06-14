@@ -88,6 +88,19 @@ namespace tracer
         //!
         protected bool _networkLock;
         //!
+        //! Flag that determines whether a Parameter will be a RPC parameter.
+        //!
+        protected bool _rpc = false;
+        //!
+        //! Function that returns the current animation state of the parameter.
+        //!
+        //! @return The current animation state of the parameter.
+        //!
+        public virtual bool isAnimated
+        {
+            get => false;
+        }
+        //!
         //! Getter for unique id of this parameter.
         //!
         public short id
@@ -100,6 +113,13 @@ namespace tracer
         public bool isNetworkLocked
         {
             get => _networkLock;
+        }
+        //!
+        //! Flag that determines whether a Parameter will be locked for network comunication.
+        //!
+        public bool isRPC
+        {
+            get => _rpc;
         }
         //!
         //! Getter for parameters C# type.
@@ -145,7 +165,7 @@ namespace tracer
         //! @param t The C# type from which the TRACER type is to be determined. 
         //! @return The determined C# type.
         //!
-        protected static Type toCType(ParameterType t)
+        public static Type toCType(ParameterType t)
         {
             return _paramTypes[(int)t];
         }
@@ -163,19 +183,23 @@ namespace tracer
             else
                 return (ParameterType)idx;
         }
+        public virtual AbstractParameter getAnimationParameter()
+        {
+            return null;
+        }
         //!
-        //! Abstract definition of the function for serializing the parameters data.
+        //! Abstract definition of the function for serializing the parameters sourceSpan.
         //! 
-        //! @param startoffset The offset in bytes within the generated array at which the data should start at.
-        //! @return The Parameters data serialized as a byte array.
+        //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
+        //! @return The Parameters sourceSpan serialized as a byte array.
         //! 
         public abstract void Serialize(Span<byte> targetSpan);
         //!
-        //! Abstract definition of the function for deserializing parameter data.
+        //! Abstract definition of the function for deserializing parameter sourceSpan.
         //! 
-        //! @param data The byte data to be deserialized and copyed to the parameters value.
+        //! @param sourceSpan The byte sourceSpan to be deserialized and copyed to the parameters value.
         //! 
-        public abstract void deSerialize(Span<byte> data, int offset);
+        public abstract void deSerialize(ReadOnlySpan<byte> data);
 
         //!
         //! Abstract definition of function called to copy value of other parameter
@@ -204,11 +228,11 @@ namespace tracer
         //!
         protected T _initialValue;
         //!
-        //! The size of the serialized data of the parameter.
+        //! The size of the serialized sourceSpan of the parameter.
         //!
         protected short _dataSize = -1;
         //!
-        //! Getter for the size of the serialized data of the parameter.
+        //! Getter for the size of the serialized sourceSpan of the parameter.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int dataSize()
@@ -243,7 +267,7 @@ namespace tracer
             _distribute = distribute;
             _initialValue = value;
 
-            // initialize data size
+            // initialize sourceSpan size
             switch (_type)
             {
                 case ParameterType.NONE:
@@ -355,93 +379,81 @@ namespace tracer
             }
         }
 
-          /////////////////////////////////////////////////////////////
-         /////////////////////// Serialisation ///////////////////////
+        public override AbstractParameter getAnimationParameter()
+        {
+            return new AnimationParameter<T>(this);
+        }
+
+        /////////////////////////////////////////////////////////////
+        /////////////////////// Serialisation ///////////////////////
         /////////////////////////////////////////////////////////////
 
         //!
-        //! Function for serializing the parameters data.
+        //! Function for serializing the parameters sourceSpan.
         //! 
-        //! @param startoffset The offset in bytes within the generated array at which the data should start at.
-        //! @return The Parameters data serialized as a byte array.
+        //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
+        //! @return The Parameters sourceSpan serialized as a byte array.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void Serialize(Span<byte> targetSpan)
+        {
+            SerializeData(targetSpan, _value);
+        }
+
+        //!
+        //! Function for serializing the parameters sourceSpan.
+        //! 
+        //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
+        //! @return The Parameters sourceSpan serialized as a byte array.
+        //! 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void SerializeData(Span<byte> targetSpan, in T value)
         {
             switch (_type)
             {
                 case ParameterType.BOOL:
                     {
-                        targetSpan[0] = Convert.ToByte(_value);
+                        FromBool(value, targetSpan);
                         break;
                     }
                 case ParameterType.INT:
                     {
-                        BitConverter.TryWriteBytes(targetSpan, Convert.ToInt32(_value));
+                        FromInt(value, targetSpan);
                         break;
                     }
                 case ParameterType.FLOAT:
                     {
-                        BitConverter.TryWriteBytes(targetSpan, Convert.ToSingle(_value));
+                        FromFloat(value, targetSpan);
                         break;
                     }
                 case ParameterType.VECTOR2:
                     {
-                        Vector2 obj = (Vector2)Convert.ChangeType(_value, typeof(Vector2));
-
-                        BitConverter.TryWriteBytes(targetSpan.Slice(0, 4), obj.x);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(4, 4), obj.y);
-
+                        FromVector2(value, targetSpan);
                         break;
                     }
                 case ParameterType.VECTOR3:
                     {
-                        Vector3 obj = (Vector3)Convert.ChangeType(_value, typeof(Vector3));
-
-                        BitConverter.TryWriteBytes(targetSpan.Slice(0, 4), obj.x);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(4, 4), obj.y);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(8, 4), obj.z);
-
+                        FromVector3 (value, targetSpan);
                         break;
                     }
                 case ParameterType.VECTOR4:
                     {
-                        Vector4 obj = (Vector4)Convert.ChangeType(_value, typeof(Vector4));
-
-                        BitConverter.TryWriteBytes(targetSpan.Slice(0, 4), obj.x);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(4, 4), obj.y);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(8, 4), obj.z);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(12, 4), obj.w);
-
+                       FromVector4(value, targetSpan);
                         break;
                     }
                 case ParameterType.QUATERNION:
                     {
-                        Quaternion obj = (Quaternion)Convert.ChangeType(_value, typeof(Quaternion));
-
-                        BitConverter.TryWriteBytes(targetSpan.Slice(0, 4), obj.x);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(4, 4), obj.y);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(8, 4), obj.z);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(12, 4), obj.w);
-
+                        FromQuaternion(value, targetSpan);
                         break;
                     }
                 case ParameterType.COLOR:
                     {
-                        Color obj = (Color)Convert.ChangeType(_value, typeof(Color));
-
-                        BitConverter.TryWriteBytes(targetSpan.Slice(0, 4), obj.r);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(4, 4), obj.g);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(8, 4), obj.b);
-                        BitConverter.TryWriteBytes(targetSpan.Slice(12, 4), obj.a);
-
+                        FromColor(value, targetSpan);
                         break;
                     }
                 case ParameterType.STRING:
                     {
-                        string obj = (string)Convert.ChangeType(_value, typeof(string));
-                        targetSpan = Encoding.UTF8.GetBytes(obj);
-
+                        FromString(value, targetSpan);
                         break;
                     }
                 default:
@@ -449,94 +461,218 @@ namespace tracer
             }
         }
 
+        //!
+        //! Function for deserializing parameter _data.
+        //! 
+        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
+        //! @param _offset The start offset in the given sourceSpan array.
+        //! 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
+        {
+            _value = deSerializeData(sourceSpan);
+        }
 
 
         //!
         //! Function for deserializing parameter _data.
         //! 
         //! @param _data The byte _data to be deserialized and copyed to the parameters value.
-        //! @param _offset The start offset in the given data array.
+        //! @param _offset The start offset in the given sourceSpan array.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void deSerialize(Span<byte> data, int offset)
+        protected T deSerializeData(ReadOnlySpan<byte> sourceSpan)
         {
+            T returnvalue = default;
             switch (_type)
             {
                 case ParameterType.BOOL:
-                    _value = (T)(object)MemoryMarshal.Read<bool>(data.Slice(offset));
+                    returnvalue = ToBool(sourceSpan);
                     break;
                 case ParameterType.INT:
-                    _value = (T)(object)MemoryMarshal.Read<int>(data.Slice(offset));
+                    returnvalue = ToInt(sourceSpan);
                     break;
                 case ParameterType.FLOAT:
-                    _value = (T)(object)MemoryMarshal.Read<float>(data.Slice(offset));
+                    returnvalue = ToFloat(sourceSpan);
                     break;
                 case ParameterType.VECTOR2:
-                    _value = (T)(object)new Vector2(MemoryMarshal.Read<float>(data.Slice(offset)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 4)));
+                    returnvalue = ToVector2(sourceSpan);
                     break;
                 case ParameterType.VECTOR3:
-                    _value = (T)(object)new Vector3(MemoryMarshal.Read<float>(data.Slice(offset)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 4)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 8)));
+                    returnvalue = ToVector3(sourceSpan);
                     break;
                 case ParameterType.VECTOR4:
-                    _value = (T)(object)new Vector4(MemoryMarshal.Read<float>(data.Slice(offset)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 4)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 8)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 12)));
+                    returnvalue = ToVector4(sourceSpan);
                     break;
                 case ParameterType.QUATERNION:
-                    _value = (T)(object)new Quaternion(MemoryMarshal.Read<float>(data.Slice(offset)),
-                                                     MemoryMarshal.Read<float>(data.Slice(offset + 4)),
-                                                     MemoryMarshal.Read<float>(data.Slice(offset + 8)),
-                                                     MemoryMarshal.Read<float>(data.Slice(offset + 12)));
+                    returnvalue = ToQuaternion(sourceSpan);
                     break;
                 case ParameterType.COLOR:
-                    _value = (T)(object)new Color(MemoryMarshal.Read<float>(data.Slice(offset)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 4)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 8)),
-                                                    MemoryMarshal.Read<float>(data.Slice(offset + 12)));
+                    returnvalue = ToColor(sourceSpan);
                     break;
                 case ParameterType.STRING:
-                    _value = (T)(object)new string(Encoding.UTF8.GetString(data));
+                    returnvalue = ToString(sourceSpan);
                     break;
                 default:
-                    return;
+                    break;
             }
             _networkLock = true;
             hasChanged?.Invoke(this, _value);
             _networkLock = false;
+
+            return returnvalue;
         }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void InvokeHasChanged()
         {
             hasChanged?.Invoke(this, _value);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromBool(in T value, Span<byte> target)
+        {
+            target[0] = Convert.ToByte(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromInt(in T value, Span<byte> target)
+        {
+            BitConverter.TryWriteBytes(target, Convert.ToInt32(value));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromFloat(in T value, Span<byte> target)
+        {
+            BitConverter.TryWriteBytes(target, Convert.ToSingle(value));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromVector2(in T value, Span<byte> target)
+        {
+            Vector2 obj = (Vector2)(object) value;
+
+            BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
+            BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromVector3(in T value, Span<byte> target)
+        {
+            Vector3 obj = (Vector3)(object) value;
+
+            BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
+            BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
+            BitConverter.TryWriteBytes(target.Slice(8, 4), obj.z);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromVector4(in T value, Span<byte> target)
+        {
+            Vector4 obj = (Vector4)(object) value;
+
+            BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
+            BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
+            BitConverter.TryWriteBytes(target.Slice(8, 4), obj.z);
+            BitConverter.TryWriteBytes(target.Slice(12, 4), obj.w);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromQuaternion(in T value, Span<byte> target)
+        {
+            Quaternion obj = (Quaternion)(object) value;
+
+            BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
+            BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
+            BitConverter.TryWriteBytes(target.Slice(8, 4), obj.z);
+            BitConverter.TryWriteBytes(target.Slice(12, 4), obj.w);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromColor(in T value, Span<byte> target)
+        {
+            Color obj = (Color)(object) value;
+
+            BitConverter.TryWriteBytes(target.Slice(0, 4), obj.r);
+            BitConverter.TryWriteBytes(target.Slice(4, 4), obj.g);
+            BitConverter.TryWriteBytes(target.Slice(8, 4), obj.b);
+            BitConverter.TryWriteBytes(target.Slice(12, 4), obj.a);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void FromString(in T value, Span<byte> target)
+        {
+            string obj = (string)Convert.ChangeType(value, typeof(string));
+            target = Encoding.UTF8.GetBytes(obj);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToBool(ReadOnlySpan<byte> source) 
+        { 
+            return (T)(object) MemoryMarshal.Read<bool>(source); 
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToInt(ReadOnlySpan<byte> source)
+        {
+            return (T)(object) MemoryMarshal.Read<int>(source);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToFloat(ReadOnlySpan<byte> source)
+        {
+            return (T)(object) MemoryMarshal.Read<float>(source);
+        }        
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToVector2(ReadOnlySpan<byte> source)
+        {
+            return (T)(object) new Vector2(MemoryMarshal.Read<float>(source),
+                               MemoryMarshal.Read<float>(source.Slice(4)));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToVector3(ReadOnlySpan<byte> source)
+        {
+            return (T)(object) new Vector3(MemoryMarshal.Read<float>(source),
+                               MemoryMarshal.Read<float>(source.Slice(4)),
+                               MemoryMarshal.Read<float>(source.Slice(8)));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToVector4(ReadOnlySpan<byte> source)
+        {
+            return (T)(object) new Vector4(MemoryMarshal.Read<float>(source),
+                               MemoryMarshal.Read<float>(source.Slice(4)),
+                               MemoryMarshal.Read<float>(source.Slice(8)),
+                               MemoryMarshal.Read<float>(source.Slice(12)));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToQuaternion(ReadOnlySpan<byte> source)
+        {
+            return (T)(object) new Quaternion(MemoryMarshal.Read<float>(source),
+                               MemoryMarshal.Read<float>(source.Slice(4)),
+                               MemoryMarshal.Read<float>(source.Slice(8)),
+                               MemoryMarshal.Read<float>(source.Slice(12)));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToColor(ReadOnlySpan<byte> source)
+        {
+            return (T)(object) new Color(MemoryMarshal.Read<float>(source),
+                               MemoryMarshal.Read<float>(source.Slice(4)),
+                               MemoryMarshal.Read<float>(source.Slice(8)),
+                               MemoryMarshal.Read<float>(source.Slice(12)));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static T ToString(ReadOnlySpan<byte> source)
+        {
+            return (T)(object) new string(Encoding.UTF8.GetString(source));
+        }
+
     }
 
-    //public interface IParam<T>
-    //{
-    //    public abstract void Serialize(byte data);
-    //}
-    //public class AParam: IParam<bool>, IParam<float>
-    //{
-    //    //public abstract void Serialize(byte data);
-    //    void IParam<bool>.Serialize(byte data) { }
-    //    void IParam<float>.Serialize(byte data) { }
-
-    //    private readonly AParam inst = new();
-    //    public void Serialize<T>(byte data) { } //=> (inst as IParam<T> ?? throw new NotSupportedException()).Serialize(data);
-
-    //}
-    //public class Param<T> : AParam
-    //{
-    //    public void Serialize(byte data)
-    //    {
-    //        AParam t = new AParam();
-    //        t.Serialize<T>(data);
-    //    }
-
-    //}
 }

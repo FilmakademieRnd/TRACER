@@ -21,6 +21,7 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace tracer
 {
@@ -40,15 +41,40 @@ namespace tracer
         //!
         //! A reference to the key list (for animation).
         //!
-        public ref List<Key<T>> _key_List { get => ref _keyList; }
+        public ref List<Key<T>> keys { get => ref _keyList; }
         //!
         //! A reference to the Animation Manager.
         //!
         private AnimationManager _animationManager = null;
-        public AnimationParameter(T parameterValue, string name, ParameterObject parent = null, bool distribute = true) : base(parameterValue, name, parent, distribute) 
+        public AnimationParameter(T parameterValue, string name, ParameterObject parent = null, bool distribute = true) : base(parameterValue, name, parent, distribute)
         {
+            if (typeof(T) == typeof(string))
+                throw new InvalidOperationException("Type not supported");
+
             _nextIdx = 0;
             _prevIdx = 0;
+        }
+
+        //!
+        //! Factory Constructor for AnimationParameter from Parameter<T>
+        //! @param p source parameter to copy values from
+        //!
+        public AnimationParameter(Parameter<T> p) : base(p)
+        {
+            if (typeof(T) == typeof(string))
+                throw new InvalidOperationException("Type not supported");
+
+            _nextIdx = 0;
+            _prevIdx = 0;
+        }
+
+        //!
+        //! Factory Constructor from AnimationParameter
+        //! @return A new Parameter<T> based in the AnimationParameter.
+        //!
+        public AbstractParameter getParameter()
+        {
+            return new Parameter<T>(this);
         }
 
         //!
@@ -66,12 +92,23 @@ namespace tracer
                 _animationManager.animationUpdate += updateValue;
         }
 
+
         //!
         //! Destructor
         //!
         ~AnimationParameter()
         {
             clearKeys();
+        }
+
+        //!
+        //! Getter for the size of the serialized sourceSpan of the parameter.
+        //!
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override int dataSize()
+        {
+            // count<short> + count *(type<byte> + time<float> + tangentTime<float> + value<ParamValueSize> + tangentvalue<ParamValueSize>) 
+            return _dataSize + 2 + _keyList.Count * (1 + 2 * sizeof(float) + 2 * _dataSize);
         }
 
         /////////////////////////////////////////////////////////
@@ -99,7 +136,7 @@ namespace tracer
         //!
         public void addKey(Key<T> key)
         {
-            if (!isAnimated())
+            if (!isAnimated)
                 initAnimation();
 
             int i = findNextKeyIndex(key);
@@ -160,7 +197,7 @@ namespace tracer
         //!
         private void updateValue(object o, float time)
         {
-            if (isAnimated())
+            if (isAnimated)
             {
                 // current time is NOT in between the two active keys
                 if (time < _keyList[_prevIdx].time || time > _keyList[_nextIdx].time)
@@ -215,13 +252,15 @@ namespace tracer
         //!
         //! @return The current animation state of the parameter.
         //!
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool isAnimated()
+        public override bool isAnimated
         {
-            if (_keyList != null)
-                return _keyList.Count > 0;
-            else
-                return false;
+            get
+            {
+                if (_keyList != null)
+                    return _keyList.Count > 0;
+                else
+                    return false;
+            }
         }
 
         //!
@@ -242,6 +281,64 @@ namespace tracer
                     return (T)(object)(((float)(object)_keyList[_prevIdx].value) * (1.0f - s1) + ((float)(object)_keyList[_nextIdx].value) * s1);
                 default:
                     return default(T);
+            }
+        }
+
+        //!
+        //! Function for serializing the animation parameters keys.
+        //! 
+        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
+        //! @param _offset The start offset in the given sourceSpan array.
+        //! 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override void Serialize(Span<byte> targetSpan)
+        {
+            base.Serialize(targetSpan);
+
+            int offset = _dataSize;
+            short keyCount = (short) _keyList.Count;
+          
+            BitConverter.TryWriteBytes(targetSpan.Slice(offset+=2, 2), keyCount); // nbr. of keys
+            for (int i=0; i<keyCount; i++)
+            {
+                Key<T> key = _keyList[i];
+                BitConverter.TryWriteBytes(targetSpan.Slice(offset+=1, 1),(byte)key.type); // type
+                BitConverter.TryWriteBytes(targetSpan.Slice(offset+=4, 4), key.time); // time
+                BitConverter.TryWriteBytes(targetSpan.Slice(offset+=4, 4), key.tangentTime); // tangent time
+                SerializeData(targetSpan.Slice(offset+=_dataSize, _dataSize), key.value); // value
+                SerializeData(targetSpan.Slice(offset+=_dataSize, _dataSize), key.tangentValue); // tangent value
+            }
+        }
+
+        //!
+        //! Function for deserializing the animation parameters keys.
+        //! 
+        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
+        //! @param _offset The start offset in the given sourceSpan array.
+        //! 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
+        {
+            base.deSerialize(sourceSpan);
+
+            // determine the correct offset in the span
+            int offset = _dataSize;
+            short keyCount = MemoryMarshal.Read<short>(sourceSpan.Slice(offset+=2, 2));
+
+            if (!isAnimated && keyCount>0)
+                initAnimation();
+
+            _keyList.Clear();
+
+            for (int i=0; i<keyCount; i++) 
+            {
+                Key<T>.KeyType type = MemoryMarshal.Read<Key<T>.KeyType>(sourceSpan.Slice(offset+=1, 1));
+                float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset+=4, 4));
+                float tangenttime = MemoryMarshal.Read<float>(sourceSpan.Slice(offset+=4, 4));
+                T value = deSerializeData(sourceSpan.Slice(offset+=_dataSize, _dataSize));
+                T tangentvalue = deSerializeData(sourceSpan.Slice(offset+=_dataSize, _dataSize));
+
+                _keyList.Add(new Key<T>(time, value, tangenttime, tangentvalue, type));
             }
         }
     }
