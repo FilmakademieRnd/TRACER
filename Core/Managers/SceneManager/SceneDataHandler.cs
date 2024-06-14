@@ -455,31 +455,35 @@ namespace tracer
                     // textureScales
                     dataIdx = deserialize(m_materialsByteData, out matPack.textureScales, dataIdx, intValue * 2);
 
-                    // size shaderConfig
-                    intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
-                    dataIdx += size_int;
 
-                    // shaderConfig
-                    dataIdx = deserialize(m_materialsByteData, out matPack.shaderConfig, dataIdx, intValue);
+                    if (matPack.type != 1)
+                    {
+                        // size shaderConfig
+                        intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                        dataIdx += size_int;
 
-                    // size shaderProperties
-                    intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
-                    dataIdx += size_int;
+                        // shaderConfig
+                        dataIdx = deserialize(m_materialsByteData, out matPack.shaderConfig, dataIdx, intValue);
 
-                    // shader property IDs
-                    dataIdx = deserialize(m_materialsByteData, out matPack.shaderPropertyIds, dataIdx, intValue);
+                        // size shaderProperties
+                        intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                        dataIdx += size_int;
 
-                    // shader property types
-                    dataIdx = deserialize(m_materialsByteData, out matPack.shaderPropertyTypes, dataIdx, intValue);
+                        // shader property IDs
+                        dataIdx = deserialize(m_materialsByteData, out matPack.shaderPropertyIds, dataIdx, intValue);
 
-                    // size shaderProperties data
-                    intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
-                    dataIdx += size_int;
+                        // shader property types
+                        dataIdx = deserialize(m_materialsByteData, out matPack.shaderPropertyTypes, dataIdx, intValue);
 
-                    // shader property data
-                    matPack.shaderProperties = new byte[intValue];
-                    Buffer.BlockCopy(m_materialsByteData, dataIdx, matPack.shaderProperties, 0, intValue);
-                    dataIdx += intValue;
+                        // size shaderProperties data
+                        intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                        dataIdx += size_int;
+
+                        // shader property data
+                        matPack.shaderProperties = new byte[intValue];
+                        Buffer.BlockCopy(m_materialsByteData, dataIdx, matPack.shaderProperties, 0, intValue);
+                        dataIdx += intValue;
+                    }
 
                     materialList.Add(matPack);
                 }
