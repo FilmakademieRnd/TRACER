@@ -274,7 +274,7 @@ namespace tracer
 
                 for (int i = 0; i < timeSlotBuffer.Count; i++)
                 {
-                    Span<byte> message = timeSlotBuffer[i];
+                    ReadOnlySpan<byte> message = timeSlotBuffer[i];
 
                     if ((MessageType)message[2] == MessageType.LOCK)
                     {
@@ -300,7 +300,14 @@ namespace tracer
                                 parameterObject = core.getParameterObject(sceneID, parameterObjectID);
 
                             if (parameterObject != null)
-                                parameterObject.parameterList[parameterID].deSerialize(message, start + 7);
+                            {
+                                AbstractParameter parameter = parameterObject.parameterList[parameterID];
+                                // check update if animation is incoming and change parameter type if required 
+                                if (!parameter.isAnimated && length > parameter.dataSize()) {
+                                    parameter = parameter.getAnimationParameter();
+                                }
+                                parameter.deSerialize(message.Slice(start + 7));
+                            }
 
                             start += length;
                             oldSceneID = sceneID;

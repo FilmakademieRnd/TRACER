@@ -332,8 +332,6 @@ namespace tracer
             //// List os Parameters
             //! The types of the parameters inside the parameter object.
             public int[] pTypes;
-            //! The IDs of the parameters inside the parameter object.
-            public int[] pIDs;  // <-- is this rteally needed???, do we need a dafault value? [REVIEW]
             //! Flag determines wether a parameter is an RPC parameter.
             public bool[] pRPC;
             //! The names of the parameters inside the parameter object.

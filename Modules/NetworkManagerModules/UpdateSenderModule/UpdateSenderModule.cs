@@ -258,6 +258,41 @@ namespace tracer
         }
 
         //!
+        //! Function that creates a reset message.
+        //!
+        //! @param parameter The modified parameter the message will be based on.
+        //!
+        public void queueRPCMessage(object sender, AbstractParameter parameter)
+        {
+            // Message structure: Header, Parameter (optional)
+            // Header: ClientID, Time, MessageType
+            // Parameter: SceneID, ParameterObjectID, ParameterID, ParameterType, ParameterData
+
+            lock (sender)
+            {
+                m_controlMessage = new byte[3 + parameter.dataSize() + 7];
+                Span<byte> msgSpan = m_controlMessage;
+
+                // header
+                msgSpan[0] = manager.cID; // ClientID
+                msgSpan[1] = core.time; // Time
+                msgSpan[2] = (byte)MessageType.RPC; // MessageType
+
+                int length = 7 + parameter.dataSize();
+                Span<byte> newSpan = msgSpan.Slice(3, length);
+
+                newSpan[0] = parameter.parent.sceneID;  // SceneID
+                BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter.parent.id);  // SceneObjectID
+                BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter.id);  // ParameterID
+                newSpan[5] = (byte)parameter.tracerType;  // ParameterType
+                newSpan[6] = (byte)newSpan.Length;  // Parameter message length
+                parameter.Serialize(newSpan.Slice(7)); // Parameter data
+            }
+            Helpers.Log("RPC sended!");
+            m_mre.Set();
+        }
+
+        //!
         //! Function collects all parameter modifications within one global time tick for sending.
         //!
         //! @param sender The scene object containing the modified parameter.
@@ -267,6 +302,13 @@ namespace tracer
         {
             lock (m_modifiedParameters)
             {
+                if (parameter.isRPC)
+                {
+                    if (!parameter.isNetworkLocked)
+                        queueRPCMessage(sender, parameter);
+                    return;
+                }
+
                 bool paramInList = m_modifiedParameters.Contains(parameter);
                 if (parameter.isNetworkLocked)
                 {
@@ -298,7 +340,7 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // ParameterList: List<SceneObjectID, ParameterID, ParameterType, Parameter message length, ParameterData>
 
-            byte[] message = new byte[3 + m_modifiedParametersDataSize + 7 * m_modifiedParameters.Count];
+            byte[] message = new byte[3 + m_modifiedParametersDataSize + 8 * m_modifiedParameters.Count];
             Span<byte> msgSpan = new Span<byte>(message);
 
             // header
@@ -306,6 +348,7 @@ namespace tracer
             msgSpan[1] = core.time; // Time
             msgSpan[2] = (byte)MessageType.PARAMETERUPDATE; // MessageType
 
+            // list of parameters
             int start = 3;
             for (int i = 0; i < m_modifiedParameters.Count; i++)
             {

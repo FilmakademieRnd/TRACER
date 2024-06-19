@@ -586,9 +586,6 @@ namespace tracer
                     // parameter types
                     dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pTypes, dataIdx, intValue);
                    
-                    // parameter IDs
-                    dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pIDs, dataIdx, intValue);
-                    
                     // parameter is RPC
                     dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pRPC, dataIdx, intValue);
                     
@@ -1097,7 +1094,6 @@ namespace tracer
                         3 * SceneDataHandler.size_int +
                         poPack.name.Length +
                         poPack.pTypes.Length * SceneDataHandler.size_int +
-                        poPack.pIDs.Length * SceneDataHandler.size_float +
                         poPack.pRPC.Length * SceneDataHandler.size_float +
                         poPack.pNames.Length * SceneDataHandler.size_int +
                         charLength];
@@ -1114,13 +1110,10 @@ namespace tracer
                     dstIdx = serialize<byte>(Encoding.ASCII.GetBytes(poPack.name), ref poByteData, dstIdx);
 
                     // nbr parameters (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.pIDs.Length), ref poByteData, dstIdx);
+                    dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.pTypes.Length), ref poByteData, dstIdx);
 
                     // prameter types (int[])
                     dstIdx = serialize<int>(poPack.pTypes, ref poByteData, dstIdx);
-
-                    // prameter ID's (int[])
-                    dstIdx = serialize<int>(poPack.pIDs, ref poByteData, dstIdx);
 
                     // prameter RPC properties (bool[])
                     dstIdx = serialize<bool>(poPack.pRPC, ref poByteData, dstIdx);
