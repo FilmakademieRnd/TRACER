@@ -206,6 +206,9 @@ namespace tracer
                         case "nodes":
                             sceneDataHandler.nodesByteData = sceneReceiver.ReceiveFrameBytes();
                             break;
+                        case "parameterobjects":
+                            sceneDataHandler.parameterObjectsByteData = sceneReceiver.ReceiveFrameBytes();
+                            break;
                         case "objects":
                             sceneDataHandler.objectsByteData = sceneReceiver.ReceiveFrameBytes();
                             break;
@@ -232,7 +235,7 @@ namespace tracer
         //! 
         public void receiveScene(string ip, string port)
         {
-            m_requests = new List<string>() { "header", "nodes", "objects", "characters", "textures", "materials" };
+            m_requests = new List<string>() { "header", "nodes", "parameterobjects", "objects", "characters", "textures", "materials",  };
             start(ip, port);
         }
 

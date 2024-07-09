@@ -23,7 +23,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @version 0
-//! @date 28.10.2021
+//! @date 19.06.2024
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -340,7 +340,7 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // ParameterList: List<SceneObjectID, ParameterID, ParameterType, Parameter message length, ParameterData>
 
-            byte[] message = new byte[3 + m_modifiedParametersDataSize + 8 * m_modifiedParameters.Count];
+            byte[] message = new byte[3 + m_modifiedParametersDataSize + 7 * m_modifiedParameters.Count];
             Span<byte> msgSpan = new Span<byte>(message);
 
             // header

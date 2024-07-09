@@ -23,7 +23,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @version 0
-//! @date 28.10.2021
+//! @date 19.06.2024
 
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -31,7 +31,6 @@ using System;
 using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
-using System.Diagnostics;
 using UnityEngine;
 using System.Runtime.InteropServices;
 
@@ -93,8 +92,6 @@ namespace tracer
             m_sceneManager = core.getManager<SceneManager>();
             m_sceneManager.sceneReady += connectAndStart;
         }
-
-
 
         //!
         //! Function that connects the scene object change events for parameter queuing.
