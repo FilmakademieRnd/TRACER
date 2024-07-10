@@ -264,14 +264,14 @@ namespace tracer
             UIManager uiManager = core.getManager<UIManager>();
 
             customMenue = customMenue.Begin(MenuItem.IType.VSPLIT);   // <<< begin VSPLIT
-            
+            GameObject coreObject = core.transform.gameObject;
+
             foreach (SceneManager.ParameterObjectPackage po in sceneData.parameterObjectList)
             {
                 // [REVIEW]
                 // create ParameterObjects
-                ParameterObject obj = new ParameterObject();
+                ParameterObject obj = SceneObject.Attach(coreObject, 255);
                 obj.objectName = po.name;
-                obj.Init(255);
 
                 customMenue = customMenue.Add(po.name, true);
                 customMenue = customMenue.Add(MenuItem.IType.SPACE);

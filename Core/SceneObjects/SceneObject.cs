@@ -84,12 +84,12 @@ namespace tracer
         //! Factory to create a new SceneObject and do it's initialisation.
         //! Use this function instead GameObject.AddComponen<>!
         //!
-        //! @param gameObject The gameObject the new SceneObject will be attached to.
+        //! @param parent The gameObject the new SceneObject will be attached to.
         //! @sceneID The scene ID for the new SceneObject.
         //!
-        public static new SceneObject Attach(GameObject gameObject, byte sceneID = 254)
+        public static new SceneObject Attach(GameObject parent, byte sceneID = 254)
         {
-            SceneObject obj = gameObject.AddComponent<SceneObject>();
+            SceneObject obj = parent.AddComponent<SceneObject>();
             obj.Init(sceneID);
 
             return obj;
