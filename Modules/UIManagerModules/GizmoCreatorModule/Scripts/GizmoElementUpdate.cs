@@ -1,4 +1,5 @@
-/* 
+/*
+-----------------------------------------------------------------------------------
 TRACER FOUNDATION -
 Toolset for Realtime Animation, Collaboration & Extended Reality
 
@@ -17,6 +18,7 @@ ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
 FOR A PARTICULAR PURPOSE. See the MIT License for more details.
 You should have received a copy of the MIT License along with this program;
 if not go to https://opensource.org/licenses/MIT
+-----------------------------------------------------------------------------------
 */
 
 //! @file "GizmoElementUpdate.cs"
