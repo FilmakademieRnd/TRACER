@@ -126,7 +126,7 @@ namespace tracer
             if (manager.settings.loadTextures)
                 createTextures(ref sceneData);
 
-            createParameterObjects(ref sceneData);
+            //createParameterObjects(ref sceneData);
 
             createMaterials(ref sceneData);
 

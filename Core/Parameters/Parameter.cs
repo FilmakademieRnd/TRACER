@@ -474,6 +474,10 @@ namespace tracer
         public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
         {
             _value = deSerializeData(sourceSpan);
+
+            _networkLock = true;
+            hasChanged?.Invoke(this, _value);
+            _networkLock = false;
         }
 
 
@@ -486,7 +490,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected T deSerializeData(ReadOnlySpan<byte> sourceSpan)
         {
-            T returnvalue = default;
+            T returnvalue;
             switch (_type)
             {
                 case ParameterType.BOOL:
@@ -517,11 +521,9 @@ namespace tracer
                     returnvalue = ToString(sourceSpan);
                     break;
                 default:
+                    returnvalue = default;
                     break;
             }
-            _networkLock = true;
-            hasChanged?.Invoke(this, _value);
-            _networkLock = false;
 
             return returnvalue;
         }
