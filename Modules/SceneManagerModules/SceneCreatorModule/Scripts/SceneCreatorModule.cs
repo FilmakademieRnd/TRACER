@@ -273,7 +273,7 @@ namespace tracer
             {
                 // [REVIEW]
                 // create ParameterObjects
-                ParameterObject obj = SceneObject.Attach(coreObject, 255);
+                DinamicParameterObject obj = DinamicParameterObject.Attach(coreObject, 255);
                 obj.objectName = po.name;
 
                 customMenue = customMenue.Add(po.name, true);
@@ -286,13 +286,20 @@ namespace tracer
                     Type paramType;
                     if (po.pRPC[i])
                         paramType = typeof(RPCParameter<>).MakeGenericType(type);
+                    // connect param change fct to the fct of new DPO by fct call
                     else
                         paramType = typeof(Parameter<>).MakeGenericType(type);
+                    // connect param change fct to the fct of new DPO by fct call
 
+                    var parameter = Activator.CreateInstance(paramType, Activator.CreateInstance(type), po.pNames[i],
+                        obj, true);
+                    obj.SubscribeToParameterChange((AbstractParameter)parameter);
+                    
+                    
                     customMenue = customMenue.Begin(MenuItem.IType.HSPLIT);  // <<< start HSPLIT
 
                     customMenue.Add(po.pNames[i]);
-                    customMenue.Add((AbstractParameter)Activator.CreateInstance(paramType, Activator.CreateInstance(type), po.pNames[i], obj, true));
+                    customMenue.Add((AbstractParameter)parameter);
 
                     customMenue.End();  // <<< end HSPLIT
                 }
@@ -403,6 +410,9 @@ namespace tracer
         //!
         private int createSceneGraphIter(ref SceneManager.SceneDataHandler.SceneData sceneData, Transform parent, int idx = 0, bool isRoot = true)
         {
+            if (sceneData.nodeList.Count > 0)
+            {
+
             SceneManager.SceneNode node = sceneData.nodeList[idx];
 
             // process all registered build callbacks
@@ -423,6 +433,9 @@ namespace tracer
                 idxChild = createSceneGraphIter(ref sceneData, parent, idxChild + 1);
 
             return idxChild;
+                            
+            }
+            else return 0;
         }
 
         //!
@@ -482,8 +495,9 @@ namespace tracer
                 humanDescription.legStretch = 0.05f;
                 humanDescription.feetSpacing = 0.0f;
                 humanDescription.hasTranslationDoF = false;
-
+                
                 Avatar avatar = AvatarBuilder.BuildHumanAvatar(obj, humanDescription);
+                
                 if (avatar.isValid == false || avatar.isHuman == false)
                 {
                     Helpers.Log(GetType().FullName + ": Unable to create source Avatar for retargeting. Check that your Skeleton Asset Name and Bone Naming Convention are configured correctly.", Helpers.logMsgType.ERROR);
