@@ -303,7 +303,8 @@ namespace tracer
                             {
                                 AbstractParameter parameter = parameterObject.parameterList[parameterID];
                                 // check update if animation is incoming and change parameter type if required 
-                                if (!parameter.isAnimated && length > parameter.dataSize()) {
+                                // 7 is the size of the parameter fixed fields
+                                if (!parameter.isAnimated && length > 7 + parameter.dataSize()) {
                                     parameter = parameter.getAnimationParameter();
                                 }
                                 parameter.deSerialize(message.Slice(start + 7));
