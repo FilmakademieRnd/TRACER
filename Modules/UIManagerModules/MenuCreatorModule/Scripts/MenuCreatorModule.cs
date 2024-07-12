@@ -266,10 +266,10 @@ namespace tracer
                                 Toggle toggle = newObject.GetComponent<Toggle>();
                                 toggle.isOn = ((Parameter<bool>)item.Parameter).value;
                                 toggle.onValueChanged.AddListener(delegate { ((Parameter<bool>)item.Parameter).setValue(toggle.isOn); });
-                                Text textComponent = newObject.GetComponentInChildren<Text>();
+                                /*Text textComponent = newObject.GetComponentInChildren<Text>();
                                 textComponent.text = item.Parameter.name;
                                 textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
-                                textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;*/
                                 ColorBlock toggleColors = toggle.colors;
                                 toggleColors.normalColor = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
                                 toggleColors.highlightedColor = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
@@ -279,6 +279,20 @@ namespace tracer
                                 toggle.colors = toggleColors;
                             }
                         break;
+                        case AbstractParameter.ParameterType.INT:
+                        {
+                            newObject = GameObject.Instantiate(m_numberInputField, parentObject.transform);
+                            TMP_InputField numberInputField = newObject.GetComponent<TMP_InputField>();
+                            numberInputField.text = ((Parameter<int>)item.Parameter).value.ToString();
+                            numberInputField.onEndEdit.AddListener(delegate { ((Parameter<int>)item.Parameter).setValue(Mathf.RoundToInt(float.Parse(numberInputField.text))); numberInputField.text = ((Parameter<int>)item.Parameter).value.ToString(); });
+                            Image imgButton = numberInputField.GetComponent<Image>();
+                            imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
+                            numberInputField.textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                            numberInputField.textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                            numberInputField.textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                            numberInputField.caretPosition = numberInputField.text.Length;
+                        }
+                            break;
                         case AbstractParameter.ParameterType.FLOAT:
                             {
                                 newObject = GameObject.Instantiate(m_numberInputField, parentObject.transform);
@@ -293,6 +307,174 @@ namespace tracer
                                 numberInputField.caretPosition = numberInputField.text.Length;
                             }
                         break;
+                        case AbstractParameter.ParameterType.VECTOR2:
+                        {
+                            GameObject[] inputFields = new GameObject[2];
+                            TMP_InputField[] numberInputFields = new TMP_InputField[2];
+    
+                            for (int i = 0; i < 2; i++)
+                            {
+                                inputFields[i] = GameObject.Instantiate(m_numberInputField, parentObject.transform);
+                                numberInputFields[i] = inputFields[i].GetComponent<TMP_InputField>();
+                            }
+    
+                            Vector2 vectorValue = ((Parameter<Vector2>)item.Parameter).value;
+
+                            for (int i = 0; i < 2; i++)
+                            {
+                                numberInputFields[i].text = vectorValue[i].ToString();
+                                int index = i; // Capture current index for delegate
+
+                                numberInputFields[i].onEndEdit.AddListener(delegate {
+                                    vectorValue[index] = float.Parse(numberInputFields[index].text);
+                                    ((Parameter<Vector2>)item.Parameter).setValue(vectorValue);
+                                });
+
+                                // Set appearance
+                                Image imgButton = numberInputFields[i].GetComponent<Image>();
+                                imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
+                                numberInputFields[i].textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                                numberInputFields[i].textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                                numberInputFields[i].textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                numberInputFields[i].caretPosition = numberInputFields[i].text.Length;
+                            }
+                        }
+                            break;
+                        case AbstractParameter.ParameterType.VECTOR3:
+                        {
+                            GameObject[] inputFields = new GameObject[3];
+                            TMP_InputField[] numberInputFields = new TMP_InputField[3];
+    
+                            for (int i = 0; i < 3; i++)
+                            {
+                                inputFields[i] = GameObject.Instantiate(m_numberInputField, parentObject.transform);
+                                numberInputFields[i] = inputFields[i].GetComponent<TMP_InputField>();
+                            }
+    
+                            Vector3 vectorValue = ((Parameter<Vector3>)item.Parameter).value;
+
+                            for (int i = 0; i < 3; i++)
+                            {
+                                numberInputFields[i].text = vectorValue[i].ToString();
+                                int index = i; // Capture current index for delegate
+
+                                numberInputFields[i].onEndEdit.AddListener(delegate {
+                                    vectorValue[index] = float.Parse(numberInputFields[index].text);
+                                    ((Parameter<Vector3>)item.Parameter).setValue(vectorValue);
+                                });
+
+                                // Set appearance
+                                Image imgButton = numberInputFields[i].GetComponent<Image>();
+                                imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
+                                numberInputFields[i].textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                                numberInputFields[i].textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                                numberInputFields[i].textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                numberInputFields[i].caretPosition = numberInputFields[i].text.Length;
+                            }
+                        }
+                            break;
+                        case AbstractParameter.ParameterType.VECTOR4:
+                        {
+                            GameObject[] inputFields = new GameObject[4];
+                            TMP_InputField[] numberInputFields = new TMP_InputField[4];
+    
+                            for (int i = 0; i < 4; i++)
+                            {
+                                inputFields[i] = GameObject.Instantiate(m_numberInputField, parentObject.transform);
+                                numberInputFields[i] = inputFields[i].GetComponent<TMP_InputField>();
+                            }
+    
+                            Vector4 vectorValue = ((Parameter<Vector4>)item.Parameter).value;
+
+                            for (int i = 0; i < 4; i++)
+                            {
+                                numberInputFields[i].text = vectorValue[i].ToString();
+                                int index = i; // Capture current index for delegate
+
+                                numberInputFields[i].onEndEdit.AddListener(delegate {
+                                    vectorValue[index] = float.Parse(numberInputFields[index].text);
+                                    ((Parameter<Vector4>)item.Parameter).setValue(vectorValue);
+                                });
+
+                                // Set appearance
+                                Image imgButton = numberInputFields[i].GetComponent<Image>();
+                                imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
+                                numberInputFields[i].textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                                numberInputFields[i].textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                                numberInputFields[i].textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                numberInputFields[i].caretPosition = numberInputFields[i].text.Length;
+                            }
+                        }
+                            break;
+                        case AbstractParameter.ParameterType.QUATERNION:
+                        {
+                            GameObject[] inputFields = new GameObject[4];
+                            TMP_InputField[] numberInputFields = new TMP_InputField[4];
+    
+                            for (int i = 0; i < 4; i++)
+                            {
+                                inputFields[i] = GameObject.Instantiate(m_numberInputField, parentObject.transform);
+                                numberInputFields[i] = inputFields[i].GetComponent<TMP_InputField>();
+                            }
+    
+                            Quaternion quaternionValue = ((Parameter<Quaternion>)item.Parameter).value;
+
+                            for (int i = 0; i < 4; i++)
+                            {
+                                numberInputFields[i].text = quaternionValue[i].ToString();
+                                int index = i; // Capture current index for delegate
+
+                                numberInputFields[i].onEndEdit.AddListener(delegate {
+                                    quaternionValue[index] = float.Parse(numberInputFields[index].text);
+                                    ((Parameter<Quaternion>)item.Parameter).setValue(quaternionValue);
+                                });
+
+                                // Set appearance
+                                Image imgButton = numberInputFields[i].GetComponent<Image>();
+                                imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
+                                numberInputFields[i].textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                                numberInputFields[i].textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                                numberInputFields[i].textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                numberInputFields[i].caretPosition = numberInputFields[i].text.Length;
+                            }
+                        }
+                            break;
+                        case AbstractParameter.ParameterType.COLOR:
+                        {
+                            GameObject[] inputFields = new GameObject[4];
+                            TMP_InputField[] numberInputFields = new TMP_InputField[4];
+    
+                            for (int i = 0; i < 4; i++)
+                            {
+                                inputFields[i] = GameObject.Instantiate(m_numberInputField, parentObject.transform);
+                                numberInputFields[i] = inputFields[i].GetComponent<TMP_InputField>();
+                            }
+    
+                            Color colorValue = ((Parameter<Color>)item.Parameter).value;
+
+                            for (int i = 0; i < 4; i++)
+                            {
+                                numberInputFields[i].text = colorValue[i].ToString();
+                                int index = i; // Capture current index for delegate
+
+                                numberInputFields[i].onEndEdit.AddListener(delegate {
+                                    float parsedValue = float.Parse(numberInputFields[index].text);
+                                    float clampedValue = Mathf.Clamp(parsedValue, 0, 255);
+                                    colorValue[index] = clampedValue;
+                                    ((Parameter<Color>)item.Parameter).setValue(colorValue);
+                                    numberInputFields[index].text = colorValue[index].ToString();
+                                });
+
+                                // Set appearance
+                                Image imgButton = numberInputFields[i].GetComponent<Image>();
+                                imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
+                                numberInputFields[i].textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                                numberInputFields[i].textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                                numberInputFields[i].textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                numberInputFields[i].caretPosition = numberInputFields[i].text.Length;
+                            }
+                        }
+                            break;
                         case AbstractParameter.ParameterType.STRING:
                             {
                                 newObject = GameObject.Instantiate(m_inputField, parentObject.transform);

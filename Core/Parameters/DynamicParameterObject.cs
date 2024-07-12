@@ -21,8 +21,8 @@ if not go to https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------------
 */
 
-//! @file "DinamicParameterObject.cs"
-//! @brief implementation Dinamic Parameter Object
+//! @file "DynamicParameterObject.cs"
+//! @brief implementation Dynamic Parameter Object
 //! @author Alexandru Schwartz
 //! @author Simon Hagg
 //! @author Simon Spielmann
@@ -36,7 +36,7 @@ using System.Reflection;
 using tracer;
 using UnityEngine;
 
-public class DinamicParameterObject : ParameterObject
+public class DynamicParameterObject : ParameterObject
 {
     
     
@@ -47,9 +47,9 @@ public class DinamicParameterObject : ParameterObject
     //! @param gameObject The gameObject the new ParameterObject will be attached to.
     //! @sceneID The scene ID for the new ParameterObject.
     //!
-    public static DinamicParameterObject Attach(GameObject gameObject, byte sceneID = 254)
+    public static DynamicParameterObject Attach(GameObject gameObject, byte sceneID = 254)
     {
-        DinamicParameterObject obj = gameObject.AddComponent<DinamicParameterObject>();
+        DynamicParameterObject obj = gameObject.AddComponent<DynamicParameterObject>();
         obj.Init(sceneID);
             
         return obj;
@@ -84,8 +84,8 @@ public class DinamicParameterObject : ParameterObject
     private Delegate CreateHandler(AbstractParameter parameter, Type handlerType)
     {
         var type = GetType();
-        var methodInfo = type.GetMethod("UpdateDinamicParameter");
-        //var methodInfo = this.GetType().GetMethod(nameof(UpdateDinamicParameter), BindingFlags.NonPublic | BindingFlags.Instance);
+        var methodInfo = type.GetMethod("UpdateDynamicParameter");
+        //var methodInfo = this.GetType().GetMethod(nameof(UpdateDynamicParameter), BindingFlags.NonPublic | BindingFlags.Instance);
         var eventType = parameter.GetType().GetGenericArguments()[0]; // Get the generic type argument T
         var genericMethod = methodInfo.MakeGenericMethod(eventType);
         return Delegate.CreateDelegate(handlerType, this, genericMethod);
@@ -99,7 +99,7 @@ public class DinamicParameterObject : ParameterObject
     /// @param sender The object that triggered the parameter update
     /// @param value The new value of the parameter
     ///
-    public void UpdateDinamicParameter<T>(object sender, T value)
+    public void UpdateDynamicParameter<T>(object sender, T value)
     {
         emitHasChanged((AbstractParameter)sender);
     }

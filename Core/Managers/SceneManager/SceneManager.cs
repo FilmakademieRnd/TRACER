@@ -98,21 +98,21 @@ namespace tracer
         }
         
         //!
-        //! Function that returns a list containing all Dinamic Parameter Objects.
+        //! Function that returns a list containing all Dynamic Parameter Objects.
         //!
-        //! @return The list containing all Dinamic Parameter Objects.
+        //! @return The list containing all Dynamic Parameter Objects.
         //!
-        public List<DinamicParameterObject> getAllDinamicParameterObjects()
+        public List<DynamicParameterObject> getAllDynamicParameterObjects()
         {
-            List<DinamicParameterObject> returnvalue = new List<DinamicParameterObject>();
+            List<DynamicParameterObject> returnvalue = new List<DynamicParameterObject>();
 
             foreach (Dictionary<short, ParameterObject> dict in core.parameterObjectList.Values)
             {
                 foreach (ParameterObject parameterObject in dict.Values)
                 {
-                    DinamicParameterObject sceneObject = parameterObject as DinamicParameterObject;
+                    DynamicParameterObject sceneObject = parameterObject as DynamicParameterObject;
                     if (sceneObject)
-                        returnvalue.Add((DinamicParameterObject) parameterObject);
+                        returnvalue.Add((DynamicParameterObject) parameterObject);
                 }
             }
             return returnvalue;

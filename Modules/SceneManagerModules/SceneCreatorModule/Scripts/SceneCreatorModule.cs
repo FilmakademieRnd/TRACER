@@ -260,24 +260,24 @@ namespace tracer
             if (sceneData.parameterObjectList.Count == 0)
                 return;
 
-            MenuTree customMenue = new MenuTree();
+            MenuTree customMenu = new MenuTree();
 
-            //customMenue.iconResourceLocation = "Images/button_network";
-            customMenue.caption = "Custom Menue";
+            //customMenu.iconResourceLocation = "Images/button_network";
+            customMenu.caption = "Custom Menu";
             UIManager uiManager = core.getManager<UIManager>();
-
-            customMenue = customMenue.Begin(MenuItem.IType.VSPLIT);   // <<< begin VSPLIT
+            
+            customMenu = customMenu.Begin(MenuItem.IType.VSPLIT);   // <<< begin VSPLIT
             GameObject coreObject = core.transform.gameObject;
 
             foreach (SceneManager.ParameterObjectPackage po in sceneData.parameterObjectList)
             {
                 // [REVIEW]
                 // create ParameterObjects
-                DinamicParameterObject obj = DinamicParameterObject.Attach(coreObject, 255);
+                DynamicParameterObject obj = DynamicParameterObject.Attach(coreObject, 255);
                 obj.objectName = po.name;
 
-                customMenue = customMenue.Add(po.name, true);
-                customMenue = customMenue.Add(MenuItem.IType.SPACE);
+                customMenu = customMenu.Add(po.name, true);
+                customMenu = customMenu.Add(MenuItem.IType.SPACE);
 
                 // create the ParameterObject's parameters
                 for (int i=0; i<po.pTypes.Length; i++)
@@ -286,30 +286,28 @@ namespace tracer
                     Type paramType;
                     if (po.pRPC[i])
                         paramType = typeof(RPCParameter<>).MakeGenericType(type);
-                    // connect param change fct to the fct of new DPO by fct call
                     else
                         paramType = typeof(Parameter<>).MakeGenericType(type);
-                    // connect param change fct to the fct of new DPO by fct call
 
                     var parameter = Activator.CreateInstance(paramType, Activator.CreateInstance(type), po.pNames[i],
                         obj, true);
                     obj.SubscribeToParameterChange((AbstractParameter)parameter);
-                    
-                    
-                    customMenue = customMenue.Begin(MenuItem.IType.HSPLIT);  // <<< start HSPLIT
 
-                    customMenue.Add(po.pNames[i]);
-                    customMenue.Add((AbstractParameter)parameter);
+                    customMenu.scrollable = true;
+                    customMenu = customMenu.Begin(MenuItem.IType.HSPLIT);  // <<< start HSPLIT
 
-                    customMenue.End();  // <<< end HSPLIT
+                    customMenu.Add(po.pNames[i]);
+                    customMenu.Add((AbstractParameter)parameter);
+
+                    customMenu.End();  // <<< end HSPLIT
                 }
                
                 
             }
 
-            customMenue = customMenue.End();     // <<< end VSPLIT
+            customMenu = customMenu.End();     // <<< end VSPLIT
 
-            uiManager.addMenu(customMenue);
+            uiManager.addMenu(customMenu);
         }
 
         //!
