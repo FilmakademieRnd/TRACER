@@ -96,6 +96,28 @@ namespace tracer
             }
             return returnvalue;
         }
+        
+        //!
+        //! Function that returns a list containing all Dynamic Parameter Objects.
+        //!
+        //! @return The list containing all Dynamic Parameter Objects.
+        //!
+        public List<DynamicParameterObject> getAllDynamicParameterObjects()
+        {
+            List<DynamicParameterObject> returnvalue = new List<DynamicParameterObject>();
+
+            foreach (Dictionary<short, ParameterObject> dict in core.parameterObjectList.Values)
+            {
+                foreach (ParameterObject parameterObject in dict.Values)
+                {
+                    DynamicParameterObject sceneObject = parameterObject as DynamicParameterObject;
+                    if (sceneObject)
+                        returnvalue.Add((DynamicParameterObject) parameterObject);
+                }
+            }
+            return returnvalue;
+        }
+        
         //!
         //! The list storing selectable Unity lights in scene.
         //!

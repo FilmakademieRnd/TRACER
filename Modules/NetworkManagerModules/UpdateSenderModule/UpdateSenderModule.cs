@@ -127,6 +127,11 @@ namespace tracer
             {
                 sceneObject.hasChanged += queueModifiedParameter;
             }
+            
+            foreach (DynamicParameterObject dynamicParameterObject in ((SceneManager)sender).getAllDynamicParameterObjects())
+            {
+                dynamicParameterObject.hasChanged += queueModifiedParameter;
+            }
 
             manager.sceneObjectAdded += AddSceneObject;
             manager.sceneObjectRemoved += RemoveSceneObject;
