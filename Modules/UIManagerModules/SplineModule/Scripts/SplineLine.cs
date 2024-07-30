@@ -12,7 +12,7 @@ public class SplineLine : UIManagerModule
     //!
     //! Currently selected object.
     //!
-    private GameObject _animationTarget;
+    private SceneObject _animationTarget;
     
     private SplineContainer _spline;
     
@@ -84,7 +84,7 @@ public class SplineLine : UIManagerModule
             _animCreatorButton = new MenuButton("", StartAnimGen, null, "animCreatorButton ");
             _animCreatorButton.setIcon("Images/animationCreator");
             _mUIManager.addButton(_animCreatorButton);
-            _animationTarget = sceneObjects[0].gameObject;
+            _animationTarget = sceneObjects[0];
             _animCreatorButton.isHighlighted = false;
         }
     }
@@ -112,13 +112,18 @@ public class SplineLine : UIManagerModule
 
     public void AddKey()
     {
-        AnimationParameter<Vector3> paramAnim = (AnimationParameter<Vector3>)_animationTarget.GetComponent<SceneObject>().position.getAnimationParameter();
-        
-        _pos = _animationTarget.GetComponent<SceneObject>().position.value;
+        if (!_animationTarget.position.isAnimated)
+        {
+            _animationTarget.position = (AnimationParameter<Vector3>)_animationTarget.position.getAnimationParameter();
+        }
+
+        //AnimationParameter<Vector3> paramAnim = (AnimationParameter<Vector3>)_animationTarget.position;
+
+
+        _pos = _animationTarget.position.value;
         _spline.Spline.Add(new BezierKnot(new float3(_pos.x,_pos.y,_pos.z)));
  
-        paramAnim.setKey();
-        _animationTarget.GetComponent<SceneObject>().position = paramAnim;
+        ((AnimationParameter<Vector3>)_animationTarget.position).setKey();
         
         //TODO find way to edit them in scene!!! 
         CreateSplineControlPoint("knot", _pos, _spline.gameObject);

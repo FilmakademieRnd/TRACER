@@ -303,11 +303,11 @@ namespace tracer
                             {
                                 AbstractParameter  parameter = parameterObject.parameterList[parameterID];
                                 // check update if animation is incoming and change parameter type if required 
-                                // 7 is the size of the parameter fixed fields
-                                Type t = parameter.GetType();
+                                // 7 is the size of the parameter fixed field
 
-                                if (t == typeof(AnimationParameter<Vector3>) && length > 7 + parameter.dataSize()) {
-                                    parameter = (AnimationParameter<Vector3>)parameter.getAnimationParameter();
+                                if (!parameter.isAnimated && length > 7 + parameter.dataSize()) {
+                                    parameterObject.parameterList[parameterID] = parameter.getAnimationParameter();
+                                    parameter = parameterObject.parameterList[parameterID];
                                     Debug.LogError("SASASASASAWSASAASAASASA");
                                 }
                                 parameter.deSerialize(message.Slice(start + 7));
