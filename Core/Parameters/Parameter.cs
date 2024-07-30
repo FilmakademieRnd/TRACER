@@ -103,6 +103,7 @@ namespace tracer
         {
             get => false;
         }
+
         //!
         //! Getter for unique id of this parameter.
         //!
@@ -326,6 +327,8 @@ namespace tracer
             _dataSize = p._dataSize;
             _distribute = p._distribute;
             _initialValue = p._initialValue;
+
+            hasChanged = p.hasChanged;
         }
 
 

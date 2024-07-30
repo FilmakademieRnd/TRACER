@@ -25,6 +25,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using UnityEngine;
 
 namespace tracer
 {
@@ -90,9 +91,15 @@ namespace tracer
             _prevIdx = 0;
             _keyList = p._keyList;
             _animationManager = p._animationManager;
+            Debug.LogError("QQQQQQQQQQQQQQQQQQ");
 
             if (_keyList != null && _animationManager != null)
+            {
                 _animationManager.animationUpdate += updateValue;
+                Debug.LogError("WWWWWWWWWWWWWWWWWWWQQQQQQQQQQQQQQQQQQ");
+            }
+            
+                    
         }
 
 
@@ -140,7 +147,9 @@ namespace tracer
         public void addKey(Key<T> key)
         {
             if (!isAnimated)
+            {
                 initAnimation();
+            }
 
             int i = findNextKeyIndex(key);
             if (i == -1)
@@ -149,11 +158,16 @@ namespace tracer
                 if (i2 > -1)
                     _keyList[i2].value = key.value;
                 else
+                {
                     _keyList.Add(key);
+                    InvokeHasChanged();
+                }
             }
             else
+            {
                 _keyList.Insert(i, key);
-
+                InvokeHasChanged();
+            }
         }
 
         //!
@@ -177,6 +191,11 @@ namespace tracer
         //!
         public void setKey()
         {
+            if (!isAnimated)
+            {
+                initAnimation();
+            }
+            
             addKey(new Key<T>(_animationManager.time, value));
         }
 
@@ -309,7 +328,7 @@ namespace tracer
                 BitConverter.TryWriteBytes(targetSpan.Slice(offset+=4, 4), key.time); // time
                 BitConverter.TryWriteBytes(targetSpan.Slice(offset+=4, 4), key.tangentTime); // tangent time
                 SerializeData(targetSpan.Slice(offset+=_dataSize, _dataSize), key.value); // value
-                SerializeData(targetSpan.Slice(offset+=_dataSize, _dataSize), key.tangentValue); // tangent value
+                SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue); // tangent value
             }
         }
 
@@ -335,11 +354,11 @@ namespace tracer
 
             for (int i=0; i<keyCount; i++) 
             {
-                Key<T>.KeyType type = MemoryMarshal.Read<Key<T>.KeyType>(sourceSpan.Slice(offset+=1, 1));
-                float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset+=4, 4));
-                float tangenttime = MemoryMarshal.Read<float>(sourceSpan.Slice(offset+=4, 4));
-                T value = deSerializeData(sourceSpan.Slice(offset+=_dataSize, _dataSize));
-                T tangentvalue = deSerializeData(sourceSpan.Slice(offset+=_dataSize, _dataSize));
+                Key<T>.KeyType type = MemoryMarshal.Read<Key<T>.KeyType>(sourceSpan.Slice(offset+=1));
+                float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset+=4));
+                float tangenttime = MemoryMarshal.Read<float>(sourceSpan.Slice(offset+=4));
+                T value = deSerializeData(sourceSpan.Slice(offset+=_dataSize));
+                T tangentvalue = deSerializeData(sourceSpan.Slice(offset));
 
                 _keyList.Add(new Key<T>(time, value, tangenttime, tangentvalue, type));
             }

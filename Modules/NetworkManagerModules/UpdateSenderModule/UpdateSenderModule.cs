@@ -34,6 +34,7 @@ using System;
 using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
+using UnityEngine;
 
 namespace tracer
 {
@@ -410,7 +411,7 @@ namespace tracer
                 {
                     lock (m_modifiedParameters)
                     {
-                        try { sender.SendFrame(createParameterMessage(), false); } catch { } // true not wait
+                        try { sender.SendFrame(createParameterMessage(), false); } catch(Exception e) { Debug.Log(e); } // true not wait
                         m_modifiedParameters.Clear();
                         m_modifiedParametersDataSize = 0;
                     }
