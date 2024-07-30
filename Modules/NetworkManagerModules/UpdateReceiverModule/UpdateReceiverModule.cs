@@ -150,6 +150,7 @@ namespace tracer
                                     case MessageType.DATAHUB:
                                         decodeDataHubMessage(message);
                                         break;
+                                    case MessageType.RPC:
                                     case MessageType.PARAMETERUPDATE:
                                         // make shure that producer and consumer exclude eachother
                                         lock (m_messageBuffer)
@@ -188,7 +189,7 @@ namespace tracer
                  deltaTime > 3 && runtime < 8)
             {
                 core.time = (byte)(Mathf.RoundToInt(syncTime) % core.timesteps);
-               // UnityEngine.Debug.Log("Core time updated to: " + coreTime);
+                // UnityEngine.Debug.Log("Core time updated to: " + coreTime);
             }
 
             //UnityEngine.Debug.Log("Time delta: " + deltaTime);
@@ -304,7 +305,8 @@ namespace tracer
                                 AbstractParameter parameter = parameterObject.parameterList[parameterID];
                                 // check update if animation is incoming and change parameter type if required 
                                 // 7 is the size of the parameter fixed fields
-                                if (!parameter.isAnimated && length > 7 + parameter.dataSize()) {
+                                if (!parameter.isAnimated && length > 7 + parameter.dataSize())
+                                {
                                     parameter = parameter.getAnimationParameter();
                                 }
                                 parameter.deSerialize(message.Slice(start + 7));

@@ -296,7 +296,6 @@ namespace tracer
                 newSpan[6] = (byte)newSpan.Length;  // Parameter message length
                 parameter.Serialize(newSpan.Slice(7)); // Parameter data
             }
-            Helpers.Log("RPC sended!");
             m_mre.Set();
         }
 
