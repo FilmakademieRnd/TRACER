@@ -307,10 +307,9 @@ namespace tracer
 
                                 if (!parameter.isAnimated && length > 7 + parameter.dataSize()) {
                                     parameterObject.parameterList[parameterID] = parameter.getAnimationParameter();
-                                    parameter = parameterObject.parameterList[parameterID];
                                     Debug.LogError("SASASASASAWSASAASAASASA");
                                 }
-                                parameter.deSerialize(message.Slice(start + 7));
+                                parameterObject.parameterList[parameterID].deSerialize(message.Slice(start + 7));
                             }
 
                             start += length;

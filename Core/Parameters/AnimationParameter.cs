@@ -55,6 +55,8 @@ namespace tracer
             if (typeof(T) == typeof(string))
                 throw new InvalidOperationException("Type not supported");
 
+            Init();
+
             _nextIdx = 0;
             _prevIdx = 0;
         }
@@ -67,6 +69,8 @@ namespace tracer
         {
             if (typeof(T) == typeof(string))
                 throw new InvalidOperationException("Type not supported");
+
+            Init();
 
             _nextIdx = 0;
             _prevIdx = 0;
@@ -91,15 +95,11 @@ namespace tracer
             _prevIdx = 0;
             _keyList = p._keyList;
             _animationManager = p._animationManager;
-            Debug.LogError("QQQQQQQQQQQQQQQQQQ");
 
             if (_keyList != null && _animationManager != null)
             {
                 _animationManager.animationUpdate += updateValue;
-                Debug.LogError("WWWWWWWWWWWWWWWWWWWQQQQQQQQQQQQQQQQQQ");
             }
-            
-                    
         }
 
 
@@ -128,7 +128,7 @@ namespace tracer
         //!
         //! Initializes the parameters animation functionality,
         //!
-        private void initAnimation()
+        private void Init()
         {
             _keyList ??= new List<Key<T>>();
 
@@ -146,11 +146,6 @@ namespace tracer
         //!
         public void addKey(Key<T> key)
         {
-            if (!isAnimated)
-            {
-                initAnimation();
-            }
-
             int i = findNextKeyIndex(key);
             if (i == -1)
             {
@@ -191,11 +186,6 @@ namespace tracer
         //!
         public void setKey()
         {
-            if (!isAnimated)
-            {
-                initAnimation();
-            }
-            
             addKey(new Key<T>(_animationManager.time, value));
         }
 
@@ -274,16 +264,7 @@ namespace tracer
         //!
         //! @return The current animation state of the parameter.
         //!
-        public override bool isAnimated
-        {
-            get
-            {
-                if (_keyList != null)
-                    return _keyList.Count > 0;
-                else
-                    return false;
-            }
-        }
+        public override bool isAnimated => true;
 
         //!
         //! Function that interpolates the current parameter value based on a given
@@ -346,9 +327,6 @@ namespace tracer
             // determine the correct offset in the span
             int offset = _dataSize;
             short keyCount = MemoryMarshal.Read<short>(sourceSpan.Slice(offset+=2, 2));
-
-            if (!isAnimated && keyCount>0)
-                initAnimation();
 
             _keyList.Clear();
 
