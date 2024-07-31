@@ -13,9 +13,9 @@ public class SplineLine : UIManagerModule
     //! Currently selected object.
     //!
     private SceneObject _animationTarget;
-    
+
     private SplineContainer _spline;
-    
+
     //TODO MOD WITH REAL TIME 
     private int _timeeee;
 
@@ -36,17 +36,17 @@ public class SplineLine : UIManagerModule
     //! list of keyframe representing spheres
     //!
     private List<GameObject> _keyframeSpheres;
-    
+
     //!
     //! Reference to UIManager
     //!
     UIManager _mUIManager;
-    
+
     //!
     //! The UI button for logging the camera to an object.
     //!
     private MenuButton _animCreatorButton;
-    
+
     private MenuButton _addKeyButton;
 
     public MenuButton animCreatorButton()
@@ -57,12 +57,12 @@ public class SplineLine : UIManagerModule
     protected override void Start(object sender, EventArgs e)
     {
         base.Start(sender, e);
-       _mUIManager = core.getManager<UIManager>();
-       _mUIManager.selectionChanged += selection;
-       _splineHolder = new GameObject("SplineHolder");
-       _splineHolder.transform.position = new Vector3(0,0,0);
+        _mUIManager = core.getManager<UIManager>();
+        _mUIManager.selectionChanged += selection;
+        _splineHolder = new GameObject("SplineHolder");
+        _splineHolder.transform.position = new Vector3(0, 0, 0);
     }
-     
+
     protected override void Cleanup(object sender, EventArgs e)
     {
         base.Cleanup(sender, e);
@@ -90,9 +90,9 @@ public class SplineLine : UIManagerModule
     }
 
     public void StartAnimGen()
-    { 
+    {
         _animCreatorButton.isHighlighted = true;
-        String splineName = new string(_animationTarget.name + "Spline"); 
+        String splineName = new string(_animationTarget.name + "Spline");
         if (!(_splineGameObject = FindChildByNameInDictionary(splineName)))
         {
             _splineGameObject = CreateNewSplineGo(splineName);
@@ -101,30 +101,29 @@ public class SplineLine : UIManagerModule
         }
         else
         {
-            _spline =_splineGameObject.GetComponent<SplineContainer>();
+            _spline = _splineGameObject.GetComponent<SplineContainer>();
         }
-        
+
         _addKeyButton = new MenuButton("", AddKey, null, "_addKeyButton ");
         _addKeyButton.setIcon("Images/key");
         _mUIManager.addButton(_addKeyButton);
-        
+
     }
 
     public void AddKey()
     {
-        if (!_animationTarget.position.isAnimated)
+        int pid = _animationTarget.position.id;
+        AbstractParameter abstractParameter = _animationTarget.parameterList[pid];
+        if (!abstractParameter.isAnimated)
         {
-            _animationTarget.position = (AnimationParameter<Vector3>)_animationTarget.position.getAnimationParameter();
+            abstractParameter = _animationTarget.parameterList[pid] = _animationTarget.position.getAnimationParameter();
         }
 
-        //AnimationParameter<Vector3> paramAnim = (AnimationParameter<Vector3>)_animationTarget.position;
-
-
         _pos = _animationTarget.position.value;
-        _spline.Spline.Add(new BezierKnot(new float3(_pos.x,_pos.y,_pos.z)));
- 
-        ((AnimationParameter<Vector3>)_animationTarget.position).setKey();
-        
+        _spline.Spline.Add(new BezierKnot(new float3(_pos.x, _pos.y, _pos.z)));
+
+        ((AnimationParameter<Vector3>)abstractParameter).setKey();
+
         //TODO find way to edit them in scene!!! 
         CreateSplineControlPoint("knot", _pos, _spline.gameObject);
     }
@@ -132,7 +131,7 @@ public class SplineLine : UIManagerModule
     public SplineLine(string name, Manager manager) : base(name, manager)
     {
     }
-    
+
     public GameObject CreateNewSplineGo(string childName)
     {
         // Create a new GameObject
@@ -142,12 +141,12 @@ public class SplineLine : UIManagerModule
         childObject.transform.SetParent(_splineHolder.transform);
 
         // Set the local position of the child GameObject relative to its parent
-        childObject.transform.localPosition = new Vector3(0,0,0);
+        childObject.transform.localPosition = new Vector3(0, 0, 0);
 
         return childObject;
     }
-    
-    
+
+
     public void CreateSplineControlPoint(string childName, Vector3 pos, GameObject parent)
     {
         // Create a new GameObject
@@ -161,7 +160,7 @@ public class SplineLine : UIManagerModule
         // Set the local position of the child GameObject relative to its parent
         splineControlPoint.transform.localPosition = pos;
     }
-    
+
     public GameObject FindChildByNameInDictionary(string splineName)
     {
         foreach (var kvp in _sceneObjectsSplines)
@@ -174,8 +173,8 @@ public class SplineLine : UIManagerModule
         return null;
     }
 }
-    
-    
+
+
 
 
 

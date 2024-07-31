@@ -63,7 +63,7 @@ namespace tracer
                                                                           typeof(Quaternion),
                                                                           typeof(Color),
                                                                           typeof(string),
-                                                                          typeof(int) 
+                                                                          typeof(int)
         };
         //!
         //! Definition of Tracer's parameter types
@@ -103,7 +103,6 @@ namespace tracer
         {
             get => false;
         }
-
         //!
         //! Getter for unique id of this parameter.
         //!
@@ -439,12 +438,12 @@ namespace tracer
                     }
                 case ParameterType.VECTOR3:
                     {
-                        FromVector3 (value, targetSpan);
+                        FromVector3(value, targetSpan);
                         break;
                     }
                 case ParameterType.VECTOR4:
                     {
-                       FromVector4(value, targetSpan);
+                        FromVector4(value, targetSpan);
                         break;
                     }
                 case ParameterType.QUATERNION:
@@ -477,6 +476,10 @@ namespace tracer
         public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
         {
             _value = deSerializeData(sourceSpan);
+
+            _networkLock = true;
+            hasChanged?.Invoke(this, _value);
+            _networkLock = false;
         }
 
 
@@ -489,7 +492,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected T deSerializeData(ReadOnlySpan<byte> sourceSpan)
         {
-            T returnvalue = default;
+            T returnvalue;
             switch (_type)
             {
                 case ParameterType.BOOL:
@@ -520,11 +523,9 @@ namespace tracer
                     returnvalue = ToString(sourceSpan);
                     break;
                 default:
+                    returnvalue = default;
                     break;
             }
-            _networkLock = true;
-            hasChanged?.Invoke(this, _value);
-            _networkLock = false;
 
             return returnvalue;
         }
@@ -557,7 +558,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromVector2(in T value, Span<byte> target)
         {
-            Vector2 obj = (Vector2)(object) value;
+            Vector2 obj = (Vector2)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
@@ -566,7 +567,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromVector3(in T value, Span<byte> target)
         {
-            Vector3 obj = (Vector3)(object) value;
+            Vector3 obj = (Vector3)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
@@ -576,7 +577,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromVector4(in T value, Span<byte> target)
         {
-            Vector4 obj = (Vector4)(object) value;
+            Vector4 obj = (Vector4)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
@@ -587,7 +588,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromQuaternion(in T value, Span<byte> target)
         {
-            Quaternion obj = (Quaternion)(object) value;
+            Quaternion obj = (Quaternion)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
@@ -598,7 +599,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromColor(in T value, Span<byte> target)
         {
-            Color obj = (Color)(object) value;
+            Color obj = (Color)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.r);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.g);
@@ -614,34 +615,34 @@ namespace tracer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected static T ToBool(ReadOnlySpan<byte> source) 
-        { 
-            return (T)(object) MemoryMarshal.Read<bool>(source); 
+        protected static T ToBool(ReadOnlySpan<byte> source)
+        {
+            return (T)(object)MemoryMarshal.Read<bool>(source);
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToInt(ReadOnlySpan<byte> source)
         {
-            return (T)(object) MemoryMarshal.Read<int>(source);
+            return (T)(object)MemoryMarshal.Read<int>(source);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToFloat(ReadOnlySpan<byte> source)
         {
-            return (T)(object) MemoryMarshal.Read<float>(source);
-        }        
-        
+            return (T)(object)MemoryMarshal.Read<float>(source);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToVector2(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Vector2(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Vector2(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToVector3(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Vector3(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Vector3(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)),
                                MemoryMarshal.Read<float>(source.Slice(8)));
         }
@@ -649,7 +650,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToVector4(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Vector4(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Vector4(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)),
                                MemoryMarshal.Read<float>(source.Slice(8)),
                                MemoryMarshal.Read<float>(source.Slice(12)));
@@ -658,7 +659,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToQuaternion(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Quaternion(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Quaternion(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)),
                                MemoryMarshal.Read<float>(source.Slice(8)),
                                MemoryMarshal.Read<float>(source.Slice(12)));
@@ -667,7 +668,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToColor(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Color(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Color(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)),
                                MemoryMarshal.Read<float>(source.Slice(8)),
                                MemoryMarshal.Read<float>(source.Slice(12)));
@@ -676,7 +677,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToString(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new string(Encoding.UTF8.GetString(source));
+            return (T)(object)new string(Encoding.UTF8.GetString(source));
         }
 
     }

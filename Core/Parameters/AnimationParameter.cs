@@ -23,6 +23,7 @@ if not go to https://opensource.org/licenses/MIT
 
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using UnityEngine;
@@ -149,20 +150,22 @@ namespace tracer
             int i = findNextKeyIndex(key);
             if (i == -1)
             {
-                int i2 = _keyList.IndexOf(key);
-                if (i2 > -1)
-                    _keyList[i2].value = key.value;
+                i = _keyList.FindIndex(i => i.time == key.time);
+                if (i > -1)
+                    _keyList[i].value = key.value;
                 else
                 {
                     _keyList.Add(key);
-                    InvokeHasChanged();
                 }
             }
             else
             {
                 _keyList.Insert(i, key);
-                InvokeHasChanged();
             }
+
+            _networkLock = true;
+            InvokeHasChanged();
+            _networkLock = false;
         }
 
         //!
@@ -256,7 +259,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int findNextKeyIndex(float time)
         {
-            return _keyList.FindIndex(i => i.time >= time);
+            return _keyList.FindIndex(i => i.time > time);
         }
 
         //!

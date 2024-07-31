@@ -304,12 +304,11 @@ namespace tracer
                                 AbstractParameter  parameter = parameterObject.parameterList[parameterID];
                                 // check update if animation is incoming and change parameter type if required 
                                 // 7 is the size of the parameter fixed field
-
                                 if (!parameter.isAnimated && length > 7 + parameter.dataSize()) {
-                                    parameterObject.parameterList[parameterID] = parameter.getAnimationParameter();
-                                    Debug.LogError("SASASASASAWSASAASAASASA");
+                                    parameter = parameterObject.parameterList[parameterID] = parameter.getAnimationParameter();
+                                   Debug.LogError("SASASASASAWSASAASAASASA");
                                 }
-                                parameterObject.parameterList[parameterID].deSerialize(message.Slice(start + 7));
+                                parameter.deSerialize(message.Slice(start + 7));
                             }
 
                             start += length;

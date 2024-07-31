@@ -365,6 +365,7 @@ namespace tracer
                 lock (parameter)
                 {
                     int length = 7 + parameter.dataSize();
+                    Debug.Log("Parameter Name: " + parameter.name + "Type: " + parameter.GetType());
                     Span<byte> newSpan = msgSpan.Slice(start, length);
 
                     newSpan[0] = parameter.parent.sceneID;  // SceneID
