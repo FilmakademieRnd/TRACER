@@ -15,7 +15,13 @@ public class SplineLine : UIManagerModule
     private SceneObject _animationTarget;
 
     private SplineContainer _spline;
-
+    
+    private int _selectorCurrentSelectedSnapSelectElement;
+    
+    private SnapSelect _selectorSnapSelect;
+    
+    private AbstractParameter _selectedAbstractParam;
+    
     //TODO MOD WITH REAL TIME 
     private int _timeeee;
 
@@ -76,6 +82,7 @@ public class SplineLine : UIManagerModule
         {
             _mUIManager.removeButton(_animCreatorButton);
             _mUIManager.removeButton(_addKeyButton);
+            _selectorSnapSelect.parameterChanged -= ParamChange;
             _animCreatorButton = null;
         }
 
@@ -85,8 +92,12 @@ public class SplineLine : UIManagerModule
             _animCreatorButton.setIcon("Images/animationCreator");
             _mUIManager.addButton(_animCreatorButton);
             _animationTarget = sceneObjects[0];
+            _selectorSnapSelect = GameObject.Find("PRE_UI_AddSelector(Clone)").GetComponent<SnapSelect>();
             _animCreatorButton.isHighlighted = false;
+            _selectorSnapSelect.parameterChanged += ParamChange;
         }
+        
+        
     }
 
     public void StartAnimGen()
@@ -112,24 +123,66 @@ public class SplineLine : UIManagerModule
 
     public void AddKey()
     {
-        int pid = _animationTarget.position.id;
-        AbstractParameter abstractParameter = _animationTarget.parameterList[pid];
+        _selectedAbstractParam = _animationTarget.parameterList[_selectorCurrentSelectedSnapSelectElement];
+        
+        AbstractParameter abstractParameter = _selectedAbstractParam;
         if (!abstractParameter.isAnimated)
         {
-            abstractParameter = _animationTarget.parameterList[pid] = _animationTarget.position.getAnimationParameter();
+            abstractParameter = _selectedAbstractParam = _selectedAbstractParam.getAnimationParameter();
         }
 
-        _pos = _animationTarget.position.value;
-        _spline.Spline.Add(new BezierKnot(new float3(_pos.x, _pos.y, _pos.z)));
+        //TODO MOD key so it works for all param and also editable .
+        //TODO add rotation for bezier
+        if (_selectedAbstractParam.name == "position")
+        {
+            _pos = _animationTarget.position.value;
+            _spline.Spline.Add(new BezierKnot(new float3(_pos.x, _pos.y, _pos.z)));
+            CreateSplineControlPoint("knot", _pos, _spline.gameObject);
+        }
 
-        ((AnimationParameter<Vector3>)abstractParameter).setKey();
-
-        //TODO find way to edit them in scene!!! 
-        CreateSplineControlPoint("knot", _pos, _spline.gameObject);
+        //TODO find way to make it for all types 
+        setKeyBasedOnType(abstractParameter);
     }
 
     public SplineLine(string name, Manager manager) : base(name, manager)
     {
+    }
+
+    public void setKeyBasedOnType(AbstractParameter param)
+    {
+        
+        switch (param.tracerType)
+        {
+            
+            case AbstractParameter.ParameterType.BOOL:
+                ((AnimationParameter<bool>)param).setKey();
+                break;
+            case AbstractParameter.ParameterType.INT:
+                ((AnimationParameter<int>)param).setKey();
+                break;
+            case AbstractParameter.ParameterType.FLOAT:
+                ((AnimationParameter<float>)param).setKey();
+                break;
+            case AbstractParameter.ParameterType.VECTOR2:
+                ((AnimationParameter<Vector2>)param).setKey();
+                break;
+            case AbstractParameter.ParameterType.VECTOR3:
+                ((AnimationParameter<Vector3>)param).setKey();
+                break;
+            case AbstractParameter.ParameterType.VECTOR4:
+                ((AnimationParameter<Vector4>)param).setKey();
+                break;
+            case AbstractParameter.ParameterType.QUATERNION:
+                ((AnimationParameter<Quaternion>)param).setKey();
+                break;
+            case AbstractParameter.ParameterType.COLOR:
+                ((AnimationParameter<Color>)param).setKey();
+                break;
+            default:
+                
+                break;
+            
+        }
     }
 
     public GameObject CreateNewSplineGo(string childName)
@@ -171,6 +224,11 @@ public class SplineLine : UIManagerModule
             }
         }
         return null;
+    }
+    
+    public void ParamChange(object sender, int manipulatorMode)
+    {
+        _selectorCurrentSelectedSnapSelectElement = manipulatorMode;
     }
 }
 
