@@ -27,9 +27,11 @@ The TRACER Foundation itself is developed in C#, thereby it is well suited to ta
 
 ## About
 
-<img src="https://github.com/FilmakademieRnd/TRACER/blob/master/.doc/img/logo_rnd.jpg" width="100">
+![](/.doc/img/FA_AI_Logo.png) &nbsp;&nbsp;&nbsp;&nbsp;
+![](/.doc/img/logo_rnd.jpg) &nbsp;&nbsp;&nbsp;&nbsp;
+![](/.doc/img/Max-R_Logo.png)
 
-TRACER is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Labs in the scope of the EU funded project [MAX-R](https://max-r.eu/) (101070072) and funding on the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace (610005) and SAUCE (780470) have inspired the TRACER development.
+TRACER is a development by [Filmakademie Baden-Wuerttemberg](https://filmakademie.de/), [Animationsinstitut R&D Labs](http://research.animationsinstitut.de/) in the scope of the EU funded project [MAX-R](https://max-r.eu/) (101070072) and funding on the own behalf of Filmakademie Baden-Wuerttemberg.  Former EU projects Dreamspace (610005) and SAUCE (780470) have inspired the TRACER development.
 
 ## Funding
 
