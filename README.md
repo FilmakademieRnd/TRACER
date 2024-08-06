@@ -1,5 +1,5 @@
-# TRACER FOUNDATION - Toolset for Realtime Animation, Collaboration & Extended Reality
-
+# TRACER FOUNDATION
+# Toolset for Realtime Animation, Collaboration & Extended Reality
 
 ## Description
 
@@ -7,8 +7,7 @@ TRACER is a software agnostic communication infrastructure and toolset for plugg
 
 ![TRACER](.doc/img/tracer_info_graphics_shematic.png)
 
-**TRACER web site:** [animationsinstitut.de/de/forschung/tools/tracer](https://animationsinstitut.de/de/forschung/tools/tracer)
-
+**TRACER web site:** [https://research.animationsinstitut.de/tracer] (https://research.animationsinstitut.de/tracer)
 
 ## Repository Content
 
