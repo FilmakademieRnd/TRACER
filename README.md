@@ -36,10 +36,9 @@ TRACER is a development by Filmakademie Baden-Wuerttemberg, Animationsinstitut R
 ![Animationsinstitut R&D](.doc/img/EN_FundedbytheEU_RGB_POS_rs.png)
 
 This project has received funding from the European Union's Horizon Europe Research and Innovation Programme under Grant Agreement No 101070072 MAX-R.
-This project has received funding from the European Union’s Horizon 2020 Research and Innovation Programme under Grant Agreement No 780470 SAUCE.
-This research has received funding from the European Commission’s Seventh Framework Programme under grant agreement no 610005 DREAMSPACE.
+This development was inspired by projects under the the European Union’s Horizon 2020 Research and Innovation Programme under Grant Agreement No 780470 SAUCE and the European Commission’s Seventh Framework Programme under grant agreement no 610005 DREAMSPACE.
 
 
 ## License
 TRACER is a open-sorce development by Filmakademie Baden-Wuerttemberg's Animationsinstitut.  
-The framework is licensed under [MIT](LICENSE). See [License info file](LICENSE.TXT) for more details.
+The framework is licensed under [MIT](LICENSE.txt). See [License info file](LICENSE_Info.txt) for more details.
