@@ -24,7 +24,7 @@ public class SplineLine : UIManagerModule
     //!
     private Dictionary<GameObject, string> _sceneObjectsSplines = new Dictionary<GameObject, string>();
     //!
-    //! Spline GO parent
+    //! Spline GO _parent
     //!
     private GameObject _splineHolder;
 
@@ -112,17 +112,10 @@ public class SplineLine : UIManagerModule
 
     public void AddKey()
     {
-        int pid = _animationTarget.position.id;
-        AbstractParameter abstractParameter = _animationTarget.parameterList[pid];
-        if (!abstractParameter.isAnimated)
-        {
-            abstractParameter = _animationTarget.parameterList[pid] = _animationTarget.position.getAnimationParameter();
-        }
-
         _pos = _animationTarget.position.value;
         _spline.Spline.Add(new BezierKnot(new float3(_pos.x, _pos.y, _pos.z)));
 
-        ((AnimationParameter<Vector3>)abstractParameter).setKey();
+        _animationTarget.position.setKey();
 
         //TODO find way to edit them in scene!!! 
         CreateSplineControlPoint("knot", _pos, _spline.gameObject);
@@ -137,10 +130,10 @@ public class SplineLine : UIManagerModule
         // Create a new GameObject
         GameObject childObject = new GameObject(childName);
 
-        // Set the parent of the new GameObject to the specified parent
+        // Set the _parent of the new GameObject to the specified _parent
         childObject.transform.SetParent(_splineHolder.transform);
 
-        // Set the local position of the child GameObject relative to its parent
+        // Set the local position of the child GameObject relative to its _parent
         childObject.transform.localPosition = new Vector3(0, 0, 0);
 
         return childObject;
@@ -154,10 +147,10 @@ public class SplineLine : UIManagerModule
 
         splineControlPoint.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
 
-        // Set the parent of the new GameObject to the specified parent
+        // Set the _parent of the new GameObject to the specified _parent
         splineControlPoint.transform.SetParent(parent.transform);
 
-        // Set the local position of the child GameObject relative to its parent
+        // Set the local position of the child GameObject relative to its _parent
         splineControlPoint.transform.localPosition = pos;
     }
 

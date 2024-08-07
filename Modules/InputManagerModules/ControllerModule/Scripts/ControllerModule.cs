@@ -235,10 +235,10 @@ namespace tracer
             // Get the camera component.
             _camera = _mainCamera.GetComponent<Camera>();
             
-            // Get the scene manager from the core.
+            // Get the scene manager from the _core.
             _sceneManager = core.getManager<SceneManager>();
             
-            // Get the UI manager from the core.
+            // Get the UI manager from the _core.
             _uiManager = core.getManager<UIManager>();
             
             // Get the selection module from the UI manager.
@@ -269,7 +269,7 @@ namespace tracer
             manager.rightControllerStick += MoveRightStick;
             manager.ControllerStickCanceled += DoneEditing;
 
-            // Subscribe to the core update event.
+            // Subscribe to the _core update event.
             core.updateEvent += TracerUpdate;
 
             // Subscribe to UI manager events.
@@ -302,7 +302,7 @@ namespace tracer
             manager.rightControllerStick -= MoveRightStick;
             manager.ControllerStickCanceled -= DoneEditing;
 
-            // Unsubscribe from the core update event.
+            // Unsubscribe from the _core update event.
             core.updateEvent -= TracerUpdate;
 
             // Unsubscribe from UI manager events.

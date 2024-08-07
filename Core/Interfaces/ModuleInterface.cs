@@ -58,7 +58,7 @@ namespace tracer
         protected Manager m_manager;
 
         //!
-        //! Returns a reference to the TRACER core.
+        //! Returns a reference to the TRACER _core.
         //!
         protected ref Core core { get => ref m_manager.core; }
 
@@ -95,23 +95,23 @@ namespace tracer
         public ref string name { get => ref m_name; }
 
         //! 
-        //! Virtual function called when Unity initializes the TRACER core.
+        //! Virtual function called when Unity initializes the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected virtual void Init(object sender, EventArgs e) { }
         //! 
         //! Virtual function called after the Init function.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected virtual void Start(object sender, EventArgs e) { }
         //! 
-        //! Virtual function called before Unity destroys the TRACER core.
+        //! Virtual function called before Unity destroys the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected virtual void Cleanup(object sender, EventArgs e)

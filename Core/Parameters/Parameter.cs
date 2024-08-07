@@ -75,55 +75,29 @@ namespace tracer
         [SerializeField]
         protected ParameterType _type;
         //!
-        //! A reference to the parameters parent object.
+        //! A reference to the parameters _parent object.
         //!
-        protected ParameterObject _parent;
+        public ParameterObject _parent { get; protected set; }
         //!
-        //! The unique id of this parameter.
+        //! The unique _id of this parameter.
         //!
-        protected short _id;
+        public short _id { get; protected set; }
         //!
         //! Flag that determines whether a Parameter will be distributed.
         //!
-        public bool _distribute;
+        public bool _distribute { get; protected set; }
         //!
         //! Flag that determines whether a Parameter will be networl locked.
         //!
-        protected bool _networkLock;
+        public bool _networkLock { get; protected set; } = false;
         //!
         //! Flag that determines whether a Parameter will be a RPC parameter.
         //!
-        protected bool _rpc = false;
+        public bool _isRPC { get; protected set; } = false;
         //!
-        //! Function that returns the current animation state of the parameter.
+        //! Flag that determines whether a Parameter is animated.
         //!
-        //! @return The current animation state of the parameter.
-        //!
-        public virtual bool isAnimated
-        {
-            get => false;
-        }
-        //!
-        //! Getter for unique id of this parameter.
-        //!
-        public short id
-        {
-            get => _id;
-        }
-        //!
-        //! Flag that determines whether a Parameter will be locked for network comunication.
-        //!
-        public bool isNetworkLocked
-        {
-            get => _networkLock;
-        }
-        //!
-        //! Flag that determines whether a Parameter will be locked for network comunication.
-        //!
-        public bool isRPC
-        {
-            get => _rpc;
-        }
+        public bool _isAnimated { get; protected set; } = false;
         //!
         //! Getter for parameters C# type.
         //!
@@ -148,14 +122,7 @@ namespace tracer
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => ref _name;
         }
-        //!
-        //! Getter for parameters parent.
-        //!
-        public ParameterObject parent
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _parent;
-        }
+        public abstract void InitAnimation();
 
         //!
         //! abstract reset function for the abstract parameter
@@ -185,10 +152,6 @@ namespace tracer
                 return (ParameterType)100;
             else
                 return (ParameterType)idx;
-        }
-        public virtual AbstractParameter getAnimationParameter()
-        {
-            return null;
         }
         //!
         //! Abstract definition of the function for serializing the parameters sourceSpan.
@@ -235,11 +198,31 @@ namespace tracer
         //!
         protected short _dataSize = -1;
         //!
+        //! The next and the previous active keyframe index (for animation).
+        //!
+        private int _nextIdx, _prevIdx;
+        //!
+        //! The list of keyframes (for animation).
+        //!
+        private List<Key<T>> _keyList = null;
+        //!
+        //! A reference to the key list (for animation).
+        //!
+        public ref List<Key<T>> keys { get => ref _keyList; }
+        //!
+        //! A reference to the Animation Manager.
+        //!
+        private AnimationManager _animationManager = null;
+        //!
         //! Getter for the size of the serialized sourceSpan of the parameter.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int dataSize()
         {
+            if (_isAnimated)
+                // count<short> + count *(type<byte> + time<float> + tangentTime<float> + value<ParamValueSize> + tangentvalue<ParamValueSize>) 
+                return _dataSize + 2 + _keyList.Count * (1 + 2 * sizeof(float) + 2 * _dataSize);
+
             switch (_type)
             {
                 case ParameterType.STRING:
@@ -258,7 +241,7 @@ namespace tracer
         //!
         //! @param value The value of the parameder as the defined type T.
         //! @param name The parameters name.
-        //! @param name The parameters parent ParameterObject.
+        //! @param name The parameters _parent ParameterObject.
         //! @param name Flag that determines whether a Parameter will be distributed.
         //!
         public Parameter(T value, string name, ParameterObject parent = null, bool distribute = true)
@@ -269,6 +252,8 @@ namespace tracer
             _type = toTracerType(typeof(T));
             _distribute = distribute;
             _initialValue = value;
+            _nextIdx = 0;
+            _prevIdx = 0;
 
             // initialize sourceSpan size
             switch (_type)
@@ -299,7 +284,7 @@ namespace tracer
                     break;
             }
 
-            // check parent
+            // check _parent
             if (parent)
             {
                 _id = (short)_parent.parameterList.Count;
@@ -326,6 +311,8 @@ namespace tracer
             _dataSize = p._dataSize;
             _distribute = p._distribute;
             _initialValue = p._initialValue;
+            _nextIdx = p._nextIdx;
+            _prevIdx = p._prevIdx;
 
             hasChanged = p.hasChanged;
         }
@@ -368,7 +355,7 @@ namespace tracer
             }
             catch
             {
-                Debug.Log("Could not cast parameter while executing copyValue() for parameter " + this.name + " from " + this.parent.name);
+                Debug.Log("Could not cast parameter while executing copyValue() for parameter " + this.name + " from " + this._parent.name);
             }
         }
 
@@ -384,9 +371,173 @@ namespace tracer
             }
         }
 
-        public override AbstractParameter getAnimationParameter()
+        /////////////////////////////////////////////////////////
+        /////////////////////// Animation ///////////////////////
+        /////////////////////////////////////////////////////////
+
+        //!
+        //! Initializes the parameters animation functionality,
+        //!
+        public override void InitAnimation()
         {
-            return new AnimationParameter<T>(this);
+            _keyList ??= new List<Key<T>>();
+
+            _animationManager = ParameterObject._core.getManager<AnimationManager>();
+            _animationManager.animationUpdate += updateValue;
+
+            _isAnimated = true;
+        }
+
+        //!
+        //! Insert a given key element to the parameters key list, at the corresponding index.
+        //!
+        //! @param key The key to be added to the parameters key list.
+        //!
+        public void addKey(Key<T> key)
+        {
+            if (!_isAnimated) 
+                InitAnimation();
+
+            int i = findNextKeyIndex(key);
+            if (i == -1)
+            {
+                i = _keyList.FindIndex(i => i.time == key.time);
+                if (i > -1)
+                    _keyList[i].value = key.value;
+                else
+                {
+                    _keyList.Add(key);
+                }
+            }
+            else
+            {
+                _keyList.Insert(i, key);
+            }
+
+            InvokeHasChanged();
+        }
+
+        //!
+        //! Revove a given key element from the parameters key list.
+        //!
+        //! @param key The key to be removed from the parameters key list.
+        //!
+        public void removeKey(Key<T> key)
+        {
+            if (_isAnimated)
+            {
+                _keyList.Remove(key);
+
+                if (_keyList.Count == 0)
+                {
+                    _animationManager.animationUpdate -= updateValue;
+                    _isAnimated = false;
+                }
+            }
+        }
+
+        //!
+        //! Create and insert a new key element to the parameters key list, 
+        //! based on the current parameter value and Animation Manager time.
+        //!
+        public void setKey()
+        {
+            if (!_isAnimated)
+                InitAnimation();
+
+            addKey(new Key<T>(_animationManager.time, value));
+        }
+
+        //!
+        //! Clear the parameters key list and disable the animation functionality.
+        //!
+        private void clearKeys()
+        {
+            if (_isAnimated)
+            {
+                _keyList.Clear();
+                _animationManager.animationUpdate -= updateValue;
+                _isAnimated = false;
+            }
+        }
+
+        //!
+        //! Calculate the parameters value based on the keylist and given time.
+        //!
+        //! @param o A reference to the Animation Manager.
+        //! @param time The given time used to calulate the parameters new value.
+        //!
+        private void updateValue(object o, float time)
+        {
+            if (_isAnimated)
+            {
+                // current time is NOT in between the two active keys
+                if (time < _keyList[_prevIdx].time || time > _keyList[_nextIdx].time)
+                {
+                    int i = findNextKeyIndex(time);
+                    // current time is bigger than all keys in list
+                    if (i == -1)
+                        _nextIdx = _prevIdx = _keyList.Count - 1;
+                    else
+                    {
+                        // current time is smaller than all keys in list
+                        if (i == 0)
+                            _nextIdx = _prevIdx = 0;
+                        // current time is somewhere between all keys in list
+                        else
+                        {
+                            _nextIdx = i;
+                            _prevIdx = i - 1;
+                        }
+                    }
+                }
+                value = interpolate(time);
+            }
+        }
+
+        //!
+        //! Function for searching the next bigger key index in the key list.
+        //!
+        //! @param key The key on which the index is to be searched.
+        //! @return The next bigger index in the keylist.
+        //!
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int findNextKeyIndex(Key<T> key)
+        {
+            return _keyList.FindIndex(i => i.time > key.time);
+        }
+
+        //!
+        //! Function for searching the next bigger key index in the key list.
+        //!
+        //! @param time The time on which the index is to be searched.
+        //! @return The next bigger index in the keylist.
+        //!
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int findNextKeyIndex(float time)
+        {
+            return _keyList.FindIndex(i => i.time > time);
+        }
+
+        //!
+        //! Function that interpolates the current parameter value based on a given
+        //! time and the previous and next time indices.
+        //!
+        //! @parameter time The given time used to interpolate the parameters value.
+        //! @return The interpolated parameter value.
+        //!
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private T interpolate(float time)
+        {
+            switch (_type)
+            {
+                case ParameterType.FLOAT:
+                    float inBetween = (time - _keyList[_prevIdx].time) / (_keyList[_prevIdx].time - _keyList[_nextIdx].time);
+                    float s1 = 1.0f - (_keyList[_nextIdx].time - inBetween) / (_keyList[_nextIdx].time - _keyList[_prevIdx].time);
+                    return (T)(object)(((float)(object)_keyList[_prevIdx].value) * (1.0f - s1) + ((float)(object)_keyList[_nextIdx].value) * s1);
+                default:
+                    return default(T);
+            }
         }
 
         /////////////////////////////////////////////////////////////
@@ -403,6 +554,23 @@ namespace tracer
         public override void Serialize(Span<byte> targetSpan)
         {
             SerializeData(targetSpan, _value);
+
+            if (_isAnimated)
+            {
+                int offset = _dataSize;
+                short keyCount = (short)_keyList.Count;
+
+                BitConverter.TryWriteBytes(targetSpan.Slice(offset += 2, 2), keyCount); // nbr. of keys
+                for (int i = 0; i < keyCount; i++)
+                {
+                    Key<T> key = _keyList[i];
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 1, 1), (byte)key.type); // type
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.time); // time
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime); // tangent time
+                    SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.value); // value
+                    SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue); // tangent value
+                }
+            }
         }
 
         //!
@@ -475,6 +643,27 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
         {
+            if (_isAnimated)
+            {
+                // determine the correct offset in the span
+                int offset = _dataSize;
+                short keyCount = MemoryMarshal.Read<short>(sourceSpan.Slice(offset += 2, 2));
+
+                _keyList.Clear();
+
+                for (int i = 0; i < keyCount; i++)
+                {
+                    Key<T>.KeyType type = MemoryMarshal.Read<Key<T>.KeyType>(sourceSpan.Slice(offset += 1));
+                    float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    float tangenttime = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    T value = deSerializeData(sourceSpan.Slice(offset += _dataSize));
+                    T tangentvalue = deSerializeData(sourceSpan.Slice(offset));
+
+                    _keyList.Add(new Key<T>(time, value, tangenttime, tangentvalue, type));
+                    Debug.Log("deSerialize: Key added");
+                }
+            }
+
             _value = deSerializeData(sourceSpan);
 
             _networkLock = true;

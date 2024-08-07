@@ -98,7 +98,7 @@ namespace tracer
         //! Constructor.
         //!
         //! @param name Name of this module.
-        //! @param core Reference to the TRACER core.
+        //! @param _core Reference to the TRACER _core.
         //!
         public CameraNavigationModule(string name, Manager manager) : base(name, manager)
         {
@@ -124,7 +124,7 @@ namespace tracer
         //! 
         //! Init callback for the CameraNavigation module.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Init(object sender, EventArgs e)

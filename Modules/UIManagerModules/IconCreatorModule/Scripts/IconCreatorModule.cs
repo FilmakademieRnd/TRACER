@@ -65,7 +65,7 @@ namespace tracer
         //!
         //! Constructor
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public IconCreatorModule(string name, Manager manager) : base(name, manager)
         {
@@ -174,7 +174,7 @@ namespace tracer
         //!
         private void updateIconColor(object sender, Color color)
         {
-            SceneObject sceneObject = (SceneObject) ((AbstractParameter)sender).parent;
+            SceneObject sceneObject = (SceneObject) ((AbstractParameter)sender)._parent;
             sceneObject._icon.GetComponent<SpriteRenderer>().color = color;
         }
 

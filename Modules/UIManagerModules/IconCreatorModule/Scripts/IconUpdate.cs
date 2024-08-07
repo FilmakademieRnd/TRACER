@@ -42,7 +42,7 @@ namespace tracer
         private Vector3 m_iconScale;
 
         //!
-        //! A reference to the parent Scene Object.
+        //! A reference to the _parent Scene Object.
         //!
         public SceneObject m_parentObject;
         

@@ -64,7 +64,7 @@ namespace tracer
         //!
         public SceneParserModule(string name, Manager manager) : base(name, manager)
         {
-            //if (!core.isServer)
+            //if (!_core.isServer)
               //  load = false;
 
             m_lodLowLayer = LayerMask.NameToLayer("LodLow");

@@ -325,7 +325,7 @@ namespace tracer
         //!
         public class ParameterObjectPackage
         {
-            //! The id of the parameter object
+            //! The _id of the parameter object
             public int id;
             //! The name of the parameter object.
             public string name;

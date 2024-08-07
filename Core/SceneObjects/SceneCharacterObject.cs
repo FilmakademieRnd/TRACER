@@ -75,7 +75,7 @@ namespace tracer
             boneMap = new Dictionary<int, Transform>();
             
             //  If server setBones is called on awake if not setBones is called from SceneCreatorModule line 137
-            if (core.isServer)
+            if (_core.isServer)
             {
                 setBones();
             }
@@ -106,10 +106,10 @@ namespace tracer
                     localBoneRotationParameter.hasChanged += updateRotation;
                     
                     // Use the parameter's ID as the key to store the bone transform in the dictionary.
-                    var id = localBoneRotationParameter.id;
+                    var id = localBoneRotationParameter._id;
                     boneMap.Add(id, boneTransform);
                     boneNamesOrder.Add(boneTransform.name);
-                    //Debug.Log(id+"-"+boneTransform.name);
+                    //Debug.Log(_id+"-"+boneTransform.name);
                 }
             }
         }
@@ -122,7 +122,7 @@ namespace tracer
        private void updateRotation(object sender, Quaternion a)
         {
             // Retrieve the ID of the parameter whose value has changed.
-            int id = ((Parameter<Quaternion>)sender).id;
+            int id = ((Parameter<Quaternion>)sender)._id;
             
             // Update the bone transform's local rotation based on the new value.
             boneMap[id].localRotation = a;

@@ -56,7 +56,7 @@ namespace tracer
         //! Constructor
         //!
         //! @param  name  The  name of the module.
-        //! @param core A reference to the TRACER core.
+        //! @param _core A reference to the TRACER _core.
         //!
         public SceneSenderModule(string name, Manager manager) : base(name, manager)
         {
@@ -67,7 +67,7 @@ namespace tracer
         //! 
         //!  Function called when an Unity Awake() callback is triggered
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Init(object sender, EventArgs e)
@@ -93,12 +93,12 @@ namespace tracer
         //! 
         //! Function called when an Unity Start() callback is triggered
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Start(object sender, EventArgs e)
         {
-            //core.getManager<UIManager>().showMenu(m_menu);
+            //_core.getManager<UIManager>().showMenu(m_menu);
         }
 
         //!

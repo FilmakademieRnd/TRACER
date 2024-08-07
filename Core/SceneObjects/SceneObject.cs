@@ -87,7 +87,7 @@ namespace tracer
         //! Factory to create a new SceneObject and do it's initialisation.
         //! Use this function instead GameObject.AddComponen<>!
         //!
-        //! @param parent The gameObject the new SceneObject will be attached to.
+        //! @param _parent The gameObject the new SceneObject will be attached to.
         //! @sceneID The scene ID for the new SceneObject.
         //!
         public static new SceneObject Attach(GameObject parent, byte sceneID = 254)
@@ -131,7 +131,7 @@ namespace tracer
         //!
         public void lockObject(bool l)
         {
-            SceneManager sceneManager = core.getManager<SceneManager>();
+            SceneManager sceneManager = _core.getManager<SceneManager>();
             if (l)
                 sceneManager.LockSceneObject(this);
             else

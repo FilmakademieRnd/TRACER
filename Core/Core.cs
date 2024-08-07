@@ -21,8 +21,8 @@ if not go to https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------------
 */
 
-//! @file "core.cs"
-//! @brief TRACER core implementation. Central class for TRACER initalization. Manages all Tracer Managers and their modules.
+//! @file "_core.cs"
+//! @brief TRACER _core implementation. Central class for TRACER initalization. Manages all Tracer Managers and their modules.
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @version 0
@@ -64,11 +64,11 @@ namespace tracer
             public int framerate = 60;
         }
         //!
-        //! The core settings.
+        //! The _core settings.
         //!
         private Settings _settings;
         //!
-        //! Getter and setter for the core settings.
+        //! Getter and setter for the _core settings.
         //!
         public coreSettings settings
         {
@@ -284,7 +284,7 @@ namespace tracer
         }
 
         //!
-        //! Function to save the modules- and core settins to disk.
+        //! Function to save the modules- and _core settins to disk.
         //!
         private void SaveSettings()
         {
@@ -296,7 +296,7 @@ namespace tracer
         }
 
         //!
-        //! Function to load the modules- and core settins from disk.
+        //! Function to load the modules- and _core settins from disk.
         //!
         private void LoadSettings()
         {
@@ -334,8 +334,8 @@ namespace tracer
         //!
         internal void addParameterObject(ParameterObject parameterObject)
         {
-            byte sceneID = parameterObject.sceneID;
-            short poID = parameterObject.id;
+            byte sceneID = parameterObject._sceneID;
+            short poID = parameterObject._id;
             Dictionary<short, ParameterObject> sceneObjects;
 
             // check scene
@@ -352,8 +352,8 @@ namespace tracer
 
         internal void removeParameterObject(ParameterObject parameterObject) 
         {
-            byte sceneID = parameterObject.sceneID;
-            short poID = parameterObject.id;
+            byte sceneID = parameterObject._sceneID;
+            short poID = parameterObject._id;
             Dictionary<short, ParameterObject> sceneObjects;
 
             // check scene

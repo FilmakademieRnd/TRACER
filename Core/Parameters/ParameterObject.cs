@@ -42,35 +42,21 @@ namespace tracer
     public class ParameterObject : MonoBehaviour
     {
         //!
-        //! The global id counter for generating unique parameterObject IDs.
+        //! The global _id counter for generating unique parameterObject IDs.
         //!
         private static short s_id = 1;
         //!
         //! The unique ID of this parameter object.
         //!
-        protected short _id;
+        public short _id { get; protected set; }
         //!
         //! The unique ID of this parameter object.
         //!
-        protected byte _sceneID = 254;
+        public byte _sceneID { get; protected set; } = 254;
         //!
         //! The name of this parameter object.
         //!
         protected string _name = "";
-        //!
-        //! The unique ID of this parameter object.
-        //!
-        public short id
-        {
-            get => _id;
-        }
-        //!
-        //! The scene ID of this parameter object.
-        //!
-        public byte sceneID
-        {
-            get => _sceneID;
-        }
         //!
         //! The name of this parameter object.
         //!
@@ -79,16 +65,9 @@ namespace tracer
             get => ref _name;
         }
         //!
-        //! A reference to the tracer core.
+        //! A reference to the tracer _core.
         //!
-        static protected Core _core = null;
-        //!
-        //! A reference to the tracer core.
-        //!
-        public static Core core
-        {
-            get => _core;
-        }
+        static public Core _core { get; protected set; } = null;
         //!
         //! Event emitted when parameter changed.
         //!

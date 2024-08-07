@@ -62,7 +62,7 @@ namespace tracer
         //!
         //! Constructor
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public UndoRedoModule(string name, Manager manager) : base(name, manager)
         {
@@ -129,11 +129,11 @@ namespace tracer
             if (_currentHistoryPos >= 0)
             {
                 AbstractParameter sourceParam = _history[_currentHistoryPos];
-                AbstractParameter targetParam = sourceParam.parent.parameterList[sourceParam.id];
+                AbstractParameter targetParam = sourceParam._parent.parameterList[sourceParam._id];
                 bool success = false;
                 for (int i = _currentHistoryPos - 1; i > -1; i--)
-                    if (_history[i].parent.id == sourceParam.parent.id
-                        && _history[i].id == sourceParam.id)
+                    if (_history[i]._parent._id == sourceParam._parent._id
+                        && _history[i]._id == sourceParam._id)
                     {
                         targetParam.copyValue(_history[i]);
                         success = true;
@@ -154,7 +154,7 @@ namespace tracer
             if (_currentHistoryPos < (_history.Count - 1))
             {
                 AbstractParameter sourceParam = _history[_currentHistoryPos + 1];
-                AbstractParameter targetParam = sourceParam.parent.parameterList[sourceParam.id];
+                AbstractParameter targetParam = sourceParam._parent.parameterList[sourceParam._id];
                 targetParam.copyValue(sourceParam);
                 _currentHistoryPos++;
             }
@@ -166,7 +166,7 @@ namespace tracer
         public void vanishHistory(SceneObject s)
         {
             foreach (AbstractParameter p in _history)
-                if (p.parent.id == s.id)
+                if (p._parent._id == s._id)
                 {
                     _history.Remove(p);
                     _currentHistoryPos--;

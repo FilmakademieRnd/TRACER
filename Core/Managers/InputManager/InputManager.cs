@@ -448,9 +448,9 @@ namespace tracer
         }
 
         //! 
-        //! Function called when Unity initializes the TRACER core.
+        //! Function called when Unity initializes the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Init(object sender, EventArgs e)
@@ -465,7 +465,7 @@ namespace tracer
         //! 
         //! Virtual function called when Unity calls it's Start function.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Start(object sender, EventArgs e)
@@ -476,9 +476,9 @@ namespace tracer
         }
 
         //! 
-        //! Function called before Unity destroys the TRACER core.
+        //! Function called before Unity destroys the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Cleanup(object sender, EventArgs e)

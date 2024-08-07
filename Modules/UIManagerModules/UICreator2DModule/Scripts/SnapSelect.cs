@@ -227,7 +227,7 @@ namespace tracer
         private bool _axisDecided;
 
         //!
-        //! Canvas of SnapSelect in parent object
+        //! Canvas of SnapSelect in _parent object
         //!
         private Canvas _canvas;
 

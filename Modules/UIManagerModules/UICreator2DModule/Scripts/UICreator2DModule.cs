@@ -90,7 +90,7 @@ namespace tracer
         //!
         //! Constructor
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public UICreator2DModule(string name, Manager manager) : base(name, manager)
         {

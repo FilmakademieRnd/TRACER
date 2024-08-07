@@ -51,7 +51,7 @@ namespace tracer
         //!
         public const string Selectable = "Selectable";
         //!
-        //! Name of the shader property holding the selectable id.
+        //! Name of the shader property holding the selectable _id.
         //!
         private const string m_SelectableIdPropertyName = "_SelectableId";
         //!
@@ -83,11 +83,11 @@ namespace tracer
         //!
         private AsyncGPUReadbackRequest request;
         //!
-        //! Re-used property block used to set selectable id.
+        //! Re-used property block used to set selectable _id.
         //!
         private MaterialPropertyBlock m_properties;
         //!
-        //! Cached shader property id of selectable id.
+        //! Cached shader property _id of selectable _id.
         //!
         private int m_selectableIdPropertyId;
         //!
@@ -115,7 +115,7 @@ namespace tracer
         //!
         //! Constructor
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public SelectionModule(string name, Manager manager) : base(name, manager)
         {
@@ -125,9 +125,9 @@ namespace tracer
         }
 
         //! 
-        //! Function called when Unity initializes the TRACER core.
+        //! Function called when Unity initializes the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Init(object sender, EventArgs e)
@@ -144,7 +144,7 @@ namespace tracer
         }
 
         //!
-        //! Callback from TRACER core when Unity calls OnDestroy.
+        //! Callback from TRACER _core when Unity calls OnDestroy.
         //! Used to cleanup resources used by the PixelSelector module.
         //!
         protected override void Cleanup(object sender, EventArgs e)
@@ -179,7 +179,7 @@ namespace tracer
         {
             m_isRenderActive = true;
 
-            // give the system some time to render the object id's
+            // give the system some time to render the object _id's
             await System.Threading.Tasks.Task.Delay(50);
 
             manager.clearSelectedObject();
@@ -297,7 +297,7 @@ namespace tracer
         }
 
         //!
-        //! Callback from TRACER core when Unity calls it's render update.
+        //! Callback from TRACER _core when Unity calls it's render update.
         //! Used setup render texture, render the object ID pass and copy
         //! it asyncron into a Color32 array. 
         //!
@@ -331,7 +331,7 @@ namespace tracer
                 bool oldAllowMsaa = camera.allowMSAA;
 
                 camera.targetTexture = gpuTexture; // Render into render texture.
-                camera.clearFlags = CameraClearFlags.SolidColor; // Make sure non-rendered pixels have id zero.
+                camera.clearFlags = CameraClearFlags.SolidColor; // Make sure non-rendered pixels have _id zero.
                 camera.backgroundColor = Color.clear;
                 camera.renderingPath = RenderingPath.Forward; // No gbuffer required.
                 camera.allowMSAA = false; // Avoid interpolated colors.
@@ -382,8 +382,8 @@ namespace tracer
                 int sceneID = 0;
                 if (sceneObject)
                 {
-                    soID = sceneObject.id;  
-                    sceneID = sceneObject.sceneID;
+                    soID = sceneObject._id;  
+                    sceneID = sceneObject._sceneID;
                 }
                 else
                 {
@@ -397,8 +397,8 @@ namespace tracer
                             SceneObject so = t.parent.GetComponent<SceneObject>();
                             if (so)
                             {
-                                soID = so.id;  
-                                sceneID = so.sceneID;
+                                soID = so._id;  
+                                sceneID = so._sceneID;
                             }
                             break;
                         }
@@ -427,10 +427,10 @@ namespace tracer
         }
 
         //! 
-        //! Encodes a selectable id into a color.
+        //! Encodes a selectable _id into a color.
         //! 
-        //! @param id The selectable id to be encoded.
-        //! @return The color representing the encoded id.
+        //! @param _id The selectable _id to be encoded.
+        //! @return The color representing the encoded _id.
         //!
         private void EncodeId(out Color32 color, byte sceneID, short soID)
         {
@@ -442,10 +442,10 @@ namespace tracer
         }
 
         //! 
-        //! Decodes a color into a selectable id.
+        //! Decodes a color into a selectable _id.
         //! 
-        //! @param color The color to decode into a selectable id.
-        //! @return The decoded selectable id.
+        //! @param color The color to decode into a selectable _id.
+        //! @return The decoded selectable _id.
         //!
         private void DecodeId(Color32 color, ref byte sceneID, ref short soID)
         {

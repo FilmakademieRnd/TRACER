@@ -72,11 +72,11 @@ namespace tracer
         //! Creates an reference to the network manager and connects the scene creation method to the scene received event in the network requester.
         //!
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public SceneCreatorModule(string name, Manager manager) : base(name, manager)
         {
-            //if (core.isServer)
+            //if (_core.isServer)
             //    load = false;
         }
 
@@ -403,7 +403,7 @@ namespace tracer
         //! Function that recusively creates the gameObjects in the Unity scene.
         //!
         //! @param sceneData A reference to the TRACER sceneData.
-        //! @param parent The transform of the parant node.
+        //! @param _parent The transform of the parant node.
         //! @param idx The index for referencing into the node list.
         //!
         private int createSceneGraphIter(ref SceneManager.SceneDataHandler.SceneData sceneData, Transform parent, int idx = 0, bool isRoot = true)
@@ -514,9 +514,9 @@ namespace tracer
         }
 
         //!
-        //! Creates an GameObject from an TRACER SceneNode beneath the parent transform.
+        //! Creates an GameObject from an TRACER SceneNode beneath the _parent transform.
         //! @param node TRACER SceneNode to be parsed.
-        //! @param parentTransform Unity parent transform of the GameObject to-be created.
+        //! @param parentTransform Unity _parent transform of the GameObject to-be created.
         //! @return The created GameObject.
         //!
         private GameObject CreateObject(SceneManager.SceneNode node, Transform parentTransform)
@@ -764,7 +764,7 @@ namespace tracer
         //! Function that adds bone transforms to renderers of SkinnedMesh objects.
         //!
         //! @param sceneData A reference to the TRACER sceneData.
-        //! @param parent the parent Unity transform.
+        //! @param _parent the _parent Unity transform.
         //!
         private void createSkinnedRendererIter(ref SceneManager.SceneDataHandler.SceneData sceneData)
         {

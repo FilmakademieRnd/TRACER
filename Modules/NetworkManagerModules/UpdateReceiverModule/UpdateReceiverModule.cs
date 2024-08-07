@@ -63,7 +63,7 @@ namespace tracer
         //! Constructor
         //!
         //! @param  name  The  name of the module.
-        //! @param core A reference to the TRACER core.
+        //! @param _core A reference to the TRACER _core.
         //!
         public UpdateReceiverModule(string name, Manager manager) : base(name, manager)
         {
@@ -82,7 +82,7 @@ namespace tracer
         //!
         //! Function for custom initialisation.
         //! 
-        //! @param sender The TRACER core.
+        //! @param sender The TRACER _core.
         //! @param e The pssed event arguments.
         //! 
         protected override void Init(object sender, EventArgs e)
@@ -155,7 +155,7 @@ namespace tracer
                                         lock (m_messageBuffer)
                                         {
                                             // message[1] is time
-                                            //int time = (message[1] + manager.pingRTT) % core.timesteps;
+                                            //int time = (message[1] + manager.pingRTT) % _core.timesteps;
                                             //m_messageBuffer[time].Add(message);
                                             m_messageBuffer[message[1]].Add(message);
                                         }
@@ -261,7 +261,7 @@ namespace tracer
         private void consumeMessages(object o, EventArgs e)
         {
             // define the buffer size by defining the time offset in the ringbuffer
-            // % time steps to take ring (0 to core.timesteps) into account
+            // % time steps to take ring (0 to _core.timesteps) into account
             // set to 1/10 second
             int bufferTime = (((core.time - core.settings.framerate / 6) + core.timesteps) % core.timesteps);
             lock (m_messageBuffer)
@@ -302,12 +302,12 @@ namespace tracer
                             if (parameterObject != null)
                             {
                                 AbstractParameter  parameter = parameterObject.parameterList[parameterID];
+                                
                                 // check update if animation is incoming and change parameter type if required 
                                 // 7 is the size of the parameter fixed field
-                                if (!parameter.isAnimated && length > 7 + parameter.dataSize()) {
-                                    parameter = parameterObject.parameterList[parameterID] = parameter.getAnimationParameter();
-                                   Debug.LogError("SASASASASAWSASAASAASASA");
-                                }
+                                if (!parameter._isAnimated && length > 7 + parameter.dataSize())
+                                    parameter.InitAnimation();
+                                
                                 parameter.deSerialize(message.Slice(start + 7));
                             }
 

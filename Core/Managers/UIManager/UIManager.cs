@@ -183,7 +183,7 @@ namespace tracer
         //! 
         //! Virtual function called when Unity calls it's Start function.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Init(object sender, EventArgs e)
@@ -224,9 +224,9 @@ namespace tracer
         }
 
         //!
-        //! function called before Unity destroys the TRACER core.
+        //! function called before Unity destroys the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         //!
@@ -416,7 +416,7 @@ namespace tracer
         }
 
         //!
-        //! Function to create the main settings menu out of the core and manager settings.
+        //! Function to create the main settings menu out of the _core and manager settings.
         //!
         private void CreateSettingsMenu()
         {
@@ -427,7 +427,7 @@ namespace tracer
 
             settingsMenu = settingsMenu.Begin(MenuItem.IType.VSPLIT); // <<< start VSPLIT
 
-            // add core settings
+            // add _core settings
             if (core.settings != null)
                 createMenuTreefromSettings("Core", ref settingsMenu, core.settings);
 
