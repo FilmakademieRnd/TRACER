@@ -1,7 +1,7 @@
 # TRACER FOUNDATION - Toolset for Realtime Animation, Collaboration & Extended Reality
 
 TRACER is a software agnostic communication infrastructure and toolset for plugging open-source tools into a production pipeline, establishing interoperability between open source and proprietary tools, targeting real-time collaboration and XR productions, with an operational layer for exchanging data objects and updates including animation and scene data, synchronization of scene updates of different client applications (Blender, UE, Unity, VPET ...), parameter harmonization between different engines/renderers, unified scene distribution and scene export which stores the current state of the scene. Furthermore, it can act as an Animation Host, to support XR and Virtual Production high demand to be able to use, exchange and direct animations in real-time environments. TRACER can be integrated and interact with any GameEngine (e.g. Unreal) or DCC (e.g. Blender, Maya, ...) through the provided open APIs and protocols.
-![TRACER](.doc/img/tracer_info_graphics_shematic.png)
+![TRACER](.doc/img/TRACER_Shematic_1k.png)
 **TRACER web site:** https://research.animationsinstitut.de/tracer
 
 ## Repository Content
