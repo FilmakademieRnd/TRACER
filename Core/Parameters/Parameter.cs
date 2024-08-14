@@ -435,6 +435,26 @@ namespace tracer
                 }
             }
         }
+        
+        //!
+        //! Revove a given key element from the parameters key list.
+        //!
+        //! @param index is the index of the key to be removed from the parameters key list.
+        //!
+        public void removeKeyAtIndex(int index)
+        {
+            if (_isAnimated)
+            {
+                _keyList.RemoveAt(index);
+
+                if (_keyList.Count == 0)
+                {
+                    _animationManager.animationUpdate -= updateValue;
+                    _isAnimated = false;
+                }
+            }
+        }
+        
 
         //!
         //! Create and insert a new key element to the parameters key list, 
@@ -446,6 +466,7 @@ namespace tracer
                 InitAnimation();
 
             addKey(new Key<T>(_animationManager.time, value));
+            
         }
 
         //!

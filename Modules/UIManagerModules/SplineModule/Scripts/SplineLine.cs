@@ -5,6 +5,7 @@ using tracer;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Splines;
+using Object = UnityEngine.Object;
 
 
 public class SplineLine : UIManagerModule
@@ -15,6 +16,16 @@ public class SplineLine : UIManagerModule
     private SceneObject _animationTarget;
 
     private SplineContainer _spline;
+
+    private List<AbstractParameter> _abstractParametersList;
+    
+    private int _selectorCurrentSelectedSnapSelectElement;
+
+    private SnapSelect _selectorSnapSelect;
+
+    private AbstractParameter _selectedAbstractParam;
+
+    private AnimationManager _animationManager;
 
     //TODO MOD WITH REAL TIME 
     private int _timeeee;
@@ -49,6 +60,10 @@ public class SplineLine : UIManagerModule
 
     private MenuButton _addKeyButton;
 
+    private MenuButton _removeKeyButton;
+
+    private bool _removeKey;
+
     public MenuButton animCreatorButton()
     {
         return _animCreatorButton;
@@ -58,9 +73,11 @@ public class SplineLine : UIManagerModule
     {
         base.Start(sender, e);
         _mUIManager = core.getManager<UIManager>();
+        _animationManager = core.getManager<AnimationManager>();
         _mUIManager.selectionChanged += selection;
         _splineHolder = new GameObject("SplineHolder");
         _splineHolder.transform.position = new Vector3(0, 0, 0);
+        
     }
 
     protected override void Cleanup(object sender, EventArgs e)
@@ -75,7 +92,14 @@ public class SplineLine : UIManagerModule
         if (_animCreatorButton != null)
         {
             _mUIManager.removeButton(_animCreatorButton);
-            _mUIManager.removeButton(_addKeyButton);
+            if (_addKeyButton != null)
+            {
+                _mUIManager.removeButton(_addKeyButton);
+                _mUIManager.removeButton(_removeKeyButton);
+
+            }
+            DelleteSplineContainer();
+            _selectorSnapSelect.parameterChanged -= ParamChange;
             _animCreatorButton = null;
         }
 
@@ -85,42 +109,134 @@ public class SplineLine : UIManagerModule
             _animCreatorButton.setIcon("Images/animationCreator");
             _mUIManager.addButton(_animCreatorButton);
             _animationTarget = sceneObjects[0];
+            
+            _selectedAbstractParam = _animationTarget.parameterList[_selectorCurrentSelectedSnapSelectElement];
+            
+            _selectorSnapSelect = GameObject.Find("PRE_UI_AddSelector(Clone)").GetComponent<SnapSelect>();
             _animCreatorButton.isHighlighted = false;
+            _selectorSnapSelect.parameterChanged += ParamChange;
         }
     }
 
     public void StartAnimGen()
     {
         _animCreatorButton.isHighlighted = true;
-        String splineName = new string(_animationTarget.name + "Spline");
-        if (!(_splineGameObject = FindChildByNameInDictionary(splineName)))
-        {
-            _splineGameObject = CreateNewSplineGo(splineName);
-            _sceneObjectsSplines.Add(_splineGameObject, splineName);
-            _spline = _splineGameObject.AddComponent<SplineContainer>();
-        }
-        else
-        {
-            _spline = _splineGameObject.GetComponent<SplineContainer>();
-        }
-
+        RenewContainer();
+        
         _addKeyButton = new MenuButton("", AddKey, null, "_addKeyButton ");
         _addKeyButton.setIcon("Images/key");
         _mUIManager.addButton(_addKeyButton);
+        
+        
+        //TODO MAKE THIS BUTTON ONLY VISIBLE IF THERE IS A KEY AT THAT FRAME!
+        _removeKeyButton = new MenuButton("", RemoveKey, null, "_removeKeyButton ");
+        _removeKeyButton.setIcon("Images/notkey");
+        _mUIManager.addButton(_removeKeyButton);
 
     }
+
+
+
+
 
     public void AddKey()
     {
-        _pos = _animationTarget.position.value;
-        _spline.Spline.Add(new BezierKnot(new float3(_pos.x, _pos.y, _pos.z)));
-
-        _animationTarget.position.setKey();
-
-        //TODO find way to edit them in scene!!! 
-        CreateSplineControlPoint("knot", _pos, _spline.gameObject);
+        UpdateKey(false);
     }
 
+    public void RemoveKey()
+    {
+        UpdateKey(true);
+    }
+
+    public void UpdateKey(bool removeKey)
+    {
+        if (_selectedAbstractParam is Parameter<bool> boolParam)
+        {
+            ApplyKeyUpdate(boolParam, removeKey);
+        }
+        if (_selectedAbstractParam is Parameter<int> intParam)
+        {
+            ApplyKeyUpdate(intParam, removeKey);
+        }
+        if (_selectedAbstractParam is Parameter<float> floatParam)
+        {
+            ApplyKeyUpdate(floatParam, removeKey);
+        }
+        if (_selectedAbstractParam is Parameter<Vector2> vector2Param)
+        {
+            ApplyKeyUpdate(vector2Param, removeKey);
+        }
+        else if (_selectedAbstractParam is Parameter<Vector3> vector3Param)
+        {
+            ApplyKeyUpdate(vector3Param, removeKey);
+            if (_selectedAbstractParam.name == "position")
+            {
+                RenewContainer();
+            }
+        }
+        if (_selectedAbstractParam is Parameter<Vector4> vector4Param)
+        {
+            ApplyKeyUpdate(vector4Param, removeKey);
+        }
+        if (_selectedAbstractParam is Parameter<quaternion> quaternionParam)
+        {
+            ApplyKeyUpdate(quaternionParam, removeKey);
+        }
+    }
+    
+    public void DelleteSplineContainer()
+    {
+        if (_splineGameObject!= null)
+        {
+            Object.DestroyImmediate(_splineGameObject);
+        }
+    }
+
+    public void CreateSplineContainer()
+    {
+        String splineName = new string(_animationTarget.name + "Spline");
+        _splineGameObject = CreateNewSplineGo(splineName);
+        _sceneObjectsSplines.Add(_splineGameObject, splineName);
+        _spline = _splineGameObject.AddComponent<SplineContainer>();
+
+    }
+    
+    public void RenewContainer()
+    {
+        DelleteSplineContainer();
+        CreateSplineContainer();
+        RedrawSpline();
+    }
+
+    private void RedrawSpline()
+    {
+        if (_animationTarget.position.keys != null)
+        {
+            foreach (var key in _animationTarget.position.keys)
+            {
+                CreateSplineControlPoint("knot", key.value, _spline);
+            }
+        }
+    }
+
+    public void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false)
+    {
+        if (removeKey)
+        {
+            int idx = parameter.keys.FindIndex(i => i.time == _animationManager.time);
+            if (idx >= 0)
+            {
+                parameter.removeKeyAtIndex(idx);
+            }
+        }
+        else
+        {
+            parameter.setKey();
+        }
+    
+    }
+    
     public SplineLine(string name, Manager manager) : base(name, manager)
     {
     }
@@ -140,30 +256,26 @@ public class SplineLine : UIManagerModule
     }
 
 
-    public void CreateSplineControlPoint(string childName, Vector3 pos, GameObject parent)
+    public void CreateSplineControlPoint(string childName, Vector3 pos, SplineContainer spline)
     {
+        
+        _spline.Spline.Add(new BezierKnot(new float3(pos.x, pos.y, pos.z)));
         // Create a new GameObject
         GameObject splineControlPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere);
 
         splineControlPoint.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
 
         // Set the _parent of the new GameObject to the specified _parent
-        splineControlPoint.transform.SetParent(parent.transform);
+        splineControlPoint.transform.SetParent(spline.gameObject.transform);
 
         // Set the local position of the child GameObject relative to its _parent
         splineControlPoint.transform.localPosition = pos;
     }
-
-    public GameObject FindChildByNameInDictionary(string splineName)
+    
+    public void ParamChange(object sender, int manipulatorMode)
     {
-        foreach (var kvp in _sceneObjectsSplines)
-        {
-            if (kvp.Value == splineName)
-            {
-                return kvp.Key;
-            }
-        }
-        return null;
+        _selectorCurrentSelectedSnapSelectElement = manipulatorMode;
+        
     }
 }
 
