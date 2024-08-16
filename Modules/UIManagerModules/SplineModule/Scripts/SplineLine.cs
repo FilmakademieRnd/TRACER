@@ -72,6 +72,8 @@ public class SplineLine : UIManagerModule
     private bool _removeKey;
 
     private Transform _keyCanvasTrans;
+    
+    private LineRenderer _lineRenderer;
 
     public MenuButton animCreatorButton()
     {
@@ -261,9 +263,36 @@ public class SplineLine : UIManagerModule
             {
                 CreateSplineControlPoint("knot", key.value, _spline);
             }
+
+            if (_animationTarget.position.keys.Count >= 2)
+            {
+                DrawLineBetweenPoints();
+            }
         }
     }
-    
+
+    private void DrawLineBetweenPoints()
+    {
+        if (_lineRenderer == null)
+        {
+            _lineRenderer = _splineGameObject.AddComponent<LineRenderer>();
+        }
+        
+        _lineRenderer.positionCount = _animationTarget.position.keys.Count;
+        _lineRenderer.startWidth = 0.1f;
+        _lineRenderer.endWidth = 0.1f;
+        
+        _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        _lineRenderer.startColor = Color.red;
+        _lineRenderer.endColor = Color.red;
+
+        for (int i = 0; i < _animationTarget.position.keys.Count; i++)
+        {
+            _lineRenderer.SetPosition(i, _animationTarget.position.keys[i].value);
+        }
+
+    }
+
     public SplineLine(string name, Manager manager) : base(name, manager)
     {
     }
