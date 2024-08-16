@@ -80,6 +80,6 @@ Material:
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _InputColor: {r: 1, g: 0.7241975, b: 0, a: 1}
-    - _InputPos: {r: 0.40565786, g: 0.6157214, b: 0.9, a: 0.120699584}
+    - _InputColor: {r: 0.62205243, g: 1, b: 0, a: 1}
+    - _InputPos: {r: 0.57320017, g: 0.6389609, b: 0.9, a: 0.22965792}
   m_BuildTextureStacks: []

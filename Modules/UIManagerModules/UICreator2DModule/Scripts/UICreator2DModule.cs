@@ -73,6 +73,12 @@ namespace tracer
         public event EventHandler<ColorSelect> colorSelectActive; 
 
         private Transform UI2D;
+
+        public Transform UI2DCanvas
+        {
+            get => UI2D;
+        }
+        
         private Transform manipulatorPanel;
         private Transform undoRedoPanel;
         private Button undoButton;

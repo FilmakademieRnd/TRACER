@@ -472,7 +472,7 @@ namespace tracer
         //!
         //! Clear the parameters key list and disable the animation functionality.
         //!
-        private void clearKeys()
+        public void clearKeys()
         {
             if (_isAnimated)
             {
