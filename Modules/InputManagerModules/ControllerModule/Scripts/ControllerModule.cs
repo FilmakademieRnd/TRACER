@@ -141,11 +141,6 @@ namespace tracer
         private List<SnapSelectElement> _selectorSnapSelectElementsList;
 
         //!
-        //! List of elements in the spinner SnapSelect
-        //!
-        private List<SnapSelectElement> _spinnerSnapSelectElementsList;
-
-        //!
         //! The index of the currently selected SnapSelect element in the selector
         //!
         private int _selectorCurrentSelectedSnapSelectElement = 0;
@@ -912,9 +907,6 @@ namespace tracer
                 _selectorCurrentSelectedSnapSelectElement = 0;
                 _selectedAbstractParam =
                     _currentSelectedSceneObject.parameterList[_selectorCurrentSelectedSnapSelectElement];
-                //_selectorSnapSelect.parameterChanged += GetCurrentParameter;
-                //GetSpinner();
-                // List<int> uniqueButtonIDs = _snapSelectElementsList.Select(element => element.buttonID).Distinct().ToList();
             }
         }
 
@@ -926,14 +918,6 @@ namespace tracer
             _selectorCurrentSelectedSnapSelectElement = manipulatorMode;
         }
 
-        /*private void GetSpinner()
-        {
-            _spinnerSnapSelect = UI2DModule.GetManipulator().GetComponent<SnapSelect>();
-            _spinnerSnapSelectElementsList = _spinnerSnapSelect.elements.GroupBy(element => element.buttonID).Select(group => group.First()).ToList();
-            _spinnerCurrentSelectedSnapSelectElement = 0;
-            _spinnerSnapSelect.parameterChanged += GetCurrentParameter;
-        }*/
-        
         //!
         //! This method switches to the next available manipulation mode.
         //!
@@ -959,29 +943,6 @@ namespace tracer
                 _currentSelectedSceneObject.parameterList[_selectorCurrentSelectedSnapSelectElement];
             //GetSpinner();
         }
-
-        /*private void SwitchToNextSpinnerMode()
-        {
-            _spinnerCurrentSelectedSnapSelectElement = (_spinnerCurrentSelectedSnapSelectElement + 1) % _spinnerSnapSelectElementsList.Count;
-            _spinnerSnapSelectElementsList[_spinnerCurrentSelectedSnapSelectElement].ControllerClick();   
-            Debug.LogError("Controller" + _spinnerCurrentSelectedSnapSelectElement);
-        }
-
-        private void SwitchToPreviousSpinnerMode()
-        {
-            _spinnerCurrentSelectedSnapSelectElement = (_spinnerCurrentSelectedSnapSelectElement - 1 + _spinnerSnapSelectElementsList.Count) % _spinnerSnapSelectElementsList.Count;
-            _spinnerSnapSelectElementsList[_spinnerCurrentSelectedSnapSelectElement].ControllerClick();
-            Debug.LogError("Controller" + _spinnerCurrentSelectedSnapSelectElement);
-        }*/
-        
-        /*private void GetCurrentParameter(object sender, int param)
-        {
-
-            Debug.LogError(sender + " idk wtf is this " + param);
-            //AbstractParameter abstractParam = _currentSelectedSceneObject.parameterList[param];
-            //AbstractParameter.ParameterType type = abstractParam.tracerType;
-
-        }*/
         
         //!
         //! This method invokes the doneEditing event for undo/redo when an editing operation is completed.

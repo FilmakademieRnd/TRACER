@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using tracer;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Splines;
 using UnityEngine.UI;
 using Object = UnityEngine.Object;
@@ -91,6 +92,7 @@ public class SplineLine : UIManagerModule
         
         
         _mUIManager.selectionChanged += selection;
+        _mUIManager.UI2DCreated += grabUI2D;
         _splineHolder = new GameObject("SplineHolder");
         _splineHolder.transform.position = new Vector3(0, 0, 0);
         
@@ -100,6 +102,7 @@ public class SplineLine : UIManagerModule
     {
         base.Cleanup(sender, e);
         _mUIManager.selectionChanged -= selection;
+        _mUIManager.UI2DCreated -= grabUI2D;
     }
 
 
@@ -130,11 +133,14 @@ public class SplineLine : UIManagerModule
             _animationTarget = sceneObjects[0];
             
             _selectedAbstractParam = _animationTarget.parameterList[_selectorCurrentSelectedSnapSelectElement];
-            
-            _selectorSnapSelect = GameObject.Find("PRE_UI_AddSelector(Clone)").GetComponent<SnapSelect>();
             _animCreatorButton.isHighlighted = false;
-            _selectorSnapSelect.parameterChanged += ParamChange;
         }
+    }
+
+    void grabUI2D(object sender, UIBehaviour ui)
+    {
+        _selectorSnapSelect = (SnapSelect) ui;
+        _selectorSnapSelect.parameterChanged += ParamChange;
     }
 
     public void StartAnimGen()
@@ -213,7 +219,7 @@ public class SplineLine : UIManagerModule
     {
         if (removeKey && !removeAll)
         {
-            int idx = parameter.keys.FindIndex(i => i.time == _animationManager.time);
+            int idx = parameter.getKeys().FindIndex(i => i.time == _animationManager.time);
             if (idx >= 0)
             {
                 parameter.removeKeyAtIndex(idx);
@@ -257,14 +263,14 @@ public class SplineLine : UIManagerModule
 
     private void RedrawSpline()
     {
-        if (_animationTarget.position.keys != null)
+        if (_animationTarget.position.getKeys() != null)
         {
-            foreach (var key in _animationTarget.position.keys)
+            foreach (var key in _animationTarget.position.getKeys())
             {
-                CreateSplineControlPoint("knot", key.value, _spline);
+                CreateSplineControlPoint("knot", ((Key<Vector3>)key).value, _spline);
             }
 
-            if (_animationTarget.position.keys.Count >= 2)
+            if (_animationTarget.position.getKeys().Count >= 2)
             {
                 DrawLineBetweenPoints();
             }
@@ -277,8 +283,8 @@ public class SplineLine : UIManagerModule
         {
             _lineRenderer = _splineGameObject.AddComponent<LineRenderer>();
         }
-        
-        _lineRenderer.positionCount = _animationTarget.position.keys.Count;
+        List<AbstractKey> keyList = _animationTarget.position.getKeys();
+        _lineRenderer.positionCount = keyList.Count;
         _lineRenderer.startWidth = 0.1f;
         _lineRenderer.endWidth = 0.1f;
         
@@ -286,9 +292,9 @@ public class SplineLine : UIManagerModule
         _lineRenderer.startColor = Color.red;
         _lineRenderer.endColor = Color.red;
 
-        for (int i = 0; i < _animationTarget.position.keys.Count; i++)
+        for (int i = 0; i < keyList.Count; i++)
         {
-            _lineRenderer.SetPosition(i, _animationTarget.position.keys[i].value);
+            _lineRenderer.SetPosition(i, ((Key<Vector3>)keyList[i]).value);
         }
 
     }

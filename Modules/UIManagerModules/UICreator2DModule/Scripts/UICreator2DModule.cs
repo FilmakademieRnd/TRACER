@@ -241,6 +241,8 @@ namespace tracer
             currentAddSelector.SetActive(true);
 
             createManipulator(0);
+
+            manager.emitUI2DCreated(snapSelect);
         }
 
         //!

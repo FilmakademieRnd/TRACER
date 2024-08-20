@@ -35,6 +35,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace tracer
 {
@@ -132,6 +133,10 @@ namespace tracer
         //! Event emitted when a MenuTree has been deselected.
         //!
         public event EventHandler<EventArgs> menuDeselected;
+        //!
+        //! Event emitted when the 2D UI has been created.
+        //!
+        public event EventHandler<UIBehaviour> UI2DCreated;
         //!
         //! A list storing references to the menus (MenuTrees) created by the UI-Modules.
         //!
@@ -576,6 +581,11 @@ namespace tracer
 
             m_selectedObjects.Clear();
             selectionChanged?.Invoke(this, m_selectedObjects);
+        }
+
+        public void emitUI2DCreated(UIBehaviour ui)
+        {
+            UI2DCreated?.Invoke(this, ui);
         }
 
         //!

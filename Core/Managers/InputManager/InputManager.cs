@@ -67,11 +67,19 @@ namespace tracer
         //!
         //! Press start event, i.e. the begin of a click.
         //!
-        public event EventHandler<Vector2> inputPressStart;
+        public event EventHandler<Vector2> inputPressTapp;
+        //!
+        //! Press start event, i.e. the begin of a click.
+        //!
+        public event EventHandler<Vector2> inputPressStartedUI;
         //!
         //! Press start event, i.e. the begin of a click.
         //!
         public event EventHandler<Vector2> inputPressPerformed;
+        //!
+        //! Press start event, i.e. the begin of a click.
+        //!
+        public event EventHandler<Vector2> inputPressPerformedUI;
         //!
         //! Press end event, i.e. the end of a click.
         //!
@@ -131,11 +139,11 @@ namespace tracer
         public event EventHandler<Vector2> rightControllerStick;
         public event EventHandler<Vector2> ControllerStickCanceled;
         #endregion
-        
+
         //!
         //! Enumeration describing possible touch input gestures.
         //!
-        private enum InputTouchType
+        public enum InputTouchType
         {
             ONE,
             TWO,
@@ -146,6 +154,14 @@ namespace tracer
         //! The touch input gesture type.
         //!
         private InputTouchType m_touchType;
+
+        //!
+        //! The touch type getter.
+        //!
+        public InputTouchType touchType
+        {
+            get  => m_touchType;
+        }
 
         //!
         //! Flag to determine if a touch drag gesture is being performed.
@@ -182,6 +198,7 @@ namespace tracer
         //!
         //! Enum defining the automatic camera control state.
         //!
+        private List<RaycastResult> m_raycastList;
         public enum CameraControl
         {
             NONE,
@@ -232,7 +249,7 @@ namespace tracer
             m_inputs.VPETMap.Tap.performed += ctx => TapFunction(ctx);
 
             // Dedicated bindings for monitoring touch and drag interactions
-            m_inputs.VPETMap.Click.started += ctx => PressStart(ctx);
+            m_inputs.VPETMap.Click.started += ctx => PressStarted(ctx);
             m_inputs.VPETMap.Click.performed += ctx => PressPerformed(ctx);
             m_inputs.VPETMap.Click.canceled += ctx => PressEnd(ctx);
             
@@ -284,6 +301,7 @@ namespace tracer
             m_inputs.VPETMap.Position.performed += Position_performed;
             m_inputs.VPETMap.ZoomWheel.performed += ZoomWheel_performed;
 #endif
+            m_raycastList = new List<RaycastResult>(5);
         }
 
         #region Controller Button Events Invoke
@@ -487,6 +505,7 @@ namespace tracer
 
             m_inputs.VPETMap.Tap.performed -= TapFunction;
 
+            m_inputs.VPETMap.Click.started -= PressStarted;
             m_inputs.VPETMap.Click.performed -= PressPerformed;
             m_inputs.VPETMap.Click.canceled -= PressEnd;
 
@@ -580,6 +599,10 @@ namespace tracer
                 {
                     objectSelectionEvent?.Invoke(this, point);
                 }
+                else if (TappedUI(point))
+                {
+
+                }
             }
 
             // just an exampe, needs different code to discover correct type and values!
@@ -601,22 +624,28 @@ namespace tracer
         //!
         private void MovePoint(InputAction.CallbackContext c)
         {
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            inputMove?.Invoke(this, m_inputs.VPETMap.Position.ReadValue<Vector2>());
+            if (m_touchType == InputTouchType.ONE)
+            {
+                Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+                inputMove?.Invoke(this, point);
 
-            if (!m_isTouchDrag && m_touchType == InputTouchType.ONE)
-                m_isTouchDrag = true;
+                if (!m_isTouchDrag)
+                    m_isTouchDrag = true;
+            }
         }
 
         //!
         //! Input press start function, for monitoring the start of touch/click interactions.
         //!
-        private void PressStart(InputAction.CallbackContext c)
+        private void PressStarted(InputAction.CallbackContext c)
         {
+
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            if (!TappedUI(point))
-                inputPressStart?.Invoke(this, point);
+            m_touchType = InputTouchType.ONE;
+            if (TappedUI(point))
+                inputPressStartedUI?.Invoke(this, point);
         }
+
 
         //!
         //! Input press start function, for monitoring the start of touch/click interactions.
@@ -624,7 +653,9 @@ namespace tracer
         private void PressPerformed(InputAction.CallbackContext c)
         {
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            if (!TappedUI(point))
+            if (TappedUI(point))
+                inputPressPerformedUI?.Invoke(this, point);
+            else
                 inputPressPerformed?.Invoke(this, point);
         }
 
@@ -794,7 +825,6 @@ namespace tracer
         {
             if (m_touchType != InputTouchType.THREE)
                 return;
-
             // Register the gesture
             m_isTouchDrag = true;
 
@@ -866,10 +896,9 @@ namespace tracer
         {
             PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
             eventDataCurrentPosition.position = pos;
-            List<RaycastResult> results = new List<RaycastResult>();
-            EventSystem.current.RaycastAll(eventDataCurrentPosition, results);
+            EventSystem.current.RaycastAll(eventDataCurrentPosition, m_raycastList);
 
-            return results.Count > 0;
+            return m_raycastList.Count > 0;
         }
 
         //!
@@ -937,6 +966,11 @@ namespace tracer
         public void ControllerSelect(Vector2 pos)
         {
             objectSelectionEvent?.Invoke(this, pos);
+        }
+
+        public bool getKey(int key)
+        {
+            return Keyboard.current[(Key) key].isPressed;
         }
 
        

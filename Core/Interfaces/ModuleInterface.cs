@@ -30,6 +30,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 03.02.2022
 
 using System;
+using UnityEngine;
 
 namespace tracer
 {

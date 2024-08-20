@@ -30,51 +30,57 @@ if not go to https://opensource.org/licenses/MIT
 
 namespace tracer
 {
-
+    public abstract class AbstractKey
+    {
+        //!
+        //! The key's time and tangent time.
+        //!
+        public float time, tangentTime1, tangentTime2;
+        //!
+        //! Enumeration for the different interpolation types
+        //!
+        public enum InterplolationTypes { STEP, LINEAR, BEZIER, BEZIERFREE }
+        //!
+        //! The key's type.
+        //!
+        public InterplolationTypes interpolation;
+    }
     //!
     //! Parameter base class.
     //!
-    public class Key<T>
+    public class Key<T> : AbstractKey
     {
         //!
         //! The key's value and tangent value.
         //!
-        public T value, tangentValue;
-        //!
-        //! The key's time and tangent time.
-        //!
-        public float time, tangentTime;
-        //!
-        //! Enumeration for the different interpolation types
-        //!
-        public enum KeyType { STEP, LINEAR, BEZIER }
-        //!
-        //! The key's type.
-        //!
-        public KeyType type;
+        public T value, tangentValue1, tangentValue2;
 
         //!
         //! The Key's constructor for generic types.
         //!
-        public Key(float time, T value, float tangentTime = 0, T tangentValue = default(T), KeyType type = KeyType.LINEAR)
+        public Key(float time, T value, float tangentTime1 = 0, T tangentValue1 = default(T), float tangentTime2 = 0, T tangentValue2 = default(T), InterplolationTypes interpolation = InterplolationTypes.LINEAR)
         {
             this.time = time;
-            this.type = type;
+            this.interpolation = interpolation;
             this.value = value;
-            this.tangentTime = tangentTime;
-            this.tangentValue = tangentValue;
+            this.tangentTime1 = tangentTime1;
+            this.tangentTime2 = tangentTime2;
+            this.tangentValue1 = tangentValue1;
+            this.tangentValue2 = tangentValue2;
         }
 
         //!
         //! The Key's constructor for type LINEAR.
         //!
-        public Key (float time, T value)
+        public Key(float time, T value)
         {
             this.time = time;
             this.value = value;
-            this.type = KeyType.LINEAR;
-            this.tangentTime = 0;
-            this.tangentValue = default(T);
+            this.interpolation = InterplolationTypes.LINEAR;
+            this.tangentTime1 = 0;
+            this.tangentTime2 = 0;
+            this.tangentValue1 = default(T);
+            this.tangentValue2 = default(T);
         }
     }
 }

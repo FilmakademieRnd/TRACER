@@ -28,10 +28,8 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 25.06.2021
 
-using System.IO;
 using System.Collections.Generic;
 using System;
-using System.Linq;
 
 namespace tracer
 {

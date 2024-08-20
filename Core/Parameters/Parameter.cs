@@ -130,6 +130,11 @@ namespace tracer
         public abstract void reset();
 
         //!
+        //! A reference to the key list (for animation).
+        //!
+        public abstract ref List<AbstractKey> getKeys();
+
+        //!
         //! Fuction that determines a parameters C# type from a TRACER type.
         //!
         //! @param t The C# type from which the TRACER type is to be determined. 
@@ -204,11 +209,11 @@ namespace tracer
         //!
         //! The list of keyframes (for animation).
         //!
-        private List<Key<T>> _keyList = null;
+        private List<AbstractKey> _keyList = null;
         //!
         //! A reference to the key list (for animation).
         //!
-        public ref List<Key<T>> keys { get => ref _keyList; }
+        public override ref List<AbstractKey> getKeys() { return ref _keyList; }
         //!
         //! A reference to the Animation Manager.
         //!
@@ -220,8 +225,8 @@ namespace tracer
         public override int dataSize()
         {
             if (_isAnimated)
-                // count<short> + count *(type<byte> + time<float> + tangentTime<float> + value<ParamValueSize> + tangentvalue<ParamValueSize>) 
-                return _dataSize + 2 + _keyList.Count * (1 + 2 * sizeof(float) + 2 * _dataSize);
+                // parameterValue<ParamValueSize> + countKeys<short> + nbrKeys * (type<byte> + time<float> + tangentTime1<float> + tangentTime2<float> + value<ParamValueSize> + tangentvalue1<ParamValueSize> + tangentvalue2<ParamValueSize>) 
+                return _dataSize + 2 + _keyList.Count * (1 + 3 * sizeof(float) + 3 * _dataSize);
 
             switch (_type)
             {
@@ -254,6 +259,7 @@ namespace tracer
             _initialValue = value;
             _nextIdx = 0;
             _prevIdx = 0;
+            _keyList = new List<AbstractKey>();
 
             // initialize sourceSpan size
             switch (_type)
@@ -380,8 +386,6 @@ namespace tracer
         //!
         public override void InitAnimation()
         {
-            _keyList ??= new List<Key<T>>();
-
             _animationManager = ParameterObject._core.getManager<AnimationManager>();
             _animationManager.animationUpdate += updateValue;
 
@@ -395,7 +399,7 @@ namespace tracer
         //!
         public void addKey(Key<T> key)
         {
-            if (!_isAnimated) 
+            if (!_isAnimated)
                 InitAnimation();
 
             int i = findNextKeyIndex(key);
@@ -403,7 +407,7 @@ namespace tracer
             {
                 i = _keyList.FindIndex(i => i.time == key.time);
                 if (i > -1)
-                    _keyList[i].value = key.value;
+                    ((Key<T>)_keyList[i]).value = key.value;
                 else
                 {
                     _keyList.Add(key);
@@ -435,7 +439,7 @@ namespace tracer
                 }
             }
         }
-        
+
         //!
         //! Revove a given key element from the parameters key list.
         //!
@@ -454,7 +458,8 @@ namespace tracer
                 }
             }
         }
-        
+
+
 
         //!
         //! Create and insert a new key element to the parameters key list, 
@@ -465,8 +470,19 @@ namespace tracer
             if (!_isAnimated)
                 InitAnimation();
 
-            addKey(new Key<T>(_animationManager.time, value));
-            
+            addKey(new Key<T>(_animationManager.time, _value));
+        }
+
+        //!
+        //! Create and insert a new key element to the parameters key list, 
+        //! based on the given value and at the given time.
+        //!
+        //! @param time The time at which the new key is to be added.
+        //! @param value The the value for the new keyframe to be added.
+        //!
+        public void setKey(Key<T> key)
+        {
+            addKey(key);
         }
 
         //!
@@ -512,7 +528,7 @@ namespace tracer
                         }
                     }
                 }
-                value = interpolate(time);
+                value = interpolateLinear(time);
             }
         }
 
@@ -541,21 +557,21 @@ namespace tracer
         }
 
         //!
-        //! Function that interpolates the current parameter value based on a given
+        //! Function that linear interpolates the current parameter value based on a given
         //! time and the previous and next time indices.
         //!
-        //! @parameter time The given time used to interpolate the parameters value.
+        //! @parameter time The given time used to interpolateLinear the parameters value.
         //! @return The interpolated parameter value.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private T interpolate(float time)
+        private T interpolateLinear(float time)
         {
             switch (_type)
             {
                 case ParameterType.FLOAT:
                     float inBetween = (time - _keyList[_prevIdx].time) / (_keyList[_prevIdx].time - _keyList[_nextIdx].time);
                     float s1 = 1.0f - (_keyList[_nextIdx].time - inBetween) / (_keyList[_nextIdx].time - _keyList[_prevIdx].time);
-                    return (T)(object)(((float)(object)_keyList[_prevIdx].value) * (1.0f - s1) + ((float)(object)_keyList[_nextIdx].value) * s1);
+                    return (T)(object)(((float)(object)((Key<T>)_keyList[_prevIdx]).value) * (1.0f - s1) + ((float)(object)((Key<T>)_keyList[_nextIdx]).value) * s1);
                 default:
                     return default(T);
             }
@@ -584,12 +600,14 @@ namespace tracer
                 BitConverter.TryWriteBytes(targetSpan.Slice(offset += 2, 2), keyCount); // nbr. of keys
                 for (int i = 0; i < keyCount; i++)
                 {
-                    Key<T> key = _keyList[i];
-                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 1, 1), (byte)key.type); // type
+                    Key<T> key = (Key<T>)_keyList[i];
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 1, 1), (byte)key.interpolation); // interpolation
                     BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.time); // time
-                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime); // tangent time
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime1); // tangent time 1
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime2); // tangent time 2
                     SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.value); // value
-                    SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue); // tangent value
+                    SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue1); // tangent value 1
+                    SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue2); // tangent value 2
                 }
             }
         }
@@ -674,13 +692,15 @@ namespace tracer
 
                 for (int i = 0; i < keyCount; i++)
                 {
-                    Key<T>.KeyType type = MemoryMarshal.Read<Key<T>.KeyType>(sourceSpan.Slice(offset += 1));
+                    Key<T>.InterplolationTypes interplolation = MemoryMarshal.Read<Key<T>.InterplolationTypes>(sourceSpan.Slice(offset += 1));
                     float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
-                    float tangenttime = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    float tangenttime1 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    float tangenttime2 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
                     T value = deSerializeData(sourceSpan.Slice(offset += _dataSize));
-                    T tangentvalue = deSerializeData(sourceSpan.Slice(offset));
+                    T tangentvalue1 = deSerializeData(sourceSpan.Slice(offset));
+                    T tangentvalue2 = deSerializeData(sourceSpan.Slice(offset));
 
-                    _keyList.Add(new Key<T>(time, value, tangenttime, tangentvalue, type));
+                    _keyList.Add(new Key<T>(time, value, tangenttime1, tangentvalue1, tangenttime2, tangentvalue2 , interplolation));
                     Debug.Log("deSerialize: Key added");
                 }
             }

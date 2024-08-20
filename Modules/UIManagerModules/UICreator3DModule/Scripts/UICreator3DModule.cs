@@ -32,6 +32,7 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace tracer
 {
@@ -387,12 +388,10 @@ namespace tracer
         // Potential bad behaviors if there are other objects besides the manipulators with physics collider inside UI layer
         private GameObject CameraRaycast(Vector3 pos, int layerMask = 1 << 5)
         {
-
             if (Physics.Raycast(mainCamera.ScreenPointToRay(pos), out RaycastHit hit, Mathf.Infinity, layerMask))
                 return hit.collider.gameObject;
 
             return null;
-
         }
 
         //!
