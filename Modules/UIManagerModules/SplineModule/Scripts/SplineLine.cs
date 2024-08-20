@@ -282,20 +282,31 @@ public class SplineLine : UIManagerModule
         if (_lineRenderer == null)
         {
             _lineRenderer = _splineGameObject.AddComponent<LineRenderer>();
+            _lineRenderer.useWorldSpace = true;
         }
         List<AbstractKey> keyList = _animationTarget.position.getKeys();
-        _lineRenderer.positionCount = keyList.Count;
         _lineRenderer.startWidth = 0.1f;
         _lineRenderer.endWidth = 0.1f;
         
         _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
         _lineRenderer.startColor = Color.red;
         _lineRenderer.endColor = Color.red;
+        int lineSegmentCount = 100;
+        _lineRenderer.positionCount = lineSegmentCount + 1;
+        
+        for (int i = 0; i <= lineSegmentCount; i++)
+        {
+            float t = i / (float)lineSegmentCount;  // Normalized time along the spline
+            Vector3 point = _spline.EvaluatePosition(t);  // Evaluate the position on the spline at this time
+            _lineRenderer.SetPosition(i, point);  // Set this position on the LineRenderer
+        }
 
-        for (int i = 0; i < keyList.Count; i++)
+
+
+        /*for (int i = 0; i < keyList.Count; i++)
         {
             _lineRenderer.SetPosition(i, ((Key<Vector3>)keyList[i]).value);
-        }
+        }*/
 
     }
 
@@ -320,8 +331,9 @@ public class SplineLine : UIManagerModule
 
     public void CreateSplineControlPoint(string childName, Vector3 pos, SplineContainer spline)
     {
-        
-        _spline.Spline.Add(new BezierKnot(new float3(pos.x, pos.y, pos.z)));
+        BezierKnot knot = new BezierKnot(new float3(pos.x, pos.y, pos.z));
+        _spline.Spline.Add(knot);
+        _spline.Spline.SetTangentMode(0);
         // Create a new GameObject
         GameObject splineControlPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere);
 
