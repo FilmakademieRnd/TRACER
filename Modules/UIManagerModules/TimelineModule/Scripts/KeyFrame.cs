@@ -24,13 +24,12 @@ this program; if not go to
 https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------
 */
-using tracer;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace vpet
+namespace tracer
 {
 	public class KeyFrame : Button, IBeginDragHandler, IDragHandler
 	{

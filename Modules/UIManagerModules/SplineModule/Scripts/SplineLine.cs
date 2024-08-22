@@ -213,6 +213,8 @@ public class SplineLine : UIManagerModule
         {
             ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
         }
+
+        _animationManager.keyframesUpdated(_selectedAbstractParam);
     }
     
     public void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false)

@@ -42,6 +42,7 @@ namespace tracer
         private float m_time;
         public float time { get => m_time; }
         public event EventHandler<float> animationUpdate;
+        public event EventHandler<AbstractParameter> keyframeUpdate;
         public AnimationManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_time = 0;
@@ -50,6 +51,10 @@ namespace tracer
         {
             m_time = time;
             animationUpdate?.Invoke(this, time);
+        }
+        public void keyframesUpdated(AbstractParameter parameter)
+        {
+            keyframeUpdate?.Invoke(this, parameter);
         }
     }
 

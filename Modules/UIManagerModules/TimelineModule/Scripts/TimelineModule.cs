@@ -32,11 +32,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using vpet;
 
 namespace tracer
 {
@@ -116,7 +114,7 @@ namespace tracer
         private Coroutine m_playCoroutine;
 
         private SnapSelect m_snapSelect;
-        private int m_avtiveParameterIndex = 0;
+        private int m_activeParameterIndex = 0;
 
         //!
         //! The visible start time of the timeline.
@@ -241,13 +239,6 @@ namespace tracer
             m_prevButton.onClick.AddListener(prevFrame);
             m_nextButton.onClick.AddListener(nextFrame);
 
-            Keyframe[] keys = new Keyframe[3];
-            keys[0] = new Keyframe(-10, -1);
-            keys[1] = new Keyframe(2, 0);
-            keys[2] = new Keyframe(5, 1);
-            AnimationCurve testCurve = new AnimationCurve(keys);
-            UpdateFrames(testCurve);
-
             setTime(2f);
 
             m_inputManager.inputPressStartedUI += OnBeginDrag;
@@ -256,6 +247,8 @@ namespace tracer
             m_inputManager.inputMove += OnDrag;
             m_inputManager.twoDragEvent += OnTwoFingerDrag;
             m_inputManager.pinchEvent += OnPinch;
+            m_animationManager.keyframeUpdate += OnKeyframeUpdated;
+            manager.selectionChanged += OnSelectionChanged;
             manager.UI2DCreated += On2DUIReady;
         }
 
@@ -273,6 +266,8 @@ namespace tracer
             m_inputManager.inputMove -= OnDrag;
             m_inputManager.twoDragEvent -= OnTwoFingerDrag;
             m_inputManager.pinchEvent -= OnPinch;
+            m_animationManager.keyframeUpdate -= OnKeyframeUpdated;
+            manager.selectionChanged -= OnSelectionChanged;
             manager.UI2DCreated -= On2DUIReady;
         }
 
@@ -315,6 +310,18 @@ namespace tracer
             m_animationManager.timelineUpdated(time);
         }
 
+        private void OnSelectionChanged(object o, List<SceneObject> sceneObjects)
+        {
+            if (sceneObjects.Count < 1)
+                clearFrames();
+        }
+
+        private void OnKeyframeUpdated(object o, AbstractParameter parameter)
+        {
+            clearFrames();
+            CreateFrames(parameter);
+        }
+
         //!
         //! Updates the displayed keys according to the given scene objecs and their 
         //! containt parameters with it's keys. Will add/remove frames if neccessary.
@@ -328,51 +335,35 @@ namespace tracer
             m_snapSelect.parameterChanged += OnParameterChanged;
 
             if (manager.SelectedObjects.Count > 0)
-            {
-                AbstractParameter abstractParameter = manager.SelectedObjects[0].parameterList[m_avtiveParameterIndex];
-                foreach (AbstractKey key in abstractParameter.getKeys())
-                {
-                    bool exists = false;
-                    // check if there is already a key // TODO: smarter search
-                    foreach (GameObject img in m_keyframeList)
-                    {
-                        if (img.GetComponent<KeyFrame>().key.time == key.time)
-                        {
-                            exists = true;
-                            break;
-                        }
-                    }
-                    if (!exists)
-                        addFrame(key);
-                }
-            }
+                CreateFrames(manager.SelectedObjects[0].parameterList[m_activeParameterIndex]);
 
             UpdateFrames();
         }
 
         private void OnParameterChanged(object o, int idx)
         {
-            m_avtiveParameterIndex = idx;
-            Debug.Log(m_avtiveParameterIndex);
+            clearFrames();
+
+            m_activeParameterIndex = idx;
+            CreateFrames(manager.SelectedObjects[0].parameterList[m_activeParameterIndex]);
         }
 
-        // REMOVE only for demo!
-        public void UpdateFrames(AnimationCurve curve)
+        public void CreateFrames(AbstractParameter parameter)
         {
-            for (int i = 0; i < curve.keys.Length; i++)
+            foreach (AbstractKey key in parameter.getKeys())
             {
                 bool exists = false;
                 // check if there is already a key // TODO: smarter search
                 foreach (GameObject img in m_keyframeList)
                 {
-                    if (img.GetComponent<KeyFrame>().key.time == curve.keys[i].time)
+                    if (img.GetComponent<KeyFrame>().key.time == key.time)
                     {
                         exists = true;
                         break;
                     }
                 }
                 if (!exists)
-                    addFrame(curve.keys[i].time);
+                    addFrame(key);
             }
 
             UpdateFrames();
@@ -405,25 +396,6 @@ namespace tracer
             KeyFrame keyframeComponent = keyFrame.GetComponent<KeyFrame>();
             keyFrame.transform.SetAsFirstSibling();
             keyframeComponent.key = key;
-
-            keyFrame.name = m_keyframeList.Count.ToString();
-            m_keyframeList.Add(keyFrame);
-
-            if (m_startTime <= time && time <= m_endTime)
-                keyFrame.SetActive(true);
-            else
-                keyFrame.SetActive(false);
-
-            keyframeComponent.Callback = setTimeFromGlobalPositionX;
-        }
-
-        // REMOVE only for example!
-        private void addFrame(float time)
-        {
-            GameObject keyFrame = GameObject.Instantiate<GameObject>(m_keyframePrefab, m_timelineRect, false);
-            KeyFrame keyframeComponent = keyFrame.GetComponent<KeyFrame>();
-            keyFrame.transform.SetAsFirstSibling();
-            keyframeComponent.key = new Key<float>(time, 0);
 
             keyFrame.name = m_keyframeList.Count.ToString();
             m_keyframeList.Add(keyFrame);
@@ -591,6 +563,7 @@ namespace tracer
             float _x = m_timelineRect.InverseTransformPoint(new Vector3(x, m_timelineRect.position.y, m_timelineRect.position.z)).x;
             float time = mapToCurrentTime(_x);
             key.time = time;
+            // [REVIEW] update keyframe list here!!!
             setTime(time);
         }
 

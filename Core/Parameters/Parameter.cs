@@ -436,6 +436,7 @@ namespace tracer
                     _animationManager.animationUpdate -= updateValue;
                     _isAnimated = false;
                 }
+                InvokeHasChanged();
             }
         }
 
@@ -455,6 +456,7 @@ namespace tracer
                     _animationManager.animationUpdate -= updateValue;
                     _isAnimated = false;
                 }
+                InvokeHasChanged();
             }
         }
 
@@ -709,6 +711,7 @@ namespace tracer
 
                     _keyList.Add(new Key<T>(time, value, tangenttime1, tangentvalue1, tangenttime2, tangentvalue2 , interplolation));
                 }
+                _animationManager.keyframesUpdated(this);
             }
 
             _value = deSerializeData(sourceSpan);
