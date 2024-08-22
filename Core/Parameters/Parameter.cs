@@ -162,7 +162,6 @@ namespace tracer
         //! Abstract definition of the function for serializing the parameters sourceSpan.
         //! 
         //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
-        //! @return The Parameters sourceSpan serialized as a byte array.
         //! 
         public abstract void Serialize(Span<byte> targetSpan);
         //!
@@ -508,27 +507,30 @@ namespace tracer
         {
             if (_isAnimated)
             {
-                // current time is NOT in between the two active keys
-                if (time < _keyList[_prevIdx].time || time > _keyList[_nextIdx].time)
+                if (_keyList[_prevIdx].time < time && time < _keyList[_nextIdx].time)
+                    value = interpolateLinear(time);
+                else
                 {
+                    // current time is NOT in between the two active keys
                     int i = findNextKeyIndex(time);
                     // current time is bigger than all keys in list
                     if (i == -1)
-                        _nextIdx = _prevIdx = _keyList.Count - 1;
+                    {
+                        _prevIdx = _keyList.Count - 1;
+                    }
+                    // current time is smaller than all keys in list
+                    else if (i == 0)
+                    {
+                        _nextIdx = 0;
+                    }
+                    // current time is somewhere between all keys in list
                     else
                     {
-                        // current time is smaller than all keys in list
-                        if (i == 0)
-                            _nextIdx = _prevIdx = 0;
-                        // current time is somewhere between all keys in list
-                        else
-                        {
-                            _nextIdx = i;
-                            _prevIdx = i - 1;
-                        }
+                        _nextIdx = i;
+                        _prevIdx = i - 1;
+                        value = interpolateLinear(time);
                     }
                 }
-                value = interpolateLinear(time);
             }
         }
 
@@ -566,12 +568,19 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private T interpolateLinear(float time)
         {
+            float pt = _keyList[_prevIdx].time;
+            float nt = _keyList[_nextIdx].time;
+            T pv = ((Key<T>)_keyList[_prevIdx]).value;
+            T nv = ((Key<T>)_keyList[_nextIdx]).value;
+
+            float inBetween = (time - pt) / (nt - pt);
+
             switch (_type)
             {
                 case ParameterType.FLOAT:
-                    float inBetween = (time - _keyList[_prevIdx].time) / (_keyList[_prevIdx].time - _keyList[_nextIdx].time);
-                    float s1 = 1.0f - (_keyList[_nextIdx].time - inBetween) / (_keyList[_nextIdx].time - _keyList[_prevIdx].time);
-                    return (T)(object)(((float)(object)((Key<T>)_keyList[_prevIdx]).value) * (1.0f - s1) + ((float)(object)((Key<T>)_keyList[_nextIdx]).value) * s1);
+                    return (T)(object)((float)(object)pv * (1.0f - inBetween) + (float)(object)nv * inBetween);
+                case ParameterType.VECTOR3:
+                    return (T)(object)((Vector3)(object)pv * (1.0f - inBetween) + (Vector3)(object)nv * inBetween);
                 default:
                     return default(T);
             }
@@ -582,10 +591,9 @@ namespace tracer
         /////////////////////////////////////////////////////////////
 
         //!
-        //! Function for serializing the parameters sourceSpan.
+        //! Function for serializing the parameters value into the targetSpan.
         //! 
         //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
-        //! @return The Parameters sourceSpan serialized as a byte array.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void Serialize(Span<byte> targetSpan)
@@ -615,8 +623,8 @@ namespace tracer
         //!
         //! Function for serializing the parameters sourceSpan.
         //! 
-        //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
-        //! @return The Parameters sourceSpan serialized as a byte array.
+        //! @param targetSpan The target span to write the serialized data to.
+        //! @param value The value to be serialized.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void SerializeData(Span<byte> targetSpan, in T value)
@@ -676,8 +684,7 @@ namespace tracer
         //!
         //! Function for deserializing parameter _data.
         //! 
-        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
-        //! @param _offset The start offset in the given sourceSpan array.
+        //! @param sourceSpan The byte data as span to be deserialized and copyed to the parameters value.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
@@ -701,7 +708,6 @@ namespace tracer
                     T tangentvalue2 = deSerializeData(sourceSpan.Slice(offset));
 
                     _keyList.Add(new Key<T>(time, value, tangenttime1, tangentvalue1, tangenttime2, tangentvalue2 , interplolation));
-                    Debug.Log("deSerialize: Key added");
                 }
             }
 
@@ -716,8 +722,8 @@ namespace tracer
         //!
         //! Function for deserializing parameter _data.
         //! 
-        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
-        //! @param _offset The start offset in the given sourceSpan array.
+        //! @param sourceSpan The byte data as span to be deserialized.
+        //! @return The deserialized value as T.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected T deSerializeData(ReadOnlySpan<byte> sourceSpan)

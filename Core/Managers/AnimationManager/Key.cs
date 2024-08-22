@@ -56,6 +56,20 @@ namespace tracer
         public T value, tangentValue1, tangentValue2;
 
         //!
+        //! The Key's default constructor
+        //!
+        public Key()
+        {
+            this.time = 0;
+            this.value = default(T);
+            this.interpolation = InterplolationTypes.LINEAR;
+            this.tangentTime1 = 0;
+            this.tangentTime2 = 0;
+            this.tangentValue1 = default(T);
+            this.tangentValue2 = default(T);
+        }
+
+        //!
         //! The Key's constructor for generic types.
         //!
         public Key(float time, T value, float tangentTime1 = 0, T tangentValue1 = default(T), float tangentTime2 = 0, T tangentValue2 = default(T), InterplolationTypes interpolation = InterplolationTypes.LINEAR)
