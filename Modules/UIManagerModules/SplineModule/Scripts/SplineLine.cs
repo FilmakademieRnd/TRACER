@@ -33,6 +33,11 @@ public class SplineLine : UIManagerModule
 
     private UICreator2DModule _creator2DModule;
 
+    private InputManager _inputManager;
+    private bool _updateLineWhenZooming;
+
+    private float _keyHandleScale;
+
     //TODO MOD WITH REAL TIME 
     private int _timeeee;
 
@@ -86,7 +91,7 @@ public class SplineLine : UIManagerModule
         base.Start(sender, e);
         _mUIManager = core.getManager<UIManager>();
         _animationManager = core.getManager<AnimationManager>();
-        
+        _inputManager = core.getManager<InputManager>();
         _addRemoveKeyPanel = Resources.Load<GameObject>("Prefabs/AddRemoveKeyPanel");
         
         
@@ -123,6 +128,13 @@ public class SplineLine : UIManagerModule
                 _removeAnimationButton.onClick.RemoveAllListeners();
 
             }
+
+            if (_updateLineWhenZooming)
+            {
+                _inputManager.pinchEvent -= EventCallDrawLineBetweenPoints;
+                _updateLineWhenZooming = false;
+            }
+            
         }
 
         if (sceneObjects.Count > 0)
@@ -213,7 +225,7 @@ public class SplineLine : UIManagerModule
         {
             ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
         }
-
+        
         _animationManager.keyframesUpdated(_selectedAbstractParam);
     }
     
@@ -274,9 +286,23 @@ public class SplineLine : UIManagerModule
 
             if (_animationTarget.position.getKeys().Count >= 2)
             {
-                DrawLineBetweenPoints();
+                if (_lineRenderer == null)
+                {
+                    DrawLineBetweenPoints();
+                }
+
+                if (!_updateLineWhenZooming)
+                {
+                    _inputManager.pinchEvent += EventCallDrawLineBetweenPoints;
+                    _updateLineWhenZooming = true;
+                }
             }
         }
+    }
+
+    private void EventCallDrawLineBetweenPoints(object sender, float distance)
+    {
+        DrawLineBetweenPoints();
     }
 
     private void DrawLineBetweenPoints()
@@ -287,12 +313,29 @@ public class SplineLine : UIManagerModule
             _lineRenderer.useWorldSpace = true;
         }
         List<AbstractKey> keyList = _animationTarget.position.getKeys();
-        _lineRenderer.startWidth = 0.1f;
-        _lineRenderer.endWidth = 0.1f;
         
-        _lineRenderer.material = new Material(Shader.Find("Sprites/Default"));
-        _lineRenderer.startColor = Color.red;
-        _lineRenderer.endColor = Color.red;
+        
+        // make line nice
+        Vector3 lineMiddle = Vector3.zero;
+        foreach (var key in _animationTarget.position.getKeys())
+        {
+            lineMiddle += _animationTarget.transform.parent.TransformPoint(((Key<Vector3>)key).value);
+        }
+
+        lineMiddle /= _animationTarget.position.getKeys().Count;
+        _keyHandleScale = Vector3.Distance(Camera.main.transform.position, lineMiddle) / 100f;
+        _lineRenderer.startWidth = _keyHandleScale /3f;
+        _lineRenderer.endWidth = _lineRenderer.startWidth;
+        foreach (var obj in _spline.gameObject.GetComponentsInChildren<Transform>())
+        {
+            if (obj != _spline.transform)
+            {
+                obj.localScale = new Vector3(_keyHandleScale, _keyHandleScale, _keyHandleScale);
+            }
+        }
+        // nice nice 
+        
+        _lineRenderer.material = Resources.Load<Material>("Materials/LineRendererMaterial");
         int lineSegmentCount = 100;
         _lineRenderer.positionCount = lineSegmentCount + 1;
         
@@ -338,8 +381,9 @@ public class SplineLine : UIManagerModule
         _spline.Spline.SetTangentMode(0);
         // Create a new GameObject
         GameObject splineControlPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        splineControlPoint.GetComponent<Renderer>().material = Resources.Load<Material>("Materials/keySphereMat");
 
-        splineControlPoint.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
+        splineControlPoint.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
 
         // Set the _parent of the new GameObject to the specified _parent
         splineControlPoint.transform.SetParent(spline.gameObject.transform);
