@@ -42,6 +42,8 @@ namespace tracer
     {
         public int m_framerate = 30;
         public bool m_isPlaying = false;
+
+        
         //!
         //! The text displayed above the timeline, showing the start frame number.
         //!
@@ -67,15 +69,11 @@ namespace tracer
         private GameObject m_canvas;
 
         //!
-        //! A reference to the prefab of the timeline .
-        //!
-        private GameObject m_timelinePrefab;
-
-        //!
         //! A reference to the prefab of a keyframe box in the timeline.
         //!
         private GameObject m_keyframePrefab;
 
+        private GameObject m_timeLine;
 
         //!
         //! A reference to the timeline rect transform.
@@ -114,7 +112,7 @@ namespace tracer
         private Coroutine m_playCoroutine;
 
         private SnapSelect m_snapSelect;
-        private int m_activeParameterIndex = 0;
+        private IAnimationParameter m_activeParameter = null;
 
         //!
         //! The visible start time of the timeline.
@@ -167,9 +165,8 @@ namespace tracer
             m_keyframeList = new List<GameObject>();
             m_uiElements = new List<GameObject>();
 
-            m_timelinePrefab = Resources.Load("Prefabs/TimeLine") as GameObject;
-            m_keyframePrefab = Resources.Load("Prefabs/KeyFrameTemplate") as GameObject;
             m_canvas = Resources.Load("Prefabs/TimelineCanvas") as GameObject;
+            m_keyframePrefab = Resources.Load("Prefabs/KeyFrameTemplate") as GameObject;
 
             MenuButton hideTimelineButton = new MenuButton("Timeline", toggleTimeLine, new List<UIManager.Roles>() { UIManager.Roles.SET });
             //hideTimelineButton.setIcon("Images/button_timeline");
@@ -208,29 +205,32 @@ namespace tracer
             menuCanvas.GetComponent<Canvas>().sortingOrder = 15;
             m_uiElements.Add(menuCanvas);
 
-            Transform menuCanvasTransform = menuCanvas.transform.GetChild(0);
-            m_timelineRect = menuCanvasTransform.GetComponent<RectTransform>();
+            Transform menuTimeLineTransform = menuCanvas.transform.GetChild(0);
+            m_timelineRect = menuTimeLineTransform.GetComponent<RectTransform>();
+
+            // get the time line GameObject
+            m_timeLine = menuTimeLineTransform.gameObject;
 
             // get redline component
-            m_redLine = menuCanvasTransform.Find("RedLine").GetComponent<RectTransform>();
+            m_redLine = menuTimeLineTransform.Find("RedLine").GetComponent<RectTransform>();
 
             // get text component
-            m_startFrameDisplay = menuCanvasTransform.Find("StartFrameNumber").GetComponent<Text>();
+            m_startFrameDisplay = menuTimeLineTransform.Find("StartFrameNumber").GetComponent<Text>();
 
             // get text component
-            m_endFrameDisplay = menuCanvasTransform.Find("EndFrameNumber").GetComponent<Text>();
+            m_endFrameDisplay = menuTimeLineTransform.Find("EndFrameNumber").GetComponent<Text>();
 
             // get text component
             m_currentFrameDisplay = m_redLine.GetChild(0).GetComponent<Text>();
 
             // get play button component
-            m_playButton = menuCanvasTransform.Find("PlayButton").GetComponent<Button>();
+            m_playButton = menuTimeLineTransform.Find("PlayButton").GetComponent<Button>();
 
             // get prev button component
-            m_prevButton = menuCanvasTransform.Find("PrevButton").GetComponent<Button>();
+            m_prevButton = menuTimeLineTransform.Find("PrevButton").GetComponent<Button>();
 
             // get prev button component
-            m_nextButton = menuCanvasTransform.Find("NextButton").GetComponent<Button>();
+            m_nextButton = menuTimeLineTransform.Find("NextButton").GetComponent<Button>();
 
             m_startFrameDisplay.text = Mathf.RoundToInt(m_startTime * m_framerate).ToString();
             m_endFrameDisplay.text = Mathf.RoundToInt(m_endTime * m_framerate).ToString();
@@ -316,7 +316,7 @@ namespace tracer
                 clearFrames();
         }
 
-        private void OnKeyframeUpdated(object o, AbstractParameter parameter)
+        private void OnKeyframeUpdated(object o, IAnimationParameter parameter)
         {
             clearFrames();
             CreateFrames(parameter);
@@ -335,7 +335,10 @@ namespace tracer
             m_snapSelect.parameterChanged += OnParameterChanged;
 
             if (manager.SelectedObjects.Count > 0)
-                CreateFrames(manager.SelectedObjects[0].parameterList[m_activeParameterIndex]);
+            {
+                m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
+                CreateFrames(m_activeParameter);
+            }
 
             UpdateFrames();
         }
@@ -344,11 +347,11 @@ namespace tracer
         {
             clearFrames();
 
-            m_activeParameterIndex = idx;
-            CreateFrames(manager.SelectedObjects[0].parameterList[m_activeParameterIndex]);
+            m_activeParameter = manager.SelectedObjects[0].parameterList[idx] as IAnimationParameter;
+            CreateFrames(m_activeParameter);
         }
 
-        public void CreateFrames(AbstractParameter parameter)
+        public void CreateFrames(IAnimationParameter parameter)
         {
             foreach (AbstractKey key in parameter.getKeys())
             {
@@ -447,15 +450,31 @@ namespace tracer
         ///////////
         // INPUT //
         ///////////
+
+        private GameObject Raycast(Vector2 point)
+        {
+            //Set up the new Pointer Event
+            PointerEventData pointerEventData = new PointerEventData(EventSystem.current);
+            //Set the Pointer Event Position to that of the game object
+            pointerEventData.position = point;
+
+            //Create a list of Raycast Results
+            List<RaycastResult> results = new List<RaycastResult>();
+
+            //Raycast using the Graphics Raycaster and mouse click position
+            EventSystem.current.RaycastAll(pointerEventData, results);
+
+            return results[0].gameObject;
+        }
+
         private void OnPointerDown(object sender, Vector2 point)
         {
-            float x = mapToCurrentTime(m_timelineRect.InverseTransformPoint(new Vector3(point.x, m_timelineRect.position.y, m_timelineRect.position.z)).x);
-            if (StartTime < x && x < EndTime)
-            {
-                m_isSelected = true;
-                float time = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
-                setTime(time);
-            }
+            if (Raycast(point) != m_timeLine)
+                return;
+
+            m_isSelected = true;
+            float time = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
+            setTime(time);
         }
 
         private void OnPointerEnd(object sender, Vector2 point)
@@ -562,9 +581,8 @@ namespace tracer
         {
             float _x = m_timelineRect.InverseTransformPoint(new Vector3(x, m_timelineRect.position.y, m_timelineRect.position.z)).x;
             float time = mapToCurrentTime(_x);
-            key.time = time;
-            // [REVIEW] update keyframe list here!!!
-            setTime(time);
+            m_activeParameter.setKeyTime(key, time);
+            setTime(m_currentTime);
         }
 
     }

@@ -31,7 +31,7 @@ using UnityEngine.UI;
 
 namespace tracer
 {
-	public class KeyFrame : Button, IBeginDragHandler, IDragHandler
+	public class KeyFrame : Button, IBeginDragHandler, IDragHandler, IEndDragHandler
 	{
 		private RectTransform timelineTransform;
 
@@ -47,8 +47,8 @@ namespace tracer
 	    {
 	        set { callback = value; }
 	    }
-	
-	    protected override void Awake()
+
+        protected void Awake()
 	    {
 	        base.Awake();
 	        // get rectTransform component
@@ -68,17 +68,11 @@ namespace tracer
 			if (newX > timelineTransform.position.x - timelineTransform.rect.width / 2f &&
 				newX < timelineTransform.position.x + timelineTransform.rect.width / 2f) 
 				rectTransform.position = new Vector3(lastPosition.x + data.position.x - data.pressPosition.x, lastPosition.y, lastPosition.z);
-			if (callback != null)
-			{
-				callback(key, rectTransform.position.x);
-			}
 		}
 	
-	    public override void OnSelect(BaseEventData data)
+	    public void OnEndDrag(PointerEventData data)
 	    {
-	        base.OnSelect(data);
-	        if (callback != null)
-	            callback(key, rectTransform.position.x);
+	        callback?.Invoke(key, rectTransform.position.x);
 	    }
     }
 }

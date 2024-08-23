@@ -51,22 +51,30 @@ namespace tracer
     public class Key<T> : AbstractKey
     {
         //!
-        //! The key's value and tangent value.
+        //! The key's value.
         //!
-        public T value, tangentValue1, tangentValue2;
+        public T value { get;  internal set; }
+        //!
+        //! The key's tangent value 1.
+        //!
+        public T tangentValue1 { get; internal set; }
+        //!
+        //! The key's tangent value 2.
+        //!
+        public T tangentValue2 { get; internal set; }
 
         //!
         //! The Key's default constructor
         //!
         public Key()
         {
-            this.time = 0;
-            this.value = default(T);
-            this.interpolation = InterplolationTypes.LINEAR;
-            this.tangentTime1 = 0;
-            this.tangentTime2 = 0;
-            this.tangentValue1 = default(T);
-            this.tangentValue2 = default(T);
+            time = 0;
+            value = default(T);
+            interpolation = InterplolationTypes.LINEAR;
+            tangentTime1 = 0;
+            tangentTime2 = 0;
+            tangentValue1 = default(T);
+            tangentValue2 = default(T);
         }
 
         //!
