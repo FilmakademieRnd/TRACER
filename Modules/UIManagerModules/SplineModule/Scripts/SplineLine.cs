@@ -1,3 +1,32 @@
+/*
+-----------------------------------------------------------------------------------
+TRACER FOUNDATION -
+Toolset for Realtime Animation, Collaboration & Extended Reality
+
+Copyright (c) 2024 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Labs
+https://research.animationsinstitut.de/tracer
+https://github.com/FilmakademieRnd/TRACER
+
+TRACER FOUNDATION is a development by Filmakademie Baden-Wuerttemberg,
+Animationsinstitut R&D Labs in the scope of the EU funded project
+MAX-R (101070072) and funding on the own behalf of Filmakademie Baden-Wuerttemberg.
+Former EU projects Dreamspace (610005) and SAUCE (780470) have inspired the
+TRACER FOUNDATION development.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the MIT License for more details.
+You should have received a copy of the MIT License along with this program;
+if not go to https://opensource.org/licenses/MIT
+-----------------------------------------------------------------------------------
+*/
+
+//! @file "SplineLine.cs"
+//! @brief Implementation of the 3D representation of the splinme and UI to add and remove keis.
+//! @author Alexandru-Sebastian Tufis-Schwartz
+//! @version 0
+//! @date 23.08.2024
+
 
 using System;
 using System.Collections.Generic;
@@ -16,31 +45,46 @@ public class SplineLine : UIManagerModule
     //! Currently selected object.
     //!
     private SceneObject _animationTarget;
-
+    //!
+    //! The spline container.
+    //!
     private SplineContainer _spline;
-
-    private List<AbstractParameter> _abstractParametersList;
-    
+    //!
+    //! The index of the currently selected SnapSelect element in the selector
+    //!
     private int _selectorCurrentSelectedSnapSelectElement;
-
+    //!
+    //! Reference to the selector SnapSelect component
+    //!
     private SnapSelect _selectorSnapSelect;
-
+    //!
+    //! The currently selected abstract parameter
+    //!
     private AbstractParameter _selectedAbstractParam;
-
+    //!
+    //! The Animation Manager.
+    //!
     private AnimationManager _animationManager;
-
+    //!
+    //! Controll panel for addin and removing keys.
+    //!
     private GameObject _addRemoveKeyPanel;
-
+    //!
+    //! Ref to the UICreator2DModule.
+    //!
     private UICreator2DModule _creator2DModule;
-
+    //!
+    //! Ref to InputManager.
+    //!
     private InputManager _inputManager;
+    //!
+    //! Boolean for updateing the size of the line renderer and knots(Sphear GO).
+    //!
     private bool _updateLineWhenZooming;
-
+    //!
+    //! Distance between camera and spline.
+    //!
     private float _keyHandleScale;
-
-    //TODO MOD WITH REAL TIME 
-    private int _timeeee;
-
     //!
     //! Dictionary of spline existing in the World
     //!
@@ -49,43 +93,46 @@ public class SplineLine : UIManagerModule
     //! Spline GO _parent
     //!
     private GameObject _splineHolder;
-
+    //!
+    //! Spline GO.
+    //!
     private GameObject _splineGameObject;
-
-    private Vector3 _pos;
-
     //!
     //! list of keyframe representing spheres
     //!
     private List<GameObject> _keyframeSpheres;
-
     //!
     //! Reference to UIManager
     //!
     UIManager _mUIManager;
-
     //!
-    //! The UI button for logging the camera to an object.
+    //! The UI button for starting the Animation ui.
     //!
     private MenuButton _animCreatorButton;
-
+    //!
+    //! The UI button to add a key.
+    //!
     private Button _addKeyButton;
-
+    //!
+    //! The UI button to remove a key.
+    //!
     private Button _removeKeyButton;
-    
+    //!
+    //! The UI button to remove all keys.
+    //!
     private Button _removeAnimationButton;
-
-    private bool _removeKey;
-
+    //!
+    //! Transform of the KeyCanvas.
+    //!
     private Transform _keyCanvasTrans;
-    
+    //!
+    //! The Line renderer.
+    //!
     private LineRenderer _lineRenderer;
 
-    public MenuButton animCreatorButton()
-    {
-        return _animCreatorButton;
-    }
-
+    //! 
+    //! Function called when an Unity Start() callback is triggered
+    //! 
     protected override void Start(object sender, EventArgs e)
     {
         base.Start(sender, e);
@@ -103,6 +150,9 @@ public class SplineLine : UIManagerModule
         
     }
 
+    //! 
+    //! Function called before Unity destroys the TRACER _core.
+    //! 
     protected override void Cleanup(object sender, EventArgs e)
     {
         base.Cleanup(sender, e);
@@ -110,7 +160,9 @@ public class SplineLine : UIManagerModule
         _mUIManager.UI2DCreated -= grabUI2D;
     }
 
-
+    //!
+    //! Function called when selection has changed.
+    //!
     private void selection(object sender, List<SceneObject> sceneObjects)
     {
         if (_animCreatorButton != null)
@@ -149,12 +201,18 @@ public class SplineLine : UIManagerModule
         }
     }
 
+    //!
+    //! Function to get the UI2D.
+    //!
     void grabUI2D(object sender, UIBehaviour ui)
     {
         _selectorSnapSelect = (SnapSelect) ui;
         _selectorSnapSelect.parameterChanged += ParamChange;
     }
 
+    //!
+    //! Function called when _animCreatorButton is pressed 
+    //!
     public void StartAnimGen()
     {
         Transform ui2D = _mUIManager.getModule<UICreator2DModule>().UI2DCanvas;
@@ -175,22 +233,33 @@ public class SplineLine : UIManagerModule
 
 
 
-
+    //!
+    //! Function used to add a key.
+    //!
     public void AddKey()
     {
         UpdateKey(false);
     }
 
+    //!
+    //! Function used to remove a key.
+    //!
     public void RemoveKey()
     {
         UpdateKey(true);
     }
     
+    //!
+    //! Function used to remove all keys.
+    //!
     public void RemoveAnimation()
     {
         UpdateKey(false, true);
     }
 
+    //!
+    //! Function used to Update a key (add or remove).
+    //!
     public void UpdateKey(bool removeKey, bool removeAll = false)
     {
         if (_selectedAbstractParam is Parameter<bool> boolParam)
@@ -229,6 +298,9 @@ public class SplineLine : UIManagerModule
         _animationManager.keyframesUpdated(_selectedAbstractParam);
     }
     
+    //!
+    //! Function used to apply the key update
+    //!
     public void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false)
     {
         if (removeKey && !removeAll)
@@ -251,6 +323,9 @@ public class SplineLine : UIManagerModule
     
     }
     
+    //!
+    //! Function that Destroy the spline when an object is deselected
+    //!
     public void DelleteSplineContainer()
     {
         if (_splineGameObject!= null)
@@ -259,6 +334,9 @@ public class SplineLine : UIManagerModule
         }
     }
 
+    //!
+    //! Function that creates a spline
+    //!
     public void CreateSplineContainer()
     {
         String splineName = new string(_animationTarget.name + "Spline");
@@ -268,6 +346,9 @@ public class SplineLine : UIManagerModule
 
     }
     
+    //!
+    //! Function that creates a new spline when a key is updated
+    //!
     public void RenewContainer()
     {
         DelleteSplineContainer();
@@ -275,6 +356,9 @@ public class SplineLine : UIManagerModule
         RedrawSpline();
     }
 
+    //!
+    //! Function that redraw the spline
+    //!
     private void RedrawSpline()
     {
         if (_animationTarget.position.getKeys() != null)
@@ -300,11 +384,17 @@ public class SplineLine : UIManagerModule
         }
     }
 
+    //!
+    //! event listner when pinchEvent is triggerd 
+    //!
     private void EventCallDrawLineBetweenPoints(object sender, float distance)
     {
         DrawLineBetweenPoints();
     }
 
+    //!
+    //! Function that draws the LineRenderer between the knots(key points)
+    //!
     private void DrawLineBetweenPoints()
     {
         if (_lineRenderer == null)
@@ -345,20 +435,15 @@ public class SplineLine : UIManagerModule
             Vector3 point = _spline.EvaluatePosition(t);  // Evaluate the position on the spline at this time
             _lineRenderer.SetPosition(i, point);  // Set this position on the LineRenderer
         }
-
-
-
-        /*for (int i = 0; i < keyList.Count; i++)
-        {
-            _lineRenderer.SetPosition(i, ((Key<Vector3>)keyList[i]).value);
-        }*/
-
     }
 
     public SplineLine(string name, Manager manager) : base(name, manager)
     {
     }
 
+    //!
+    //!Function that creates a new Spline GO
+    //!
     public GameObject CreateNewSplineGo(string childName)
     {
         // Create a new GameObject
@@ -374,6 +459,9 @@ public class SplineLine : UIManagerModule
     }
 
 
+    //!
+    //!Function that creates a new Knot GO
+    //!
     public void CreateSplineControlPoint(string childName, Vector3 pos, SplineContainer spline)
     {
         BezierKnot knot = new BezierKnot(new float3(pos.x, pos.y, pos.z));
@@ -392,6 +480,9 @@ public class SplineLine : UIManagerModule
         splineControlPoint.transform.localPosition = pos;
     }
     
+    //!
+    //!Function called when parameter has changed
+    //!
     public void ParamChange(object sender, int manipulatorMode)
     {
         _selectorCurrentSelectedSnapSelectElement = manipulatorMode;
