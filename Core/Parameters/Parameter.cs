@@ -383,7 +383,7 @@ namespace tracer
                     BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime1); // tangent time 1
                     BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime2); // tangent time 2
                     SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.value); // value
-                    SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue1); // tangent value 1
+                    SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.tangentValue1); // tangent value 1
                     SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue2); // tangent value 2
                 }
             }
@@ -473,7 +473,7 @@ namespace tracer
                     float tangenttime1 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
                     float tangenttime2 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
                     T value = deSerializeData(sourceSpan.Slice(offset += _dataSize));
-                    T tangentvalue1 = deSerializeData(sourceSpan.Slice(offset));
+                    T tangentvalue1 = deSerializeData(sourceSpan.Slice(offset += _dataSize));
                     T tangentvalue2 = deSerializeData(sourceSpan.Slice(offset));
 
                     _keyList.Add(new Key<T>(time, value, tangenttime1, tangentvalue1, tangenttime2, tangentvalue2 , interplolation));

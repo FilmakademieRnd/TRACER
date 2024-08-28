@@ -347,7 +347,6 @@ namespace tracer
                 case ParameterType.FLOAT:
                     return (T)(object)((float)(object)pv * (1.0f - inBetween) + (float)(object)nv * inBetween);
                 case ParameterType.VECTOR3:
-                    Debug.Log("SCALEEEEEEEEE   " + this.name);
                     return (T)(object)((Vector3)(object)pv * (1.0f - inBetween) + (Vector3)(object)nv * inBetween);
                 default:
                     return default(T);
