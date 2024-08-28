@@ -486,6 +486,7 @@ public class SplineLine : UIManagerModule
     public void ParamChange(object sender, int manipulatorMode)
     {
         _selectorCurrentSelectedSnapSelectElement = manipulatorMode;
+        _selectedAbstractParam = _animationTarget.parameterList[_selectorCurrentSelectedSnapSelectElement];
         
     }
 }

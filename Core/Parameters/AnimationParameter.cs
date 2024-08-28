@@ -77,7 +77,7 @@ namespace tracer
         //!
         //! The next and the previous active keyframe index (for animation).
         //!
-        private int _nextIdx, _prevIdx;
+        private int _nextIdx = 0, _prevIdx = 0;
         //!
         //! The list of keyframes (for animation).
         //!
@@ -211,6 +211,8 @@ namespace tracer
                 _keyList.Clear();
                 _animationManager.animationUpdate -= updateParameterValue;
                 _isAnimated = false;
+                _prevIdx = 0;
+                _nextIdx = 0;
             }
         }
 
@@ -345,6 +347,7 @@ namespace tracer
                 case ParameterType.FLOAT:
                     return (T)(object)((float)(object)pv * (1.0f - inBetween) + (float)(object)nv * inBetween);
                 case ParameterType.VECTOR3:
+                    Debug.Log("SCALEEEEEEEEE   " + this.name);
                     return (T)(object)((Vector3)(object)pv * (1.0f - inBetween) + (Vector3)(object)nv * inBetween);
                 default:
                     return default(T);
