@@ -174,6 +174,20 @@ namespace tracer
 
             m_inputManager = core.getManager<InputManager>();
             m_animationManager = core.getManager<AnimationManager>();
+            manager.UI2DCreated += On2DUIReady;
+        }
+
+        //! 
+        //! Function called before Unity destroys the TRACER _core.
+        //! 
+        //! @param sender A reference to the TRACER _core.
+        //! @param e Arguments for these event. 
+        //! 
+        protected override void Cleanup(object sender, EventArgs e)
+        {
+            base.Cleanup(sender, e);
+
+            manager.UI2DCreated -= On2DUIReady;
         }
 
 
@@ -239,8 +253,6 @@ namespace tracer
             m_prevButton.onClick.AddListener(prevFrame);
             m_nextButton.onClick.AddListener(nextFrame);
 
-            setTime(2f);
-
             m_inputManager.inputPressStartedUI += OnBeginDrag;
             m_inputManager.inputPressEnd += OnPointerEnd;
             m_inputManager.inputPressPerformedUI += OnPointerDown;
@@ -249,7 +261,14 @@ namespace tracer
             m_inputManager.pinchEvent += OnPinch;
             m_animationManager.keyframeUpdate += OnKeyframeUpdated;
             manager.selectionChanged += OnSelectionChanged;
-            manager.UI2DCreated += On2DUIReady;
+
+            if (manager.SelectedObjects.Count > 0)
+            {
+                m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
+                CreateFrames(m_activeParameter);
+            }
+
+            setTime(m_animationManager.time);
         }
 
         //!
@@ -268,7 +287,6 @@ namespace tracer
             m_inputManager.pinchEvent -= OnPinch;
             m_animationManager.keyframeUpdate -= OnKeyframeUpdated;
             manager.selectionChanged -= OnSelectionChanged;
-            manager.UI2DCreated -= On2DUIReady;
         }
 
         //!
