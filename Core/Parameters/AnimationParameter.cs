@@ -272,6 +272,9 @@ namespace tracer
         //!
         private void updateParameterValue(object o, float time)
         {
+            if (((SceneObject)_parent)._lock)
+                return;
+
             if (_isAnimated)
             {
                 if (_keyList[_prevIdx].time < time && time < _keyList[_nextIdx].time)

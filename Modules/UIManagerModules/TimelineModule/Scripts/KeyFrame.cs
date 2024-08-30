@@ -65,8 +65,8 @@ namespace tracer
 	    public void OnDrag(PointerEventData data)
 	    {
 			float newX = lastPosition.x + data.position.x - data.pressPosition.x;
-			if (newX > timelineTransform.position.x - timelineTransform.rect.width / 2f &&
-				newX < timelineTransform.position.x + timelineTransform.rect.width / 2f) 
+			if (newX - rectTransform.rect.width * 0.5f > timelineTransform.position.x - timelineTransform.rect.width * 0.5f &&
+				newX + rectTransform.rect.width * 0.5f < timelineTransform.position.x + timelineTransform.rect.width * 0.5f) 
 				rectTransform.position = new Vector3(lastPosition.x + data.position.x - data.pressPosition.x, lastPosition.y, lastPosition.z);
 		}
 	

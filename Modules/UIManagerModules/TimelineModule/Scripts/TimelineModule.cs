@@ -347,6 +347,9 @@ namespace tracer
         //!
         private void On2DUIReady(object o, UIBehaviour ui)
         {
+            if (!m_showTimeLine)
+                return; 
+
             m_snapSelect = (SnapSelect) ui;
             m_snapSelect.parameterChanged -= OnParameterChanged;
             clearFrames();
@@ -521,14 +524,14 @@ namespace tracer
                     // normalized distance
                     float pinchFactor = 1f + (point.x - pinchInitDistance) / Screen.width * 2f;
                     float widthPrev = endTimeDragInit - startTimeDragInit;
-                    float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) / 2f;
+                    float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
                     StartTime = startTimeDragInit + widthDeltaHalf;
                     EndTime = endTimeDragInit - widthDeltaHalf;
                     setTime(timeDragStart);
                 }
                 else // move
                 {
-                    float timeOffset = timeDragStart - _map(m_timelineRect.InverseTransformPoint(point).x, -m_timelineRect.sizeDelta.x / 2f, m_timelineRect.sizeDelta.x / 2f, startTimeDragInit, endTimeDragInit);
+                    float timeOffset = timeDragStart - _map(m_timelineRect.InverseTransformPoint(point).x, -m_timelineRect.sizeDelta.x * 0.5f, m_timelineRect.sizeDelta.x * 0.5f, startTimeDragInit, endTimeDragInit);
                     StartTime = startTimeDragInit + timeOffset;
                     EndTime = endTimeDragInit + timeOffset;
                     setTime(timeDragStart + timeOffset);
@@ -548,7 +551,7 @@ namespace tracer
             // normalized distance
             float pinchFactor = 1f + (delta) / Screen.width * 2f;
             float widthPrev = endTimeDragInit - startTimeDragInit;
-            float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) / 2f;
+            float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
             StartTime = startTimeDragInit + widthDeltaHalf;
             EndTime = endTimeDragInit - widthDeltaHalf;
             setTime(timeDragStart);
@@ -564,7 +567,7 @@ namespace tracer
             // normalized distance
             float pinchFactor = 1f + (point.x) / Screen.width * 2f;
             float widthPrev = endTimeDragInit - startTimeDragInit;
-            float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) / 2f;
+            float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
             StartTime = startTimeDragInit + widthDeltaHalf;
             EndTime = endTimeDragInit - widthDeltaHalf;
             setTime(timeDragStart);
@@ -585,13 +588,13 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private float mapToTimelinePosition(float x)
         {
-            return _map(x, m_startTime, m_endTime, -m_timelineRect.sizeDelta.x / 2f, m_timelineRect.sizeDelta.x / 2f);
+            return _map(x, m_startTime, m_endTime, -m_timelineRect.sizeDelta.x * 0.5f, m_timelineRect.sizeDelta.x * 0.5f);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private float mapToCurrentTime(float x)
         {
-            return _map(x, -m_timelineRect.sizeDelta.x / 2f, m_timelineRect.sizeDelta.x / 2f, m_startTime, m_endTime);
+            return _map(x, -m_timelineRect.sizeDelta.x * 0.5f, m_timelineRect.sizeDelta.x * 0.5f, m_startTime, m_endTime);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
