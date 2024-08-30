@@ -305,7 +305,7 @@ public class SplineLine : UIManagerModule
     {
         if (removeKey && !removeAll)
         {
-            int idx = parameter.getKeys().FindIndex(i => i.time == _animationManager.time);
+            int idx = parameter.getKeys().FindIndex(i => Mathf.RoundToInt(i.time * 30) == Mathf.RoundToInt(_animationManager.time * 30));
             if (idx >= 0)
             {
                 parameter.removeKeyAtIndex(idx);
@@ -343,7 +343,6 @@ public class SplineLine : UIManagerModule
         _splineGameObject = CreateNewSplineGo(splineName);
         _sceneObjectsSplines.Add(_splineGameObject, splineName);
         _spline = _splineGameObject.AddComponent<SplineContainer>();
-
     }
     
     //!
