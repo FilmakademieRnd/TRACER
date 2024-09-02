@@ -48,77 +48,98 @@ namespace tracer
         //! The text displayed above the timeline, showing the start frame number.
         //!
         private Text m_startFrameDisplay;
-
         //!
         //! The text displayed above the timeline, showing the end frame number.
         //!
         private Text m_endFrameDisplay;
-
         //!
         //! The text displayed above the timeline, showing the current frame number.
         //!
         private Text m_currentFrameDisplay;
-
+        //!
+        //! A reference to the play button of the timeline.
+        //!
         private Button m_playButton;
+        //!
+        //! A reference to the previous key button of the timeline.
+        //!
         private Button m_prevButton;
+        //!
+        //! A reference to the mext key button of the timeline.
+        //!
         private Button m_nextButton;
-
         //!
         //! Prefab for the Unity canvas object.
         //!
         private GameObject m_canvas;
-
         //!
         //! A reference to the prefab of a keyframe box in the timeline.
         //!
         private GameObject m_keyframePrefab;
-
+        //!
+        //! A reference to the timeline GameObject.
+        //!
         private GameObject m_timeLine;
-
         //!
         //! A reference to the timeline rect transform.
         //!
         private RectTransform m_timelineRect;
-
         //!
         //! A reference to the redline transform.
         //!
         private RectTransform m_redLine;
-
         //!
         //! The list in which all GUI keyframes are registered.
         //!
         private List<GameObject> m_keyframeList;
-
+        //!
+        //! The index of the last active keyframe;
+        //!
+        private int m_activeKeyframeIndex = 0;
         //!
         //! The list containing all UI elemets of the current menu.
         //!
         private List<GameObject> m_uiElements;
-
         //!
         //! The current time of the animation.
         //!
         private float m_currentTime = 0;
-
         //!
         //! Flag that defines whether the time line is shown or not.
         //!
         private bool m_showTimeLine = false;
-
+        //!
+        //! Flag that defines whether a UI is selected or not.
+        //!
         private bool m_isSelected = false;
-
+        //!
+        //! A reference to TRACER's input manager.
+        //!
         private InputManager m_inputManager;
+        //!
+        //! A reference to TRACER's animation manager.
+        //!
         private AnimationManager m_animationManager;
+        //!
+        //! The coroutine fired in play mode.
+        //!
         private Coroutine m_playCoroutine;
-
+        //!
+        //! A reference the the snap select UI element.
+        //!
         private SnapSelect m_snapSelect;
+        //!
+        //! A reference the current active parameter the key are displayed by the timeline.
+        //!
         private IAnimationParameter m_activeParameter = null;
-
         //!
         //! The visible start time of the timeline.
         //!
         private float m_startTime = 0;
-        public float StartTime
+        //!
+        //! Getter/Setter for the start time of the timeline.
+        //!
+        private float StartTime
         {
             get { return m_startTime; }
             set
@@ -127,11 +148,13 @@ namespace tracer
                 m_startFrameDisplay.text = Mathf.RoundToInt(m_startTime * m_framerate).ToString();
             }
         }
-
         //!
         //! The visible end time of the timeline.
         //!
         private float m_endTime = 5;
+        //!
+        //! Getter/Setter for the end time of the timeline.
+        //!
         public float EndTime
         {
             get { return m_endTime; }
@@ -141,10 +164,21 @@ namespace tracer
                 m_endFrameDisplay.text = Mathf.RoundToInt(m_endTime * m_framerate).ToString();
             }
         }
-
+        //!
+        //! Initial start time at drag begin.
+        //!
         private float startTimeDragInit = 0;
+        //!
+        //! Initial end time at drag begin.
+        //!
         private float endTimeDragInit = 1;
+        //!
+        //! Initial active time at drag begin.
+        //!
         private float timeDragStart = 0;
+        //!
+        //! Initial pinc distance. 
+        //!
         private float pinchInitDistance = 0;
 
         //!
@@ -264,7 +298,8 @@ namespace tracer
 
             if (manager.SelectedObjects.Count > 0)
             {
-                m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
+                if (m_activeParameter == null)
+                    m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
                 CreateFrames(m_activeParameter);
             }
 
@@ -336,8 +371,11 @@ namespace tracer
 
         private void OnKeyframeUpdated(object o, IAnimationParameter parameter)
         {
-            clearFrames();
-            CreateFrames(parameter);
+            if (parameter == m_activeParameter)
+            {
+                clearFrames();
+                CreateFrames(parameter);
+            }
         }
 
         //!
@@ -347,18 +385,18 @@ namespace tracer
         //!
         private void On2DUIReady(object o, UIBehaviour ui)
         {
-            if (!m_showTimeLine)
-                return; 
 
             m_snapSelect = (SnapSelect) ui;
             m_snapSelect.parameterChanged -= OnParameterChanged;
-            clearFrames();
             m_snapSelect.parameterChanged += OnParameterChanged;
 
+            clearFrames();
+            
             if (manager.SelectedObjects.Count > 0)
             {
                 m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
-                CreateFrames(m_activeParameter);
+                if (m_showTimeLine)
+                    CreateFrames(m_activeParameter);
             }
 
             UpdateFrames();
@@ -437,12 +475,24 @@ namespace tracer
         //////////////
         private void nextFrame()
         {
-            setTime(m_currentTime + (1f / m_framerate));
+            if (m_activeKeyframeIndex + 1 < m_keyframeList.Count)
+            {
+                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
+                KeyFrame keyFrame = m_keyframeList[++m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                keyFrame.select();
+                setTime(keyFrame.key.time);
+            }
         }
 
         private void prevFrame()
         {
-            setTime(m_currentTime - (1f / m_framerate));
+            if (m_activeKeyframeIndex - 1 > -1)
+            {
+                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
+                KeyFrame keyFrame = m_keyframeList[--m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                keyFrame.select();
+                setTime(keyFrame.key.time);
+            }
         }
 
         private void play()
@@ -517,9 +567,9 @@ namespace tracer
             if (!m_isSelected)
                 return;
 
-            if (m_inputManager.getKey(53))
+            if (m_inputManager.getKey(53))  // 53 -> left ALT key
             {
-                if (m_inputManager.getKey(55)) // pinch
+                if (m_inputManager.getKey(55)) // pinch  55 -> left CTRL key
                 {
                     // normalized distance
                     float pinchFactor = 1f + (point.x - pinchInitDistance) / Screen.width * 2f;

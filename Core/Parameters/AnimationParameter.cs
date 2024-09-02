@@ -35,42 +35,50 @@ using UnityEngine.InputSystem;
 
 namespace tracer
 {
+    //!
+    //! This is the interface for the Parameter class animation extensions.
+    //!
     public interface IAnimationParameter
     {
         //!
         //! A reference to the key list (for animation).
         //!
         public ref List<AbstractKey> getKeys();
-        
         //!
+        //! Create and insert a new key element to the parameters key list, 
+        //! based on the current parameter value and Animation Manager time.
         //!
+        public void setKey();
         //!
-        public void moveKey(AbstractKey key, float toTime);
-
+        //! Clear the parameters key list and disable the animation functionality.
+        //!
+        public void clearKeys();
         //!
         //! Revove a given key element from the parameters key list.
         //!
         //! @param index is the index of the key to be removed from the parameters key list.
         //!
         public void removeKeyAtIndex(int index);
-
         //!
-        //! Create and insert a new key element to the parameters key list, 
-        //! based on the current parameter value and Animation Manager time.
+        //! Sets the time of a given key.
+        //! The internal keylist will be automatically reordered by time. 
         //!
-        public void setKey();
-
+        //! @ param key The key for which the time is to be changed.
+        //! @ param time The time the geven key shall be moved to.
         //!
-        //! Clear the parameters key list and disable the animation functionality.
-        //!
-        public void clearKeys();
-
         public void setKeyTime(AbstractKey key, float time);
+        //!
+        //! Sets the time of a key in the key list at the given index.
+        //! The internal keylist will be automatically reordered by time. 
+        //!
+        //! @ param index The index of the key for which the time is to be changed.
+        //! @ param time The time the geven key shall be moved to.
+        //!
         public void setKeyTime(int index, float time);
     }
 
     //!
-    //! Parameter class defining the fundamental functionality and interface
+    //! This is an extansion for the Parameter class containing animation functionality.
     //!
     public partial class Parameter<T> : AbstractParameter, IAnimationParameter
     {
@@ -194,13 +202,6 @@ namespace tracer
             addKey(key);
         }
 
-        public void moveKey(AbstractKey key, float toTime)
-        {
-            key.time = toTime;
-            _keyList.Remove(key);
-            addKey((Key<T>)key);
-        }
-
         //!
         //! Clear the parameters key list and disable the animation functionality.
         //!
@@ -216,19 +217,47 @@ namespace tracer
             }
         }
 
+        //!
+        //! Sets the value of a given key.
+        //!
+        //! @ param key The key for which the value is to be changed.
+        //! @ param value The new value for the given key.
+        //!
         public void setKeyValue(AbstractKey key, T value)
         {
             ((Key<T>)key).value = value;
         }
+
+        //!
+        //! Sets the value of a key in the key list at the given index.
+        //!
+        //! @ param index The index of the key for which the value is to be changed.
+        //! @ param value The new value for the given key.
+        //!
         public void setKeyValue (int index, T value)
         {
             ((Key<T>)_keyList[index]).value = value;
         }
 
+        //!
+        //! Sets the time of a given key.
+        //! The internal keylist will be automatically reordered by time. 
+        //!
+        //! @ param key The key for which the time is to be changed.
+        //! @ param time The time the geven key shall be moved to.
+        //!
         public void setKeyTime(AbstractKey key, float time)
         {
             setKeyTime(_keyList.IndexOf(key), time);
         }
+
+        //!
+        //! Sets the time of a key in the key list at the given index.
+        //! The internal keylist will be automatically reordered by time. 
+        //!
+        //! @ param index The index of the key for which the time is to be changed.
+        //! @ param time The time the geven key shall be moved to.
+        //!
         public void setKeyTime(int index, float time)
         {
             Key<T> key = (Key<T>)_keyList[index];
@@ -277,7 +306,7 @@ namespace tracer
 
             if (_isAnimated)
             {
-                if (_keyList[_prevIdx].time < time && time < _keyList[_nextIdx].time)
+                if (_keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
                     value = interpolateLinear(time);
                 else
                 {
@@ -313,7 +342,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int findNextKeyIndex(Key<T> key)
         {
-            return _keyList.FindIndex(i => i.time > key.time);
+            return _keyList.FindIndex(i => i.time >= key.time);
         }
 
         //!
@@ -325,7 +354,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int findNextKeyIndex(float time)
         {
-            return _keyList.FindIndex(i => i.time > time);
+            return _keyList.FindIndex(i => i.time >= time);
         }
 
         //!
@@ -342,6 +371,9 @@ namespace tracer
             float nt = _keyList[_nextIdx].time;
             T pv = ((Key<T>)_keyList[_prevIdx]).value;
             T nv = ((Key<T>)_keyList[_nextIdx]).value;
+
+            if (nt == pt)
+                return nv;
 
             float inBetween = (time - pt) / (nt - pt);
 

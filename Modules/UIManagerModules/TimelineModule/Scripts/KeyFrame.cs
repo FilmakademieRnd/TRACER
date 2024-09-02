@@ -36,6 +36,8 @@ namespace tracer
 		private RectTransform timelineTransform;
 
 	    private RectTransform rectTransform;
+	    
+		private Image image;
 	
 	    private Vector3 lastPosition = Vector3.zero;
 	
@@ -53,11 +55,22 @@ namespace tracer
 	        base.Awake();
 	        // get rectTransform component
 	        rectTransform = transform.GetComponent<RectTransform>();
+			image = transform.GetComponent<Image>();
 			timelineTransform = transform.parent.GetComponent<RectTransform>();
 	    }
-	
-	    // DRAG
-	    public void OnBeginDrag(PointerEventData data)
+
+		public void select()
+		{
+			image.color = Color.blue;
+		}
+
+        public void deSelect()
+        {
+            image.color = new Color(1.0f, 0.517f, 0,216);
+        }
+
+        // DRAG
+        public void OnBeginDrag(PointerEventData data)
 	    {
 	        lastPosition = rectTransform.position;
 	    }
