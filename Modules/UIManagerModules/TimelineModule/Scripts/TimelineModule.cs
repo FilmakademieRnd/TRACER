@@ -31,6 +31,7 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -366,7 +367,12 @@ namespace tracer
         private void OnSelectionChanged(object o, List<SceneObject> sceneObjects)
         {
             if (sceneObjects.Count < 1)
+            {
                 clearFrames();
+                m_activeParameter = null;
+                if (m_snapSelect)
+                    m_snapSelect.parameterChanged -= OnParameterChanged;
+            }
         }
 
         private void OnKeyframeUpdated(object o, IAnimationParameter parameter)

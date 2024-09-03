@@ -293,7 +293,7 @@ namespace tracer
                             byte sceneID = message[start];
                             short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(start + 1));
                             short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3));
-                            int length = message[start + 6];
+                            int length = MemoryMarshal.Read<int>(message.Slice(start + 6));
 
                             if (sceneID != oldSceneID ||
                                 parameterObjectID != oldParameterObjectID)
@@ -304,11 +304,11 @@ namespace tracer
                                 AbstractParameter  parameter = parameterObject.parameterList[parameterID];
                                 
                                 // check update if animation is incoming and change parameter type if required 
-                                // 7 is the size of the parameter fixed field
-                                if (!parameter._isAnimated && length > 7 + parameter.dataSize())
+                                // 10 is the size of the parameter fixed field
+                                if (!parameter._isAnimated && length > 10 + parameter.dataSize())
                                     parameter.InitAnimation();
                                 
-                                parameter.deSerialize(message.Slice(start + 7));
+                                parameter.deSerialize(message.Slice(start + 10));
                             }
 
                             start += length;

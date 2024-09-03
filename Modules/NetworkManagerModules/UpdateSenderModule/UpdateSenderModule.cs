@@ -349,7 +349,7 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // ParameterList: List<SceneObjectID, ParameterID, ParameterType, Parameter message length, ParameterData>
 
-            byte[] message = new byte[3 + m_modifiedParametersDataSize + 7 * m_modifiedParameters.Count];
+            byte[] message = new byte[3 + m_modifiedParametersDataSize + 10 * m_modifiedParameters.Count];
             Span<byte> msgSpan = new Span<byte>(message);
 
             // header
@@ -364,15 +364,15 @@ namespace tracer
                 AbstractParameter parameter = m_modifiedParameters[i];
                 lock (parameter)
                 {
-                    int length = 7 + parameter.dataSize();
+                    int length = 10 + parameter.dataSize();
                     Span<byte> newSpan = msgSpan.Slice(start, length);
 
                     newSpan[0] = parameter._parent._sceneID;  // SceneID
                     BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id);  // SceneObjectID
                     BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);  // ParameterID
                     newSpan[5] = (byte)parameter.tracerType;  // ParameterType
-                    newSpan[6] = (byte)newSpan.Length;  // Parameter message length
-                    parameter.Serialize(newSpan.Slice(7)); // Parameter data
+                    BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);  // Parameter message length
+                    parameter.Serialize(newSpan.Slice(10)); // Parameter data
 
                     start += length;
                 }
