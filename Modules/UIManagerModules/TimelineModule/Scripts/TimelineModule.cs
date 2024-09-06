@@ -426,6 +426,13 @@ namespace tracer
             UpdateFrames();
         }
 
+        //! 
+        //! Function called when the parameter selected by the UI changed.
+        //! Updates the timeline widgets based on the parameters data.
+        //!
+        //! @param o The UI element (SnapSelect) that changes the selected parameter.
+        //! @param idx The index of the parameter in the selected objects parameter list.
+        //!
         private void OnParameterChanged(object o, int idx)
         {
             clearFrames();
@@ -436,6 +443,13 @@ namespace tracer
             CreateFrames(m_activeParameter);
         }
 
+        //!
+        //! Function that creates the keyframe widget of the time line, 
+        //! based on a given parameter.
+        //!
+        //! @param parameter The parameter for which the keyframe widgets
+        //! shall be created. 
+        //!
         public void CreateFrames(IAnimationParameter parameter)
         {
             foreach (AbstractKey key in parameter.getKeys())
@@ -497,9 +511,45 @@ namespace tracer
             keyframeComponent.Callback1 = keyframeSelected;
         }
 
+        ////////////////////////
+        // KEYFRAME CALLBACKS //
+        ////////////////////////
+
+        //!
+        //! Callback function called from a keyframe widget to update the key's values.
+        //!
+        //! @param key The key the keyframe wedget belogs to.
+        //! @param x The new x position of the keyframe widget on the timelene. 
+        //!
+        private void setTimeFromGlobalPositionX(AbstractKey key, float x)
+        {
+            float _x = m_timelineRect.InverseTransformPoint(new Vector3(x, m_timelineRect.position.y, m_timelineRect.position.z)).x;
+            float time = mapToCurrentTime(_x);
+            m_activeParameter.setKeyTime(key, time);
+            clearFrames();
+            CreateFrames(m_activeParameter);
+            setTime(m_currentTime);
+        }
+
+        //!
+        //! Callback function called from a keyframe widget when it has been klicked.
+        //!
+        //! @param keyframe The Uinty GameObject behind the keyframe widget. 
+        //!
+        private void keyframeSelected(GameObject keyframe)
+        {
+            m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
+            m_activeKeyframeIndex = m_keyframeList.IndexOf(keyframe);
+            m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().select();
+        }
+
         //////////////
         // CONTROLS //
         //////////////
+
+        //!
+        //! Function selects the next key frame and moves the time line view if needed.
+        //!
         private void nextFrame()
         {
             KeyFrame nextKeyFrame, activeKeyFrame;
@@ -529,6 +579,9 @@ namespace tracer
             setTime(nextKeyFrame.key.time);
         }
 
+        //!
+        //! Function selects the previous key frame and moves the time line view if needed.
+        //!
         private void prevFrame()
         {
             KeyFrame prevKeyFrame, activeKeyFrame;
@@ -558,6 +611,9 @@ namespace tracer
             setTime(prevKeyFrame.key.time);
         }
 
+        //!
+        //! Function to trigger the play/pause mode.
+        //!
         private void play()
         {
             if (m_isPlaying)
@@ -572,6 +628,10 @@ namespace tracer
             }
         }
 
+
+        //!
+        //! Coroutine to update the time and trigger all evaluations in play mode.
+        //!
         private IEnumerator playCoroutine()
         {
             while (m_isPlaying)
@@ -581,26 +641,18 @@ namespace tracer
             }
         }
 
+
+
         ///////////
         // INPUT //
         ///////////
 
-        private GameObject Raycast(Vector2 point)
-        {
-            //Set up the new Pointer Event
-            PointerEventData pointerEventData = new PointerEventData(EventSystem.current);
-            //Set the Pointer Event Position to that of the game object
-            pointerEventData.position = point;
-
-            //Create a list of Raycast Results
-            List<RaycastResult> results = new List<RaycastResult>();
-
-            //Raycast using the Graphics Raycaster and mouse click position
-            EventSystem.current.RaycastAll(pointerEventData, results);
-
-            return results[0].gameObject;
-        }
-
+        //!
+        //! Function that is called when the input manager registers a pointer down event
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param point The point in screen space the pointer down event happened.
+        //!
         private void OnPointerDown(object sender, Vector2 point)
         {
             if (Raycast(point) != m_timeLine)
@@ -611,11 +663,23 @@ namespace tracer
             setTime(time);
         }
 
+        //!
+        //! Function that is called when the input manager registers a pointer end event
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param point The point in screen space the pointer up event happened.
+        //!
         private void OnPointerEnd(object sender, Vector2 point)
         {
             m_isSelected = false;
         }
 
+        //!
+        //! Function that is called when the input manager registers a begin drag event
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param point The point in screen space the bigin drag event happened.
+        //!
         private void OnBeginDrag(object sender, Vector2 point)
         {
             startTimeDragInit = m_startTime;
@@ -625,6 +689,12 @@ namespace tracer
             pinchInitDistance = point.x;
         }
 
+        //!
+        //! Function that is called when the input manager registers an on drag event
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param point The point in screen space the on drag event happened.
+        //!
         private void OnDrag(object sender, Vector2 point)
         {
             if (!m_isSelected)
@@ -655,7 +725,16 @@ namespace tracer
                 setTime(mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x));
         }
 
+        //////////////////
         // Touch Inputs //
+        //////////////////
+
+        //!
+        //! Function that is called when the input manager registers an on pinch event
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param delta The distance between the two pinch input pointers.
+        //!
         private void OnPinch(object sender, float delta)
         {
             if (!m_isSelected)
@@ -672,6 +751,12 @@ namespace tracer
             UpdateFrames();
         }
 
+        //!
+        //! Function that is called when the input manager registers a two finger drag event
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param The point in screen space the two finger drag event happened.
+        //!
         private void OnTwoFingerDrag(object sender, Vector2 point)
         {
             if (!m_isSelected)
@@ -691,7 +776,24 @@ namespace tracer
         //////////////////////
         // Helper functions //
         //////////////////////
-        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private GameObject Raycast(Vector2 point)
+        {
+            //Set up the new Pointer Event
+            PointerEventData pointerEventData = new PointerEventData(EventSystem.current);
+            //Set the Pointer Event Position to that of the game object
+            pointerEventData.position = point;
+
+            //Create a list of Raycast Results
+            List<RaycastResult> results = new List<RaycastResult>();
+
+            //Raycast using the Graphics Raycaster and mouse click position
+            EventSystem.current.RaycastAll(pointerEventData, results);
+
+            return results[0].gameObject;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static private float _map(float x, float a1, float b1, float a2, float b2)
         {
@@ -708,24 +810,6 @@ namespace tracer
         private float mapToCurrentTime(float x)
         {
             return _map(x, -m_timelineRect.sizeDelta.x * 0.5f, m_timelineRect.sizeDelta.x * 0.5f, m_startTime, m_endTime);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void setTimeFromGlobalPositionX(AbstractKey key, float x)
-        {
-            float _x = m_timelineRect.InverseTransformPoint(new Vector3(x, m_timelineRect.position.y, m_timelineRect.position.z)).x;
-            float time = mapToCurrentTime(_x);
-            m_activeParameter.setKeyTime(key, time);
-            clearFrames();
-            CreateFrames(m_activeParameter);
-            setTime(m_currentTime);
-        }
-
-        private void keyframeSelected(KeyFrame keyframe)
-        {
-            m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
-            m_activeKeyframeIndex = m_keyframeList.FindIndex(k => k.GetComponent<KeyFrame>() == keyframe);
-            m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().select();
         }
 
     }
