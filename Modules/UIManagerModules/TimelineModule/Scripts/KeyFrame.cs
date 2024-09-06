@@ -33,59 +33,67 @@ namespace tracer
 {
 	public class KeyFrame : Button, IBeginDragHandler, IDragHandler, IEndDragHandler
 	{
-		private RectTransform timelineTransform;
-
-	    private RectTransform rectTransform;
-	    
-		private Image image;
-	
-	    private Vector3 lastPosition = Vector3.zero;
-	
 	    public AbstractKey key;
+		
+		private RectTransform m_timelineTransform;
+
+	    private RectTransform m_rectTransform;
+	    
+		private Image m_image;
 	
-	    private UnityAction<AbstractKey, float> callback;
+	    private Vector3 m_lastPosition = Vector3.zero;
+	
+	    private UnityAction<AbstractKey, float> m_callback;
+
+		private float m_leftLimit, m_rightLimit = 0.0f;
 	
 	    public UnityAction<AbstractKey, float> Callback
 	    {
-	        set { callback = value; }
+	        set { m_callback = value; }
 	    }
 
         protected void Awake()
 	    {
 	        base.Awake();
-	        // get rectTransform component
-	        rectTransform = transform.GetComponent<RectTransform>();
-			image = transform.GetComponent<Image>();
-			timelineTransform = transform.parent.GetComponent<RectTransform>();
-	    }
+	        // get m_rectTransform component
+	        m_rectTransform = transform.GetComponent<RectTransform>();
+			m_image = transform.GetComponent<Image>();
+            Transform tp = transform.parent;
+			if (tp)
+			{
+				m_timelineTransform = tp.GetComponent<RectTransform>();
+                m_leftLimit = m_timelineTransform.position.x - m_timelineTransform.rect.width * transform.parent.parent.localScale.x * 0.5f;
+                m_rightLimit = m_timelineTransform.position.x + m_timelineTransform.rect.width * transform.parent.parent.localScale.x * 0.5f;
+            }
+        }
 
 		public void select()
 		{
-			image.color = Color.blue;
+			m_image.color = Color.blue;
 		}
 
         public void deSelect()
         {
-            image.color = new Color(1.0f, 0.517f, 0,216);
+            m_image.color = new Color(1.0f, 0.517f, 0,216);
         }
 
         // DRAG
         public void OnBeginDrag(PointerEventData data)
 	    {
-	        lastPosition = rectTransform.position;
+	        m_lastPosition = m_rectTransform.position;
 	    }
 	
 	    public void OnDrag(PointerEventData data)
 	    {
-			float newX = lastPosition.x + data.position.x - data.pressPosition.x;
-			if (newX - rectTransform.rect.width * 0.5f > timelineTransform.position.x - timelineTransform.rect.width * 0.5f &&
-				newX + rectTransform.rect.width * 0.5f < timelineTransform.position.x + timelineTransform.rect.width * 0.5f) 
-				rectTransform.position = new Vector3(lastPosition.x + data.position.x - data.pressPosition.x, lastPosition.y, lastPosition.z);
-		}
+			float newX = m_lastPosition.x + data.position.x - data.pressPosition.x;
+
+            if (newX > m_leftLimit && newX < m_rightLimit)
+                m_rectTransform.position = new Vector3(newX, m_lastPosition.y, m_lastPosition.z);
+        }
 	
 	    public void OnEndDrag(PointerEventData data)
 	    {
-	        callback?.Invoke(key, rectTransform.position.x);
+	        m_callback?.Invoke(key, m_rectTransform.position.x);
 	    }
     }
 }

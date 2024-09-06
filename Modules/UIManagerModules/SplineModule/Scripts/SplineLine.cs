@@ -131,7 +131,7 @@ public class SplineLine : UIManagerModule
     private LineRenderer _lineRenderer;
 
     //! 
-    //! Function called when an Unity Start() callback is triggered
+    //! Function called when an Unity Start() m_callback is triggered
     //! 
     protected override void Start(object sender, EventArgs e)
     {

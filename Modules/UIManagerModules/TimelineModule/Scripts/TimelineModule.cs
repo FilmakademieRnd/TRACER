@@ -454,7 +454,7 @@ namespace tracer
         }
 
         //!
-        //! Add a frame representing image to the timeline
+        //! Add a frame representing m_image to the timeline
         //! @param      key    key at which to add the keyframe to the timeline
         //!
         private void addFrame(AbstractKey key)

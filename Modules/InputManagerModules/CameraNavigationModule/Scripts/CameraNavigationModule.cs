@@ -122,7 +122,7 @@ namespace tracer
         }
 
         //! 
-        //! Init callback for the CameraNavigation module.
+        //! Init m_callback for the CameraNavigation module.
         //! 
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 

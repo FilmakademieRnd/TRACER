@@ -66,7 +66,7 @@ namespace tracer
         private GameObject _currentAddSelector;
 
         //!
-        //! Reference to the crosshair image
+        //! Reference to the crosshair m_image
         //!
         private Image _crossHairImg;
 

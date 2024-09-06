@@ -129,9 +129,9 @@ namespace tracer
         }
 
         //!
-        //! Init callback for the UICreator2D module.
+        //! Init m_callback for the UICreator2D module.
         //! Called after constructor.
-        //! @param sender callback sender
+        //! @param sender m_callback sender
         //! @param e event reference
         //!
         protected override void Init(object sender, EventArgs e)
@@ -157,7 +157,7 @@ namespace tracer
         //!
         //! Function that recreates the UI Layout.
         //! Being called when selection has changed.
-        //! @param sender callback sender
+        //! @param sender m_callback sender
         //! @param sceneObjects event payload containg all sceneObjects the UI shall be created for
         //!
         private void createUI(object sender, List<SceneObject> sceneObjects)

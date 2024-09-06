@@ -65,7 +65,7 @@ namespace tracer
         }
 
         //! 
-        //!  Function called when an Unity Awake() callback is triggered
+        //!  Function called when an Unity Awake() m_callback is triggered
         //! 
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
@@ -91,7 +91,7 @@ namespace tracer
         }
 
         //! 
-        //! Function called when an Unity Start() callback is triggered
+        //! Function called when an Unity Start() m_callback is triggered
         //! 
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 

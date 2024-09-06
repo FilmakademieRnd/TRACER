@@ -71,7 +71,7 @@ namespace tracer
         }
 
         //!
-        //! Init callback for the UICreator3DPointOnFloor module.
+        //! Init m_callback for the UICreator3DPointOnFloor module.
         //!
         protected override void Init(object sender, EventArgs e)
         {
@@ -98,7 +98,7 @@ namespace tracer
         //!
         //! Function to prepare for transformations.
         //! Called with the start of click from InputManager
-        //! @param sender callback sender
+        //! @param sender m_callback sender
         //! @param e event reference
         //!
         private void PressStart(object sender, Vector2 point)
@@ -172,7 +172,7 @@ namespace tracer
         //!
         //! Function to finalize manipulator operation
         //! Called with the end (cancellation) of click from InputManager
-        //! @param sender callback sender
+        //! @param sender m_callback sender
         //! @param e event reference
         //!
         private void PressEnd(object sender, Vector2 point)
