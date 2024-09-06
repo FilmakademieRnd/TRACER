@@ -31,7 +31,6 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -474,6 +473,7 @@ namespace tracer
                 keyFrame.SetActive(false);
 
             keyframeComponent.Callback = setTimeFromGlobalPositionX;
+            keyframeComponent.Callback1 = keyframeSelected;
         }
 
         //////////////
@@ -481,24 +481,60 @@ namespace tracer
         //////////////
         private void nextFrame()
         {
+            KeyFrame nextKeyFrame, activeKeyFrame;
+
             if (m_activeKeyframeIndex + 1 < m_keyframeList.Count)
             {
-                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
-                KeyFrame keyFrame = m_keyframeList[++m_activeKeyframeIndex].GetComponent<KeyFrame>();
-                keyFrame.select();
-                setTime(keyFrame.key.time);
+                activeKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                nextKeyFrame = m_keyframeList[++m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                float deltaTime = nextKeyFrame.key.time - activeKeyFrame.key.time;
+
+                if (nextKeyFrame.key.time >= m_endTime)
+                {
+                    EndTime += deltaTime;
+                    StartTime += deltaTime;
+                    UpdateFrames();
+                    setTime(m_currentTime + deltaTime);
+                }
+                
+                activeKeyFrame.deSelect();
             }
+            else if (m_keyframeList.Count > 0)
+                nextKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
+            else
+                return;
+
+            nextKeyFrame.select();
+            setTime(nextKeyFrame.key.time);
         }
 
         private void prevFrame()
         {
+            KeyFrame prevKeyFrame, activeKeyFrame;
+
             if (m_activeKeyframeIndex - 1 > -1)
             {
-                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
-                KeyFrame keyFrame = m_keyframeList[--m_activeKeyframeIndex].GetComponent<KeyFrame>();
-                keyFrame.select();
-                setTime(keyFrame.key.time);
+                activeKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                prevKeyFrame = m_keyframeList[--m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                float deltaTime = activeKeyFrame.key.time - prevKeyFrame.key.time;
+
+                if (prevKeyFrame.key.time <= m_startTime)
+                {
+                    EndTime -= deltaTime;
+                    StartTime -= deltaTime;
+                    UpdateFrames();
+                    setTime(m_currentTime - deltaTime);
+                }
+
+                activeKeyFrame.deSelect();
             }
+            else if (m_keyframeList.Count > 0)
+                prevKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
+            else
+                return;
+
+            prevKeyFrame.select();
+            setTime(prevKeyFrame.key.time);
         }
 
         private void play()
@@ -659,7 +695,16 @@ namespace tracer
             float _x = m_timelineRect.InverseTransformPoint(new Vector3(x, m_timelineRect.position.y, m_timelineRect.position.z)).x;
             float time = mapToCurrentTime(_x);
             m_activeParameter.setKeyTime(key, time);
+            clearFrames();
+            CreateFrames(m_activeParameter);
             setTime(m_currentTime);
+        }
+
+        private void keyframeSelected(KeyFrame keyframe)
+        {
+            m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
+            m_activeKeyframeIndex = m_keyframeList.FindIndex(k => k.GetComponent<KeyFrame>() == keyframe);
+            m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().select();
         }
 
     }

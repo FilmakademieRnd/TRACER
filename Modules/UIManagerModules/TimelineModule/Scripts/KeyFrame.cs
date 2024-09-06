@@ -31,7 +31,7 @@ using UnityEngine.UI;
 
 namespace tracer
 {
-	public class KeyFrame : Button, IBeginDragHandler, IDragHandler, IEndDragHandler
+	public class KeyFrame : Button, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerDownHandler
 	{
 	    public AbstractKey key;
 		
@@ -44,6 +44,7 @@ namespace tracer
 	    private Vector3 m_lastPosition = Vector3.zero;
 	
 	    private UnityAction<AbstractKey, float> m_callback;
+	    private UnityAction<KeyFrame> m_callback1;
 
 		private float m_leftLimit, m_rightLimit = 0.0f;
 	
@@ -51,6 +52,11 @@ namespace tracer
 	    {
 	        set { m_callback = value; }
 	    }
+
+        public UnityAction<KeyFrame> Callback1
+        {
+            set { m_callback1 = value; }
+        }
 
         protected void Awake()
 	    {
@@ -95,5 +101,10 @@ namespace tracer
 	    {
 	        m_callback?.Invoke(key, m_rectTransform.position.x);
 	    }
+
+		public void OnPointerDown(PointerEventData data)
+		{
+            m_callback1?.Invoke(this);
+        }
     }
 }
