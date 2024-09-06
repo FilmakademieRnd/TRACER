@@ -28,6 +28,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 01.02.2023
 
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
@@ -75,6 +76,11 @@ namespace tracer
         //! @ param time The time the geven key shall be moved to.
         //!
         public void setKeyTime(int index, float time);
+        //!
+        //! Event emitted when a keyframe has changed.
+        //!
+        public event EventHandler keyHasChanged;
+        public void InvokeKeyHasChanged();
     }
 
     //!
@@ -82,6 +88,10 @@ namespace tracer
     //!
     public partial class Parameter<T> : AbstractParameter, IAnimationParameter
     {
+        //!
+        //! Event emitted when a keyframe has changed.
+        //!
+        public event EventHandler keyHasChanged;
         //!
         //! The next and the previous active keyframe index (for animation).
         //!
@@ -293,6 +303,12 @@ namespace tracer
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void InvokeKeyHasChanged()
+        {
+            keyHasChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         //!
         //! Calculate the parameters value based on the keylist and given time.
         //!
@@ -332,6 +348,7 @@ namespace tracer
                 }
             }
         }
+
 
         //!
         //! Function for searching the next bigger key index in the key list.

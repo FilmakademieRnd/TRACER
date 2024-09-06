@@ -295,7 +295,7 @@ public class SplineLine : UIManagerModule
             ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
         }
         
-        _animationManager.keyframesUpdated(_selectedAbstractParam as IAnimationParameter);
+        (_selectedAbstractParam as IAnimationParameter).InvokeKeyHasChanged();
     }
     
     //!

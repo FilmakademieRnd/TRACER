@@ -52,10 +52,6 @@ namespace tracer
             m_time = time;
             animationUpdate?.Invoke(this, time);
         }
-        public void keyframesUpdated(IAnimationParameter parameter)
-        {
-            keyframeUpdate?.Invoke(this, parameter);
-        }
     }
 
 }

@@ -478,7 +478,8 @@ namespace tracer
 
                     _keyList.Add(new Key<T>(time, value, tangenttime1, tangentvalue1, tangenttime2, tangentvalue2 , interplolation));
                 }
-                _animationManager.keyframesUpdated(this);
+                //_animationManager.keyframesUpdated(this);
+                keyHasChanged?.Invoke(this, EventArgs.Empty);
             }
 
             _value = deSerializeData(sourceSpan);

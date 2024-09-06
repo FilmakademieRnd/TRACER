@@ -293,13 +293,15 @@ namespace tracer
             m_inputManager.inputMove += OnDrag;
             m_inputManager.twoDragEvent += OnTwoFingerDrag;
             m_inputManager.pinchEvent += OnPinch;
-            m_animationManager.keyframeUpdate += OnKeyframeUpdated;
             manager.selectionChanged += OnSelectionChanged;
 
             if (manager.SelectedObjects.Count > 0)
             {
                 if (m_activeParameter == null)
+                {
                     m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
+                    m_activeParameter.keyHasChanged += OnKeyframeUpdated;
+                }
                 CreateFrames(m_activeParameter);
             }
 
@@ -320,7 +322,6 @@ namespace tracer
             m_inputManager.inputMove -= OnDrag;
             m_inputManager.twoDragEvent -= OnTwoFingerDrag;
             m_inputManager.pinchEvent -= OnPinch;
-            m_animationManager.keyframeUpdate -= OnKeyframeUpdated;
             manager.selectionChanged -= OnSelectionChanged;
         }
 
@@ -363,24 +364,39 @@ namespace tracer
             m_animationManager.timelineUpdated(time);
         }
 
+        //!
+        //! Function called when the selected objects changed.
+        //! Will remove all keyframes from timeline UI is new selection is empty.
+        //!
+        //! @param o The UI manager.
+        //! @param sceneObjects The list containing the selected objects. 
+        //!
         private void OnSelectionChanged(object o, List<SceneObject> sceneObjects)
         {
             if (sceneObjects.Count < 1)
             {
                 clearFrames();
-                m_activeParameter = null;
+                if (m_activeParameter != null)
+                {
+                    m_activeParameter.keyHasChanged -= OnKeyframeUpdated;
+                    m_activeParameter = null;
+                }
                 if (m_snapSelect)
                     m_snapSelect.parameterChanged -= OnParameterChanged;
             }
         }
 
-        private void OnKeyframeUpdated(object o, IAnimationParameter parameter)
+        //!
+        //! Function called a keyframe 
+        //! Will remove all keyframes from timeline UI is new selection is empty.
+        //!
+        //! @param o The UI manager.
+        //! @param sceneObjects The list containing the selected objects. 
+        //!
+        private void OnKeyframeUpdated(object o, EventArgs e)
         {
-            if (parameter == m_activeParameter)
-            {
-                clearFrames();
-                CreateFrames(parameter);
-            }
+            clearFrames();
+            CreateFrames((IAnimationParameter) o);
         }
 
         //!
@@ -399,7 +415,10 @@ namespace tracer
             
             if (manager.SelectedObjects.Count > 0)
             {
+                if (m_activeParameter != null)
+                    m_activeParameter.keyHasChanged -= OnKeyframeUpdated;
                 m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
+                m_activeParameter.keyHasChanged += OnKeyframeUpdated;
                 if (m_showTimeLine)
                     CreateFrames(m_activeParameter);
             }
@@ -410,8 +429,10 @@ namespace tracer
         private void OnParameterChanged(object o, int idx)
         {
             clearFrames();
-
+            if (m_activeParameter != null)
+                m_activeParameter.keyHasChanged -= OnKeyframeUpdated;
             m_activeParameter = manager.SelectedObjects[0].parameterList[idx] as IAnimationParameter;
+            m_activeParameter.keyHasChanged += OnKeyframeUpdated;
             CreateFrames(m_activeParameter);
         }
 
