@@ -136,6 +136,32 @@ namespace tracer
         //! The visible start time of the timeline.
         //!
         private float m_startTime = 0;
+        
+        //!
+        //! The UI button to add a key.
+        //!
+        private Button _addKeyButton;
+        //!
+        //! The UI button to remove a key.
+        //!
+        private Button _removeKeyButton;
+        //!
+        //! The UI button to remove all keys.
+        //!
+        private Button _removeAnimationButton;
+        //!
+        //! The UI button for starting the Animation ui.
+        //!
+        private MenuButton _animCreatorButton;
+        //!
+        //! Controll panel for addin and removing keys.
+        //!
+        private GameObject _addRemoveKeyPanel;
+        //!
+        //! Transform of the KeyCanvas.
+        //!
+        private Transform _keyCanvasTrans;
+        
         //!
         //! Getter/Setter for the start time of the timeline.
         //!
@@ -201,6 +227,7 @@ namespace tracer
 
             m_canvas = Resources.Load("Prefabs/TimelineCanvas") as GameObject;
             m_keyframePrefab = Resources.Load("Prefabs/KeyFrameTemplate") as GameObject;
+            _addRemoveKeyPanel = Resources.Load<GameObject>("Prefabs/AddRemoveKeyPanel");
 
             MenuButton hideTimelineButton = new MenuButton("Timeline", toggleTimeLine, new List<UIManager.Roles>() { UIManager.Roles.SET });
             //hideTimelineButton.setIcon("Images/button_timeline");
@@ -381,10 +408,64 @@ namespace tracer
                     m_activeParameter.keyHasChanged -= OnKeyframeUpdated;
                     m_activeParameter = null;
                 }
+
                 if (m_snapSelect)
                     m_snapSelect.parameterChanged -= OnParameterChanged;
+
+                if (_animCreatorButton != null)
+                {
+                    manager.removeButton(_animCreatorButton);
+                    _animCreatorButton = null;
+                    if (_keyCanvasTrans != null)
+                    {
+                        GameObject.DestroyImmediate(_keyCanvasTrans.gameObject);
+                        _addKeyButton.onClick.RemoveAllListeners();
+                        _removeKeyButton.onClick.RemoveAllListeners();
+                        _removeAnimationButton.onClick.RemoveAllListeners();
+                    }
+
+                }
+            }
+
+            if (sceneObjects.Count > 0)
+
+            {
+                _animCreatorButton = new MenuButton("", StartAnimGen, null, "animCreatorButton ");
+                _animCreatorButton.setIcon("Images/animationCreator");
+                manager.addButton(_animCreatorButton);
             }
         }
+
+        public void StartAnimGen()
+        {
+            Transform ui2D = manager.getModule<UICreator2DModule>().UI2DCanvas;
+            _keyCanvasTrans = SceneObject.Instantiate(_addRemoveKeyPanel.transform, ui2D);
+            
+            m_animationManager.OnStartAnimaGeneration(null);
+            
+            _addKeyButton = _keyCanvasTrans.GetChild(1).GetComponent<Button>();
+            _addKeyButton.onClick.AddListener(CallAddKeyEvent);
+            _removeKeyButton = _keyCanvasTrans.GetChild(2).GetComponent<Button>();
+            _removeKeyButton.onClick.AddListener(CallRemoveKeyEvent);
+            _removeAnimationButton = _keyCanvasTrans.GetChild(3).GetComponent<Button>();
+            _removeAnimationButton.onClick.AddListener(CallRemoveAnimationEvent);
+        }
+
+        private void CallAddKeyEvent()
+        {
+            m_animationManager.OnAddKey(null);
+        }
+
+        private void CallRemoveKeyEvent()
+        {
+            m_animationManager.OnRemoveKey(null);
+        }
+
+        private void CallRemoveAnimationEvent()
+        {
+            m_animationManager.OnRemoveAnimation(null);
+        }
+
 
         //!
         //! Function called a keyframe 
