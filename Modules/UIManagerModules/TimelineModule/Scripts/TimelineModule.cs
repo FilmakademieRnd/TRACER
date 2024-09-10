@@ -150,10 +150,6 @@ namespace tracer
         //!
         private Button _removeAnimationButton;
         //!
-        //! The UI button for starting the Animation ui.
-        //!
-        private MenuButton _animCreatorButton;
-        //!
         //! Controll panel for addin and removing keys.
         //!
         private GameObject _addRemoveKeyPanel;
@@ -261,11 +257,13 @@ namespace tracer
             {
                 m_showTimeLine = false;
                 destroyTimeline();
+                StopAnimGen();
             }
             else
             {
                 m_showTimeLine = true;
-                createTimeline();  
+                createTimeline(); 
+                StartAnimGen();
             }
         }
 
@@ -342,6 +340,7 @@ namespace tracer
         {
             clearFrames();
             clearUI();
+            StopAnimGen();
 
             m_inputManager.inputPressStartedUI -= OnBeginDrag;
             m_inputManager.inputPressEnd -= OnPointerEnd;
@@ -412,43 +411,46 @@ namespace tracer
                 if (m_snapSelect)
                     m_snapSelect.parameterChanged -= OnParameterChanged;
 
-                if (_animCreatorButton != null)
+                if (_keyCanvasTrans != null)
                 {
-                    manager.removeButton(_animCreatorButton);
-                    _animCreatorButton = null;
-                    if (_keyCanvasTrans != null)
-                    {
-                        GameObject.DestroyImmediate(_keyCanvasTrans.gameObject);
-                        _addKeyButton.onClick.RemoveAllListeners();
-                        _removeKeyButton.onClick.RemoveAllListeners();
-                        _removeAnimationButton.onClick.RemoveAllListeners();
-                    }
-
+                    StopAnimGen();
                 }
             }
 
             if (sceneObjects.Count > 0)
-
             {
-                _animCreatorButton = new MenuButton("", StartAnimGen, null, "animCreatorButton ");
-                _animCreatorButton.setIcon("Images/animationCreator");
-                manager.addButton(_animCreatorButton);
+                StartAnimGen();
             }
         }
 
-        public void StartAnimGen()
+        private void StopAnimGen()
         {
-            Transform ui2D = manager.getModule<UICreator2DModule>().UI2DCanvas;
-            _keyCanvasTrans = SceneObject.Instantiate(_addRemoveKeyPanel.transform, ui2D);
-            
-            m_animationManager.OnStartAnimaGeneration(null);
-            
-            _addKeyButton = _keyCanvasTrans.GetChild(1).GetComponent<Button>();
-            _addKeyButton.onClick.AddListener(CallAddKeyEvent);
-            _removeKeyButton = _keyCanvasTrans.GetChild(2).GetComponent<Button>();
-            _removeKeyButton.onClick.AddListener(CallRemoveKeyEvent);
-            _removeAnimationButton = _keyCanvasTrans.GetChild(3).GetComponent<Button>();
-            _removeAnimationButton.onClick.AddListener(CallRemoveAnimationEvent);
+            if (_keyCanvasTrans != null)
+            {
+                GameObject.DestroyImmediate(_keyCanvasTrans.gameObject);
+                m_animationManager.OnStopAnimaGeneration(null);
+                _addKeyButton.onClick.RemoveAllListeners();
+                _removeKeyButton.onClick.RemoveAllListeners();
+                _removeAnimationButton.onClick.RemoveAllListeners();
+
+            }
+        }
+
+        private void StartAnimGen()
+        {
+            if (!_keyCanvasTrans)
+            {
+                Transform ui2D = manager.getModule<UICreator2DModule>().UI2DCanvas;
+                _keyCanvasTrans = SceneObject.Instantiate(_addRemoveKeyPanel.transform, ui2D);
+
+                m_animationManager.OnStartAnimaGeneration(null);
+                _addKeyButton = _keyCanvasTrans.GetChild(1).GetComponent<Button>();
+                _addKeyButton.onClick.AddListener(CallAddKeyEvent);
+                _removeKeyButton = _keyCanvasTrans.GetChild(2).GetComponent<Button>();
+                _removeKeyButton.onClick.AddListener(CallRemoveKeyEvent);
+                _removeAnimationButton = _keyCanvasTrans.GetChild(3).GetComponent<Button>();
+                _removeAnimationButton.onClick.AddListener(CallRemoveAnimationEvent);
+            }
         }
 
         private void CallAddKeyEvent()

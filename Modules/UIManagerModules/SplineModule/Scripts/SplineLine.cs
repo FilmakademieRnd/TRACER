@@ -145,6 +145,7 @@ public class SplineLine : UIManagerModule
         if (sceneObjects.Count < 1)
         {
             _animationManager.startAnimaGeneration -= StartAnimGen;
+            _animationManager.stopAnimaGeneration -= StopAnimGen;
             _animationManager.addKey -= AddKey;
             _animationManager.removeKey -= RemoveKey;
             _animationManager.removeAnimation -= RemoveAnimation;
@@ -164,6 +165,7 @@ public class SplineLine : UIManagerModule
         if (sceneObjects.Count > 0)
         {
             _animationManager.startAnimaGeneration += StartAnimGen;
+            _animationManager.stopAnimaGeneration += StopAnimGen;
             _animationTarget = sceneObjects[0];
             
             _selectedAbstractParam = _animationTarget.parameterList[_selectorCurrentSelectedSnapSelectElement];
@@ -188,6 +190,14 @@ public class SplineLine : UIManagerModule
         _animationManager.addKey += AddKey;
         _animationManager.removeKey += RemoveKey;
         _animationManager.removeAnimation += RemoveAnimation;
+    }
+
+    public void StopAnimGen(object sender, IAnimationParameter animationParameter)
+    {
+        DelleteSplineContainer();
+        _animationManager.addKey -= AddKey;
+        _animationManager.removeKey -= RemoveKey;
+        _animationManager.removeAnimation -= RemoveAnimation;
     }
 
     

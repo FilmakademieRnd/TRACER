@@ -47,6 +47,7 @@ namespace tracer
         public event EventHandler<IAnimationParameter> removeKey;
         public event EventHandler<IAnimationParameter> removeAnimation;
         public event EventHandler<IAnimationParameter> startAnimaGeneration;
+        public event EventHandler<IAnimationParameter> stopAnimaGeneration;
         public AnimationManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_time = 0;
@@ -59,6 +60,11 @@ namespace tracer
         public void OnStartAnimaGeneration(IAnimationParameter e)
         {
             startAnimaGeneration?.Invoke(this, e);
+        }
+        
+        public void OnStopAnimaGeneration(IAnimationParameter e)
+        {
+            stopAnimaGeneration?.Invoke(this, e);
         }
 
         public void OnAddKey(IAnimationParameter e)
