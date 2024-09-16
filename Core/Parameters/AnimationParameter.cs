@@ -359,7 +359,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int findNextKeyIndex(Key<T> key)
         {
-            return _keyList.FindIndex(i => i.time >= key.time);
+            return _keyList.FindIndex(i => i.time > key.time);
         }
 
         //!
