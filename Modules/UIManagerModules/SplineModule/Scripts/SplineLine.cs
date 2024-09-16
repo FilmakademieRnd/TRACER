@@ -258,9 +258,13 @@ public class SplineLine : UIManagerModule
         {
             ApplyKeyUpdate(vector4Param, removeKey, removeAll);
         }
-        if (_selectedAbstractParam is Parameter<quaternion> quaternionParam)
+        if (_selectedAbstractParam is Parameter<Quaternion> quaternionParam)
         {
             ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
+        }
+        if (_selectedAbstractParam is Parameter<Color> colorParameter)
+        {
+            ApplyKeyUpdate(colorParameter, removeKey, removeAll);
         }
         
         (_selectedAbstractParam as IAnimationParameter).InvokeKeyHasChanged();
