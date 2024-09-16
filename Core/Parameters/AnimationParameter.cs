@@ -400,6 +400,10 @@ namespace tracer
                     return (T)(object)((float)(object)pv * (1.0f - inBetween) + (float)(object)nv * inBetween);
                 case ParameterType.VECTOR3:
                     return (T)(object)((Vector3)(object)pv * (1.0f - inBetween) + (Vector3)(object)nv * inBetween);
+                case ParameterType.QUATERNION:
+                    return (T)(object)Quaternion.Slerp((Quaternion)(object)pv, (Quaternion)(object)nv, inBetween);
+                case ParameterType.COLOR:
+                    return (T)(object)Color.Lerp((Color)(object)pv, (Color)(object)nv, inBetween);
                 default:
                     return default(T);
             }

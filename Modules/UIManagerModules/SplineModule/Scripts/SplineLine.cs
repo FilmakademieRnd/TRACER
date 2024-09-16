@@ -66,10 +66,6 @@ public class SplineLine : UIManagerModule
     //!
     private AnimationManager _animationManager;
     //!
-    //! Controll panel for addin and removing keys.
-    //!
-    private GameObject _addRemoveKeyPanel;
-    //!
     //! Ref to the UICreator2DModule.
     //!
     private UICreator2DModule _creator2DModule;
@@ -105,26 +101,7 @@ public class SplineLine : UIManagerModule
     //! Reference to UIManager
     //!
     UIManager _mUIManager;
-    //!
-    //! The UI button for starting the Animation ui.
-    //!
-    private MenuButton _animCreatorButton;
-    //!
-    //! The UI button to add a key.
-    //!
-    private Button _addKeyButton;
-    //!
-    //! The UI button to remove a key.
-    //!
-    private Button _removeKeyButton;
-    //!
-    //! The UI button to remove all keys.
-    //!
-    private Button _removeAnimationButton;
-    //!
-    //! Transform of the KeyCanvas.
-    //!
-    private Transform _keyCanvasTrans;
+
     //!
     //! The Line renderer.
     //!
@@ -139,9 +116,6 @@ public class SplineLine : UIManagerModule
         _mUIManager = core.getManager<UIManager>();
         _animationManager = core.getManager<AnimationManager>();
         _inputManager = core.getManager<InputManager>();
-        _addRemoveKeyPanel = Resources.Load<GameObject>("Prefabs/AddRemoveKeyPanel");
-        
-        
         
         _mUIManager.selectionChanged += selection;
         _mUIManager.UI2DCreated += grabUI2D;
@@ -158,6 +132,9 @@ public class SplineLine : UIManagerModule
         base.Cleanup(sender, e);
         _mUIManager.selectionChanged -= selection;
         _mUIManager.UI2DCreated -= grabUI2D;
+        _animationManager.addKey -= AddKey;
+        _animationManager.removeKey -= RemoveKey;
+        _animationManager.removeAnimation -= RemoveAnimation;
     }
 
     //!
@@ -165,20 +142,17 @@ public class SplineLine : UIManagerModule
     //!
     private void selection(object sender, List<SceneObject> sceneObjects)
     {
-        if (_animCreatorButton != null)
+        if (sceneObjects.Count < 1)
         {
-            _mUIManager.removeButton(_animCreatorButton);
+            _animationManager.startAnimaGeneration -= StartAnimGen;
+            _animationManager.stopAnimaGeneration -= StopAnimGen;
+            _animationManager.addKey -= AddKey;
+            _animationManager.removeKey -= RemoveKey;
+            _animationManager.removeAnimation -= RemoveAnimation;
             DelleteSplineContainer();
-            _selectorSnapSelect.parameterChanged -= ParamChange;
-            _animCreatorButton = null;
-
-            if (_keyCanvasTrans != null)
+            if (_selectorSnapSelect)
             {
-                GameObject.DestroyImmediate(_keyCanvasTrans.gameObject);
-                _addKeyButton.onClick.RemoveAllListeners();
-                _removeKeyButton.onClick.RemoveAllListeners();
-                _removeAnimationButton.onClick.RemoveAllListeners();
-
+                _selectorSnapSelect.parameterChanged -= ParamChange;
             }
 
             if (_updateLineWhenZooming)
@@ -186,18 +160,15 @@ public class SplineLine : UIManagerModule
                 _inputManager.pinchEvent -= EventCallDrawLineBetweenPoints;
                 _updateLineWhenZooming = false;
             }
-            
         }
 
         if (sceneObjects.Count > 0)
         {
-            _animCreatorButton = new MenuButton("", StartAnimGen, null, "animCreatorButton ");
-            _animCreatorButton.setIcon("Images/animationCreator");
-            _mUIManager.addButton(_animCreatorButton);
+            _animationManager.startAnimaGeneration += StartAnimGen;
+            _animationManager.stopAnimaGeneration += StopAnimGen;
             _animationTarget = sceneObjects[0];
             
             _selectedAbstractParam = _animationTarget.parameterList[_selectorCurrentSelectedSnapSelectElement];
-            _animCreatorButton.isHighlighted = false;
         }
     }
 
@@ -213,30 +184,27 @@ public class SplineLine : UIManagerModule
     //!
     //! Function called when _animCreatorButton is pressed 
     //!
-    public void StartAnimGen()
+    public void StartAnimGen(object sender, IAnimationParameter animationParameter)
     {
-        Transform ui2D = _mUIManager.getModule<UICreator2DModule>().UI2DCanvas;
-        _keyCanvasTrans = SceneObject.Instantiate(_addRemoveKeyPanel.transform, ui2D);
-        
-        _animCreatorButton.isHighlighted = true;
         RenewContainer();
-        
-        _addKeyButton = _keyCanvasTrans.GetChild(1).GetComponent<Button>();
-        _addKeyButton.onClick.AddListener(AddKey);
-        _removeKeyButton = _keyCanvasTrans.GetChild(2).GetComponent<Button>();
-        _removeKeyButton.onClick.AddListener(RemoveKey);
-        _removeAnimationButton = _keyCanvasTrans.GetChild(3).GetComponent<Button>();
-        _removeAnimationButton.onClick.AddListener(RemoveAnimation);
-
+        _animationManager.addKey += AddKey;
+        _animationManager.removeKey += RemoveKey;
+        _animationManager.removeAnimation += RemoveAnimation;
     }
 
+    public void StopAnimGen(object sender, IAnimationParameter animationParameter)
+    {
+        DelleteSplineContainer();
+        _animationManager.addKey -= AddKey;
+        _animationManager.removeKey -= RemoveKey;
+        _animationManager.removeAnimation -= RemoveAnimation;
+    }
 
-
-
+    
     //!
     //! Function used to add a key.
     //!
-    public void AddKey()
+    public void AddKey(object sender, IAnimationParameter animationParameter)
     {
         UpdateKey(false);
     }
@@ -244,7 +212,7 @@ public class SplineLine : UIManagerModule
     //!
     //! Function used to remove a key.
     //!
-    public void RemoveKey()
+    public void RemoveKey(object sender, IAnimationParameter animationParameter)
     {
         UpdateKey(true);
     }
@@ -252,7 +220,7 @@ public class SplineLine : UIManagerModule
     //!
     //! Function used to remove all keys.
     //!
-    public void RemoveAnimation()
+    public void RemoveAnimation(object sender, IAnimationParameter animationParameter)
     {
         UpdateKey(false, true);
     }
@@ -290,9 +258,13 @@ public class SplineLine : UIManagerModule
         {
             ApplyKeyUpdate(vector4Param, removeKey, removeAll);
         }
-        if (_selectedAbstractParam is Parameter<quaternion> quaternionParam)
+        if (_selectedAbstractParam is Parameter<Quaternion> quaternionParam)
         {
             ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
+        }
+        if (_selectedAbstractParam is Parameter<Color> colorParameter)
+        {
+            ApplyKeyUpdate(colorParameter, removeKey, removeAll);
         }
         
         (_selectedAbstractParam as IAnimationParameter).InvokeKeyHasChanged();
