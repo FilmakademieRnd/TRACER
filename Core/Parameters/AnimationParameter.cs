@@ -322,29 +322,37 @@ namespace tracer
 
             if (_isAnimated)
             {
-                if (_keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
-                    value = interpolateLinear(time);
-                else
+                if (_keyList.Count > 1)
                 {
-                    // current time is NOT in between the two active keys
-                    int i = findNextKeyIndex(time);
-                    // current time is bigger than all keys in list
-                    if (i == -1)
-                    {
-                        _prevIdx = _keyList.Count - 1;
-                    }
-                    // current time is smaller than all keys in list
-                    else if (i == 0)
-                    {
-                        _nextIdx = 0;
-                    }
-                    // current time is somewhere between all keys in list
+                    if (_keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
+                        value = interpolateLinear(time);
                     else
                     {
-                        _nextIdx = i;
-                        _prevIdx = i - 1;
-                        value = interpolateLinear(time);
+                        // current time is NOT in between the two active keys
+                        int i = findNextKeyIndex(time);
+                        // current time is bigger than all keys in list
+                        if (i == -1)
+                        {
+                            _prevIdx = _keyList.Count - 1;
+                        }
+                        // current time is smaller than all keys in list
+                        else if (i == 0)
+                        {
+                            _nextIdx = 0;
+                        }
+                        // current time is somewhere between all keys in list
+                        else
+                        {
+                            _nextIdx = i;
+                            _prevIdx = i - 1;
+                            value = interpolateLinear(time);
+                        }
                     }
+                }
+                else
+                {
+                    _nextIdx = _prevIdx = 0;
+                    
                 }
             }
         }
