@@ -669,6 +669,27 @@ namespace tracer
                 //Debug.Log(selObj);
                 GrabParameterIndex();
 
+                // Unsubscribe from parameter updates
+                if (posParam != null)
+                    posParam.hasChanged -= UpdateManipulatorPosition;
+                if (rotParam != null)
+                    rotParam.hasChanged -= UpdateManipulatorRotation;
+                if (scaParam != null)
+                    scaParam.hasChanged -= UpdateManipulatorScale;
+
+                // Reset parameters
+                posParam = null;
+                rotParam = null;
+                scaParam = null;
+
+                posParam = (Parameter<Vector3>)selObj.parameterList[tIndex];
+                rotParam = (Parameter<Quaternion>)selObj.parameterList[rIndex];
+                scaParam = (Parameter<Vector3>)selObj.parameterList[sIndex];
+                // Subscribe to change
+                posParam.hasChanged += UpdateManipulatorPosition;
+                rotParam.hasChanged += UpdateManipulatorRotation;
+                scaParam.hasChanged += UpdateManipulatorScale;
+
                 // Start with translation
                 // todo: confirm this design choice
                 if (modeTRS == -1)
@@ -837,23 +858,6 @@ namespace tracer
         //!
         private void SetManipulatorMode(object sender, int manipulatorMode)
         {
-            // Unsubscribe from parameter updates
-            if (posParam != null)
-            {
-                posParam.hasChanged -= UpdateManipulatorPosition;
-                posParam = null;
-            }
-            if (rotParam != null)
-            {
-                rotParam.hasChanged -= UpdateManipulatorRotation;
-                rotParam = null;
-            }
-            if (scaParam != null)
-            {
-                scaParam.hasChanged -= UpdateManipulatorScale;
-                scaParam = null;
-            }
-
             // Disable manipulator
             if (manipulatorMode < 0 || manipulatorMode > 2)
             {
@@ -869,31 +873,17 @@ namespace tracer
 
             if (selObj)
             {
-                // Reset parameters
-                posParam = null;
-                rotParam = null;
-                scaParam = null;
-
-                if (manipulatorMode == 0)
+                if (manipulatorMode == 0 )
                 {
-                    posParam = (Parameter<Vector3>)selObj.parameterList[tIndex];
                     SetModeT();
-                    // Subscribe to change
-                    posParam.hasChanged += UpdateManipulatorPosition;
                 }
                 else if (manipulatorMode == 1)
                 {
-                    rotParam = (Parameter<Quaternion>)selObj.parameterList[rIndex];
                     SetModeR();
-                    // Subscribe to change
-                    rotParam.hasChanged += UpdateManipulatorRotation;
                 }
                 else if (manipulatorMode == 2)
                 {
-                    scaParam = (Parameter<Vector3>)selObj.parameterList[sIndex];
                     SetModeS();
-                    // Subscribe to change
-                    scaParam.hasChanged += UpdateManipulatorScale;
                 }
             }
 
@@ -913,7 +903,10 @@ namespace tracer
             }
             if(selObjs.Count>0)
                 averagePos /= selObjs.Count;
+            
             manipT.transform.position = averagePos;
+            manipR.transform.position = averagePos;
+            manipS.transform.position = averagePos;
         }
 
         //!
@@ -922,7 +915,12 @@ namespace tracer
         public void UpdateManipulatorRotation(object sender, Quaternion rotation)
         {
             if (selObjs.Count <= 1) // only update here if single selection
-                manipR.transform.localRotation = selObj.transform.rotation;
+            {
+                Quaternion q = selObj.transform.rotation;
+                manipT.transform.localRotation = q;
+                manipR.transform.localRotation = q;
+                manipS.transform.localRotation = q;
+            }
         }
 
         //!
@@ -939,9 +937,9 @@ namespace tracer
             float UniZ = NonZero(localDelta.z);
 
             // Main axes
-            manipSx.transform.localPosition = Vector3.Scale(localDelta, Vector3.right) / .61f;
-            manipSy.transform.localPosition = Vector3.Scale(localDelta, Vector3.up) / .61f;
-            manipSz.transform.localPosition = Vector3.Scale(localDelta, Vector3.forward) / .61f;
+            manipSx.transform.localPosition = Vector3.Scale(localDelta, Vector3.right) * 1.64f;
+            manipSy.transform.localPosition = Vector3.Scale(localDelta, Vector3.up) * 1.64f;
+            manipSz.transform.localPosition = Vector3.Scale(localDelta, Vector3.forward) * 1.64f;
             // Multi axes
             manipSxy.transform.localPosition = UniX * UniY * Vector3.Scale(localDelta, vecXY);
             manipSxz.transform.localPosition = UniX * UniZ * Vector3.Scale(localDelta, vecXZ);
