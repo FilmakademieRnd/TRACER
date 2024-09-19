@@ -31,6 +31,7 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -95,7 +96,7 @@ namespace tracer
         //!
         //! The index of the last active keyframe;
         //!
-        private int m_activeKeyframeIndex = 0;
+        private int m_activeKeyframeIndex = -1;
         //!
         //! The list containing all UI elemets of the current menu.
         //!
@@ -310,9 +311,9 @@ namespace tracer
             m_playButton.onClick.AddListener(play);
             m_prevButton.onClick.AddListener(prevFrame);
             m_nextButton.onClick.AddListener(nextFrame);
-            _addKeyButton.onClick.AddListener(CallAddKeyEvent);
-            _removeKeyButton.onClick.AddListener(CallRemoveKeyEvent);
-            _removeAnimationButton.onClick.AddListener(CallRemoveAnimationEvent);
+            _addKeyButton.onClick.AddListener(AddKey);
+            _removeKeyButton.onClick.AddListener(RemoveKey);
+            _removeAnimationButton.onClick.AddListener(RemoveAnimation);
 
             m_inputManager.inputPressStartedUI += OnBeginDrag;
             m_inputManager.inputPressEnd += OnPointerEnd;
@@ -431,23 +432,7 @@ namespace tracer
         {
             m_animationManager.OnStopAnimaGeneration(null);
         }
-
-        private void CallAddKeyEvent()
-        {
-            m_animationManager.OnAddKey(null);
-        }
-
-        private void CallRemoveKeyEvent()
-        {
-            m_animationManager.OnRemoveKey(null);
-        }
-
-        private void CallRemoveAnimationEvent()
-        {
-            m_animationManager.OnRemoveAnimation(null);
-        }
-
-
+        
         //!
         //! Function called a keyframe 
         //! Will remove all keyframes from timeline UI is new selection is empty.
@@ -503,6 +488,7 @@ namespace tracer
             m_activeParameter = manager.SelectedObjects[0].parameterList[idx] as IAnimationParameter;
             m_activeParameter.keyHasChanged += OnKeyframeUpdated;
             CreateFrames(m_activeParameter);
+            keyframeDeselected();
         }
 
         //!
@@ -600,23 +586,171 @@ namespace tracer
         //!
         private void keyframeSelected(GameObject keyframe)
         {
-            m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
-            m_activeKeyframeIndex = m_keyframeList.IndexOf(keyframe);
-            m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().select();
+            if (m_activeKeyframeIndex != -1)
+            {
+                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
+            }
+
+            if (m_activeKeyframeIndex == m_keyframeList.IndexOf(keyframe))
+            {
+                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
+                m_activeKeyframeIndex = -1;
+            }
+            else
+            {
+                m_activeKeyframeIndex = m_keyframeList.IndexOf(keyframe);
+                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().select();
+            }
         }
+
+        private void keyframeDeselected()
+        {
+            m_activeKeyframeIndex = -1;
+        }
+        
+        //!
+    //! Function used to add a key.
+    //!
+    private void AddKey()
+    {
+        UpdateKey(false);
+    }
+
+    //!
+    //! Function used to remove a key.
+    //!
+    private void RemoveKey()
+    {
+        UpdateKey(true);
+        keyframeDeselected();
+    }
+    
+    //!
+    //! Function used to remove all keys.
+    //!
+    private void RemoveAnimation()
+    {
+        UpdateKey(false, true);
+        keyframeDeselected();
+    }
+
+    //!
+    //! Function used to Update a key (add or remove).
+    //!
+    public void UpdateKey(bool removeKey, bool removeAll = false)
+    {
+        if (m_activeParameter is Parameter<bool> boolParam)
+        {
+            ApplyKeyUpdate(boolParam, removeKey, removeAll);
+        }
+        if (m_activeParameter is Parameter<int> intParam)
+        {
+            ApplyKeyUpdate(intParam, removeKey, removeAll);
+        }
+        if (m_activeParameter is Parameter<float> floatParam)
+        {
+            ApplyKeyUpdate(floatParam, removeKey, removeAll);
+        }
+        if (m_activeParameter is Parameter<Vector2> vector2Param)
+        {
+            ApplyKeyUpdate(vector2Param, removeKey, removeAll);
+        }
+        else if (m_activeParameter is Parameter<Vector3> vector3Param)
+        {
+            ApplyKeyUpdate(vector3Param, removeKey, removeAll);
+            if ((m_activeParameter as AbstractParameter)?.name == "position")
+            {
+                m_animationManager.OnRenewSplineContainer(null);
+            }
+        }
+        if (m_activeParameter is Parameter<Vector4> vector4Param)
+        {
+            ApplyKeyUpdate(vector4Param, removeKey, removeAll);
+        }
+        if (m_activeParameter is Parameter<Quaternion> quaternionParam)
+        {
+            ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
+        }
+        if (m_activeParameter is Parameter<Color> colorParameter)
+        {
+            ApplyKeyUpdate(colorParameter, removeKey, removeAll);
+        }
+        
+        (m_activeParameter).InvokeKeyHasChanged();
+    }
+    
+    //!
+    //! Function used to apply the key update
+    //!
+    public void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false)
+    {
+        if (removeKey && !removeAll && m_activeKeyframeIndex > -1)
+        {
+            int idx = m_activeKeyframeIndex;
+            if (idx >= 0)
+            {
+                parameter.removeKeyAtIndex(idx);
+                m_activeKeyframeIndex = -1;
+            }
+        }
+        else if (!removeKey)
+        {
+            parameter.setKey();
+        }
+
+        if (removeAll)
+        {
+            parameter.clearKeys();
+            m_activeKeyframeIndex = -1;
+        }
+    
+    }
+        
 
         //////////////
         // CONTROLS //
         //////////////
+
+        public GameObject FindClosestBiggerValue(float time)
+        {
+            var closestBiggerObject = m_keyframeList.Where(obj => obj.GetComponent<KeyFrame>() != null).Select(obj => new
+                {
+                    gameObject = obj,
+                    value = obj.GetComponent<KeyFrame>().key.time 
+                }).Where(x => x.value > time).OrderBy(x => x.value).FirstOrDefault();
+
+            return closestBiggerObject?.gameObject;
+        }
+        
+        public GameObject FindClosestSmallerValue(float time)
+        {
+            var closestSmallerObject = m_keyframeList.Where(obj => obj.GetComponent<KeyFrame>() != null).Select(obj => new
+                {
+                    gameObject = obj,
+                    value = obj.GetComponent<KeyFrame>().key.time 
+                }).Where(x => x.value < time).OrderByDescending(x => x.value).FirstOrDefault(); 
+
+            return closestSmallerObject?.gameObject;
+        }
+
 
         //!
         //! Function selects the next key frame and moves the time line view if needed.
         //!
         private void nextFrame()
         {
-            KeyFrame nextKeyFrame, activeKeyFrame;
-
-            if (m_activeKeyframeIndex + 1 < m_keyframeList.Count)
+            KeyFrame nextKeyFrame = null, activeKeyFrame;
+            //m_currentTime
+            if (m_activeKeyframeIndex == -1)
+            {
+                var go = FindClosestBiggerValue(m_currentTime);
+                if (go != null)
+                {
+                    nextKeyFrame = go.GetComponent<KeyFrame>();
+                    m_activeKeyframeIndex = m_keyframeList.IndexOf(nextKeyFrame.gameObject);
+                }
+            }
+            else if (m_activeKeyframeIndex + 1 < m_keyframeList.Count)
             {
                 activeKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
                 nextKeyFrame = m_keyframeList[++m_activeKeyframeIndex].GetComponent<KeyFrame>();
@@ -629,16 +763,20 @@ namespace tracer
                     UpdateFrames();
                     setTime(m_currentTime + deltaTime);
                 }
-                
+
                 activeKeyFrame.deSelect();
             }
             else if (m_keyframeList.Count > 0)
+
                 nextKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
             else
                 return;
 
-            nextKeyFrame.select();
-            setTime(nextKeyFrame.key.time);
+            if (nextKeyFrame != null)
+            {
+                nextKeyFrame.select();
+                setTime(nextKeyFrame.key.time);
+            }
         }
 
         //!
@@ -646,9 +784,19 @@ namespace tracer
         //!
         private void prevFrame()
         {
-            KeyFrame prevKeyFrame, activeKeyFrame;
+            KeyFrame prevKeyFrame = null, activeKeyFrame;
 
-            if (m_activeKeyframeIndex - 1 > -1)
+            if (m_activeKeyframeIndex == -1)
+            {
+                var go = FindClosestSmallerValue(m_currentTime);
+                if (go != null)
+                {
+                    prevKeyFrame = go.GetComponent<KeyFrame>();
+                    m_activeKeyframeIndex = m_keyframeList.IndexOf(prevKeyFrame.gameObject);
+                }
+            }
+
+            else if (m_activeKeyframeIndex - 1 > -1)
             {
                 activeKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
                 prevKeyFrame = m_keyframeList[--m_activeKeyframeIndex].GetComponent<KeyFrame>();
@@ -669,8 +817,11 @@ namespace tracer
             else
                 return;
 
-            prevKeyFrame.select();
-            setTime(prevKeyFrame.key.time);
+            if (prevKeyFrame != null)
+            {
+                prevKeyFrame.select();
+                setTime(prevKeyFrame.key.time);
+            }
         }
 
         //!

@@ -119,6 +119,7 @@ public class SplineLine : UIManagerModule
         
         _mUIManager.selectionChanged += selection;
         _mUIManager.UI2DCreated += grabUI2D;
+        _animationManager.renewSplineContainer += executeRenewContainer;
         _splineHolder = new GameObject("SplineHolder");
         _splineHolder.transform.position = new Vector3(0, 0, 0);
         
@@ -132,9 +133,6 @@ public class SplineLine : UIManagerModule
         base.Cleanup(sender, e);
         _mUIManager.selectionChanged -= selection;
         _mUIManager.UI2DCreated -= grabUI2D;
-        _animationManager.addKey -= AddKey;
-        _animationManager.removeKey -= RemoveKey;
-        _animationManager.removeAnimation -= RemoveAnimation;
     }
 
     //!
@@ -146,9 +144,6 @@ public class SplineLine : UIManagerModule
         {
             _animationManager.startAnimaGeneration -= StartAnimGen;
             _animationManager.stopAnimaGeneration -= StopAnimGen;
-            _animationManager.addKey -= AddKey;
-            _animationManager.removeKey -= RemoveKey;
-            _animationManager.removeAnimation -= RemoveAnimation;
             DelleteSplineContainer();
             if (_selectorSnapSelect)
             {
@@ -187,112 +182,11 @@ public class SplineLine : UIManagerModule
     public void StartAnimGen(object sender, IAnimationParameter animationParameter)
     {
         RenewContainer();
-        _animationManager.addKey += AddKey;
-        _animationManager.removeKey += RemoveKey;
-        _animationManager.removeAnimation += RemoveAnimation;
     }
 
     public void StopAnimGen(object sender, IAnimationParameter animationParameter)
     {
         DelleteSplineContainer();
-        _animationManager.addKey -= AddKey;
-        _animationManager.removeKey -= RemoveKey;
-        _animationManager.removeAnimation -= RemoveAnimation;
-    }
-
-    
-    //!
-    //! Function used to add a key.
-    //!
-    public void AddKey(object sender, IAnimationParameter animationParameter)
-    {
-        UpdateKey(false);
-    }
-
-    //!
-    //! Function used to remove a key.
-    //!
-    public void RemoveKey(object sender, IAnimationParameter animationParameter)
-    {
-        UpdateKey(true);
-    }
-    
-    //!
-    //! Function used to remove all keys.
-    //!
-    public void RemoveAnimation(object sender, IAnimationParameter animationParameter)
-    {
-        UpdateKey(false, true);
-    }
-
-    //!
-    //! Function used to Update a key (add or remove).
-    //!
-    public void UpdateKey(bool removeKey, bool removeAll = false)
-    {
-        if (_selectedAbstractParam is Parameter<bool> boolParam)
-        {
-            ApplyKeyUpdate(boolParam, removeKey, removeAll);
-        }
-        if (_selectedAbstractParam is Parameter<int> intParam)
-        {
-            ApplyKeyUpdate(intParam, removeKey, removeAll);
-        }
-        if (_selectedAbstractParam is Parameter<float> floatParam)
-        {
-            ApplyKeyUpdate(floatParam, removeKey, removeAll);
-        }
-        if (_selectedAbstractParam is Parameter<Vector2> vector2Param)
-        {
-            ApplyKeyUpdate(vector2Param, removeKey, removeAll);
-        }
-        else if (_selectedAbstractParam is Parameter<Vector3> vector3Param)
-        {
-            ApplyKeyUpdate(vector3Param, removeKey, removeAll);
-            if (_selectedAbstractParam.name == "position")
-            {
-                RenewContainer();
-            }
-        }
-        if (_selectedAbstractParam is Parameter<Vector4> vector4Param)
-        {
-            ApplyKeyUpdate(vector4Param, removeKey, removeAll);
-        }
-        if (_selectedAbstractParam is Parameter<Quaternion> quaternionParam)
-        {
-            ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
-        }
-        if (_selectedAbstractParam is Parameter<Color> colorParameter)
-        {
-            ApplyKeyUpdate(colorParameter, removeKey, removeAll);
-        }
-        
-        (_selectedAbstractParam as IAnimationParameter).InvokeKeyHasChanged();
-    }
-    
-    //!
-    //! Function used to apply the key update
-    //!
-    public void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false)
-    {
-        if (removeKey && !removeAll)
-        {
-            int idx = parameter.getKeys().FindIndex(i => Mathf.RoundToInt(i.time * 30) == Mathf.RoundToInt(_animationManager.time * 30));
-            if (idx >= 0)
-            {
-                parameter.removeKeyAtIndex(idx);
-            }
-        }
-        else
-        {
-            parameter.setKey();
-        }
-
-        if (removeAll)
-        {
-            parameter.clearKeys();
-        }
-    
     }
     
     //!
@@ -315,6 +209,11 @@ public class SplineLine : UIManagerModule
         _splineGameObject = CreateNewSplineGo(splineName);
         _sceneObjectsSplines.Add(_splineGameObject, splineName);
         _spline = _splineGameObject.AddComponent<SplineContainer>();
+    }
+
+    private void executeRenewContainer(object sender, IAnimationParameter animationParameter)
+    {
+        RenewContainer();
     }
     
     //!

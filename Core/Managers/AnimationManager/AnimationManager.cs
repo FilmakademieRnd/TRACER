@@ -48,6 +48,7 @@ namespace tracer
         public event EventHandler<IAnimationParameter> removeAnimation;
         public event EventHandler<IAnimationParameter> startAnimaGeneration;
         public event EventHandler<IAnimationParameter> stopAnimaGeneration;
+        public event EventHandler<IAnimationParameter> renewSplineContainer;
         public AnimationManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_time = 0;
@@ -82,6 +83,10 @@ namespace tracer
             removeAnimation?.Invoke(this, e);
         }
 
+        public void OnRenewSplineContainer(IAnimationParameter e)
+        {
+            renewSplineContainer?.Invoke(this, e);
+        }
     }
 
 }
