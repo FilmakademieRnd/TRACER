@@ -613,7 +613,10 @@ namespace tracer
     //!
     private void AddKey()
     {
-        UpdateKey(false);
+        if (m_activeParameter != null)
+        {
+            UpdateKey(false);
+        }
     }
 
     //!
@@ -621,17 +624,23 @@ namespace tracer
     //!
     private void RemoveKey()
     {
-        UpdateKey(true);
-        keyframeDeselected();
+        if (m_activeParameter != null)
+        {
+            UpdateKey(true);
+            keyframeDeselected();
+        }
     }
-    
+
     //!
     //! Function used to remove all keys.
     //!
     private void RemoveAnimation()
     {
-        UpdateKey(false, true);
-        keyframeDeselected();
+        if (m_activeParameter != null)
+        {
+            UpdateKey(false, true);
+            keyframeDeselected();
+        }
     }
 
     //!
