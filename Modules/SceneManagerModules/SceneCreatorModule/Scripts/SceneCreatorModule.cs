@@ -482,6 +482,10 @@ namespace tracer
                         skeleton[i].scale = new Vector3(cp.boneScale[i * 3], cp.boneScale[i * 3 + 1], cp.boneScale[i * 3 + 2]);
                     }
                 }
+                
+                
+                
+                /*
                 HumanDescription humanDescription = new HumanDescription();
                 humanDescription.human = human;
                 humanDescription.skeleton = skeleton;
@@ -493,14 +497,16 @@ namespace tracer
                 humanDescription.legStretch = 0.05f;
                 humanDescription.feetSpacing = 0.0f;
                 humanDescription.hasTranslationDoF = false;
+                */
+
+                Avatar avatar = AvatarBuilder.BuildGenericAvatar(obj, "hip");
+                //Avatar avatar = AvatarBuilder.BuildHumanAvatar(obj, humanDescription);
                 
-                Avatar avatar = AvatarBuilder.BuildHumanAvatar(obj, humanDescription);
-                
-                if (avatar.isValid == false || avatar.isHuman == false)
+                /*if (avatar.isValid == false || avatar.isHuman == false)
                 {
                     Helpers.Log(GetType().FullName + ": Unable to create source Avatar for retargeting. Check that your Skeleton Asset Name and Bone Naming Convention are configured correctly.", Helpers.logMsgType.ERROR);
                     return;
-                }
+                }*/
 
                 avatar.name = obj.name;
                 Animator animator = obj.AddComponent<Animator>();
