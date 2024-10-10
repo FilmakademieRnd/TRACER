@@ -188,13 +188,30 @@ namespace tracer
         //!
         private float endTimeDragInit = 1;
         //!
+        //! timeline frame size we adjust if zooming. necessary if we reach one (the lower) end while moving the tl
+        //!
+        private int timelineDistance = 150;
+        //!
         //! Initial active time at drag begin.
         //!
         private float timeDragStart = 0;
         //!
-        //! Initial pinc distance. 
+        //! Initial pinch distance. 
         //!
         private float pinchInitDistance = 0;
+        //!
+        //! pos buffer to calculate the drag movement delta which we already get from touches
+        //!
+        private Vector2 m_posDragBuffer;
+
+        //!
+        //! last time we pinched, to not switch between pinch and grab on touch, since it happens all the time
+        //!
+        private float timeLastPinched = 0;
+        //!
+        //! last time we two finger grabbed the timeline, to not switch between pinch and grab on touch, since it happens all the time
+        //!
+        private float timeLastMoved = 0;
 
         //!
         //! Constructor
@@ -315,9 +332,9 @@ namespace tracer
             _removeKeyButton.onClick.AddListener(RemoveKey);
             _removeAnimationButton.onClick.AddListener(RemoveAnimation);
 
-            m_inputManager.inputPressStartedUI += OnBeginDrag;
+            m_inputManager.inputPressStartedUI += OnPointerDown; //OnBeginDrag;
             m_inputManager.inputPressEnd += OnPointerEnd;
-            m_inputManager.inputPressPerformedUI += OnPointerDown;
+            //obsolete m_inputManager.inputPressPerformedUI += OnPointerDown;
             m_inputManager.inputMove += OnDrag;
             m_inputManager.twoDragEvent += OnTwoFingerDrag;
             m_inputManager.pinchEvent += OnPinch;
@@ -334,6 +351,8 @@ namespace tracer
                 CreateFrames(m_activeParameter);
             }
 
+            timelineDistance = Mathf.RoundToInt((m_endTime-m_startTime) * m_framerate);
+
             setTime(m_animationManager.time);
         }
 
@@ -345,9 +364,9 @@ namespace tracer
             clearFrames();
             clearUI();
 
-            m_inputManager.inputPressStartedUI -= OnBeginDrag;
+            m_inputManager.inputPressStartedUI -= OnPointerDown;
             m_inputManager.inputPressEnd -= OnPointerEnd;
-            m_inputManager.inputPressPerformedUI -= OnPointerDown;
+            //m_inputManager.inputPressPerformedUI -= OnPointerDown;
             m_inputManager.inputMove -= OnDrag;
             m_inputManager.twoDragEvent -= OnTwoFingerDrag;
             m_inputManager.pinchEvent -= OnPinch;
@@ -380,6 +399,8 @@ namespace tracer
         //!
         public void setTime(float time)
         {
+            time = Mathf.Max(time, 0f);
+
             if (time > m_endTime)
                 m_currentTime = m_endTime;
             else if
@@ -881,6 +902,13 @@ namespace tracer
                 return;
 
             m_isSelected = true;
+            m_posDragBuffer = point;
+            setDragValues(point);
+
+            //dont change if we want to grab or zoom the timeline
+            if (m_inputManager.getKey(53))
+                return;
+
             float time = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
             setTime(time);
         }
@@ -893,20 +921,20 @@ namespace tracer
         //!
         private void OnPointerEnd(object sender, Vector2 point)
         {
+            Debug.Log("<color=cyan>TIMELINE::OnPointerEnd</color>");
             m_isSelected = false;
         }
 
         //!
-        //! Function that is called when the input manager registers a begin drag event
+        //! Function that is called to setup values for a potential drag event
         //!
-        //! @param sender A reference to the input manager.
-        //! @param point The point in screen space the bigin drag event happened.
+        //! @param point The point in screen space the first touch started.
         //!
-        private void OnBeginDrag(object sender, Vector2 point)
+        private void setDragValues(Vector2 point)
         {
             startTimeDragInit = m_startTime;
             endTimeDragInit = m_endTime;
-            timeDragStart = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
+            timeDragStart = m_currentTime;//mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
 
             pinchInitDistance = point.x;
         }
@@ -932,19 +960,28 @@ namespace tracer
                     float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
                     StartTime = startTimeDragInit + widthDeltaHalf;
                     EndTime = endTimeDragInit - widthDeltaHalf;
+
+                    timelineDistance = Mathf.RoundToInt((EndTime-StartTime) * m_framerate);
+
                     setTime(timeDragStart);
                 }
                 else // move
                 {
-                    float timeOffset = timeDragStart - _map(m_timelineRect.InverseTransformPoint(point).x, -m_timelineRect.sizeDelta.x * 0.5f, m_timelineRect.sizeDelta.x * 0.5f, startTimeDragInit, endTimeDragInit);
-                    StartTime = startTimeDragInit + timeOffset;
-                    EndTime = endTimeDragInit + timeOffset;
-                    setTime(timeDragStart + timeOffset);
+                    
+                    //float timeOffset = timeDragStart - _map(m_timelineRect.InverseTransformPoint(point).x, -m_timelineRect.sizeDelta.x * 0.5f, m_timelineRect.sizeDelta.x * 0.5f, startTimeDragInit, endTimeDragInit);
+                    Vector2 delta = point-m_posDragBuffer;
+                    DragTimeline(delta);
+
+                    // StartTime = startTimeDragInit + timeOffset;
+                    // EndTime = endTimeDragInit + timeOffset;
+
                 }
                 UpdateFrames();
             }
             else // move time cursor
                 setTime(mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x));
+
+            m_posDragBuffer = point;
         }
 
         //////////////////
@@ -959,15 +996,39 @@ namespace tracer
         //!
         private void OnPinch(object sender, float delta)
         {
-            if (!m_isSelected)
+            return; //out for testing drag
+
+            if (!m_isSelected){
+                Debug.Log("ignore <color=cyan>TIMELINE::OnPinch</color> due to !m_isSelected");
                 return;
+            }
+
+            if(Time.time - timeLastMoved < 0.125f){
+                return;
+            }
+
+            timeLastPinched = Time.time;
+
+            Debug.Log("<color=cyan>TIMELINE::OnPinch</color> "+delta);
 
             // normalized distance
-            float pinchFactor = 1f + (delta) / Screen.width * 2f;
-            float widthPrev = endTimeDragInit - startTimeDragInit;
-            float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
-            StartTime = startTimeDragInit + widthDeltaHalf;
-            EndTime = endTimeDragInit - widthDeltaHalf;
+            // float pinchFactor = 1f + (delta) / Screen.width * 2f;
+            // float widthPrev = endTimeDragInit - startTimeDragInit;
+            // float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
+            // StartTime = startTimeDragInit + widthDeltaHalf;
+            // EndTime = endTimeDragInit - widthDeltaHalf;
+
+            //TODO: check where on the timeline our center of touches is and offset the delta accordingly
+            //e.g.  on the most left (startTimeDragInit + delta * 0f) and (endTimeDragInit - delta * 1f)
+            //      on the center (startTimeDragInit + delta * 0.5f) and (endTimeDragInit - delta * 0.5f)
+
+            startTimeDragInit   = Mathf.Clamp(startTimeDragInit+delta,  startTimeDragInit,          endTimeDragInit-delta);
+            endTimeDragInit     = Mathf.Clamp(endTimeDragInit-delta,    startTimeDragInit+delta,    endTimeDragInit);
+
+            timelineDistance = Mathf.RoundToInt((endTimeDragInit-startTimeDragInit) * m_framerate);
+
+            StartTime = startTimeDragInit;
+            EndTime = endTimeDragInit;
             setTime(timeDragStart);
 
             UpdateFrames();
@@ -977,23 +1038,46 @@ namespace tracer
         //! Function that is called when the input manager registers a two finger drag event
         //!
         //! @param sender A reference to the input manager.
-        //! @param The point in screen space the two finger drag event happened.
+        //! @param deltaPos The delta of touch0 touch1 positions
         //!
-        private void OnTwoFingerDrag(object sender, Vector2 point)
+        private void OnTwoFingerDrag(object sender, Vector2 deltaPos)
         {
-            if (!m_isSelected)
+            if (!m_isSelected){
+                Debug.Log("ignore <color=cyan>TIMELINE::OnTwoFingerDrag</color> due to !m_isSelected");
                 return;
+            }
 
-            // normalized distance
-            float pinchFactor = 1f + (point.x) / Screen.width * 2f;
-            float widthPrev = endTimeDragInit - startTimeDragInit;
-            float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
-            StartTime = startTimeDragInit + widthDeltaHalf;
-            EndTime = endTimeDragInit - widthDeltaHalf;
-            setTime(timeDragStart);
+            if(Time.time - timeLastPinched < 0.125f){
+                return;
+            }
+
+            timeLastMoved = Time.time;
+
+            Debug.Log("<color=cyan>TIMELINE::OnTwoFingerDrag</color> "+deltaPos);
+
+            DragTimeline(deltaPos);
 
             UpdateFrames();
         }
+
+        private void DragTimeline(Vector2 deltaPos){
+            
+            startTimeDragInit   += deltaPos.x * Time.deltaTime;
+            endTimeDragInit     += deltaPos.x * Time.deltaTime;
+            
+            //startTimeDragInit   = Mathf.Clamp(startTimeDragInit, -10f/m_framerate, endTimeDragInit-1);       //Debug.Log(startTimeDragInit);
+            //endTimeDragInit     = Mathf.Max(endTimeDragInit, startTimeDragInit+1f/m_framerate);
+
+            if(startTimeDragInit <= -10f/m_framerate && deltaPos.x < 0f){
+                startTimeDragInit = -10f/m_framerate;
+                endTimeDragInit   = startTimeDragInit + timelineDistance/m_framerate;
+            }
+            StartTime = startTimeDragInit;
+            EndTime = endTimeDragInit;
+
+            setTime(timeDragStart);
+        }
+
 
         //////////////////////
         // Helper functions //

@@ -71,15 +71,19 @@ namespace tracer
         //!
         //! Press start event, i.e. the begin of a click.
         //!
+        public event EventHandler<Vector2> inputPressStarted;
+        //!
+        //! Press start event, i.e. the begin of a click.
+        //!
         public event EventHandler<Vector2> inputPressStartedUI;
         //!
         //! Press start event, i.e. the begin of a click.
         //!
-        public event EventHandler<Vector2> inputPressPerformed;
+        //public event EventHandler<Vector2> inputPressPerformed;   performed only makes sense for axis/movement, to receive smooth updated values instead of just the initial value
         //!
         //! Press start event, i.e. the begin of a click.
         //!
-        public event EventHandler<Vector2> inputPressPerformedUI;
+        //public event EventHandler<Vector2> inputPressPerformedUI;
         //!
         //! Press end event, i.e. the end of a click.
         //!
@@ -163,6 +167,10 @@ namespace tracer
             get  => m_touchType;
         }
 
+        //!
+        //! Flag to determine if a touch started on a ui-element
+        //!
+        private bool m_touchStartedUI;
         //!
         //! Flag to determine if a touch drag gesture is being performed.
         //!
@@ -250,7 +258,7 @@ namespace tracer
 
             // Dedicated bindings for monitoring touch and drag interactions
             m_inputs.VPETMap.Click.started += ctx => PressStarted(ctx);
-            m_inputs.VPETMap.Click.performed += ctx => PressPerformed(ctx);
+            //m_inputs.VPETMap.Click.performed += ctx => PressPerformed(ctx);
             m_inputs.VPETMap.Click.canceled += ctx => PressEnd(ctx);
             
             
@@ -506,7 +514,7 @@ namespace tracer
             m_inputs.VPETMap.Tap.performed -= TapFunction;
 
             m_inputs.VPETMap.Click.started -= PressStarted;
-            m_inputs.VPETMap.Click.performed -= PressPerformed;
+            //m_inputs.VPETMap.Click.performed -= PressPerformed;
             m_inputs.VPETMap.Click.canceled -= PressEnd;
 
             m_inputs.VPETMap.Position.performed -= MovePoint;
@@ -591,17 +599,18 @@ namespace tracer
         //!
         private void TapFunction(InputAction.CallbackContext c)
         {
-            
+            Debug.Log("<color=green>Tap Function</color>");
             if (c.performed)
             {
                 Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
                 if (!TappedUI(point) && !Tapped3DUI(point))
                 {
+                    m_touchStartedUI = false;
                     objectSelectionEvent?.Invoke(this, point);
                 }
                 else if (TappedUI(point))
                 {
-
+                    m_touchStartedUI = true;
                 }
             }
 
@@ -639,25 +648,31 @@ namespace tracer
         //!
         private void PressStarted(InputAction.CallbackContext c)
         {
-
+            Debug.Log("<color=green>Press Started</color>");                    //is only ever called for the first finger, for non else! (why?)
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            m_touchType = InputTouchType.ONE;
-            if (TappedUI(point))
+            m_touchType = InputTouchType.ONE;                                   //no, see above. m_touchType = (m_touchType == InputTouchType.ONE) ? InputTouchType.TWO : InputTouchType.ONE;
+            if (TappedUI(point)){
                 inputPressStartedUI?.Invoke(this, point);
+                m_touchStartedUI = true;
+            }else{
+                inputPressStarted?.Invoke(this, point);
+                m_touchStartedUI = false;
+            }
         }
 
 
         //!
         //! Input press start function, for monitoring the start of touch/click interactions.
         //!
-        private void PressPerformed(InputAction.CallbackContext c)
+        /*private void PressPerformed(InputAction.CallbackContext c)
         {
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            Debug.Log("<color=yellow>Press Performed</color>");
             if (TappedUI(point))
                 inputPressPerformedUI?.Invoke(this, point);
             else
                 inputPressPerformed?.Invoke(this, point);
-        }
+        }*/
 
         //!
         //! Input press end function, for monitoring the end of touch/click interactions.
@@ -665,6 +680,7 @@ namespace tracer
         private void PressEnd(InputAction.CallbackContext c)
         {
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            Debug.Log("<color=blue>Press End</color>");
 
             inputPressEnd?.Invoke(this, point);
 
@@ -679,14 +695,18 @@ namespace tracer
         private void FingerDown(Finger fgr)
         {
             // If a specific gesture is in progress, do not accept new input
-            if (m_isTouchDrag)
+            if (m_isTouchDrag){
+                Debug.Log("ignore <color=green>Finger Down</color> due to m_isTouchDrag");
                 return;
+            }
+
 
             // Reset monitor variables
             m_touchType = InputTouchType.NONE;
 
             // Poll touch count 
             int touchCount = UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches.Count;
+            Debug.Log("<color=green>Finger Down "+touchCount+"</color>");
 
             // Single touch
             if (touchCount == 1)
@@ -704,6 +724,10 @@ namespace tracer
         //!
         private void FingerUp(Finger fgr)
         {
+            Debug.Log("<color=blue>Finger Up</color>");
+            //TODO this should decrease and not instantly end it all
+            //otherwise we could "hold" a button and have another finger touch+end and this will call the end at this button we are still holding
+
             // Suspend the touch input
             m_touchType = InputTouchType.NONE;
 
@@ -723,15 +747,20 @@ namespace tracer
         private void FingerMove(Finger fgr)
         {
             // If a specific gesture is in progress, do not accept new input
-            if (m_isTouchDrag)
+            if (m_isTouchDrag){
+                Debug.Log("ignore <color=yellow>Finger Move</color> due to m_isTouchDrag");
                 return;
+            }
+
+            Debug.Log("<color=yellow>Finger Move</color>");
 
             // Else (i.e., touch was made, but not moved)
             // and if operating with multi-finger input,
             // force the suspension of active selection.
-            if (m_touchType == InputTouchType.TWO || m_touchType == InputTouchType.THREE)
+            if(m_touchType == InputTouchType.TWO || m_touchType == InputTouchType.THREE)
             {
-                LockUIOperation();
+                if(!m_touchStartedUI)
+                    LockUIOperation();
                 //ClearClickInput();
             }
         }
@@ -741,8 +770,10 @@ namespace tracer
         //!
         private void TwoFingerMove(Finger fgr)
         {
-            if (m_touchType != InputTouchType.TWO)
+            if (m_touchType != InputTouchType.TWO){
+                Debug.Log("ignore <color=yellow>Two Finger Move</color> due to m_touchType = "+m_touchType);
                 return;
+            }
 
             // Register the gesture
             m_isTouchDrag = true;
@@ -769,11 +800,13 @@ namespace tracer
                 m_isPinch = true;
             }
 
+
             // Two finger drag (used for orbit)
             if(!m_isPinch && (m_cameraControl == CameraControl.NONE || m_cameraControl == CameraControl.TOUCH))
             { 
                 // Grab the average position
                 Vector2 pos = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
+                Debug.Log("<color=yellow>Two Finger Move</color> is drag (orbit)");
 
                 // Store it once
                 if (m_doOnce)
@@ -796,6 +829,7 @@ namespace tracer
             {
                 // Grab the distance
                 float dist = Vector2.Distance(tcs[0].screenPosition, tcs[1].screenPosition);
+                Debug.Log("<color=yellow>Two Finger Move</color> is pinch (zoom)");
 
                 // Store it once
                 if (m_doOnce)

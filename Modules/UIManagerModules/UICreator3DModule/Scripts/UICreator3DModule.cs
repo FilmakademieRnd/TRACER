@@ -254,7 +254,7 @@ namespace tracer
             // Unsubscribe
             manager.selectionChanged -= SelectionUpdate;
 
-            m_inputManager.inputPressPerformed -= PressStart;
+            m_inputManager.inputPressStarted -= PressStart;
             m_inputManager.inputPressEnd -= PressEnd;
 
             m_inputManager.fingerGestureEvent -= updateGizmoScale;
@@ -302,7 +302,7 @@ namespace tracer
             m_inputManager = core.getManager<InputManager>();
 
             // Hookup to input events
-            m_inputManager.inputPressPerformed += PressStart;
+            m_inputManager.inputPressStarted += PressStart;
             m_inputManager.inputPressEnd += PressEnd;
 
             m_inputManager.fingerGestureEvent += updateGizmoScale;
