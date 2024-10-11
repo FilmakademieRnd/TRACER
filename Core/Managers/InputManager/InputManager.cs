@@ -58,6 +58,18 @@ namespace tracer
         }
 
         //!
+        //! Used for the detailed pinch event to have position and scroll delta
+        //!
+        public class DetailedEventArgs : EventArgs{
+            public DetailedEventArgs(Vector2 _point, Vector2 _delta){
+                point = _point;
+                delta = _delta;
+            }
+            public Vector2 point { get; set; }
+            public Vector2 delta { get; set; }
+        }
+
+        //!
         //! The default input event.
         //!
         public event EventHandler<Vector2> objectSelectionEvent;
@@ -98,9 +110,29 @@ namespace tracer
         //!
         public event EventHandler<float> pinchEvent;
         //!
+        //! The two finger/scroll wheel pinch input event with position as well
+        //!
+        public event EventHandler<DetailedEventArgs> pinchDetailedEvent;
+        //!
+        //! The middle click pressed event which give the current position
+        //!
+        public event EventHandler<Vector2> middleClickPressEvent;
+        //!
+        //! The middle click move while pressed event which give the current position
+        //!
+        public event EventHandler<Vector2> middleClickMoveEvent;
+        //!
+        //! The middle click release event which give the current position
+        //!
+        public event EventHandler<Vector2> middleClickReleaseEvent;
+        //!
         //! The two finger drag input event.
         //!
         public event EventHandler<Vector2> twoDragEvent;
+        //!
+        //! The two finger drag input event with positin data as well
+        //!
+        public event EventHandler<DetailedEventArgs> twoDragDetailEvent;
         //!
         //! The three finger drag input event.
         //!
@@ -307,8 +339,17 @@ namespace tracer
             m_inputs.VPETMap.DragClick.performed += DragClick_performed;
             m_inputs.VPETMap.DragClick.canceled += DragClick_canceled;
             m_inputs.VPETMap.Position.performed += Position_performed;
-            m_inputs.VPETMap.ZoomWheel.performed += ZoomWheel_performed;
 #endif
+
+#if UNITY_EDITOR || (!UNITY_IOS && !UNITY_ANDROID)
+            //excluded for editor only, to work on e.g. standalone-windows as well
+            m_inputs.VPETMap.ZoomWheel.performed += ZoomWheel_performed;
+            m_inputs.VPETMap.MiddleClick.started += MiddleClick_started;
+            m_inputs.VPETMap.MiddleClick.performed += MiddleClick_performed;
+            m_inputs.VPETMap.MiddleClick.canceled += MiddleClick_ended;
+            
+#endif
+            
             m_raycastList = new List<RaycastResult>(5);
         }
 
@@ -409,6 +450,7 @@ namespace tracer
         private void DragClick_performed(InputAction.CallbackContext obj)
         {
             dragClick = true;
+            Debug.Log("drag click performed");
         }
 
         //!
@@ -438,6 +480,8 @@ namespace tracer
 
                 // Invoke event
                 twoDragEvent?.Invoke(this, pos - m_posBuffer);
+                // Invoke detail event
+                twoDragDetailEvent?.Invoke(this, new DetailedEventArgs(pos, pos - m_posBuffer));
 
                 // Update buffer
                 m_posBuffer = pos;
@@ -471,6 +515,41 @@ namespace tracer
 
             // Invoke event
             pinchEvent?.Invoke(this, dist);
+            
+            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            Vector2 delta = Vector2.zero;
+            delta.x = dist;
+            pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
+        }
+
+        //!
+        //! Function to handle the middle click e.g. for dragging the timeline (editor only)
+        //!
+        private void MiddleClick_started(InputAction.CallbackContext obj)
+        {
+            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            // Invoke event
+            middleClickPressEvent?.Invoke(this, pos);
+        }
+
+        //!
+        //! Function to handle the middle click move e.g. for dragging the timeline (editor only)
+        //!
+        private void MiddleClick_performed(InputAction.CallbackContext obj)
+        {
+            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            // Invoke event
+            middleClickMoveEvent?.Invoke(this, pos);
+        }
+
+        //!
+        //! Function to handle the middle click, e.g. for dragging the timeline (editor only)
+        //!
+        private void MiddleClick_ended(InputAction.CallbackContext obj)
+        {
+            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            // Invoke event
+            middleClickReleaseEvent?.Invoke(this, pos);
         }
 
         //! 
@@ -556,7 +635,13 @@ namespace tracer
             m_inputs.VPETMap.DragClick.performed -= DragClick_performed;
             m_inputs.VPETMap.DragClick.canceled -= DragClick_canceled;
             m_inputs.VPETMap.Position.performed -= Position_performed;
+#endif
+
+#if UNITY_EDITOR || (!UNITY_IOS && !UNITY_ANDROID)
             m_inputs.VPETMap.ZoomWheel.performed -= ZoomWheel_performed;
+            m_inputs.VPETMap.MiddleClick.started -= MiddleClick_started;
+            m_inputs.VPETMap.MiddleClick.performed -= MiddleClick_performed;
+            m_inputs.VPETMap.MiddleClick.canceled -= MiddleClick_ended;
 #endif
         }
 
@@ -747,10 +832,8 @@ namespace tracer
         private void FingerMove(Finger fgr)
         {
             // If a specific gesture is in progress, do not accept new input
-            if (m_isTouchDrag){
-                Debug.Log("ignore <color=yellow>Finger Move</color> due to m_isTouchDrag");
+            if (m_isTouchDrag)
                 return;
-            }
 
             Debug.Log("<color=yellow>Finger Move</color>");
 
@@ -771,7 +854,7 @@ namespace tracer
         private void TwoFingerMove(Finger fgr)
         {
             if (m_touchType != InputTouchType.TWO){
-                Debug.Log("ignore <color=yellow>Two Finger Move</color> due to m_touchType = "+m_touchType);
+                //Debug.Log("ignore <color=yellow>Two Finger Move</color> due to m_touchType = "+m_touchType);
                 return;
             }
 
@@ -806,7 +889,7 @@ namespace tracer
             { 
                 // Grab the average position
                 Vector2 pos = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
-                Debug.Log("<color=yellow>Two Finger Move</color> is drag (orbit)");
+                //Debug.Log("<color=yellow>Two Finger Move</color> is drag (orbit)");
 
                 // Store it once
                 if (m_doOnce)
@@ -829,7 +912,7 @@ namespace tracer
             {
                 // Grab the distance
                 float dist = Vector2.Distance(tcs[0].screenPosition, tcs[1].screenPosition);
-                Debug.Log("<color=yellow>Two Finger Move</color> is pinch (zoom)");
+                //Debug.Log("<color=yellow>Two Finger Move</color> is pinch (zoom)");
 
                 // Store it once
                 if (m_doOnce)
@@ -838,12 +921,19 @@ namespace tracer
                     m_doOnce = false;
                 }
 
-                // Invoke event
                 if (m_cameraControl != CameraControl.TOUCH)
                     m_oldcameraControl = m_cameraControl;
                 m_cameraControl = CameraControl.TOUCH;
 
-                pinchEvent?.Invoke(this, dist - m_distBuffer);
+                Vector2 point = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
+                Vector2 delta = Vector2.zero;
+                delta.x = dist - m_distBuffer;
+
+                // Invoke event
+                pinchEvent?.Invoke(this, delta.x);
+
+                // Invoke detail event
+                pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
 
                 // Update buffer
                 m_distBuffer = dist;
@@ -919,6 +1009,8 @@ namespace tracer
             // Is this too much of a hack?
             Vector2 point = new(-5, -5);
             objectSelectionEvent?.Invoke(this, point);
+            m_touchStartedUI = false;
+            
         }
 
         //!
@@ -1007,7 +1099,9 @@ namespace tracer
             return Keyboard.current[(Key) key].isPressed;
         }
 
-       
+        public bool IsInputTouch(){
+            return UnityEngine.InputSystem.EnhancedTouch.Touch.activeFingers.Count > 0;
+        }       
     }
 
 }

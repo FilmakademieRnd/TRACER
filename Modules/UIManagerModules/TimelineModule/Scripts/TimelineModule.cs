@@ -41,9 +41,12 @@ namespace tracer
 {
     public class TimelineModule : UIManagerModule
     {
+
+        private const int TIMELINE_START_MINIMUM = -10;
+
         public int m_framerate = 30;
         public bool m_isPlaying = false;
-
+        public bool m_invertScrollAndDrag = false;
         
         //!
         //! The text displayed above the timeline, showing the start frame number.
@@ -114,6 +117,11 @@ namespace tracer
         //!
         private bool m_isSelected = false;
         //!
+        //! Flag that defines whether we did a zoom or moved the timeline
+        //!
+        private bool m_didSpecialAction = false;
+        
+        //!
         //! A reference to TRACER's input manager.
         //!
         private InputManager m_inputManager;
@@ -180,38 +188,26 @@ namespace tracer
             }
         }
         //!
-        //! Initial start time at drag begin.
+        //! Initial position we touched, only important for zooming via alt + click
         //!
-        private float startTimeDragInit = 0;
-        //!
-        //! Initial end time at drag begin.
-        //!
-        private float endTimeDragInit = 1;
-        //!
-        //! timeline frame size we adjust if zooming. necessary if we reach one (the lower) end while moving the tl
-        //!
-        private int timelineDistance = 150;
-        //!
-        //! Initial active time at drag begin.
-        //!
-        private float timeDragStart = 0;
-        //!
-        //! Initial pinch distance. 
-        //!
-        private float pinchInitDistance = 0;
+        private Vector2 m_initalTouchPos;
         //!
         //! pos buffer to calculate the drag movement delta which we already get from touches
         //!
         private Vector2 m_posDragBuffer;
+        //!
+        //! bool to execute a drag during the OnMove event (when clicking middle button)
+        //!
+        private bool m_isMiddleClickDrag = false;
 
         //!
         //! last time we pinched, to not switch between pinch and grab on touch, since it happens all the time
         //!
-        private float timeLastPinched = 0;
+        private float m_timeLastZoomed = 0;
         //!
         //! last time we two finger grabbed the timeline, to not switch between pinch and grab on touch, since it happens all the time
         //!
-        private float timeLastMoved = 0;
+        private float m_timeLastDragged = 0;
 
         //!
         //! Constructor
@@ -222,6 +218,8 @@ namespace tracer
         {
             //load = false;
         }
+
+        #region Setup
 
         //!
         //! Init Function
@@ -335,9 +333,14 @@ namespace tracer
             m_inputManager.inputPressStartedUI += OnPointerDown; //OnBeginDrag;
             m_inputManager.inputPressEnd += OnPointerEnd;
             //obsolete m_inputManager.inputPressPerformedUI += OnPointerDown;
-            m_inputManager.inputMove += OnDrag;
+            m_inputManager.inputMove += OnMove;
             m_inputManager.twoDragEvent += OnTwoFingerDrag;
-            m_inputManager.pinchEvent += OnPinch;
+            
+            m_inputManager.middleClickPressEvent += OnMiddleClickPress;
+            m_inputManager.middleClickMoveEvent += OnMiddleClickHold;
+            m_inputManager.middleClickReleaseEvent += OnMiddleClickRelease;
+            
+            m_inputManager.pinchDetailedEvent += OnPinchDetail;
             manager.selectionChanged += OnSelectionChanged;
 
             if (manager.SelectedObjects.Count > 0)
@@ -350,8 +353,6 @@ namespace tracer
 
                 CreateFrames(m_activeParameter);
             }
-
-            timelineDistance = Mathf.RoundToInt((m_endTime-m_startTime) * m_framerate);
 
             setTime(m_animationManager.time);
         }
@@ -367,9 +368,12 @@ namespace tracer
             m_inputManager.inputPressStartedUI -= OnPointerDown;
             m_inputManager.inputPressEnd -= OnPointerEnd;
             //m_inputManager.inputPressPerformedUI -= OnPointerDown;
-            m_inputManager.inputMove -= OnDrag;
+            m_inputManager.inputMove -= OnMove;
             m_inputManager.twoDragEvent -= OnTwoFingerDrag;
-            m_inputManager.pinchEvent -= OnPinch;
+            //m_inputManager.middleClickPressEvent -= OnStartDrag;
+            m_inputManager.middleClickMoveEvent -= OnMiddleClickHold;
+            m_inputManager.middleClickReleaseEvent -= OnMiddleClickRelease;
+            m_inputManager.pinchDetailedEvent -= OnPinchDetail;
             manager.selectionChanged -= OnSelectionChanged;
         }
 
@@ -392,6 +396,8 @@ namespace tracer
                 UnityEngine.Object.DestroyImmediate(uiElement);
             m_uiElements.Clear();
         }
+
+        #endregion
 
         //!
         //! set the current time (of the animation) in the timeline
@@ -889,9 +895,11 @@ namespace tracer
         ///////////
         // INPUT //
         ///////////
+        #region Timeline Input
 
         //!
         //! Function that is called when the input manager registers a pointer down event
+        //! check whether we hit the timeline, do nothing more
         //!
         //! @param sender A reference to the input manager.
         //! @param point The point in screen space the pointer down event happened.
@@ -903,14 +911,22 @@ namespace tracer
 
             m_isSelected = true;
             m_posDragBuffer = point;
-            setDragValues(point);
+            m_initalTouchPos = point;
 
-            //dont change if we want to grab or zoom the timeline
-            if (m_inputManager.getKey(53))
-                return;
+            //InputManager.FingerDown is executed after this, so I cannot differentiate between a touch and a click
+            //but i want to move the timeline to the *click* (if not key is pressed)
+            //and only move the timeline to the *touch* on FingerUp!
+            //thats why this additional check is below
+            if(m_inputManager.IsInputTouch() || m_inputManager.getKey(53)){
+                //ignore
+                //the touch is received after this, so we cannot correctly ignore it here...
+                //Debug.Log("IGNORE <color=cyan>TIMELINE::OnPointerDown</color>");
+            }else{
+                //set time instantly on click with no special action
+                UpdateTime(m_timelineRect.InverseTransformPoint(point).x);
+                //Debug.Log("<color=cyan>TIMELINE::OnPointerDown</color>");
+            }
 
-            float time = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
-            setTime(time);
         }
 
         //!
@@ -919,69 +935,101 @@ namespace tracer
         //! @param sender A reference to the input manager.
         //! @param point The point in screen space the pointer up event happened.
         //!
-        private void OnPointerEnd(object sender, Vector2 point)
-        {
-            Debug.Log("<color=cyan>TIMELINE::OnPointerEnd</color>");
+        private void OnPointerEnd(object sender, Vector2 point){
+            //if we did nothing special (drag, zoom), assume that we want to set the time here
+            if(m_isSelected){
+                if(!m_didSpecialAction){
+                    UpdateTime(m_timelineRect.InverseTransformPoint(point).x);
+                }
+            }
             m_isSelected = false;
+            m_didSpecialAction = false;
         }
 
-        //!
-        //! Function that is called to setup values for a potential drag event
-        //!
-        //! @param point The point in screen space the first touch started.
-        //!
-        private void setDragValues(Vector2 point)
-        {
-            startTimeDragInit = m_startTime;
-            endTimeDragInit = m_endTime;
-            timeDragStart = m_currentTime;//mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
-
-            pinchInitDistance = point.x;
+        private void UpdateTime(float xValue){
+            float time = mapToCurrentTime(xValue);
+            setTime(time);
         }
 
+
         //!
-        //! Function that is called when the input manager registers an on drag event
+        //! Function that is called when the input manager registers on input move event
         //!
         //! @param sender A reference to the input manager.
-        //! @param point The point in screen space the on drag event happened.
+        //! @param point The point in screen space the on move event happened.
         //!
-        private void OnDrag(object sender, Vector2 point)
+        private void OnMove(object sender, Vector2 point)
         {
-            if (!m_isSelected)
+            if (!m_isSelected || m_isMiddleClickDrag)
                 return;
 
+            //additional add zoom and drag
             if (m_inputManager.getKey(53))  // 53 -> left ALT key
             {
                 if (m_inputManager.getKey(55)) // pinch  55 -> left CTRL key
                 {
-                    // normalized distance
-                    float pinchFactor = 1f + (point.x - pinchInitDistance) / Screen.width * 2f;
-                    float widthPrev = endTimeDragInit - startTimeDragInit;
-                    float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
-                    StartTime = startTimeDragInit + widthDeltaHalf;
-                    EndTime = endTimeDragInit - widthDeltaHalf;
-
-                    timelineDistance = Mathf.RoundToInt((EndTime-StartTime) * m_framerate);
-
-                    setTime(timeDragStart);
+                    Vector2 delta = point-m_posDragBuffer;
+                    ZoomTimeline(m_initalTouchPos, delta.x);
                 }
                 else // move
                 {
-                    
-                    //float timeOffset = timeDragStart - _map(m_timelineRect.InverseTransformPoint(point).x, -m_timelineRect.sizeDelta.x * 0.5f, m_timelineRect.sizeDelta.x * 0.5f, startTimeDragInit, endTimeDragInit);
                     Vector2 delta = point-m_posDragBuffer;
                     DragTimeline(delta);
 
-                    // StartTime = startTimeDragInit + timeOffset;
-                    // EndTime = endTimeDragInit + timeOffset;
-
                 }
-                UpdateFrames();
+                //UpdateFrames();
             }
             else // move time cursor
                 setTime(mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x));
 
             m_posDragBuffer = point;
+        }
+
+        //!
+        //! Function that is called for a specific event from the input manager we map on dragging the timeline (middle click event)
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param point The point in screen space the on drag event happened.
+        //!
+        private void OnMiddleClickPress(object sender, Vector2 point)
+        {
+            if (!m_isSelected){
+                if(!m_isMiddleClickDrag && Raycast(point) == m_timeLine){
+                    m_posDragBuffer = point;
+                    m_isMiddleClickDrag = true;
+                    m_isSelected = true;
+                }else
+                    return;
+            }
+        }
+
+        //!
+        //! Function that is called for a specific event from the input manager we map on dragging the timeline (middle click press+hold and move event)
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param point The point in screen space the on drag event happened.
+        //!
+        private void OnMiddleClickHold(object sender, Vector2 point)
+        {
+            if (!m_isSelected)
+                return;
+
+            Vector2 delta = point-m_posDragBuffer;
+            DragTimeline(delta);
+            m_posDragBuffer = point;
+        }
+
+        //!
+        //! Function that is called for a specific event from the input manager we map on quit dragging the timeline (middle click release event)
+        //!
+        //! @param sender A reference to the input manager.
+        //! @param point The point in screen space the on drag event happened.
+        //!
+        private void OnMiddleClickRelease(object sender, Vector2 point){
+            if (m_isSelected)
+                m_isSelected = false;
+
+            m_isMiddleClickDrag = false;
         }
 
         //////////////////
@@ -994,44 +1042,25 @@ namespace tracer
         //! @param sender A reference to the input manager.
         //! @param delta The distance between the two pinch input pointers.
         //!
-        private void OnPinch(object sender, float delta)
+        private void OnPinchDetail(object sender, InputManager.DetailedEventArgs detailedArgs)
         {
-            return; //out for testing drag
-
             if (!m_isSelected){
-                Debug.Log("ignore <color=cyan>TIMELINE::OnPinch</color> due to !m_isSelected");
-                return;
+                //if we are not on touch (e.g. scroll wheel) select this if point is here
+                if(!m_inputManager.IsInputTouch() && Raycast(detailedArgs.point) == m_timeLine){
+                    //act like its selected
+                }else{
+                    Debug.Log("ignore <color=cyan>TIMELINE::OnPinchDetail</color> due to !m_isSelected");
+                    return;
+                }
             }
 
-            if(Time.time - timeLastMoved < 0.125f){
+            Debug.Log("OnPinchDetail "+detailedArgs.delta);
+
+            if(Time.time - m_timeLastDragged < 0.125f)
                 return;
-            }
+            
 
-            timeLastPinched = Time.time;
-
-            Debug.Log("<color=cyan>TIMELINE::OnPinch</color> "+delta);
-
-            // normalized distance
-            // float pinchFactor = 1f + (delta) / Screen.width * 2f;
-            // float widthPrev = endTimeDragInit - startTimeDragInit;
-            // float widthDeltaHalf = (widthPrev * pinchFactor - widthPrev) * 0.5f;
-            // StartTime = startTimeDragInit + widthDeltaHalf;
-            // EndTime = endTimeDragInit - widthDeltaHalf;
-
-            //TODO: check where on the timeline our center of touches is and offset the delta accordingly
-            //e.g.  on the most left (startTimeDragInit + delta * 0f) and (endTimeDragInit - delta * 1f)
-            //      on the center (startTimeDragInit + delta * 0.5f) and (endTimeDragInit - delta * 0.5f)
-
-            startTimeDragInit   = Mathf.Clamp(startTimeDragInit+delta,  startTimeDragInit,          endTimeDragInit-delta);
-            endTimeDragInit     = Mathf.Clamp(endTimeDragInit-delta,    startTimeDragInit+delta,    endTimeDragInit);
-
-            timelineDistance = Mathf.RoundToInt((endTimeDragInit-startTimeDragInit) * m_framerate);
-
-            StartTime = startTimeDragInit;
-            EndTime = endTimeDragInit;
-            setTime(timeDragStart);
-
-            UpdateFrames();
+            ZoomTimeline(detailedArgs.point, detailedArgs.delta.x);
         }
 
         //!
@@ -1042,42 +1071,98 @@ namespace tracer
         //!
         private void OnTwoFingerDrag(object sender, Vector2 deltaPos)
         {
-            if (!m_isSelected){
-                Debug.Log("ignore <color=cyan>TIMELINE::OnTwoFingerDrag</color> due to !m_isSelected");
+            if (!m_isSelected)
                 return;
-            }
 
-            if(Time.time - timeLastPinched < 0.125f){
+            Debug.Log("OnTwoFingerDrag");
+
+            if(Time.time - m_timeLastZoomed < 0.125f)
                 return;
-            }
-
-            timeLastMoved = Time.time;
-
-            Debug.Log("<color=cyan>TIMELINE::OnTwoFingerDrag</color> "+deltaPos);
 
             DragTimeline(deltaPos);
+        }
 
+
+        private void ZoomTimeline(Vector2 point, float delta){
+            Debug.Log(">>ZoomTimeline dpi@"+Screen.dpi);
+            m_timeLastZoomed = Time.time;
+            m_didSpecialAction = true;
+
+            //correct delta for touch and big screens (touch should be less accurate)
+            delta *= (m_inputManager.IsInputTouch() ? 10f/Screen.dpi : 50f/Screen.dpi);
+            Debug.Log(">>> delta@"+delta);
+
+            //use point to offset the zoom on where we are on the timeline (would be timeOnTimeline if *= m_framerate)
+            float valueOnTimeline = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
+            //float timeOnTimeline = valueOnTimeline * m_framerate;
+            //minimum delta of 1
+            delta = delta > 0 ? Mathf.Max(delta * Time.deltaTime, 1) : Mathf.Min(delta * Time.deltaTime, -1);
+
+            //save if we need to reset them
+            float startTimeWas = StartTime;
+            float endTimeWas = EndTime;
+            
+            //check where on the timeline our center of touches is and offset the delta accordingly
+            //e.g.  on the most left (startTimeDragInit + delta * 0f) and (endTimeDragInit - delta * 1f)
+            //          == we dont change the starttime, but the endtime (and vice versa below)
+            //      on the center (startTimeDragInit + delta * 0.5f) and (endTimeDragInit - delta * 0.5f)
+
+            //gather start/end offset via zoom-pos
+            float startEndOffsetRatio = (float)(valueOnTimeline-StartTime)/(EndTime-StartTime);
+
+            //increase or decrease the startTime accordingly to the point where we are zooming at
+            StartTime   += delta * startEndOffsetRatio;
+            //never go below the frame -10 at the start
+            if(StartTime <= (float)TIMELINE_START_MINIMUM/m_framerate){
+                StartTime = (float)TIMELINE_START_MINIMUM/m_framerate;
+                EndTime -= delta;
+            }else     
+                EndTime -= delta * (1f-startEndOffsetRatio);
+
+            //act like clamping, dont change nor update
+            if(StartTime >= EndTime){
+                StartTime = startTimeWas;
+                EndTime = endTimeWas;
+                return;
+            }
+
+            //set time
+            setTime(m_currentTime);
+            //update
             UpdateFrames();
         }
 
         private void DragTimeline(Vector2 deltaPos){
-            
-            startTimeDragInit   += deltaPos.x * Time.deltaTime;
-            endTimeDragInit     += deltaPos.x * Time.deltaTime;
-            
-            //startTimeDragInit   = Mathf.Clamp(startTimeDragInit, -10f/m_framerate, endTimeDragInit-1);       //Debug.Log(startTimeDragInit);
-            //endTimeDragInit     = Mathf.Max(endTimeDragInit, startTimeDragInit+1f/m_framerate);
+            Debug.Log(">>DragTimeline");
+            m_timeLastDragged = Time.time;
+            m_didSpecialAction = true;
 
-            if(startTimeDragInit <= -10f/m_framerate && deltaPos.x < 0f){
-                startTimeDragInit = -10f/m_framerate;
-                endTimeDragInit   = startTimeDragInit + timelineDistance/m_framerate;
+            //save if we need to reset them
+            float startTimeWas = StartTime;
+            float endTimeWas = EndTime;
+
+            if(m_invertScrollAndDrag){
+                StartTime   += deltaPos.x * Time.deltaTime;
+                EndTime     += deltaPos.x * Time.deltaTime;
+            }else{
+                StartTime   -= deltaPos.x * Time.deltaTime;
+                EndTime     -= deltaPos.x * Time.deltaTime;
             }
-            StartTime = startTimeDragInit;
-            EndTime = endTimeDragInit;
 
-            setTime(timeDragStart);
+
+            //act like clamping, dont change nor update
+            if(StartTime <= (float)TIMELINE_START_MINIMUM/m_framerate){
+                StartTime = startTimeWas;
+                EndTime = endTimeWas;
+                return;
+            }
+
+            //set time
+            setTime(m_currentTime);
+            //update
+            UpdateFrames();
         }
-
+        #endregion
 
         //////////////////////
         // Helper functions //
@@ -1097,7 +1182,7 @@ namespace tracer
             //Raycast using the Graphics Raycaster and mouse click position
             EventSystem.current.RaycastAll(pointerEventData, results);
 
-            return results[0].gameObject;
+            return results.Count > 0 ? results[0].gameObject : null;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
