@@ -35,7 +35,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.EnhancedTouch;
+using UnityEngine.InputSystem.LowLevel;
 
 namespace tracer
 {
@@ -44,18 +46,6 @@ namespace tracer
     //!
     public class InputManager : Manager
     {
-        // [REVIEW]
-        // Doesn't seem to be in use
-        //!
-        //! Enumeration defining supported input event types.
-        //!
-        public enum InputEventType
-        {
-            TAP,
-            DRAG,
-            STARTED,
-            PERFORMED
-        }
 
         //!
         //! Used for the detailed pinch event to have position and scroll delta
@@ -200,9 +190,25 @@ namespace tracer
         }
 
         //!
-        //! Flag to determine if a touch started on a ui-element
+        //! Enumeration describing possible input types.
         //!
-        private bool m_touchStartedUI;
+        public enum InputLayerType
+        {
+            //NONE = 10,      //like no input at all (reset) [[because we do not detect right/middle clicks, the default must be SCREEN or we cannot move the cam in the editor]]
+            UI = 20,        //touch/click started on UI (timeline, button)
+            WORLD = 30,      //touch/click started on world ui (3d handles)
+            SCREEN = 40     //touch/click behaviour for user-camera (rotating, moving)
+        }
+
+        //!
+        //! Flag to determine if a touch/click started on a ui-element
+        //!
+        private InputLayerType m_inputLayerType = InputLayerType.SCREEN;
+
+        //!
+        //! Flag to differentiate whether we have a touch or else (click, keyboard)
+        //!
+        private bool m_inputIsTouch = false;
         //!
         //! Flag to determine if a touch drag gesture is being performed.
         //!
@@ -511,15 +517,34 @@ namespace tracer
         //!
         private void ZoomWheel_performed(InputAction.CallbackContext obj)
         {
+            //if dragging, deny zooming
+            if(m_isTouchDrag)
+                return;
+            
             float dist = 0.1f * m_inputs.VPETMap.ZoomWheel.ReadValue<float>();
+            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+
+            bool resetInputLayer = m_inputLayerType == InputLayerType.SCREEN;
+
+            if(TappedUI(point)){
+                m_inputLayerType = InputLayerType.UI;
+            }else if(Tapped3DUI(point)){
+                m_inputLayerType = InputLayerType.WORLD;
+            }else{
+                //deny switching to SCREEN if we currently have UI/WORLD
+                //m_inputLayerType = InputLayerType.SCREEN;
+            }
 
             // Invoke event
             pinchEvent?.Invoke(this, dist);
             
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
             Vector2 delta = Vector2.zero;
             delta.x = dist;
             pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
+
+            // Reset it again
+            if(resetInputLayer)
+                m_inputLayerType = InputLayerType.SCREEN;
         }
 
         //!
@@ -527,9 +552,21 @@ namespace tracer
         //!
         private void MiddleClick_started(InputAction.CallbackContext obj)
         {
-            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            if(m_isTouchDrag)
+                return;
+
+            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+
+            if(TappedUI(point)){
+                m_inputLayerType = InputLayerType.UI;
+            }else if(Tapped3DUI(point)){
+                m_inputLayerType = InputLayerType.WORLD;
+            }else{
+                m_inputLayerType = InputLayerType.SCREEN;
+            }
+
             // Invoke event
-            middleClickPressEvent?.Invoke(this, pos);
+            middleClickPressEvent?.Invoke(this, point);
         }
 
         //!
@@ -537,9 +574,9 @@ namespace tracer
         //!
         private void MiddleClick_performed(InputAction.CallbackContext obj)
         {
-            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
             // Invoke event
-            middleClickMoveEvent?.Invoke(this, pos);
+            middleClickMoveEvent?.Invoke(this, point);
         }
 
         //!
@@ -547,9 +584,12 @@ namespace tracer
         //!
         private void MiddleClick_ended(InputAction.CallbackContext obj)
         {
-            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
             // Invoke event
-            middleClickReleaseEvent?.Invoke(this, pos);
+            middleClickReleaseEvent?.Invoke(this, point);
+
+            // Reset
+            m_inputLayerType = InputLayerType.SCREEN;
         }
 
         //! 
@@ -684,18 +724,17 @@ namespace tracer
         //!
         private void TapFunction(InputAction.CallbackContext c)
         {
-            Debug.Log("<color=green>Tap Function</color>");
-            if (c.performed)
-            {
+            //Debug.Log("<color=green>Tap Function</color> phase: "+c.phase);
+            if (c.performed){
+                //TAP never changes m_inputLayerType, because we get this after "Press End" and would never reset it to SCREEN
                 Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-                if (!TappedUI(point) && !Tapped3DUI(point))
-                {
-                    m_touchStartedUI = false;
+                if(TappedUI(point)){
+                    //m_inputLayerType = InputLayerType.UI;
+                }else if(Tapped3DUI(point)){
+                    //m_inputLayerType = InputLayerType.WORLD;
+                }else{
+                    //m_inputLayerType = InputLayerType.SCREEN;
                     objectSelectionEvent?.Invoke(this, point);
-                }
-                else if (TappedUI(point))
-                {
-                    m_touchStartedUI = true;
                 }
             }
 
@@ -711,6 +750,11 @@ namespace tracer
                 //e.delta = Vector2.zero;
                 //e.time = 0f;
             }
+
+            // if(c.canceled)
+            //     Debug.Log("... CANCELED");
+
+            
         }
 
         //!
@@ -733,15 +777,26 @@ namespace tracer
         //!
         private void PressStarted(InputAction.CallbackContext c)
         {
-            Debug.Log("<color=green>Press Started</color>");                    //is only ever called for the first finger, for non else! (why?)
+            Debug.Log("<color=green>Press Started</color>");    //is only ever called for the first finger, for nothing else. (why though?)
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
             m_touchType = InputTouchType.ONE;                                   //no, see above. m_touchType = (m_touchType == InputTouchType.ONE) ? InputTouchType.TWO : InputTouchType.ONE;
-            if (TappedUI(point)){
+            
+            //need this here to react to certain events below specific to touch or else
+            //ugly and inperformant setup...
+            if(c.control.device.ToString().ToLower().Contains("touch"))
+                m_inputIsTouch = true;
+            else
+                m_inputIsTouch = false;
+
+            if(TappedUI(point)){
+                m_inputLayerType = InputLayerType.UI;
                 inputPressStartedUI?.Invoke(this, point);
-                m_touchStartedUI = true;
-            }else{
+            }else if(Tapped3DUI(point)){
+                m_inputLayerType = InputLayerType.WORLD;
                 inputPressStarted?.Invoke(this, point);
-                m_touchStartedUI = false;
+            }else{
+                m_inputLayerType = InputLayerType.SCREEN;
+                inputPressStarted?.Invoke(this, point);
             }
         }
 
@@ -772,6 +827,7 @@ namespace tracer
             // Reset monitor variables
             m_touchType = InputTouchType.NONE;
             m_isTouchDrag = false;
+            m_inputLayerType = InputLayerType.SCREEN;
         }
 
         //!
@@ -781,10 +837,14 @@ namespace tracer
         {
             // If a specific gesture is in progress, do not accept new input
             if (m_isTouchDrag){
+                //TODO!
+                //always allow increasing of fingers, because we could have a moving ONE finger because of a high sensitivity
+                //although we want to touch with the other fingers!
                 Debug.Log("ignore <color=green>Finger Down</color> due to m_isTouchDrag");
                 return;
             }
 
+            m_inputIsTouch = true;
 
             // Reset monitor variables
             m_touchType = InputTouchType.NONE;
@@ -813,14 +873,18 @@ namespace tracer
             //TODO this should decrease and not instantly end it all
             //otherwise we could "hold" a button and have another finger touch+end and this will call the end at this button we are still holding
 
+
             // Suspend the touch input
             m_touchType = InputTouchType.NONE;
 
             m_cameraControl = m_oldcameraControl;
 
-
-            // Also the moving
+            // Reset
             m_isTouchDrag = false;
+            m_inputIsTouch = false;
+            m_inputLayerType = InputLayerType.SCREEN;
+            m_doOnce = true;
+
 
             // Restore UI Interaction
             toggle2DUIInteraction.Invoke(this, true);
@@ -835,14 +899,14 @@ namespace tracer
             if (m_isTouchDrag)
                 return;
 
-            Debug.Log("<color=yellow>Finger Move</color>");
+            //Debug.Log("<color=yellow>Finger Move</color>");
 
             // Else (i.e., touch was made, but not moved)
             // and if operating with multi-finger input,
             // force the suspension of active selection.
             if(m_touchType == InputTouchType.TWO || m_touchType == InputTouchType.THREE)
             {
-                if(!m_touchStartedUI)
+                if(m_inputLayerType != InputLayerType.UI)
                     LockUIOperation();
                 //ClearClickInput();
             }
@@ -854,7 +918,6 @@ namespace tracer
         private void TwoFingerMove(Finger fgr)
         {
             if (m_touchType != InputTouchType.TWO){
-                //Debug.Log("ignore <color=yellow>Two Finger Move</color> due to m_touchType = "+m_touchType);
                 return;
             }
 
@@ -902,6 +965,7 @@ namespace tracer
                 if(m_cameraControl != CameraControl.TOUCH)
                     m_oldcameraControl = m_cameraControl;
                 m_cameraControl = CameraControl.TOUCH;
+
                 twoDragEvent?.Invoke(this, pos - m_posBuffer);
 
                 // Update buffer
@@ -949,6 +1013,7 @@ namespace tracer
         {
             if (m_touchType != InputTouchType.THREE)
                 return;
+
             // Register the gesture
             m_isTouchDrag = true;
 
@@ -968,6 +1033,7 @@ namespace tracer
             // Invoke event
             if (m_cameraControl != CameraControl.TOUCH)
                 m_oldcameraControl = m_cameraControl;
+
             m_cameraControl = CameraControl.TOUCH;
             threeDragEvent?.Invoke(this, pos - m_posBuffer);
 
@@ -1009,7 +1075,7 @@ namespace tracer
             // Is this too much of a hack?
             Vector2 point = new(-5, -5);
             objectSelectionEvent?.Invoke(this, point);
-            m_touchStartedUI = false;
+            m_inputLayerType = InputLayerType.SCREEN;
             
         }
 
@@ -1100,8 +1166,12 @@ namespace tracer
         }
 
         public bool IsInputTouch(){
-            return UnityEngine.InputSystem.EnhancedTouch.Touch.activeFingers.Count > 0;
-        }       
+            return m_inputIsTouch;
+            //returns true one frame to late for using directly after PressStarted
+            //return UnityEngine.InputSystem.EnhancedTouch.Touch.activeFingers.Count > 0;
+        }
+        public bool IsAnyUIUsed(){ return m_inputLayerType == InputLayerType.UI || m_inputLayerType == InputLayerType.WORLD; }
+        public bool IsScreenCamNavigationUsed(){ return m_inputLayerType == InputLayerType.SCREEN; }
     }
 
 }

@@ -44,6 +44,8 @@ namespace tracer
 
         private const int TIMELINE_START_MINIMUM = -10;
 
+        private const bool STOP_ON_LAST_KEYFRAME = false;   //if so, timeline stops playing on current selected last keyframe
+
         public int m_framerate = 30;
         public bool m_isPlaying = false;
         public bool m_invertScrollAndDrag = false;
@@ -208,6 +210,10 @@ namespace tracer
         //! last time we two finger grabbed the timeline, to not switch between pinch and grab on touch, since it happens all the time
         //!
         private float m_timeLastDragged = 0;
+        //!
+        //! last keyframe to use during playback for certain checks
+        //!
+        private KeyFrame lastKeyFrame;
 
         //!
         //! Constructor
@@ -409,15 +415,39 @@ namespace tracer
 
             if (time > m_endTime)
                 m_currentTime = m_endTime;
-            else if
-                (time < m_startTime)
+            else if(time < m_startTime)
                 m_currentTime = m_startTime;
             else
                 m_currentTime = time;
 
-            m_redLine.localPosition = new Vector3(mapToTimelinePosition(m_currentTime), 0, 0);
+            updatePositionOnTimeline();
+
             m_currentFrameDisplay.text = Mathf.RoundToInt(m_currentTime * m_framerate).ToString();
             m_animationManager.timelineUpdated(time);
+        }
+
+        //!
+        //!  update position of time (red line), that could be out of timeline scope
+        //!
+        private void updatePositionOnTimeline(){
+            if (m_currentTime > m_endTime){                 //HIDE
+                if(m_redLine.gameObject.activeSelf){
+                    m_redLine.gameObject.SetActive(false);
+                    m_endFrameDisplay.color = Color.red;    //mark hidden side
+                }
+            }else if (m_currentTime < m_startTime){         //HIDE
+                if(m_redLine.gameObject.activeSelf){
+                    m_redLine.gameObject.SetActive(false);
+                    m_startFrameDisplay.color = Color.red;  //mark hidden side
+                }
+            }else{                                          //SHOW
+                if(!m_redLine.gameObject.activeSelf){
+                    m_redLine.gameObject.SetActive(true);
+                    m_startFrameDisplay.color = Color.white;
+                    m_endFrameDisplay.color = Color.white;
+                }
+            }
+            m_redLine.localPosition = new Vector3(mapToTimelinePosition(m_currentTime), 0, 0);
         }
 
         //!
@@ -870,8 +900,8 @@ namespace tracer
                 m_isPlaying = false;
                 core.StopCoroutine(playCoroutine());
             }
-            else
-            {
+            else{
+                focuseOnCurrentTime();
                 m_isPlaying = true;
                 m_playCoroutine = core.StartCoroutine(playCoroutine());
             }
@@ -883,10 +913,53 @@ namespace tracer
         //!
         private IEnumerator playCoroutine()
         {
+            if(m_keyframeList != null && m_keyframeList.Count > 0)
+                lastKeyFrame = m_keyframeList[^1].GetComponent<KeyFrame>();
+                
             while (m_isPlaying)
             {
                 yield return new WaitForSecondsRealtime(Mathf.FloorToInt(1000f / core.settings.framerate) / 1000f);
+                focuseOnCurrentTime();
                 setTime(m_currentTime + (1f / m_framerate));
+
+                //if bigger than last keyframe, stop playback (if no keyframes are there, play endless)
+                if(STOP_ON_LAST_KEYFRAME && lastKeyFrame && m_currentTime > lastKeyFrame.key.time){
+                    play();
+                    setTime(lastKeyFrame.key.time);
+                }
+            }
+        }
+
+        //!
+        //! if current time (red line) is out of scope, move timeline so its on the left side. During m_isPlaying, 'fix' it on 40% on timeline
+        //!
+        private void focuseOnCurrentTime(){
+            float distance = EndTime - StartTime;
+            if(m_isPlaying){
+                //if last keyframe is visible on timeline (below 90%) dont move the timeline as it plays
+                if(STOP_ON_LAST_KEYFRAME && lastKeyFrame && lastKeyFrame.key.time < (EndTime-distance*0.1f))
+                    return;
+
+                //move the timeline so the red-line stays at the same position (40%) for a more convenient way to watch
+                if(m_currentTime > StartTime + distance*0.4f){
+                    StartTime = m_currentTime - distance*0.4f;
+                    EndTime = StartTime+distance;
+                    UpdateFrames();
+                }
+            }else{
+                if(m_currentTime < StartTime){
+                    StartTime = m_currentTime;
+                    EndTime = StartTime+distance;
+                    setTime(m_currentTime);
+                    //update
+                    UpdateFrames();
+                }else if(m_currentTime > (EndTime-distance*0.05f)){
+                    StartTime = m_currentTime;
+                    EndTime = StartTime+distance;
+                    setTime(m_currentTime);
+                    //update
+                    UpdateFrames();
+                }
             }
         }
 
@@ -1074,7 +1147,7 @@ namespace tracer
             if (!m_isSelected)
                 return;
 
-            Debug.Log("OnTwoFingerDrag");
+            //Debug.Log("OnTwoFingerDrag");
 
             if(Time.time - m_timeLastZoomed < 0.125f)
                 return;
@@ -1084,19 +1157,23 @@ namespace tracer
 
 
         private void ZoomTimeline(Vector2 point, float delta){
-            Debug.Log(">>ZoomTimeline dpi@"+Screen.dpi);
+            //Debug.Log(">>ZoomTimeline dpi@"+Screen.dpi);
             m_timeLastZoomed = Time.time;
             m_didSpecialAction = true;
 
             //correct delta for touch and big screens (touch should be less accurate)
             delta *= (m_inputManager.IsInputTouch() ? 10f/Screen.dpi : 50f/Screen.dpi);
-            Debug.Log(">>> delta@"+delta);
+            //Debug.Log(">>> delta@"+delta);
 
             //use point to offset the zoom on where we are on the timeline (would be timeOnTimeline if *= m_framerate)
             float valueOnTimeline = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
             //float timeOnTimeline = valueOnTimeline * m_framerate;
-            //minimum delta of 1
-            delta = delta > 0 ? Mathf.Max(delta * Time.deltaTime, 1) : Mathf.Min(delta * Time.deltaTime, -1);
+            
+            //minimum delta of 1/Framerate
+            delta = delta > 0 ? Mathf.Max(delta * Time.deltaTime, 1f/m_framerate) : Mathf.Min(delta * Time.deltaTime, -1f/m_framerate);
+
+            //maximum delta of ... 1? (means +-30 per Frame)
+            delta = Mathf.Clamp(delta, -m_framerate, m_framerate);
 
             //save if we need to reset them
             float startTimeWas = StartTime;
@@ -1126,14 +1203,14 @@ namespace tracer
                 return;
             }
 
-            //set time
-            setTime(m_currentTime);
+            // update position of time (could be out of timeline scope!)
+            updatePositionOnTimeline();
+            
             //update
             UpdateFrames();
         }
 
         private void DragTimeline(Vector2 deltaPos){
-            Debug.Log(">>DragTimeline");
             m_timeLastDragged = Time.time;
             m_didSpecialAction = true;
 
@@ -1157,8 +1234,9 @@ namespace tracer
                 return;
             }
 
-            //set time
-            setTime(m_currentTime);
+            // update position of time (could be out of timeline scope!)
+            updatePositionOnTimeline();
+            
             //update
             UpdateFrames();
         }

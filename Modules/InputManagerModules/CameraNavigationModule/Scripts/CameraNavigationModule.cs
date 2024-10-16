@@ -173,6 +173,9 @@ namespace tracer
         //!
         private void CameraDolly(object sender, float distance)
         {
+            if(!manager.IsScreenCamNavigationUsed())
+                return;
+
             // Dolly cam
             m_camXform.Translate(0f, 0f, distance * s_dollySpeed);
 
@@ -196,6 +199,9 @@ namespace tracer
         //!
         private void CameraOrbit(object sender, Vector2 delta)
         {
+            if(!manager.IsScreenCamNavigationUsed())
+                return;
+
             // Prepare the pivot point
             Vector3 pivotPoint;
 
@@ -244,6 +250,9 @@ namespace tracer
         //!
         private void CameraPedestalTruck(object sender, Vector2 delta)
         {
+            if(!manager.IsScreenCamNavigationUsed())
+                return;
+
             // Adjust the input
             Vector2 offset = -s_panSpeed * delta;
 

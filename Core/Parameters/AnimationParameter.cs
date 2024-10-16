@@ -334,11 +334,13 @@ namespace tracer
                         if (i == -1)
                         {
                             _prevIdx = _keyList.Count - 1;
+                            value = ((Key<T>)_keyList[_prevIdx]).value; //still update animation to the last key's value
                         }
                         // current time is smaller than all keys in list
                         else if (i == 0)
                         {
                             _nextIdx = 0;
+                            value = ((Key<T>)_keyList[_nextIdx]).value; //still update animation to the first key's value
                         }
                         // current time is somewhere between all keys in list
                         else
