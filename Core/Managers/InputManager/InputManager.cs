@@ -777,7 +777,7 @@ namespace tracer
         //!
         private void PressStarted(InputAction.CallbackContext c)
         {
-            Debug.Log("<color=green>Press Started</color>");    //is only ever called for the first finger, for nothing else. (why though?)
+            //Debug.Log("<color=green>Press Started</color>");    //is only ever called for the first finger, for nothing else. (why though?)
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
             m_touchType = InputTouchType.ONE;                                   //no, see above. m_touchType = (m_touchType == InputTouchType.ONE) ? InputTouchType.TWO : InputTouchType.ONE;
             
@@ -820,7 +820,7 @@ namespace tracer
         private void PressEnd(InputAction.CallbackContext c)
         {
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            Debug.Log("<color=blue>Press End</color>");
+            //Debug.Log("<color=blue>Press End</color>");
 
             inputPressEnd?.Invoke(this, point);
 
@@ -840,7 +840,7 @@ namespace tracer
                 //TODO!
                 //always allow increasing of fingers, because we could have a moving ONE finger because of a high sensitivity
                 //although we want to touch with the other fingers!
-                Debug.Log("ignore <color=green>Finger Down</color> due to m_isTouchDrag");
+                //Debug.Log("ignore <color=green>Finger Down</color> due to m_isTouchDrag");
                 return;
             }
 
