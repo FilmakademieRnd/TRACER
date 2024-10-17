@@ -42,9 +42,12 @@ namespace tracer
     public class TimelineModule : UIManagerModule
     {
 
-        private const int TIMELINE_START_MINIMUM = -10;
-
+        private const int TIMELINE_START_MINIMUM = -10;     //the most minimum frameNr StartTime can become
         private const bool STOP_ON_LAST_KEYFRAME = false;   //if so, timeline stops playing on current selected last keyframe
+        private const bool SET_TIME_TO_MARKED_KEYFRAME = true; //if so, the red line jumps to the marked keyframe AND updates if we move it
+        
+        //private const bool ONLY_ALLOW_KEYFRAMES_AT_EMPTY_INTS = true; //minimum distance between keyframes is _ONE_ frame
+        //needs to be calculated by the current frame-size because our times are arbitrary floats
 
         public int m_framerate = 30;
         public bool m_isPlaying = false;
@@ -95,9 +98,17 @@ namespace tracer
         //!
         private RectTransform m_redLine;
         //!
-        //! The list in which all GUI keyframes are registered.
+        //! bool whether we have a sceneObject selected to toggle the "add keyframe" button
         //!
-        private List<GameObject> m_keyframeList;
+        private bool m_sceneObjectSelected = false;
+        //!
+        //! The list in which all GUI keyframes gameObjects are registered.
+        //!
+        private List<GameObject> m_keyframeObjectList;
+        //!
+        //! The list in which all keyframes are registered.
+        //!
+        private List<KeyFrame> m_keyframeList;
         //!
         //! The index of the last active keyframe;
         //!
@@ -151,15 +162,15 @@ namespace tracer
         //!
         //! The UI button to add a key.
         //!
-        private Button _addKeyButton;
+        private Button m_addKeyButton;
         //!
         //! The UI button to remove a key.
         //!
-        private Button _removeKeyButton;
+        private Button m_removeKeyButton;
         //!
         //! The UI button to remove all keys.
         //!
-        private Button _removeAnimationButton;
+        private Button m_removeAllKeysButton;
         
         //!
         //! Getter/Setter for the start time of the timeline.
@@ -232,7 +243,8 @@ namespace tracer
         //!
         protected override void Init(object sender, EventArgs e)
         {
-            m_keyframeList = new List<GameObject>();
+            m_keyframeObjectList = new List<GameObject>();
+            m_keyframeList = new List<KeyFrame>();
             m_uiElements = new List<GameObject>();
 
             m_canvas = Resources.Load("Prefabs/TimelineCanvas") as GameObject;
@@ -318,13 +330,13 @@ namespace tracer
             m_nextButton = menuTimeLineTransform.Find("NextButton").GetComponent<Button>();
 
             // get Ad Key button component
-            _addKeyButton = menuTimeLineTransform.Find("AddKeyButton").GetComponent<Button>();
+            m_addKeyButton = menuTimeLineTransform.Find("AddKeyButton").GetComponent<Button>();
 
             //get Remove Key button component
-            _removeKeyButton = menuTimeLineTransform.Find("RemoveKeyButton").GetComponent<Button>();
+            m_removeKeyButton = menuTimeLineTransform.Find("RemoveKeyButton").GetComponent<Button>();
 
             //get Remove all Keys component
-            _removeAnimationButton = menuTimeLineTransform.Find("ClearKeyButton").GetComponent<Button>();
+            m_removeAllKeysButton = menuTimeLineTransform.Find("ClearKeyButton").GetComponent<Button>();
 
             m_startFrameDisplay.text = Mathf.RoundToInt(m_startTime * m_framerate).ToString();
             m_endFrameDisplay.text = Mathf.RoundToInt(m_endTime * m_framerate).ToString();
@@ -332,9 +344,9 @@ namespace tracer
             m_playButton.onClick.AddListener(play);
             m_prevButton.onClick.AddListener(prevFrame);
             m_nextButton.onClick.AddListener(nextFrame);
-            _addKeyButton.onClick.AddListener(AddKey);
-            _removeKeyButton.onClick.AddListener(RemoveKey);
-            _removeAnimationButton.onClick.AddListener(RemoveAnimation);
+            m_addKeyButton.onClick.AddListener(AddKey);
+            m_removeKeyButton.onClick.AddListener(RemoveKey);
+            m_removeAllKeysButton.onClick.AddListener(RemoveAllKeys);
 
             m_inputManager.inputPressStartedUI += OnPointerDown; //OnBeginDrag;
             m_inputManager.inputPressEnd += OnPointerEnd;
@@ -360,7 +372,86 @@ namespace tracer
                 CreateFrames(m_activeParameter);
             }
 
+            updateButtonInteractability();
             setTime(m_animationManager.time);
+        }
+
+        //!
+        //! setup button to be interactable or not
+        //!
+        private void updateButtonInteractability(){
+            //if not initialized
+            if(!m_timelineRect)
+                return;
+
+            if(m_isPlaying){
+                //no button should be pressable while we are playing, despite the stop button
+                updateButtonBgColor(m_playButton.GetComponentInChildren<Image>(), Color.green); //first child will be BG
+                m_removeKeyButton.interactable = false;
+                m_removeAllKeysButton.interactable = false;
+                m_nextButton.interactable = false;
+                m_prevButton.interactable = false;
+                m_addKeyButton.interactable = false;
+                return;
+            }else{
+                updateButtonBgColor(m_playButton.GetComponentInChildren<Image>(), Color.black); //first child will be BG
+            }
+
+            if(m_keyframeObjectList.Count == 0){
+                m_nextButton.interactable = false;
+                m_prevButton.interactable = false;
+                m_removeKeyButton.interactable = false;
+                m_removeAllKeysButton.interactable = false;
+            }else{
+                m_nextButton.interactable = true;
+                m_prevButton.interactable = true;
+                m_removeAllKeysButton.interactable = true;
+            }
+
+            if(m_activeKeyframeIndex > -1){
+                m_removeKeyButton.interactable = true;
+                if(m_keyframeList[m_activeKeyframeIndex].key.time == m_currentTime)
+                    m_addKeyButton.interactable = false;
+                else{
+                    m_addKeyButton.interactable = !checkIfTimeIsAtKeyframe();
+
+                }
+            }else{
+                m_removeKeyButton.interactable = false;
+                if(!checkIfTimeIsAtKeyframe())
+                    m_addKeyButton.interactable = m_sceneObjectSelected;
+                else
+                    m_addKeyButton.interactable = false;
+            }
+
+
+            //m_addKeyButton.interactable = m_sceneObjectSelected;   
+        }
+
+        //!
+        //! change the color of the image respectively and remain its alpha value
+        //!
+        private void updateButtonBgColor(Image i, Color c){
+            Color color = i.color;
+            //remain its alpha value   
+            float alpha = color.a;
+            color = c;
+            color.a = alpha;
+            i.color = color;
+        }
+        //!
+        //! check over all keyframes if current time is the same and disallow creating!
+        //!
+
+        private bool checkIfTimeIsAtKeyframe(){
+            bool currentTimeIsNearKeyframe = false;
+            foreach(KeyFrame kf in m_keyframeList){
+                if(Mathf.Abs(kf.key.time-m_currentTime) < 0.001f){
+                    currentTimeIsNearKeyframe = true;
+                    break;
+                }
+            }
+            return currentTimeIsNearKeyframe;
         }
 
         //!
@@ -373,10 +464,8 @@ namespace tracer
 
             m_inputManager.inputPressStartedUI -= OnPointerDown;
             m_inputManager.inputPressEnd -= OnPointerEnd;
-            //m_inputManager.inputPressPerformedUI -= OnPointerDown;
             m_inputManager.inputMove -= OnMove;
             m_inputManager.twoDragEvent -= OnTwoFingerDrag;
-            //m_inputManager.middleClickPressEvent -= OnStartDrag;
             m_inputManager.middleClickMoveEvent -= OnMiddleClickHold;
             m_inputManager.middleClickReleaseEvent -= OnMiddleClickRelease;
             m_inputManager.pinchDetailedEvent -= OnPinchDetail;
@@ -388,9 +477,12 @@ namespace tracer
         //!
         private void clearFrames()
         {
-            foreach (GameObject g in m_keyframeList)
-                GameObject.DestroyImmediate(g);
+            foreach (GameObject g in m_keyframeObjectList)
+                GameObject.Destroy(g);
+            m_keyframeObjectList.Clear();
             m_keyframeList.Clear();
+            m_activeKeyframeIndex = -1;
+            updateButtonInteractability();
         }
 
         //!
@@ -399,7 +491,7 @@ namespace tracer
         private void clearUI()
         {
             foreach (GameObject uiElement in m_uiElements)
-                UnityEngine.Object.DestroyImmediate(uiElement);
+                GameObject.Destroy(uiElement);
             m_uiElements.Clear();
         }
 
@@ -461,6 +553,7 @@ namespace tracer
         {
             if (sceneObjects.Count < 1)
             {
+                m_sceneObjectSelected = false;
                 clearFrames();
                 if (m_activeParameter != null)
                 {
@@ -476,8 +569,11 @@ namespace tracer
 
             if (sceneObjects.Count > 0)
             {
+                m_sceneObjectSelected = true;
                 StartAnimGen();
             }
+            //Debug.Log("m_sceneObjectSelected: "+m_sceneObjectSelected);
+            updateButtonInteractability();
         }
         
         private void StartAnimGen()
@@ -561,9 +657,9 @@ namespace tracer
             {
                 bool exists = false;
                 // check if there is already a key // TODO: smarter search
-                foreach (GameObject img in m_keyframeList)
+                foreach (KeyFrame kf in m_keyframeList)
                 {
-                    if (img.GetComponent<KeyFrame>().key.time == key.time)
+                    if (kf.key.time == key.time)
                     {
                         exists = true;
                         break;
@@ -581,7 +677,7 @@ namespace tracer
         //!
         public void UpdateFrames()
         {
-            foreach (GameObject img in m_keyframeList)
+            foreach (GameObject img in m_keyframeObjectList)
             {
                 float _time = img.GetComponent<KeyFrame>().key.time;
                 if (_time < m_startTime || _time > m_endTime)
@@ -604,8 +700,9 @@ namespace tracer
             keyFrame.transform.SetAsFirstSibling();
             keyframeComponent.key = key;
 
-            keyFrame.name = m_keyframeList.Count.ToString();
-            m_keyframeList.Add(keyFrame);
+            keyFrame.name = m_keyframeObjectList.Count.ToString();
+            m_keyframeObjectList.Add(keyFrame);
+            m_keyframeList.Add(keyframeComponent);
 
             if (m_startTime <= time && time <= m_endTime)
                 keyFrame.SetActive(true);
@@ -614,6 +711,8 @@ namespace tracer
 
             keyframeComponent.Callback = setTimeFromGlobalPositionX;
             keyframeComponent.Callback1 = keyframeSelected;
+
+            updateButtonInteractability();
         }
 
         ////////////////////////
@@ -641,28 +740,28 @@ namespace tracer
         //!
         //! @param keyframe The Uinty GameObject behind the keyframe widget. 
         //!
-        private void keyframeSelected(GameObject keyframe)
-        {
-            if (m_activeKeyframeIndex != -1)
-            {
-                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
+        private void keyframeSelected(GameObject keyframe){
+            if (m_activeKeyframeIndex != -1){
+                m_keyframeList[m_activeKeyframeIndex].deSelect();
             }
 
-            if (m_activeKeyframeIndex == m_keyframeList.IndexOf(keyframe))
-            {
-                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().deSelect();
+            if (m_activeKeyframeIndex == m_keyframeObjectList.IndexOf(keyframe)){
+                m_keyframeList[m_activeKeyframeIndex].deSelect();
                 m_activeKeyframeIndex = -1;
+            }else{
+                m_activeKeyframeIndex = m_keyframeObjectList.IndexOf(keyframe);
+                m_keyframeList[m_activeKeyframeIndex].select();
+                if(SET_TIME_TO_MARKED_KEYFRAME){
+                    setTime(m_keyframeList[m_activeKeyframeIndex].key.time);
+                }
             }
-            else
-            {
-                m_activeKeyframeIndex = m_keyframeList.IndexOf(keyframe);
-                m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>().select();
-            }
+            updateButtonInteractability();
         }
 
         private void keyframeDeselected()
         {
             m_activeKeyframeIndex = -1;
+            updateButtonInteractability();
         }
         
         //!
@@ -691,7 +790,7 @@ namespace tracer
     //!
     //! Function used to remove all keys.
     //!
-    private void RemoveAnimation()
+    private void RemoveAllKeys()
     {
         if (m_activeParameter != null)
         {
@@ -742,6 +841,7 @@ namespace tracer
             ApplyKeyUpdate(colorParameter, removeKey, removeAll);
         }
         
+        updateButtonInteractability();
         (m_activeParameter).InvokeKeyHasChanged();
     }
     
@@ -779,7 +879,7 @@ namespace tracer
 
         public GameObject FindClosestBiggerValue(float time)
         {
-            var closestBiggerObject = m_keyframeList.Where(obj => obj.GetComponent<KeyFrame>() != null).Select(obj => new
+            var closestBiggerObject = m_keyframeObjectList.Where(obj => obj.GetComponent<KeyFrame>() != null).Select(obj => new
                 {
                     gameObject = obj,
                     value = obj.GetComponent<KeyFrame>().key.time 
@@ -790,7 +890,7 @@ namespace tracer
         
         public GameObject FindClosestSmallerValue(float time)
         {
-            var closestSmallerObject = m_keyframeList.Where(obj => obj.GetComponent<KeyFrame>() != null).Select(obj => new
+            var closestSmallerObject = m_keyframeObjectList.Where(obj => obj.GetComponent<KeyFrame>() != null).Select(obj => new
                 {
                     gameObject = obj,
                     value = obj.GetComponent<KeyFrame>().key.time 
@@ -812,13 +912,13 @@ namespace tracer
                 if (go != null)
                 {
                     nextKeyFrame = go.GetComponent<KeyFrame>();
-                    m_activeKeyframeIndex = m_keyframeList.IndexOf(nextKeyFrame.gameObject);
+                    m_activeKeyframeIndex = m_keyframeObjectList.IndexOf(nextKeyFrame.gameObject);
                 }
             }
             else if (m_activeKeyframeIndex + 1 < m_keyframeList.Count)
             {
-                activeKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
-                nextKeyFrame = m_keyframeList[++m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                activeKeyFrame = m_keyframeList[m_activeKeyframeIndex];
+                nextKeyFrame = m_keyframeList[++m_activeKeyframeIndex];
                 float deltaTime = nextKeyFrame.key.time - activeKeyFrame.key.time;
 
                 if (nextKeyFrame.key.time >= m_endTime)
@@ -833,7 +933,7 @@ namespace tracer
             }
             else if (m_keyframeList.Count > 0)
 
-                nextKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                nextKeyFrame = m_keyframeList[m_activeKeyframeIndex];
             else
                 return;
 
@@ -842,6 +942,8 @@ namespace tracer
                 nextKeyFrame.select();
                 setTime(nextKeyFrame.key.time);
             }
+            updatePositionOnTimeline();
+            updateButtonInteractability();
         }
 
         //!
@@ -857,14 +959,14 @@ namespace tracer
                 if (go != null)
                 {
                     prevKeyFrame = go.GetComponent<KeyFrame>();
-                    m_activeKeyframeIndex = m_keyframeList.IndexOf(prevKeyFrame.gameObject);
+                    m_activeKeyframeIndex = m_keyframeObjectList.IndexOf(prevKeyFrame.gameObject);
                 }
             }
 
             else if (m_activeKeyframeIndex - 1 > -1)
             {
-                activeKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
-                prevKeyFrame = m_keyframeList[--m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                activeKeyFrame = m_keyframeList[m_activeKeyframeIndex];
+                prevKeyFrame = m_keyframeList[--m_activeKeyframeIndex];
                 float deltaTime = activeKeyFrame.key.time - prevKeyFrame.key.time;
 
                 if (prevKeyFrame.key.time <= m_startTime)
@@ -878,7 +980,7 @@ namespace tracer
                 activeKeyFrame.deSelect();
             }
             else if (m_keyframeList.Count > 0)
-                prevKeyFrame = m_keyframeList[m_activeKeyframeIndex].GetComponent<KeyFrame>();
+                prevKeyFrame = m_keyframeList[m_activeKeyframeIndex];
             else
                 return;
 
@@ -887,23 +989,23 @@ namespace tracer
                 prevKeyFrame.select();
                 setTime(prevKeyFrame.key.time);
             }
+            updatePositionOnTimeline();
+            updateButtonInteractability();
         }
 
         //!
         //! Function to trigger the play/pause mode.
         //!
-        private void play()
-        {
-            if (m_isPlaying)
-            {
+        private void play(){
+            if (m_isPlaying){
                 m_isPlaying = false;
                 core.StopCoroutine(playCoroutine());
-            }
-            else{
+            }else{
                 focuseOnCurrentTime();
                 m_isPlaying = true;
                 m_playCoroutine = core.StartCoroutine(playCoroutine());
             }
+            updateButtonInteractability();
         }
 
 
@@ -913,7 +1015,7 @@ namespace tracer
         private IEnumerator playCoroutine()
         {
             if(m_keyframeList != null && m_keyframeList.Count > 0)
-                lastKeyFrame = m_keyframeList[^1].GetComponent<KeyFrame>();
+                lastKeyFrame = m_keyframeList[^1];
                 
             while (m_isPlaying){
                 yield return new WaitForSecondsRealtime(Mathf.FloorToInt(1000f / core.settings.framerate) / 1000f);
@@ -1011,6 +1113,7 @@ namespace tracer
             if(m_isSelected){
                 if(!m_didSpecialAction){
                     UpdateTime(m_timelineRect.InverseTransformPoint(point).x);
+                    updateButtonInteractability();
                 }
             }
             m_isSelected = false;
@@ -1120,12 +1223,12 @@ namespace tracer
                 if(!m_inputManager.IsInputTouch() && Raycast(detailedArgs.point) == m_timeLine){
                     //act like its selected
                 }else{
-                    Debug.Log("ignore <color=cyan>TIMELINE::OnPinchDetail</color> due to !m_isSelected");
+                    //Debug.Log("ignore <color=cyan>TIMELINE::OnPinchDetail</color> due to !m_isSelected");
                     return;
                 }
             }
 
-            Debug.Log("OnPinchDetail "+detailedArgs.delta);
+            //Debug.Log("OnPinchDetail "+detailedArgs.delta);
 
             if(Time.time - m_timeLastDragged < 0.125f)
                 return;
@@ -1162,6 +1265,9 @@ namespace tracer
             //correct delta for touch and big screens (touch should be less accurate)
             delta *= (m_inputManager.IsInputTouch() ? 10f/Screen.dpi : 50f/Screen.dpi);
             //Debug.Log(">>> delta@"+delta);
+
+            //multiply delta accordingly to its timeline's time size
+            delta *= (EndTime-StartTime)/2f;// /m_framerate;
 
             //use point to offset the zoom on where we are on the timeline (would be timeOnTimeline if *= m_framerate)
             float valueOnTimeline = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);

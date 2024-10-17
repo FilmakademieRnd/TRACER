@@ -549,19 +549,17 @@ namespace tracer
                 showHighlighted(0, true);
 
             if(_adaptToChildSizeAndCenter){
+                RectTransform rt = this.GetComponent<RectTransform>();
                 if(_isVertical){
-                    RectTransform rt = this.GetComponent<RectTransform>();
-                    //float correctCenter = rt.sizeDelta.y + (rt.sizeDelta.y/_menuElementCount*(_menuElementCount/2f));
                     float correctCenter = rt.sizeDelta.y * (_menuElementCount/2f - 1f);
-
-                    //rt.sizeDelta = new Vector2(rt.sizeDelta.x, correctCenter);
-                    //NO new Vector2(rt.sizeDelta.x, _elementSize.x * (1 + _previewExtend));
-                    //Vector2Int.RoundToInt(_elementSize * (_previewExtend * 2.0f));
-                    Debug.Log("rt.sizeDelta.y: "+rt.sizeDelta.y+", correctCenter: "+correctCenter+", _menuElementCount: "+_menuElementCount);
                     Vector3 pos = rt.anchoredPosition;
-                    pos.y = correctCenter; //rt.sizeDelta.y/2f;
+                    pos.y = correctCenter;
                     rt.anchoredPosition = pos;
-                    // rt.localPosition = pos;
+                }else{
+                    float correctCenter = rt.sizeDelta.x * (_menuElementCount/2f - 1f);
+                    Vector3 pos = rt.anchoredPosition;
+                    pos.x = -correctCenter;
+                    rt.anchoredPosition = pos;
                 }
             }
 
