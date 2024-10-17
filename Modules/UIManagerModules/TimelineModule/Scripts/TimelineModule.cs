@@ -806,7 +806,6 @@ namespace tracer
         private void nextFrame()
         {
             KeyFrame nextKeyFrame = null, activeKeyFrame;
-            //m_currentTime
             if (m_activeKeyframeIndex == -1)
             {
                 var go = FindClosestBiggerValue(m_currentTime);
@@ -916,8 +915,7 @@ namespace tracer
             if(m_keyframeList != null && m_keyframeList.Count > 0)
                 lastKeyFrame = m_keyframeList[^1].GetComponent<KeyFrame>();
                 
-            while (m_isPlaying)
-            {
+            while (m_isPlaying){
                 yield return new WaitForSecondsRealtime(Mathf.FloorToInt(1000f / core.settings.framerate) / 1000f);
                 focuseOnCurrentTime();
                 setTime(m_currentTime + (1f / m_framerate));

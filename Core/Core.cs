@@ -172,7 +172,7 @@ namespace tracer
             UnityEngine.Debug.unityLogger.logEnabled = true;
 #else
             Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
-            Debug.unityLogger.logEnabled = false;
+            UnityEngine.Debug.unityLogger.logEnabled = false;
 #endif
             
             if (!string.IsNullOrEmpty(Application.absoluteURL))
