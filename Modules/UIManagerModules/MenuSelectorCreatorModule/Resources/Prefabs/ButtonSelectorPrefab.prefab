@@ -54,7 +54,7 @@ MonoBehaviour:
   _allowValueSetting: 0
   _previewExtend: 1
   _fadeFactor: 0.5
-  _selectableItems: 5
+  _selectableItems: 7
   _selectByClick: 1
   _multiSelect: 1
   _collapsable: 0

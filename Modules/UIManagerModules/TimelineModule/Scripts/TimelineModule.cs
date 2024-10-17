@@ -372,6 +372,8 @@ namespace tracer
                 CreateFrames(m_activeParameter);
             }
 
+            m_sceneObjectSelected = manager.SelectedObjects.Count > 0;
+
             updateButtonInteractability();
             setTime(m_animationManager.time);
         }
@@ -423,7 +425,6 @@ namespace tracer
                 else
                     m_addKeyButton.interactable = false;
             }
-
 
             //m_addKeyButton.interactable = m_sceneObjectSelected;   
         }
