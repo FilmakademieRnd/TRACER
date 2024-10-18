@@ -460,6 +460,11 @@ namespace tracer
         //!
         private void destroyTimeline()
         {
+            if (m_isPlaying){
+                m_isPlaying = false;
+                core.StopCoroutine(playCoroutine());
+            }
+
             clearFrames();
             clearUI();
 
@@ -502,22 +507,28 @@ namespace tracer
         //! set the current time (of the animation) in the timeline
         //! @param      time        current time at the red line of the timeline
         //!
-        public void setTime(float time)
-        {
+        private void setTime(float time, bool clampTimeIntoScope = true){
             time = Mathf.Max(time, 0f);
 
-            if (time > m_endTime)
-                m_currentTime = m_endTime;
-            else if(time < m_startTime)
-                m_currentTime = m_startTime;
-            else
+            if(clampTimeIntoScope){
+                if (time > m_endTime)
+                    m_currentTime = m_endTime;
+                else if(time < m_startTime)
+                    m_currentTime = m_startTime;
+                else
+                    m_currentTime = time;
+            }else{
                 m_currentTime = time;
+            }
 
             updatePositionOnTimeline();
 
             m_currentFrameDisplay.text = Mathf.RoundToInt(m_currentTime * m_framerate).ToString();
             m_animationManager.timelineUpdated(time);
         }
+
+        private bool isTimelineTimeOutOfScope(){ return m_currentTime < StartTime || m_currentTime > EndTime; }
+        private bool wouldTimelineTimeBeOutOfScope(float timeToBe){ return timeToBe < StartTime || timeToBe > EndTime; }
 
         //!
         //!  update position of time (red line), that could be out of timeline scope
@@ -579,7 +590,7 @@ namespace tracer
         
         private void StartAnimGen()
         {
-                m_animationManager.OnStartAnimaGeneration(null);
+            m_animationManager.OnStartAnimaGeneration(null);
         }
 
         private void StopAnimGen()
@@ -766,112 +777,112 @@ namespace tracer
         }
         
         //!
-    //! Function used to add a key.
-    //!
-    private void AddKey()
-    {
-        if (m_activeParameter != null)
+        //! Function used to add a key.
+        //!
+        private void AddKey()
         {
-            UpdateKey(false);
-        }
-    }
-
-    //!
-    //! Function used to remove a key.
-    //!
-    private void RemoveKey()
-    {
-        if (m_activeParameter != null)
-        {
-            UpdateKey(true);
-            keyframeDeselected();
-        }
-    }
-
-    //!
-    //! Function used to remove all keys.
-    //!
-    private void RemoveAllKeys()
-    {
-        if (m_activeParameter != null)
-        {
-            UpdateKey(false, true);
-            keyframeDeselected();
-        }
-    }
-
-    //!
-    //! Function used to Update a key (add or remove).
-    //!
-    public void UpdateKey(bool removeKey, bool removeAll = false)
-    {
-        if (m_activeParameter is Parameter<bool> boolParam)
-        {
-            ApplyKeyUpdate(boolParam, removeKey, removeAll);
-        }
-        if (m_activeParameter is Parameter<int> intParam)
-        {
-            ApplyKeyUpdate(intParam, removeKey, removeAll);
-        }
-        if (m_activeParameter is Parameter<float> floatParam)
-        {
-            ApplyKeyUpdate(floatParam, removeKey, removeAll);
-        }
-        if (m_activeParameter is Parameter<Vector2> vector2Param)
-        {
-            ApplyKeyUpdate(vector2Param, removeKey, removeAll);
-        }
-        else if (m_activeParameter is Parameter<Vector3> vector3Param)
-        {
-            ApplyKeyUpdate(vector3Param, removeKey, removeAll);
-            if ((m_activeParameter as AbstractParameter)?.name == "position")
+            if (m_activeParameter != null)
             {
-                m_animationManager.OnRenewSplineContainer(null);
+                UpdateKey(false);
             }
         }
-        if (m_activeParameter is Parameter<Vector4> vector4Param)
+
+        //!
+        //! Function used to remove a key.
+        //!
+        private void RemoveKey()
         {
-            ApplyKeyUpdate(vector4Param, removeKey, removeAll);
+            if (m_activeParameter != null)
+            {
+                UpdateKey(true);
+                keyframeDeselected();
+            }
         }
-        if (m_activeParameter is Parameter<Quaternion> quaternionParam)
+
+        //!
+        //! Function used to remove all keys.
+        //!
+        private void RemoveAllKeys()
         {
-            ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
+            if (m_activeParameter != null)
+            {
+                UpdateKey(false, true);
+                keyframeDeselected();
+            }
         }
-        if (m_activeParameter is Parameter<Color> colorParameter)
+
+        //!
+        //! Function used to Update a key (add or remove).
+        //!
+        public void UpdateKey(bool removeKey, bool removeAll = false)
         {
-            ApplyKeyUpdate(colorParameter, removeKey, removeAll);
+            if (m_activeParameter is Parameter<bool> boolParam)
+            {
+                ApplyKeyUpdate(boolParam, removeKey, removeAll);
+            }
+            if (m_activeParameter is Parameter<int> intParam)
+            {
+                ApplyKeyUpdate(intParam, removeKey, removeAll);
+            }
+            if (m_activeParameter is Parameter<float> floatParam)
+            {
+                ApplyKeyUpdate(floatParam, removeKey, removeAll);
+            }
+            if (m_activeParameter is Parameter<Vector2> vector2Param)
+            {
+                ApplyKeyUpdate(vector2Param, removeKey, removeAll);
+            }
+            else if (m_activeParameter is Parameter<Vector3> vector3Param)
+            {
+                ApplyKeyUpdate(vector3Param, removeKey, removeAll);
+                if ((m_activeParameter as AbstractParameter)?.name == "position")
+                {
+                    m_animationManager.OnRenewSplineContainer(null);
+                }
+            }
+            if (m_activeParameter is Parameter<Vector4> vector4Param)
+            {
+                ApplyKeyUpdate(vector4Param, removeKey, removeAll);
+            }
+            if (m_activeParameter is Parameter<Quaternion> quaternionParam)
+            {
+                ApplyKeyUpdate(quaternionParam, removeKey, removeAll);
+            }
+            if (m_activeParameter is Parameter<Color> colorParameter)
+            {
+                ApplyKeyUpdate(colorParameter, removeKey, removeAll);
+            }
+            
+            updateButtonInteractability();
+            (m_activeParameter).InvokeKeyHasChanged();
         }
         
-        updateButtonInteractability();
-        (m_activeParameter).InvokeKeyHasChanged();
-    }
-    
-    //!
-    //! Function used to apply the key update
-    //!
-    public void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false)
-    {
-        if (removeKey && !removeAll && m_activeKeyframeIndex > -1)
+        //!
+        //! Function used to apply the key update
+        //!
+        public void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false)
         {
-            int idx = m_activeKeyframeIndex;
-            if (idx >= 0)
+            if (removeKey && !removeAll && m_activeKeyframeIndex > -1)
             {
-                parameter.removeKeyAtIndex(idx);
+                int idx = m_activeKeyframeIndex;
+                if (idx >= 0)
+                {
+                    parameter.removeKeyAtIndex(idx);
+                    m_activeKeyframeIndex = -1;
+                }
+            }
+            else if (!removeKey)
+            {
+                parameter.setKey();
+            }
+
+            if (removeAll)
+            {
+                parameter.clearKeys();
                 m_activeKeyframeIndex = -1;
             }
+        
         }
-        else if (!removeKey)
-        {
-            parameter.setKey();
-        }
-
-        if (removeAll)
-        {
-            parameter.clearKeys();
-            m_activeKeyframeIndex = -1;
-        }
-    
-    }
         
 
         //////////////
@@ -907,90 +918,80 @@ namespace tracer
         private void nextFrame()
         {
             KeyFrame nextKeyFrame = null, activeKeyFrame;
-            if (m_activeKeyframeIndex == -1)
-            {
+            if (m_activeKeyframeIndex == -1){                               //no keyframe selected
                 var go = FindClosestBiggerValue(m_currentTime);
-                if (go != null)
-                {
+                if (go != null){
                     nextKeyFrame = go.GetComponent<KeyFrame>();
                     m_activeKeyframeIndex = m_keyframeObjectList.IndexOf(nextKeyFrame.gameObject);
                 }
-            }
-            else if (m_activeKeyframeIndex + 1 < m_keyframeList.Count)
-            {
+            }else if (m_activeKeyframeIndex + 1 < m_keyframeList.Count){    //next keyframe available
                 activeKeyFrame = m_keyframeList[m_activeKeyframeIndex];
                 nextKeyFrame = m_keyframeList[++m_activeKeyframeIndex];
-                float deltaTime = nextKeyFrame.key.time - activeKeyFrame.key.time;
-
-                if (nextKeyFrame.key.time >= m_endTime)
-                {
+                
+                /*float deltaTime = nextKeyFrame.key.time - activeKeyFrame.key.time;
+                if (nextKeyFrame.key.time >= m_endTime){                    //keyframe time out of scope, move timeline
                     EndTime += deltaTime;
                     StartTime += deltaTime;
                     UpdateFrames();
                     setTime(m_currentTime + deltaTime);
-                }
+                }*/
 
                 activeKeyFrame.deSelect();
-            }
-            else if (m_keyframeList.Count > 0)
-
+            }else if (m_keyframeList.Count > 0){                            //use keyframe that's already selected
                 nextKeyFrame = m_keyframeList[m_activeKeyframeIndex];
-            else
+            }else{                                                          //none available
                 return;
-
-            if (nextKeyFrame != null)
-            {
-                nextKeyFrame.select();
-                setTime(nextKeyFrame.key.time);
             }
-            updatePositionOnTimeline();
+
+            if (nextKeyFrame != null){                                      //next keyframe found (or already selected)
+                nextKeyFrame.select();
+                setTime(nextKeyFrame.key.time, false);
+                if(wouldTimelineTimeBeOutOfScope(nextKeyFrame.key.time)){
+                    focuseOnCurrentTime();
+                }
+            }
             updateButtonInteractability();
         }
 
         //!
         //! Function selects the previous key frame and moves the time line view if needed.
         //!
-        private void prevFrame()
-        {
+        private void prevFrame(){
             KeyFrame prevKeyFrame = null, activeKeyFrame;
 
-            if (m_activeKeyframeIndex == -1)
-            {
+            if (m_activeKeyframeIndex == -1){                               //no keyframe selected
                 var go = FindClosestSmallerValue(m_currentTime);
                 if (go != null)
                 {
                     prevKeyFrame = go.GetComponent<KeyFrame>();
                     m_activeKeyframeIndex = m_keyframeObjectList.IndexOf(prevKeyFrame.gameObject);
                 }
-            }
-
-            else if (m_activeKeyframeIndex - 1 > -1)
-            {
+            }else if (m_activeKeyframeIndex - 1 > -1){                      //prev keyframe available
                 activeKeyFrame = m_keyframeList[m_activeKeyframeIndex];
                 prevKeyFrame = m_keyframeList[--m_activeKeyframeIndex];
-                float deltaTime = activeKeyFrame.key.time - prevKeyFrame.key.time;
-
-                if (prevKeyFrame.key.time <= m_startTime)
-                {
+                
+                /*float deltaTime = activeKeyFrame.key.time - prevKeyFrame.key.time;
+                if (prevKeyFrame.key.time <= m_startTime){
                     EndTime -= deltaTime;
                     StartTime -= deltaTime;
                     UpdateFrames();
                     setTime(m_currentTime - deltaTime);
-                }
+                }*/
 
                 activeKeyFrame.deSelect();
-            }
-            else if (m_keyframeList.Count > 0)
+            }else if (m_keyframeList.Count > 0){                           //use keyframe that's already selected
                 prevKeyFrame = m_keyframeList[m_activeKeyframeIndex];
-            else
+            }else{                                                          //none available
                 return;
-
-            if (prevKeyFrame != null)
-            {
-                prevKeyFrame.select();
-                setTime(prevKeyFrame.key.time);
             }
-            updatePositionOnTimeline();
+
+            if (prevKeyFrame != null){                                      //prev keyframe found (or already selected)
+                prevKeyFrame.select();
+                setTime(prevKeyFrame.key.time, false);
+                if(wouldTimelineTimeBeOutOfScope(prevKeyFrame.key.time)){
+                    focuseOnCurrentTime();
+                }
+            }
             updateButtonInteractability();
         }
 
@@ -1002,6 +1003,7 @@ namespace tracer
                 m_isPlaying = false;
                 core.StopCoroutine(playCoroutine());
             }else{
+                deselectKeyframe();
                 focuseOnCurrentTime();
                 m_isPlaying = true;
                 m_playCoroutine = core.StartCoroutine(playCoroutine());
@@ -1020,6 +1022,20 @@ namespace tracer
                 
             while (m_isPlaying){
                 yield return new WaitForSecondsRealtime(Mathf.FloorToInt(1000f / core.settings.framerate) / 1000f);
+                
+                //pause while touching the timeline and manipulating it!
+                if(m_isSelected){
+                    updateButtonBgColor(m_playButton.GetComponentInChildren<Image>(), Color.yellow); //first child will be BG
+                    while(m_isSelected && m_isPlaying){
+                        yield return null;
+                    }
+                    if(!m_isPlaying){
+                        yield break;
+                    }
+                    updateButtonBgColor(m_playButton.GetComponentInChildren<Image>(), Color.green); //first child will be BG
+                    continue;
+                }
+                
                 focuseOnCurrentTime();
                 setTime(m_currentTime + (1f / m_framerate));
 
@@ -1045,25 +1061,35 @@ namespace tracer
                 if(m_currentTime > StartTime + distance*0.4f){
                     StartTime = m_currentTime - distance*0.4f;
                     EndTime = StartTime+distance;
-                    UpdateFrames();
                 }
+                UpdateFrames();
             }else{
                 if(m_currentTime < StartTime){
                     StartTime = m_currentTime;
                     EndTime = StartTime+distance;
-                    setTime(m_currentTime);
+                    setTime(m_currentTime, false);
                     //update
                     UpdateFrames();
                 }else if(m_currentTime > (EndTime-distance*0.05f)){
                     StartTime = m_currentTime;
                     EndTime = StartTime+distance;
-                    setTime(m_currentTime);
+                    setTime(m_currentTime, false);
                     //update
                     UpdateFrames();
                 }
             }
         }
 
+        //!
+        //! deselect a keyframe (e.g. if we move the current time by hand, delesect a possible selected keyframe)
+        //!
+        private void deselectKeyframe(){
+            //if a keyframe is selected, deselect it (and check if we select another one - by being next to it: snap!)
+            if(m_activeKeyframeIndex != -1){
+                m_keyframeList[m_activeKeyframeIndex].deSelect();
+                m_activeKeyframeIndex = -1;
+            }
+        }
 
 
         ///////////
@@ -1098,7 +1124,6 @@ namespace tracer
             }else{
                 //set time instantly on click with no special action
                 UpdateTime(m_timelineRect.InverseTransformPoint(point).x);
-                //Debug.Log("<color=cyan>TIMELINE::OnPointerDown</color>");
             }
 
         }
@@ -1114,6 +1139,7 @@ namespace tracer
             if(m_isSelected){
                 if(!m_didSpecialAction){
                     UpdateTime(m_timelineRect.InverseTransformPoint(point).x);
+                    deselectKeyframe();
                     updateButtonInteractability();
                 }
             }
@@ -1152,10 +1178,10 @@ namespace tracer
                     DragTimeline(delta);
 
                 }
-                //UpdateFrames();
-            }
-            else // move time cursor
+            }else{ // move time cursor
+                deselectKeyframe();
                 setTime(mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x));
+            }
 
             m_posDragBuffer = point;
         }
@@ -1205,6 +1231,7 @@ namespace tracer
                 m_isSelected = false;
 
             m_isMiddleClickDrag = false;
+            m_didSpecialAction = false; //because not OnPointerEnd is thrown
         }
 
         //////////////////

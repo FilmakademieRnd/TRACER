@@ -456,7 +456,6 @@ namespace tracer
         private void DragClick_performed(InputAction.CallbackContext obj)
         {
             dragClick = true;
-            Debug.Log("drag click performed");
         }
 
         //!
