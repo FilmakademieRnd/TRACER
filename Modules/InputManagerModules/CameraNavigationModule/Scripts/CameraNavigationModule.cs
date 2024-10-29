@@ -98,7 +98,7 @@ namespace tracer
         //! Constructor.
         //!
         //! @param name Name of this module.
-        //! @param core Reference to the TRACER core.
+        //! @param _core Reference to the TRACER _core.
         //!
         public CameraNavigationModule(string name, Manager manager) : base(name, manager)
         {
@@ -122,9 +122,9 @@ namespace tracer
         }
 
         //! 
-        //! Init callback for the CameraNavigation module.
+        //! Init m_callback for the CameraNavigation module.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Init(object sender, EventArgs e)
@@ -173,6 +173,9 @@ namespace tracer
         //!
         private void CameraDolly(object sender, float distance)
         {
+            if(!manager.IsScreenCamNavigationUsed())
+                return;
+
             // Dolly cam
             m_camXform.Translate(0f, 0f, distance * s_dollySpeed);
 
@@ -196,6 +199,9 @@ namespace tracer
         //!
         private void CameraOrbit(object sender, Vector2 delta)
         {
+            if(!manager.IsScreenCamNavigationUsed())
+                return;
+
             // Prepare the pivot point
             Vector3 pivotPoint;
 
@@ -244,6 +250,9 @@ namespace tracer
         //!
         private void CameraPedestalTruck(object sender, Vector2 delta)
         {
+            if(!manager.IsScreenCamNavigationUsed())
+                return;
+
             // Adjust the input
             Vector2 offset = -s_panSpeed * delta;
 

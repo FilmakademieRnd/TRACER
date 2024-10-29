@@ -28,10 +28,8 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 25.06.2021
 
-using System.IO;
 using System.Collections.Generic;
 using System;
-using System.Linq;
 
 namespace tracer
 {
@@ -50,12 +48,12 @@ namespace tracer
     {
 
         //!
-        //! A reference to TRACER core.
+        //! A reference to TRACER _core.
         //!
         private Core m_core;
 
         //!
-        //! Returns a reference to the TRACER core.
+        //! Returns a reference to the TRACER _core.
         //!
         public ref Core core { get => ref m_core; }
 
@@ -70,24 +68,24 @@ namespace tracer
         internal Settings _settings;
 
         //!
-        //! Event invoked when an TRACER core Awake() callback is triggered.
+        //! Event invoked when an TRACER _core Awake() callback is triggered.
         //!
         public event EventHandler initEvent;
 
         //!
-        //! Event invoked when an TRACER core Start() callback is triggered.
+        //! Event invoked when an TRACER _core Start() callback is triggered.
         //!
         public event EventHandler startEvent;
 
         //!
-        //! Event invoked when an TRACER core OnDestroy() callback is triggered.
+        //! Event invoked when an TRACER _core OnDestroy() callback is triggered.
         //!
         public event EventHandler cleanupEvent;
 
         //!
         //! Constructor
         //! @param  moduleType The type of modules to be loaded by this manager.
-        //! @param tracerCore A reference to the TRACER core.
+        //! @param tracerCore A reference to the TRACER _core.
         //!
         public Manager(Type moduleType, Core tracerCore)
         {
@@ -119,9 +117,9 @@ namespace tracer
         }
 
         //! 
-        //! Virtual function called when Unity initializes the TRACER core.
+        //! Virtual function called when Unity initializes the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected virtual void Init(object sender, EventArgs e) 
@@ -132,7 +130,7 @@ namespace tracer
         //! 
         //! Virtual function called when Unity calls it's Start function.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected virtual void Start(object sender, EventArgs e) 
@@ -141,9 +139,9 @@ namespace tracer
         }
 
         //! 
-        //! Virtual function called before Unity destroys the TRACER core.
+        //! Virtual function called before Unity destroys the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected virtual void Cleanup(object sender, EventArgs e) 

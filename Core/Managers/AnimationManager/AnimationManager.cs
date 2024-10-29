@@ -42,6 +42,13 @@ namespace tracer
         private float m_time;
         public float time { get => m_time; }
         public event EventHandler<float> animationUpdate;
+        public event EventHandler<IAnimationParameter> keyframeUpdate;
+        public event EventHandler<IAnimationParameter> addKey;
+        public event EventHandler<IAnimationParameter> removeKey;
+        public event EventHandler<IAnimationParameter> removeAnimation;
+        public event EventHandler<IAnimationParameter> startAnimaGeneration;
+        public event EventHandler<IAnimationParameter> stopAnimaGeneration;
+        public event EventHandler<IAnimationParameter> renewSplineContainer;
         public AnimationManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_time = 0;
@@ -50,6 +57,35 @@ namespace tracer
         {
             m_time = time;
             animationUpdate?.Invoke(this, time);
+        }
+        public void OnStartAnimaGeneration(IAnimationParameter e)
+        {
+            startAnimaGeneration?.Invoke(this, e);
+        }
+        
+        public void OnStopAnimaGeneration(IAnimationParameter e)
+        {
+            stopAnimaGeneration?.Invoke(this, e);
+        }
+
+        public void OnAddKey(IAnimationParameter e)
+        {
+            addKey?.Invoke(this, e);
+        }
+
+        public void OnRemoveKey(IAnimationParameter e)
+        {
+            removeKey?.Invoke(this, e);
+        }
+
+        public void OnRemoveAnimation(IAnimationParameter e)
+        {
+            removeAnimation?.Invoke(this, e);
+        }
+
+        public void OnRenewSplineContainer(IAnimationParameter e)
+        {
+            renewSplineContainer?.Invoke(this, e);
         }
     }
 

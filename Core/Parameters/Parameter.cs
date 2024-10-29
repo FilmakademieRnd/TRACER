@@ -63,7 +63,7 @@ namespace tracer
                                                                           typeof(Quaternion),
                                                                           typeof(Color),
                                                                           typeof(string),
-                                                                          typeof(int) 
+                                                                          typeof(int)
         };
         //!
         //! Definition of Tracer's parameter types
@@ -75,55 +75,29 @@ namespace tracer
         [SerializeField]
         protected ParameterType _type;
         //!
-        //! A reference to the parameters parent object.
+        //! A reference to the parameters _parent object.
         //!
-        protected ParameterObject _parent;
+        public ParameterObject _parent { get; protected set; }
         //!
-        //! The unique id of this parameter.
+        //! The unique _id of this parameter.
         //!
-        protected short _id;
+        public short _id { get; protected set; }
         //!
         //! Flag that determines whether a Parameter will be distributed.
         //!
-        public bool _distribute;
+        public bool _distribute { get; protected set; }
         //!
         //! Flag that determines whether a Parameter will be networl locked.
         //!
-        protected bool _networkLock;
+        public bool _networkLock { get; protected set; } = false;
         //!
         //! Flag that determines whether a Parameter will be a RPC parameter.
         //!
-        protected bool _rpc = false;
+        public bool _isRPC { get; protected set; } = false;
         //!
-        //! Function that returns the current animation state of the parameter.
+        //! Flag that determines whether a Parameter is animated.
         //!
-        //! @return The current animation state of the parameter.
-        //!
-        public virtual bool isAnimated
-        {
-            get => false;
-        }
-        //!
-        //! Getter for unique id of this parameter.
-        //!
-        public short id
-        {
-            get => _id;
-        }
-        //!
-        //! Flag that determines whether a Parameter will be locked for network comunication.
-        //!
-        public bool isNetworkLocked
-        {
-            get => _networkLock;
-        }
-        //!
-        //! Flag that determines whether a Parameter will be locked for network comunication.
-        //!
-        public bool isRPC
-        {
-            get => _rpc;
-        }
+        public bool _isAnimated { get; protected set; } = false;
         //!
         //! Getter for parameters C# type.
         //!
@@ -148,14 +122,7 @@ namespace tracer
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => ref _name;
         }
-        //!
-        //! Getter for parameters parent.
-        //!
-        public ParameterObject parent
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _parent;
-        }
+        public abstract void InitAnimation();
 
         //!
         //! abstract reset function for the abstract parameter
@@ -186,15 +153,10 @@ namespace tracer
             else
                 return (ParameterType)idx;
         }
-        public virtual AbstractParameter getAnimationParameter()
-        {
-            return null;
-        }
         //!
         //! Abstract definition of the function for serializing the parameters sourceSpan.
         //! 
         //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
-        //! @return The Parameters sourceSpan serialized as a byte array.
         //! 
         public abstract void Serialize(Span<byte> targetSpan);
         //!
@@ -217,7 +179,7 @@ namespace tracer
     //!
     //! Parameter class defining the fundamental functionality and interface
     //!
-    public class Parameter<T> : AbstractParameter
+    public partial class Parameter<T> : AbstractParameter, IAnimationParameter
     {
         [SerializeField]
         //!
@@ -240,6 +202,10 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int dataSize()
         {
+            if (_isAnimated)
+                // parameterValue<ParamValueSize> + countKeys<short> + nbrKeys * (type<byte> + time<float> + tangentTime1<float> + tangentTime2<float> + value<ParamValueSize> + tangentvalue1<ParamValueSize> + tangentvalue2<ParamValueSize>) 
+                return _dataSize + 2 + _keyList.Count * (1 + 3 * sizeof(float) + 3 * _dataSize);
+
             switch (_type)
             {
                 case ParameterType.STRING:
@@ -258,7 +224,7 @@ namespace tracer
         //!
         //! @param value The value of the parameder as the defined type T.
         //! @param name The parameters name.
-        //! @param name The parameters parent ParameterObject.
+        //! @param name The parameters _parent ParameterObject.
         //! @param name Flag that determines whether a Parameter will be distributed.
         //!
         public Parameter(T value, string name, ParameterObject parent = null, bool distribute = true)
@@ -269,6 +235,9 @@ namespace tracer
             _type = toTracerType(typeof(T));
             _distribute = distribute;
             _initialValue = value;
+            _nextIdx = 0;
+            _prevIdx = 0;
+            _keyList = new List<AbstractKey>();
 
             // initialize sourceSpan size
             switch (_type)
@@ -299,7 +268,7 @@ namespace tracer
                     break;
             }
 
-            // check parent
+            // check _parent
             if (parent)
             {
                 _id = (short)_parent.parameterList.Count;
@@ -326,6 +295,10 @@ namespace tracer
             _dataSize = p._dataSize;
             _distribute = p._distribute;
             _initialValue = p._initialValue;
+            _nextIdx = p._nextIdx;
+            _prevIdx = p._prevIdx;
+
+            hasChanged = p.hasChanged;
         }
 
 
@@ -366,7 +339,7 @@ namespace tracer
             }
             catch
             {
-                Debug.Log("Could not cast parameter while executing copyValue() for parameter " + this.name + " from " + this.parent.name);
+                Debug.Log("Could not cast parameter while executing copyValue() for parameter " + this.name + " from " + this._parent.name);
             }
         }
 
@@ -382,32 +355,45 @@ namespace tracer
             }
         }
 
-        public override AbstractParameter getAnimationParameter()
-        {
-            return new AnimationParameter<T>(this);
-        }
-
         /////////////////////////////////////////////////////////////
         /////////////////////// Serialisation ///////////////////////
         /////////////////////////////////////////////////////////////
 
         //!
-        //! Function for serializing the parameters sourceSpan.
+        //! Function for serializing the parameters value into the targetSpan.
         //! 
         //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
-        //! @return The Parameters sourceSpan serialized as a byte array.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void Serialize(Span<byte> targetSpan)
         {
             SerializeData(targetSpan, _value);
+
+            if (_isAnimated)
+            {
+                int offset = _dataSize;
+                short keyCount = (short)_keyList.Count;
+
+                BitConverter.TryWriteBytes(targetSpan.Slice(offset += 2, 2), keyCount); // nbr. of keys
+                for (int i = 0; i < keyCount; i++)
+                {
+                    Key<T> key = (Key<T>)_keyList[i];
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 1, 1), (byte)key.interpolation); // interpolation
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.time); // time
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime1); // tangent time 1
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime2); // tangent time 2
+                    SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.value); // value
+                    SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.tangentValue1); // tangent value 1
+                    SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue2); // tangent value 2
+                }
+            }
         }
 
         //!
         //! Function for serializing the parameters sourceSpan.
         //! 
-        //! @param startoffset The offset in bytes within the generated array at which the sourceSpan should start at.
-        //! @return The Parameters sourceSpan serialized as a byte array.
+        //! @param targetSpan The target span to write the serialized data to.
+        //! @param value The value to be serialized.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void SerializeData(Span<byte> targetSpan, in T value)
@@ -436,12 +422,12 @@ namespace tracer
                     }
                 case ParameterType.VECTOR3:
                     {
-                        FromVector3 (value, targetSpan);
+                        FromVector3(value, targetSpan);
                         break;
                     }
                 case ParameterType.VECTOR4:
                     {
-                       FromVector4(value, targetSpan);
+                        FromVector4(value, targetSpan);
                         break;
                     }
                 case ParameterType.QUATERNION:
@@ -467,12 +453,35 @@ namespace tracer
         //!
         //! Function for deserializing parameter _data.
         //! 
-        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
-        //! @param _offset The start offset in the given sourceSpan array.
+        //! @param sourceSpan The byte data as span to be deserialized and copyed to the parameters value.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
         {
+            if (_isAnimated)
+            {
+                // determine the correct offset in the span
+                int offset = _dataSize;
+                short keyCount = MemoryMarshal.Read<short>(sourceSpan.Slice(offset += 2, 2));
+
+                _keyList.Clear();
+
+                for (int i = 0; i < keyCount; i++)
+                {
+                    Key<T>.InterplolationTypes interplolation = MemoryMarshal.Read<Key<T>.InterplolationTypes>(sourceSpan.Slice(offset += 1));
+                    float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    float tangenttime1 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    float tangenttime2 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    T value = deSerializeData(sourceSpan.Slice(offset += _dataSize));
+                    T tangentvalue1 = deSerializeData(sourceSpan.Slice(offset += _dataSize));
+                    T tangentvalue2 = deSerializeData(sourceSpan.Slice(offset));
+
+                    _keyList.Add(new Key<T>(time, value, tangenttime1, tangentvalue1, tangenttime2, tangentvalue2 , interplolation));
+                }
+                //_animationManager.keyframesUpdated(this);
+                keyHasChanged?.Invoke(this, EventArgs.Empty);
+            }
+
             _value = deSerializeData(sourceSpan);
 
             _networkLock = true;
@@ -484,8 +493,8 @@ namespace tracer
         //!
         //! Function for deserializing parameter _data.
         //! 
-        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
-        //! @param _offset The start offset in the given sourceSpan array.
+        //! @param sourceSpan The byte data as span to be deserialized.
+        //! @return The deserialized value as T.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected T deSerializeData(ReadOnlySpan<byte> sourceSpan)
@@ -556,7 +565,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromVector2(in T value, Span<byte> target)
         {
-            Vector2 obj = (Vector2)(object) value;
+            Vector2 obj = (Vector2)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
@@ -565,7 +574,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromVector3(in T value, Span<byte> target)
         {
-            Vector3 obj = (Vector3)(object) value;
+            Vector3 obj = (Vector3)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
@@ -575,7 +584,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromVector4(in T value, Span<byte> target)
         {
-            Vector4 obj = (Vector4)(object) value;
+            Vector4 obj = (Vector4)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
@@ -586,7 +595,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromQuaternion(in T value, Span<byte> target)
         {
-            Quaternion obj = (Quaternion)(object) value;
+            Quaternion obj = (Quaternion)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.x);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.y);
@@ -597,7 +606,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static void FromColor(in T value, Span<byte> target)
         {
-            Color obj = (Color)(object) value;
+            Color obj = (Color)(object)value;
 
             BitConverter.TryWriteBytes(target.Slice(0, 4), obj.r);
             BitConverter.TryWriteBytes(target.Slice(4, 4), obj.g);
@@ -613,34 +622,34 @@ namespace tracer
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected static T ToBool(ReadOnlySpan<byte> source) 
-        { 
-            return (T)(object) MemoryMarshal.Read<bool>(source); 
+        protected static T ToBool(ReadOnlySpan<byte> source)
+        {
+            return (T)(object)MemoryMarshal.Read<bool>(source);
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToInt(ReadOnlySpan<byte> source)
         {
-            return (T)(object) MemoryMarshal.Read<int>(source);
+            return (T)(object)MemoryMarshal.Read<int>(source);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToFloat(ReadOnlySpan<byte> source)
         {
-            return (T)(object) MemoryMarshal.Read<float>(source);
-        }        
-        
+            return (T)(object)MemoryMarshal.Read<float>(source);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToVector2(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Vector2(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Vector2(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToVector3(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Vector3(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Vector3(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)),
                                MemoryMarshal.Read<float>(source.Slice(8)));
         }
@@ -648,7 +657,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToVector4(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Vector4(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Vector4(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)),
                                MemoryMarshal.Read<float>(source.Slice(8)),
                                MemoryMarshal.Read<float>(source.Slice(12)));
@@ -657,7 +666,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToQuaternion(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Quaternion(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Quaternion(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)),
                                MemoryMarshal.Read<float>(source.Slice(8)),
                                MemoryMarshal.Read<float>(source.Slice(12)));
@@ -666,7 +675,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToColor(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new Color(MemoryMarshal.Read<float>(source),
+            return (T)(object)new Color(MemoryMarshal.Read<float>(source),
                                MemoryMarshal.Read<float>(source.Slice(4)),
                                MemoryMarshal.Read<float>(source.Slice(8)),
                                MemoryMarshal.Read<float>(source.Slice(12)));
@@ -675,7 +684,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected static T ToString(ReadOnlySpan<byte> source)
         {
-            return (T)(object) new string(Encoding.UTF8.GetString(source));
+            return (T)(object)new string(Encoding.UTF8.GetString(source));
         }
 
     }

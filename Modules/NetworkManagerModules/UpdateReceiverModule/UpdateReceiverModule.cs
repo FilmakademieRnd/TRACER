@@ -63,7 +63,7 @@ namespace tracer
         //! Constructor
         //!
         //! @param  name  The  name of the module.
-        //! @param core A reference to the TRACER core.
+        //! @param _core A reference to the TRACER _core.
         //!
         public UpdateReceiverModule(string name, Manager manager) : base(name, manager)
         {
@@ -82,7 +82,7 @@ namespace tracer
         //!
         //! Function for custom initialisation.
         //! 
-        //! @param sender The TRACER core.
+        //! @param sender The TRACER _core.
         //! @param e The pssed event arguments.
         //! 
         protected override void Init(object sender, EventArgs e)
@@ -150,13 +150,12 @@ namespace tracer
                                     case MessageType.DATAHUB:
                                         decodeDataHubMessage(message);
                                         break;
-                                    case MessageType.RPC:
                                     case MessageType.PARAMETERUPDATE:
                                         // make shure that producer and consumer exclude eachother
                                         lock (m_messageBuffer)
                                         {
                                             // message[1] is time
-                                            //int time = (message[1] + manager.pingRTT) % core.timesteps;
+                                            //int time = (message[1] + manager.pingRTT) % _core.timesteps;
                                             //m_messageBuffer[time].Add(message);
                                             m_messageBuffer[message[1]].Add(message);
                                         }
@@ -189,7 +188,7 @@ namespace tracer
                  deltaTime > 3 && runtime < 8)
             {
                 core.time = (byte)(Mathf.RoundToInt(syncTime) % core.timesteps);
-                // UnityEngine.Debug.Log("Core time updated to: " + coreTime);
+               // UnityEngine.Debug.Log("Core time updated to: " + coreTime);
             }
 
             //UnityEngine.Debug.Log("Time delta: " + deltaTime);
@@ -262,7 +261,7 @@ namespace tracer
         private void consumeMessages(object o, EventArgs e)
         {
             // define the buffer size by defining the time offset in the ringbuffer
-            // % time steps to take ring (0 to core.timesteps) into account
+            // % time steps to take ring (0 to _core.timesteps) into account
             // set to 1/10 second
             int bufferTime = (((core.time - core.settings.framerate / 6) + core.timesteps) % core.timesteps);
             lock (m_messageBuffer)
@@ -294,7 +293,7 @@ namespace tracer
                             byte sceneID = message[start];
                             short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(start + 1));
                             short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3));
-                            int length = message[start + 6];
+                            int length = MemoryMarshal.Read<int>(message.Slice(start + 6));
 
                             if (sceneID != oldSceneID ||
                                 parameterObjectID != oldParameterObjectID)
@@ -302,14 +301,14 @@ namespace tracer
 
                             if (parameterObject != null)
                             {
-                                AbstractParameter parameter = parameterObject.parameterList[parameterID];
+                                AbstractParameter  parameter = parameterObject.parameterList[parameterID];
+                                
                                 // check update if animation is incoming and change parameter type if required 
-                                // 7 is the size of the parameter fixed fields
-                                if (!parameter.isAnimated && length > 7 + parameter.dataSize())
-                                {
-                                    parameter = parameter.getAnimationParameter();
-                                }
-                                parameter.deSerialize(message.Slice(start + 7));
+                                // 10 is the size of the parameter fixed field
+                                if (!parameter._isAnimated && length > 10 + parameter.dataSize())
+                                    parameter.InitAnimation();
+                                
+                                parameter.deSerialize(message.Slice(start + 10));
                             }
 
                             start += length;

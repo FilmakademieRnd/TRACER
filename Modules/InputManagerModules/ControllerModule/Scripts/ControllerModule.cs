@@ -66,7 +66,7 @@ namespace tracer
         private GameObject _currentAddSelector;
 
         //!
-        //! Reference to the crosshair image
+        //! Reference to the crosshair m_image
         //!
         private Image _crossHairImg;
 
@@ -139,11 +139,6 @@ namespace tracer
         //! List of elements in the selector SnapSelect
         //!
         private List<SnapSelectElement> _selectorSnapSelectElementsList;
-
-        //!
-        //! List of elements in the spinner SnapSelect
-        //!
-        private List<SnapSelectElement> _spinnerSnapSelectElementsList;
 
         //!
         //! The index of the currently selected SnapSelect element in the selector
@@ -235,10 +230,10 @@ namespace tracer
             // Get the camera component.
             _camera = _mainCamera.GetComponent<Camera>();
             
-            // Get the scene manager from the core.
+            // Get the scene manager from the _core.
             _sceneManager = core.getManager<SceneManager>();
             
-            // Get the UI manager from the core.
+            // Get the UI manager from the _core.
             _uiManager = core.getManager<UIManager>();
             
             // Get the selection module from the UI manager.
@@ -269,7 +264,7 @@ namespace tracer
             manager.rightControllerStick += MoveRightStick;
             manager.ControllerStickCanceled += DoneEditing;
 
-            // Subscribe to the core update event.
+            // Subscribe to the _core update event.
             core.updateEvent += TracerUpdate;
 
             // Subscribe to UI manager events.
@@ -302,7 +297,7 @@ namespace tracer
             manager.rightControllerStick -= MoveRightStick;
             manager.ControllerStickCanceled -= DoneEditing;
 
-            // Unsubscribe from the core update event.
+            // Unsubscribe from the _core update event.
             core.updateEvent -= TracerUpdate;
 
             // Unsubscribe from UI manager events.
@@ -912,9 +907,6 @@ namespace tracer
                 _selectorCurrentSelectedSnapSelectElement = 0;
                 _selectedAbstractParam =
                     _currentSelectedSceneObject.parameterList[_selectorCurrentSelectedSnapSelectElement];
-                //_selectorSnapSelect.parameterChanged += GetCurrentParameter;
-                //GetSpinner();
-                // List<int> uniqueButtonIDs = _snapSelectElementsList.Select(element => element.buttonID).Distinct().ToList();
             }
         }
 
@@ -926,14 +918,6 @@ namespace tracer
             _selectorCurrentSelectedSnapSelectElement = manipulatorMode;
         }
 
-        /*private void GetSpinner()
-        {
-            _spinnerSnapSelect = UI2DModule.GetManipulator().GetComponent<SnapSelect>();
-            _spinnerSnapSelectElementsList = _spinnerSnapSelect.elements.GroupBy(element => element.buttonID).Select(group => group.First()).ToList();
-            _spinnerCurrentSelectedSnapSelectElement = 0;
-            _spinnerSnapSelect.parameterChanged += GetCurrentParameter;
-        }*/
-        
         //!
         //! This method switches to the next available manipulation mode.
         //!
@@ -959,29 +943,6 @@ namespace tracer
                 _currentSelectedSceneObject.parameterList[_selectorCurrentSelectedSnapSelectElement];
             //GetSpinner();
         }
-
-        /*private void SwitchToNextSpinnerMode()
-        {
-            _spinnerCurrentSelectedSnapSelectElement = (_spinnerCurrentSelectedSnapSelectElement + 1) % _spinnerSnapSelectElementsList.Count;
-            _spinnerSnapSelectElementsList[_spinnerCurrentSelectedSnapSelectElement].ControllerClick();   
-            Debug.LogError("Controller" + _spinnerCurrentSelectedSnapSelectElement);
-        }
-
-        private void SwitchToPreviousSpinnerMode()
-        {
-            _spinnerCurrentSelectedSnapSelectElement = (_spinnerCurrentSelectedSnapSelectElement - 1 + _spinnerSnapSelectElementsList.Count) % _spinnerSnapSelectElementsList.Count;
-            _spinnerSnapSelectElementsList[_spinnerCurrentSelectedSnapSelectElement].ControllerClick();
-            Debug.LogError("Controller" + _spinnerCurrentSelectedSnapSelectElement);
-        }*/
-        
-        /*private void GetCurrentParameter(object sender, int param)
-        {
-
-            Debug.LogError(sender + " idk wtf is this " + param);
-            //AbstractParameter abstractParam = _currentSelectedSceneObject.parameterList[param];
-            //AbstractParameter.ParameterType type = abstractParam.tracerType;
-
-        }*/
         
         //!
         //! This method invokes the doneEditing event for undo/redo when an editing operation is completed.

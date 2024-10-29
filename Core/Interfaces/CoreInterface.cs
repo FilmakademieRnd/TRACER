@@ -22,7 +22,7 @@ if not go to https://opensource.org/licenses/MIT
 */
 
 //! @file "tracer.cs"
-//! @brief TRACER core implementation
+//! @brief TRACER _core implementation
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @version 0

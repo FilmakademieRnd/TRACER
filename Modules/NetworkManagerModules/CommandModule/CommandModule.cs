@@ -67,7 +67,7 @@ namespace tracer
         //! Constructor
         //!
         //! @param  name  The  name of the module.
-        //! @param core A reference to the TRACER core.
+        //! @param _core A reference to the TRACER _core.
         //!
         public CommandModule(string name, Manager manager) : base(name, manager)
         {
@@ -76,7 +76,7 @@ namespace tracer
         //!
         //! Function for custom initialisation.
         //! 
-        //! @param sender The TRACER core.
+        //! @param sender The TRACER _core.
         //! @param e The pssed event arguments.
         //! 
         protected override void Init(object sender, EventArgs e)
@@ -121,7 +121,7 @@ namespace tracer
         //!
         //! Function that creates a command message for sending.
         //!
-        //! @param sender The TRACER core.
+        //! @param sender The TRACER _core.
         //! @param time The clients global time.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -144,7 +144,7 @@ namespace tracer
         //!
         //! Function that creates a ping message for sending.
         //!
-        //! @param sender The TRACER core.
+        //! @param sender The TRACER _core.
         //! @param time The clients global time.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

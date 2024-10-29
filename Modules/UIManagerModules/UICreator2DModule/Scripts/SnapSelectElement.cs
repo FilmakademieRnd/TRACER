@@ -92,7 +92,7 @@ namespace tracer
         public int index;
 
         //!
-        //! id of the corresponding menu button
+        //! _id of the corresponding menu button
         //! reported back to SnapSelect when element is clicked
         //!
         public int buttonID;

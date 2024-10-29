@@ -102,7 +102,7 @@ namespace tracer
         //! Constructor initializing member variables.
         //!
         //! @param  moduleType  type of modules to be loaded by this manager
-        //! @param tracerCore A reference to the TRACER core.
+        //! @param tracerCore A reference to the TRACER _core.
         //!
         public NetworkManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
@@ -129,9 +129,9 @@ namespace tracer
         }
 
         //! 
-        //! Cleanup function called before Unity destroys the TRACER core.
+        //! Cleanup function called before Unity destroys the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Cleanup(object sender, EventArgs e)

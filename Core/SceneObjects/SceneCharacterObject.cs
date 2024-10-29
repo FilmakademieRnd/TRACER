@@ -75,7 +75,7 @@ namespace tracer
             boneMap = new Dictionary<int, Transform>();
             
             //  If server setBones is called on awake if not setBones is called from SceneCreatorModule line 137
-            if (core.isServer)
+            if (_core.isServer)
             {
                 setBones();
             }
@@ -106,10 +106,30 @@ namespace tracer
                     localBoneRotationParameter.hasChanged += updateRotation;
                     
                     // Use the parameter's ID as the key to store the bone transform in the dictionary.
-                    var id = localBoneRotationParameter.id;
+                    var id = localBoneRotationParameter._id;
                     boneMap.Add(id, boneTransform);
                     boneNamesOrder.Add(boneTransform.name);
-                    //Debug.Log(id+"-"+boneTransform.name);
+                    //Debug.Log(_id+"-"+boneTransform.name);
+                }
+            }
+            
+            for (int i = 0; i < bones.Length; i++)
+            {
+                Transform boneTransform = bones[i];
+                if (boneTransform != null)
+                {
+                    // Create a new Quaternion parameter for each bone transform's local rotation.
+                    Parameter<Vector3> localBonePositionParameter =
+                        new Parameter<Vector3>(boneTransform.localPosition, boneTransform.name, this);
+                    
+                    // Attach a callback to the parameter's "hasChanged" event, which is triggered when the bone transform is updated.
+                    localBonePositionParameter.hasChanged += updatePosition;
+                    
+                    // Use the parameter's ID as the key to store the bone transform in the dictionary.
+                    var id = localBonePositionParameter._id;
+                    boneMap.Add(id, boneTransform);
+                    //boneNamesOrder.Add(boneTransform.name);
+                    //Debug.Log(_id+"-"+boneTransform.name);
                 }
             }
         }
@@ -122,10 +142,22 @@ namespace tracer
        private void updateRotation(object sender, Quaternion a)
         {
             // Retrieve the ID of the parameter whose value has changed.
-            int id = ((Parameter<Quaternion>)sender).id;
+            int id = ((Parameter<Quaternion>)sender)._id;
             
             // Update the bone transform's local rotation based on the new value.
             boneMap[id].localRotation = a;
+            
+            // Emit a signal to notify that the parameter has changed (if necessary).
+            emitHasChanged((AbstractParameter)sender);
+        }
+       
+        private void updatePosition(object sender, Vector3 a)
+        {
+            // Retrieve the ID of the parameter whose value has changed.
+            int id = ((Parameter<Vector3>)sender)._id;
+            
+            // Update the bone transform's local rotation based on the new value.
+            boneMap[id].localPosition = a;
             
             // Emit a signal to notify that the parameter has changed (if necessary).
             emitHasChanged((AbstractParameter)sender);
@@ -149,14 +181,30 @@ namespace tracer
             for (int i = 0; i < boneMap.Count; i++)
             {
                 KeyValuePair<int, Transform> boneAtPos = boneMap.ElementAt(i);
-                Parameter<Quaternion> parameter = ((Parameter<Quaternion>)parameterList[boneAtPos.Key]);
-                Quaternion valueAtPos = parameter.value;
-                
-                if (boneAtPos.Value.localRotation != valueAtPos)
+                if (parameterList[boneAtPos.Key].tracerType == AbstractParameter.ParameterType.QUATERNION)
                 {
-                    // If the local rotation has changed, update the parameter's value to match the bone transform.
-                    parameter.setValue(boneAtPos.Value.localRotation);
+                    Parameter<Quaternion> parameter = ((Parameter<Quaternion>)parameterList[boneAtPos.Key]);
+                    Quaternion valueAtPos = parameter.value;
+                    
+                    if (boneAtPos.Value.localRotation != valueAtPos)
+                    {
+                        // If the local rotation has changed, update the parameter's value to match the bone transform.
+                        parameter.setValue(boneAtPos.Value.localRotation);
+                    }
                 }
+                else
+                {
+                    Parameter<Vector3> parameter = ((Parameter<Vector3>)parameterList[boneAtPos.Key]);
+                    Vector3 valueAtPos = parameter.value;  
+                    
+                    if (boneAtPos.Value.localPosition != valueAtPos)
+                    {
+                        // If the local rotation has changed, update the parameter's value to match the bone transform.
+                        parameter.setValue(boneAtPos.Value.localPosition);
+                    }
+                }
+
+               
             }
         }
     }

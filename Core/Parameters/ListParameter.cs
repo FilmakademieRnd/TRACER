@@ -38,7 +38,7 @@ namespace tracer
         //!
         //! @param parameterList The list of parameders with the given type T.
         //! @param name The parameters name.
-        //! @param name The parameters parent ParameterObject.
+        //! @param name The parameters _parent ParameterObject.
         //! @param name Flag that determines whether a Parameter will be distributed.
         //!
         public ListParameter(List<AbstractParameter> parameterList, string name, ParameterObject parent = null, bool distribute = true) : base(0, name, parent, distribute)

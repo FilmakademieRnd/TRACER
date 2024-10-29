@@ -37,7 +37,7 @@ namespace tracer
     {
         private static int s_id = 0;
         //!
-        //! The unique id of the MenuButton.
+        //! The unique _id of the MenuButton.
         //!
         public int id = -1;
         //!

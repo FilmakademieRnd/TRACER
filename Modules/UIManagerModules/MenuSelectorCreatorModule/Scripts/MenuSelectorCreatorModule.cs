@@ -59,7 +59,7 @@ namespace tracer
         //!
         //! Constructor
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public MenuSelectorCreatorModule(string name, Manager manager) : base(name, manager)
         {
@@ -68,7 +68,7 @@ namespace tracer
         //!
         //! Function that creates a menu containing buttons for every registered menu.
         //!
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e The event arguments for the start event.
         //!
         protected override void Init(object sender, EventArgs e)
@@ -90,7 +90,7 @@ namespace tracer
         //! 
         //! Function called when an Unity Start() callback is triggered
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Start(object sender, EventArgs e)
@@ -98,9 +98,9 @@ namespace tracer
         }
 
         //! 
-        //! Function called before Unity destroys the TRACER core.
+        //! Function called before Unity destroys the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Cleanup(object sender, EventArgs e)
@@ -215,7 +215,7 @@ namespace tracer
         //! Function called when a button has clicked.
         //!
         //! @param sender The snapSelect triggering this function.
-        //! @param id The snapSelect internal id for the corresponding button.
+        //! @param _id The snapSelect internal _id for the corresponding button.
         //!
         private void buttonClicked(object sender, int id)
         {
@@ -228,7 +228,7 @@ namespace tracer
         //! Function called when a menu button has clicked. Informs the UI manager to show the given MenuTree. 
         //!
         //! @param sender The snapSelect triggering this function.
-        //! @param id The snapSelect internal id for the corresponding menu.
+        //! @param _id The snapSelect internal _id for the corresponding menu.
         //!
         private void menuClicked(object sender, int id)
         {

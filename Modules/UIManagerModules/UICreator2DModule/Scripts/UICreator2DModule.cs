@@ -73,6 +73,12 @@ namespace tracer
         public event EventHandler<ColorSelect> colorSelectActive; 
 
         private Transform UI2D;
+
+        public Transform UI2DCanvas
+        {
+            get => UI2D;
+        }
+        
         private Transform manipulatorPanel;
         private Transform undoRedoPanel;
         private Button undoButton;
@@ -90,7 +96,7 @@ namespace tracer
         //!
         //! Constructor
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public UICreator2DModule(string name, Manager manager) : base(name, manager)
         {
@@ -123,9 +129,9 @@ namespace tracer
         }
 
         //!
-        //! Init callback for the UICreator2D module.
+        //! Init m_callback for the UICreator2D module.
         //! Called after constructor.
-        //! @param sender callback sender
+        //! @param sender m_callback sender
         //! @param e event reference
         //!
         protected override void Init(object sender, EventArgs e)
@@ -151,7 +157,7 @@ namespace tracer
         //!
         //! Function that recreates the UI Layout.
         //! Being called when selection has changed.
-        //! @param sender callback sender
+        //! @param sender m_callback sender
         //! @param sceneObjects event payload containg all sceneObjects the UI shall be created for
         //!
         private void createUI(object sender, List<SceneObject> sceneObjects)
@@ -235,6 +241,8 @@ namespace tracer
             currentAddSelector.SetActive(true);
 
             createManipulator(0);
+
+            manager.emitUI2DCreated(snapSelect);
         }
 
         //!

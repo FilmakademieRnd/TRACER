@@ -62,7 +62,7 @@ namespace tracer
         //!
         //! Constructor
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public UICreator3DPointOnFloor(string name, Manager manager) : base(name, manager)
         {
@@ -71,7 +71,7 @@ namespace tracer
         }
 
         //!
-        //! Init callback for the UICreator3DPointOnFloor module.
+        //! Init m_callback for the UICreator3DPointOnFloor module.
         //!
         protected override void Init(object sender, EventArgs e)
         {
@@ -84,7 +84,7 @@ namespace tracer
             m_inputManager = core.getManager<InputManager>();
 
             // Hookup to input events
-            m_inputManager.inputPressPerformed += PressStart;
+            m_inputManager.inputPressStarted += PressStart;
             m_inputManager.inputPressEnd += PressEnd;
 
             // Instantiate widget
@@ -98,7 +98,7 @@ namespace tracer
         //!
         //! Function to prepare for transformations.
         //! Called with the start of click from InputManager
-        //! @param sender callback sender
+        //! @param sender m_callback sender
         //! @param e event reference
         //!
         private void PressStart(object sender, Vector2 point)
@@ -172,7 +172,7 @@ namespace tracer
         //!
         //! Function to finalize manipulator operation
         //! Called with the end (cancellation) of click from InputManager
-        //! @param sender callback sender
+        //! @param sender m_callback sender
         //! @param e event reference
         //!
         private void PressEnd(object sender, Vector2 point)

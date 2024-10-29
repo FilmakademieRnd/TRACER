@@ -191,7 +191,7 @@ namespace tracer
         //!
         public AbstractParameter Parameter { get; }
         //!
-        //! The parent of the menu item.
+        //! The _parent of the menu item.
         //!
         public MenuItem Parent { get; }
         //!
@@ -203,7 +203,7 @@ namespace tracer
         //!
         //! @param type The type of the menuItem.
         //! @param param The parameterm the menuItem is associated with.
-        //! @param parant The parent of the menuItem.
+        //! @param parant The _parent of the menuItem.
         //!
         public MenuItem(IType type, AbstractParameter param, MenuItem parent)
         {

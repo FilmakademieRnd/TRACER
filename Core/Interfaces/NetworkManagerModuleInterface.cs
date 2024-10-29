@@ -101,7 +101,7 @@ namespace tracer
         //!
         //! constructor
         //! @param  name  The  name of the module.
-        //! @param core A reference to the TRACER core.
+        //! @param _core A reference to the TRACER _core.
         //!
         public NetworkManagerModule(string name, Manager manager) : base(name, manager) 
         {
@@ -122,7 +122,7 @@ namespace tracer
         }
 
         //!
-        //! Function to stop all tranceiver threads (called when TRACER core will be destroyed).
+        //! Function to stop all tranceiver threads (called when TRACER _core will be destroyed).
         //!
         private void stopThread(object sender, EventArgs e)
         {

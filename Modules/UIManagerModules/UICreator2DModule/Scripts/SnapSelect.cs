@@ -101,6 +101,11 @@ namespace tracer
         public bool _collapsable = false;
 
         //!
+        //! Should we adapt our size to our child extents and center our position on change?
+        //!
+        public bool _adaptToChildSizeAndCenter = false;
+
+        //!
         //! Is the menu collapsable
         //!
         public Sprite _collapsableIcon;
@@ -227,7 +232,7 @@ namespace tracer
         private bool _axisDecided;
 
         //!
-        //! Canvas of SnapSelect in parent object
+        //! Canvas of SnapSelect in _parent object
         //!
         private Canvas _canvas;
 
@@ -542,6 +547,21 @@ namespace tracer
 
             if(_elementCount == 1 && !_selectByClick)
                 showHighlighted(0, true);
+
+            if(_adaptToChildSizeAndCenter){
+                RectTransform rt = this.GetComponent<RectTransform>();
+                if(_isVertical){
+                    float correctCenter = rt.sizeDelta.y * (_menuElementCount/2f - 1f);
+                    Vector3 pos = rt.anchoredPosition;
+                    pos.y = correctCenter;
+                    rt.anchoredPosition = pos;
+                }else{
+                    float correctCenter = rt.sizeDelta.x * (_menuElementCount/2f - 1f);
+                    Vector3 pos = rt.anchoredPosition;
+                    pos.x = -correctCenter;
+                    rt.anchoredPosition = pos;
+                }
+            }
 
             _initialized = true;
         }

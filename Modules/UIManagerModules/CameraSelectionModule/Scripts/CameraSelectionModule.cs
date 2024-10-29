@@ -125,16 +125,16 @@ namespace tracer
         //!
         //! Constructor
         //! @param name Name of this module
-        //! @param core Reference to the TRACER core
+        //! @param _core Reference to the TRACER _core
         //!
         public CameraSelectionModule(string name, Manager manager) : base(name, manager)
         {
         }
 
         //! 
-        //! Function called before Unity destroys the TRACER core.
+        //! Function called before Unity destroys the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Start(object sender, EventArgs e)
@@ -164,9 +164,9 @@ namespace tracer
         }
 
         //! 
-        //! Function called before Unity destroys the TRACER core.
+        //! Function called before Unity destroys the TRACER _core.
         //! 
-        //! @param sender A reference to the TRACER core.
+        //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
         protected override void Cleanup(object sender, EventArgs e)

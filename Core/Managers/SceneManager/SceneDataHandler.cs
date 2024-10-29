@@ -565,7 +565,7 @@ namespace tracer
                 {
                     ParameterObjectPackage poPack = new ParameterObjectPackage();
 
-                    // get id
+                    // get _id
                     int intValue = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
                     poPack.id = intValue;
                     dataIdx += size_int;
@@ -928,7 +928,7 @@ namespace tracer
                     BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.sSize);
                     dstIdx += SceneDataHandler.size_int;
 
-                    // root dag id
+                    // root dag _id
                     BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.characterRootId);
                     dstIdx += SceneDataHandler.size_int;
 
@@ -1100,7 +1100,7 @@ namespace tracer
                     
                     int dstIdx = 0;
                     
-                    // id (int)
+                    // _id (int)
                     dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.id), ref poByteData, dstIdx);
 
                     // name length (int)

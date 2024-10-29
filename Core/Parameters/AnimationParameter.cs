@@ -1,4 +1,4 @@
-/*
+﻿/*
 -----------------------------------------------------------------------------------
 TRACER FOUNDATION -
 Toolset for Realtime Animation, Collaboration & Extended Reality
@@ -21,115 +21,102 @@ if not go to https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------------
 */
 
+//! @file "parameter.cs"
+//! @brief Implementation of the tracer parameter
+//! @author Simon Spielmann
+//! @author Jonas Trottnow
+//! @version 0
+//! @date 01.02.2023
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace tracer
 {
     //!
-    //! RPCParameter class defining the fundamental functionality and interface
+    //! This is the interface for the Parameter class animation extensions.
     //!
-    public class AnimationParameter<T> : Parameter<T>
+    public interface IAnimationParameter
     {
-        //!
-        //! The next and the previous active keyframe index (for animation).
-        //!
-        private int _nextIdx, _prevIdx;
-        //!
-        //! The list of keyframes (for animation).
-        //!
-        private List<Key<T>> _keyList = null;
         //!
         //! A reference to the key list (for animation).
         //!
-        public ref List<Key<T>> keys { get => ref _keyList; }
+        public ref List<AbstractKey> getKeys();
+        //!
+        //! Create and insert a new key element to the parameters key list, 
+        //! based on the current parameter value and Animation Manager time.
+        //!
+        public void setKey();
+        //!
+        //! Clear the parameters key list and disable the animation functionality.
+        //!
+        public void clearKeys();
+        //!
+        //! Revove a given key element from the parameters key list.
+        //!
+        //! @param index is the index of the key to be removed from the parameters key list.
+        //!
+        public void removeKeyAtIndex(int index);
+        //!
+        //! Sets the time of a given key.
+        //! The internal keylist will be automatically reordered by time. 
+        //!
+        //! @ param key The key for which the time is to be changed.
+        //! @ param time The time the geven key shall be moved to.
+        //!
+        public void setKeyTime(AbstractKey key, float time);
+        //!
+        //! Sets the time of a key in the key list at the given index.
+        //! The internal keylist will be automatically reordered by time. 
+        //!
+        //! @ param index The index of the key for which the time is to be changed.
+        //! @ param time The time the geven key shall be moved to.
+        //!
+        public void setKeyTime(int index, float time);
+        //!
+        //! Event emitted when a keyframe has changed.
+        //!
+        public event EventHandler keyHasChanged;
+        public void InvokeKeyHasChanged();
+    }
+
+    //!
+    //! This is an extansion for the Parameter class containing animation functionality.
+    //!
+    public partial class Parameter<T> : AbstractParameter, IAnimationParameter
+    {
+        //!
+        //! Event emitted when a keyframe has changed.
+        //!
+        public event EventHandler keyHasChanged;
+        //!
+        //! The next and the previous active keyframe index (for animation).
+        //!
+        private int _nextIdx = 0, _prevIdx = 0;
+        //!
+        //! The list of keyframes (for animation).
+        //!
+        private List<AbstractKey> _keyList = null;
+        //!
+        //! A reference to the key list (for animation).
+        //!
+        public ref List<AbstractKey> getKeys() { return ref _keyList; }
         //!
         //! A reference to the Animation Manager.
         //!
         private AnimationManager _animationManager = null;
-        public AnimationParameter(T parameterValue, string name, ParameterObject parent = null, bool distribute = true) : base(parameterValue, name, parent, distribute)
-        {
-            if (typeof(T) == typeof(string))
-                throw new InvalidOperationException("Type not supported");
-
-            _nextIdx = 0;
-            _prevIdx = 0;
-        }
-
-        //!
-        //! Factory Constructor for AnimationParameter from Parameter<T>
-        //! @param p source parameter to copy values from
-        //!
-        public AnimationParameter(Parameter<T> p) : base(p)
-        {
-            if (typeof(T) == typeof(string))
-                throw new InvalidOperationException("Type not supported");
-
-            _nextIdx = 0;
-            _prevIdx = 0;
-        }
-
-        //!
-        //! Factory Constructor from AnimationParameter
-        //! @return A new Parameter<T> based in the AnimationParameter.
-        //!
-        public AbstractParameter getParameter()
-        {
-            return new Parameter<T>(this);
-        }
-
-        //!
-        //! Copy Constructor
-        //! @param p source parameter to copy values from
-        //!
-        public AnimationParameter(AnimationParameter<T> p) : base(p)
-        {
-            _nextIdx = 0;
-            _prevIdx = 0;
-            _keyList = p._keyList;
-            _animationManager = p._animationManager;
-
-            if (_keyList != null && _animationManager != null)
-                _animationManager.animationUpdate += updateValue;
-        }
-
-
-        //!
-        //! Destructor
-        //!
-        ~AnimationParameter()
-        {
-            clearKeys();
-        }
-
-        //!
-        //! Getter for the size of the serialized sourceSpan of the parameter.
-        //!
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int dataSize()
-        {
-            // count<short> + count *(type<byte> + time<float> + tangentTime<float> + value<ParamValueSize> + tangentvalue<ParamValueSize>) 
-            return _dataSize + 2 + _keyList.Count * (1 + 2 * sizeof(float) + 2 * _dataSize);
-        }
-
-        /////////////////////////////////////////////////////////
-        /////////////////////// Animation ///////////////////////
-        /////////////////////////////////////////////////////////
-
         //!
         //! Initializes the parameters animation functionality,
         //!
-        private void initAnimation()
+        public override void InitAnimation()
         {
-            _keyList ??= new List<Key<T>>();
+            _animationManager = ParameterObject._core.getManager<AnimationManager>();
+            _animationManager.animationUpdate += updateParameterValue;
 
-            if (_animationManager == null)
-            {
-                _animationManager = ParameterObject.core.getManager<AnimationManager>();
-                _animationManager.animationUpdate += updateValue;
-            }
+            _isAnimated = true;
         }
 
         //!
@@ -139,21 +126,26 @@ namespace tracer
         //!
         public void addKey(Key<T> key)
         {
-            if (!isAnimated)
-                initAnimation();
+            if (!_isAnimated)
+                InitAnimation();
 
             int i = findNextKeyIndex(key);
             if (i == -1)
             {
-                int i2 = _keyList.IndexOf(key);
-                if (i2 > -1)
-                    _keyList[i2].value = key.value;
+                i = _keyList.FindIndex(i => i.time == key.time);
+                if (i > -1)
+                    ((Key<T>)_keyList[i]).value = key.value;
                 else
+                {
                     _keyList.Add(key);
+                }
             }
             else
+            {
                 _keyList.Insert(i, key);
+            }
 
+            InvokeHasChanged();
         }
 
         //!
@@ -163,11 +155,36 @@ namespace tracer
         //!
         public void removeKey(Key<T> key)
         {
-            if (_keyList != null)
+            if (_isAnimated)
             {
                 _keyList.Remove(key);
+
                 if (_keyList.Count == 0)
-                    _animationManager.animationUpdate -= updateValue;
+                {
+                    _animationManager.animationUpdate -= updateParameterValue;
+                    _isAnimated = false;
+                }
+                InvokeHasChanged();
+            }
+        }
+
+        //!
+        //! Revove a given key element from the parameters key list.
+        //!
+        //! @param index is the index of the key to be removed from the parameters key list.
+        //!
+        public void removeKeyAtIndex(int index)
+        {
+            if (_isAnimated)
+            {
+                _keyList.RemoveAt(index);
+
+                if (_keyList.Count == 0)
+                {
+                    _animationManager.animationUpdate -= updateParameterValue;
+                    _isAnimated = false;
+                }
+                InvokeHasChanged();
             }
         }
 
@@ -177,19 +194,119 @@ namespace tracer
         //!
         public void setKey()
         {
-            addKey(new Key<T>(_animationManager.time, value));
+            if (!_isAnimated)
+                InitAnimation();
+
+            addKey(new Key<T>(_animationManager.time, _value));
+        }
+
+        //!
+        //! Create and insert a new key element to the parameters key list, 
+        //! based on the given value and at the given time.
+        //!
+        //! @param time The time at which the new key is to be added.
+        //! @param value The the value for the new keyframe to be added.
+        //!
+        public void setKey(Key<T> key)
+        {
+            addKey(key);
         }
 
         //!
         //! Clear the parameters key list and disable the animation functionality.
         //!
-        private void clearKeys()
+        public void clearKeys()
         {
-            if (_animationManager != null)
-                _animationManager.animationUpdate -= updateValue;
-
-            if (_keyList != null)
+            if (_isAnimated)
+            {
                 _keyList.Clear();
+                _animationManager.animationUpdate -= updateParameterValue;
+                _isAnimated = false;
+                _prevIdx = 0;
+                _nextIdx = 0;
+            }
+        }
+
+        //!
+        //! Sets the value of a given key.
+        //!
+        //! @ param key The key for which the value is to be changed.
+        //! @ param value The new value for the given key.
+        //!
+        public void setKeyValue(AbstractKey key, T value)
+        {
+            ((Key<T>)key).value = value;
+        }
+
+        //!
+        //! Sets the value of a key in the key list at the given index.
+        //!
+        //! @ param index The index of the key for which the value is to be changed.
+        //! @ param value The new value for the given key.
+        //!
+        public void setKeyValue (int index, T value)
+        {
+            ((Key<T>)_keyList[index]).value = value;
+        }
+
+        //!
+        //! Sets the time of a given key.
+        //! The internal keylist will be automatically reordered by time. 
+        //!
+        //! @ param key The key for which the time is to be changed.
+        //! @ param time The time the geven key shall be moved to.
+        //!
+        public void setKeyTime(AbstractKey key, float time)
+        {
+            setKeyTime(_keyList.IndexOf(key), time);
+        }
+
+        //!
+        //! Sets the time of a key in the key list at the given index.
+        //! The internal keylist will be automatically reordered by time. 
+        //!
+        //! @ param index The index of the key for which the time is to be changed.
+        //! @ param time The time the geven key shall be moved to.
+        //!
+        public void setKeyTime(int index, float time)
+        {
+            Key<T> key = (Key<T>)_keyList[index];
+            int count = _keyList.Count;
+            key.time = time;
+
+            if (count < 2)
+                return;
+
+            if (index > 0 && index < count - 1)
+            {
+                if (time < _keyList[index - 1].time || time > _keyList[index + 1].time)
+                {
+                    _keyList.Remove(key);
+                    addKey(key);
+                }
+            }
+            else if (index == 0)
+            {
+                if (time > _keyList[index + 1].time)
+                {
+                    _keyList.Remove(key);
+                    addKey(key);
+                }
+            }
+            else if (index == count-1)
+            {
+                if (time < _keyList[index - 1].time)
+                {
+                    _keyList.Remove(key);
+                    addKey(key);
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void InvokeKeyHasChanged()
+        {
+            keyHasChanged?.Invoke(this, EventArgs.Empty);
         }
 
         //!
@@ -198,33 +315,50 @@ namespace tracer
         //! @param o A reference to the Animation Manager.
         //! @param time The given time used to calulate the parameters new value.
         //!
-        private void updateValue(object o, float time)
+        private void updateParameterValue(object o, float time)
         {
-            if (isAnimated)
+            if (((SceneObject)_parent)._lock)
+                return;
+
+            if (_isAnimated)
             {
-                // current time is NOT in between the two active keys
-                if (time < _keyList[_prevIdx].time || time > _keyList[_nextIdx].time)
+                if (_keyList.Count > 1)
                 {
-                    int i = findNextKeyIndex(time);
-                    // current time is bigger than all keys in list
-                    if (i == -1)
-                        _nextIdx = _prevIdx = _keyList.Count - 1;
+                    if (_keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
+                        value = interpolateLinear(time);
                     else
                     {
+                        // current time is NOT in between the two active keys
+                        int i = findNextKeyIndex(time);
+                        // current time is bigger than all keys in list
+                        if (i == -1)
+                        {
+                            _prevIdx = _keyList.Count - 1;
+                            value = ((Key<T>)_keyList[_prevIdx]).value; //still update animation to the last key's value
+                        }
                         // current time is smaller than all keys in list
-                        if (i == 0)
-                            _nextIdx = _prevIdx = 0;
+                        else if (i == 0)
+                        {
+                            _nextIdx = 0;
+                            value = ((Key<T>)_keyList[_nextIdx]).value; //still update animation to the first key's value
+                        }
                         // current time is somewhere between all keys in list
                         else
                         {
                             _nextIdx = i;
                             _prevIdx = i - 1;
+                            value = interpolateLinear(time);
                         }
                     }
                 }
-                value = interpolate(time);
+                else
+                {
+                    _nextIdx = _prevIdx = 0;
+                    
+                }
             }
         }
+
 
         //!
         //! Function for searching the next bigger key index in the key list.
@@ -251,98 +385,39 @@ namespace tracer
         }
 
         //!
-        //! Function that returns the current animation state of the parameter.
-        //!
-        //! @return The current animation state of the parameter.
-        //!
-        public override bool isAnimated
-        {
-            get
-            {
-                if (_keyList != null)
-                    return _keyList.Count > 0;
-                else
-                    return false;
-            }
-        }
-
-        //!
-        //! Function that interpolates the current parameter value based on a given
+        //! Function that linear interpolates the current parameter value based on a given
         //! time and the previous and next time indices.
         //!
-        //! @parameter time The given time used to interpolate the parameters value.
+        //! @parameter time The given time used to interpolateLinear the parameters value.
         //! @return The interpolated parameter value.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private T interpolate(float time)
+        private T interpolateLinear(float time)
         {
+            float pt = _keyList[_prevIdx].time;
+            float nt = _keyList[_nextIdx].time;
+            T pv = ((Key<T>)_keyList[_prevIdx]).value;
+            T nv = ((Key<T>)_keyList[_nextIdx]).value;
+
+            if (nt == pt)
+                return nv;
+
+            float inBetween = (time - pt) / (nt - pt);
+
             switch (_type)
             {
                 case ParameterType.FLOAT:
-                    float inBetween = (time - _keyList[_prevIdx].time) / (_keyList[_prevIdx].time - _keyList[_nextIdx].time);
-                    float s1 = 1.0f - (_keyList[_nextIdx].time - inBetween) / (_keyList[_nextIdx].time - _keyList[_prevIdx].time);
-                    return (T)(object)(((float)(object)_keyList[_prevIdx].value) * (1.0f - s1) + ((float)(object)_keyList[_nextIdx].value) * s1);
+                    return (T)(object)((float)(object)pv * (1.0f - inBetween) + (float)(object)nv * inBetween);
+                case ParameterType.VECTOR3:
+                    return (T)(object)((Vector3)(object)pv * (1.0f - inBetween) + (Vector3)(object)nv * inBetween);
+                case ParameterType.QUATERNION:
+                    return (T)(object)Quaternion.Slerp((Quaternion)(object)pv, (Quaternion)(object)nv, inBetween);
+                case ParameterType.COLOR:
+                    return (T)(object)Color.Lerp((Color)(object)pv, (Color)(object)nv, inBetween);
                 default:
                     return default(T);
             }
         }
-
-        //!
-        //! Function for serializing the animation parameters keys.
-        //! 
-        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
-        //! @param _offset The start offset in the given sourceSpan array.
-        //! 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void Serialize(Span<byte> targetSpan)
-        {
-            base.Serialize(targetSpan);
-
-            int offset = _dataSize;
-            short keyCount = (short) _keyList.Count;
-          
-            BitConverter.TryWriteBytes(targetSpan.Slice(offset+=2, 2), keyCount); // nbr. of keys
-            for (int i=0; i<keyCount; i++)
-            {
-                Key<T> key = _keyList[i];
-                BitConverter.TryWriteBytes(targetSpan.Slice(offset+=1, 1),(byte)key.type); // type
-                BitConverter.TryWriteBytes(targetSpan.Slice(offset+=4, 4), key.time); // time
-                BitConverter.TryWriteBytes(targetSpan.Slice(offset+=4, 4), key.tangentTime); // tangent time
-                SerializeData(targetSpan.Slice(offset+=_dataSize, _dataSize), key.value); // value
-                SerializeData(targetSpan.Slice(offset+=_dataSize, _dataSize), key.tangentValue); // tangent value
-            }
-        }
-
-        //!
-        //! Function for deserializing the animation parameters keys.
-        //! 
-        //! @param _data The byte _data to be deserialized and copyed to the parameters value.
-        //! @param _offset The start offset in the given sourceSpan array.
-        //! 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
-        {
-            base.deSerialize(sourceSpan);
-
-            // determine the correct offset in the span
-            int offset = _dataSize;
-            short keyCount = MemoryMarshal.Read<short>(sourceSpan.Slice(offset+=2, 2));
-
-            if (!isAnimated && keyCount>0)
-                initAnimation();
-
-            _keyList.Clear();
-
-            for (int i=0; i<keyCount; i++) 
-            {
-                Key<T>.KeyType type = MemoryMarshal.Read<Key<T>.KeyType>(sourceSpan.Slice(offset+=1, 1));
-                float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset+=4, 4));
-                float tangenttime = MemoryMarshal.Read<float>(sourceSpan.Slice(offset+=4, 4));
-                T value = deSerializeData(sourceSpan.Slice(offset+=_dataSize, _dataSize));
-                T tangentvalue = deSerializeData(sourceSpan.Slice(offset+=_dataSize, _dataSize));
-
-                _keyList.Add(new Key<T>(time, value, tangenttime, tangentvalue, type));
-            }
-        }
     }
+
 }

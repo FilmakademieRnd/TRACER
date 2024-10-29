@@ -224,7 +224,7 @@ namespace tracer
             m_sceneDataHandler = new SceneDataHandler();
             settings.sceneFilepath = new Parameter<string>("VPETdefaultScene", "Filepath");
 
-            // create scene parent if not there
+            // create scene _parent if not there
             scnRoot = GameObject.Find("Scene");
             if (scnRoot == null)
             {
@@ -243,7 +243,7 @@ namespace tracer
         //!
         //! Function that returns a scne object based in the given ID.
         //!
-        //! @param id The ID of the scene object to be returned.
+        //! @param _id The ID of the scene object to be returned.
         //! @return The corresponding scene object to the gevien ID.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

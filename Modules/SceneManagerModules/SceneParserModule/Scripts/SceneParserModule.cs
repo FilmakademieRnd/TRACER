@@ -64,7 +64,7 @@ namespace tracer
         //!
         public SceneParserModule(string name, Manager manager) : base(name, manager)
         {
-            //if (!core.isServer)
+            //if (!_core.isServer)
               //  load = false;
 
             m_lodLowLayer = LayerMask.NameToLayer("LodLow");
@@ -622,52 +622,72 @@ namespace tracer
         //! @characterList The list to add the serialised skinned object to.
         //! @param gameObjectList A reference to the list of the traversed Unity Game Object tree. 
         //!
-        private void processCharacter(Animator animator, ref List<GameObject> gameObjectList, ref List<SceneManager.CharacterPackage> characterList)
+        private void processCharacter(Animator animator, ref List<GameObject> gameObjectList,
+            ref List<SceneManager.CharacterPackage> characterList)
         {
+            // Create a new CharacterPackage to store bone data
             SceneManager.CharacterPackage chrPack = new SceneManager.CharacterPackage();
             chrPack.characterRootId = gameObjectList.IndexOf(animator.transform.gameObject);
 
-            HumanBone[] boneArray = animator.avatar.humanDescription.human;
-            chrPack.bMSize = Enum.GetNames(typeof(HumanBodyBones)).Length;
-            chrPack.boneMapping = Enumerable.Repeat(-1, chrPack.bMSize).ToArray<int>();
+            // Get all child bones (transforms) of the root object recursively
+            List<Transform> boneList = new List<Transform>();
+            CollectBones(animator.transform, boneList); // A helper function that collects all bones recursively
 
-            for (int i = 0; i < boneArray.Length; i++)
+            chrPack.sSize = boneList.Count; // The number of bones
+            chrPack.bMSize = chrPack.sSize;
+            chrPack.boneMapping = Enumerable.Repeat(-1, chrPack.bMSize).ToArray<int>();
+            
+            chrPack.skeletonMapping = new int[chrPack.sSize]; // To map bones to game objects
+            chrPack.bonePosition = new float[chrPack.sSize * 3]; // Store bone positions
+            chrPack.boneRotation = new float[chrPack.sSize * 4]; // Store bone rotations
+            chrPack.boneScale = new float[chrPack.sSize * 3]; // Store bone scales
+
+            for (int i = 0; i < boneList.Count; i++)
             {
-                if (boneArray[i].boneName != null)
+                if (boneList[i].name != null)
                 {
-                    string enumName = boneArray[i].humanName.Replace(" ", "");
+                    string enumName = boneList[i].name.Replace(" ", "");
                     HumanBodyBones enumNum;
                     Enum.TryParse<HumanBodyBones>(enumName, true, out enumNum);
-                    Transform boneTransform = Helpers.FindDeepChild(animator.transform, boneArray[i].boneName);
+                    Transform boneTransform = Helpers.FindDeepChild(animator.transform, boneList[i].name);
                     chrPack.boneMapping[(int)enumNum] = gameObjectList.IndexOf(boneTransform.gameObject);
                 }
             }
-
-            SkeletonBone[] skeletonArray = animator.avatar.humanDescription.skeleton;
-            chrPack.sSize = skeletonArray.Length;
-            chrPack.skeletonMapping = new int[chrPack.sSize];
-            chrPack.bonePosition = new float[chrPack.sSize * 3];
-            chrPack.boneRotation = new float[chrPack.sSize * 4];
-            chrPack.boneScale = new float[chrPack.sSize * 3];
-
-            for (int i = 0; i < skeletonArray.Length; i++)
+            
+            // Loop through all bones and collect the information
+            for (int i = 0; i < boneList.Count; i++)
             {
-                chrPack.skeletonMapping[i] = gameObjectList.IndexOf(GameObject.Find(skeletonArray[i].name));
+                Transform boneTransform = boneList[i];
+                chrPack.skeletonMapping[i] = gameObjectList.IndexOf(boneTransform.gameObject);
 
-                chrPack.bonePosition[i * 3] = skeletonArray[i].position.x;
-                chrPack.bonePosition[i * 3 + 1] = skeletonArray[i].position.y;
-                chrPack.bonePosition[i * 3 + 2] = skeletonArray[i].position.z;
+                // Position
+                chrPack.bonePosition[i * 3] = boneTransform.localPosition.x;
+                chrPack.bonePosition[i * 3 + 1] = boneTransform.localPosition.y;
+                chrPack.bonePosition[i * 3 + 2] = boneTransform.localPosition.z;
 
-                chrPack.boneRotation[i * 4] = skeletonArray[i].rotation.x;
-                chrPack.boneRotation[i * 4 + 1] = skeletonArray[i].rotation.y;
-                chrPack.boneRotation[i * 4 + 2] = skeletonArray[i].rotation.z;
-                chrPack.boneRotation[i * 4 + 3] = skeletonArray[i].rotation.w;
+                // Rotation (local rotation)
+                chrPack.boneRotation[i * 4] = boneTransform.localRotation.x;
+                chrPack.boneRotation[i * 4 + 1] = boneTransform.localRotation.y;
+                chrPack.boneRotation[i * 4 + 2] = boneTransform.localRotation.z;
+                chrPack.boneRotation[i * 4 + 3] = boneTransform.localRotation.w;
 
-                chrPack.boneScale[i * 3] = skeletonArray[i].scale.x;
-                chrPack.boneScale[i * 3 + 1] = skeletonArray[i].scale.y;
-                chrPack.boneScale[i * 3 + 2] = skeletonArray[i].scale.z;
+                // Scale
+                chrPack.boneScale[i * 3] = boneTransform.localScale.x;
+                chrPack.boneScale[i * 3 + 1] = boneTransform.localScale.y;
+                chrPack.boneScale[i * 3 + 2] = boneTransform.localScale.z;
             }
+
+            // Add the character package to the character list
             characterList.Add(chrPack);
+        }
+
+        private void CollectBones(Transform root, List<Transform> boneList)
+        {
+            foreach (Transform child in root)
+            {
+                boneList.Add(child);
+                CollectBones(child, boneList); // Recursively add child bones
+            }
         }
     }
 }
