@@ -64,12 +64,12 @@ namespace tracer
         //!
         public event EventHandler<Vector2> objectSelectionEvent;
         
-        public event EventHandler<Vector2> ControllerObjectSelectionEvent;
+        //public event EventHandler<Vector2> ControllerObjectSelectionEvent;
 
         //!
         //! Press start event, i.e. the begin of a click.
         //!
-        public event EventHandler<Vector2> inputPressTapp;
+        //public event EventHandler<Vector2> inputPressTapp;
         //!
         //! Press start event, i.e. the begin of a click.
         //!

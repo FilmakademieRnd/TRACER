@@ -70,7 +70,7 @@ namespace tracer
         //!
         public event EventHandler<int> parameterChanged;
 
-        public event EventHandler<ColorSelect> colorSelectActive; 
+        //public event EventHandler<ColorSelect> colorSelectActive; 
 
         private Transform UI2D;
 

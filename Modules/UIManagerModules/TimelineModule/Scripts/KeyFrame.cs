@@ -58,7 +58,7 @@ namespace tracer
             set { m_callback1 = value; }
         }
 
-        protected void Awake()
+        protected override void Awake()
 	    {
 	        base.Awake();
 	        // get m_rectTransform component
@@ -102,8 +102,9 @@ namespace tracer
 	        m_callback?.Invoke(key, m_rectTransform.position.x);
 	    }
 
-		public void OnPointerDown(PointerEventData data)
+		public override void OnPointerDown(PointerEventData data)
 		{
+			base.OnPointerDown(data);
             m_callback1?.Invoke(transform.gameObject);
         }
     }

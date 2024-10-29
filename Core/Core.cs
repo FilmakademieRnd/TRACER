@@ -159,7 +159,7 @@ namespace tracer
         //!
         public event EventHandler<byte> syncEvent;
 
-        public event  EventHandler<string> QrCodeReady;
+        //public event  EventHandler<string> QrCodeReady;
         [SerializeField] public bool useRandomCID = false;
 
         //!

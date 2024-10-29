@@ -42,7 +42,7 @@ namespace tracer
         private float m_time;
         public float time { get => m_time; }
         public event EventHandler<float> animationUpdate;
-        public event EventHandler<IAnimationParameter> keyframeUpdate;
+        //public event EventHandler<IAnimationParameter> keyframeUpdate;
         public event EventHandler<IAnimationParameter> addKey;
         public event EventHandler<IAnimationParameter> removeKey;
         public event EventHandler<IAnimationParameter> removeAnimation;
