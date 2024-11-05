@@ -302,11 +302,19 @@ namespace tracer
                             if (parameterObject != null)
                             {
                                 AbstractParameter  parameter = parameterObject.parameterList[parameterID];
-                                
+
                                 // check update if animation is incoming and change parameter type if required 
                                 // 10 is the size of the parameter fixed field
-                                if (!parameter._isAnimated && length > 10 + parameter.dataSize())
-                                    parameter.InitAnimation();
+                                if (parameter._isAnimated)
+                                {
+                                    if (length == 10 + parameter.defaultDataSize())
+                                        parameter.reset();
+                                }
+                                else 
+                                {
+                                    if (length > 10 + parameter.dataSize())
+                                        parameter.InitAnimation();
+                                }
                                 
                                 parameter.deSerialize(message.Slice(start + 10));
                             }

@@ -173,6 +173,7 @@ namespace tracer
         public abstract void copyValue(AbstractParameter v);
 
         public abstract int dataSize();
+        public abstract int defaultDataSize();
     }
 
     [Serializable]
@@ -206,6 +207,11 @@ namespace tracer
                 // parameterValue<ParamValueSize> + countKeys<short> + nbrKeys * (type<byte> + time<float> + tangentTime1<float> + tangentTime2<float> + value<ParamValueSize> + tangentvalue1<ParamValueSize> + tangentvalue2<ParamValueSize>) 
                 return _dataSize + 2 + _keyList.Count * (1 + 3 * sizeof(float) + 3 * _dataSize);
 
+            return defaultDataSize();
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override int defaultDataSize()
+        {
             switch (_type)
             {
                 case ParameterType.STRING:
@@ -353,6 +359,7 @@ namespace tracer
                 _value = _initialValue;
                 hasChanged?.Invoke(this, _value);
             }
+            clearKeys();
         }
 
         /////////////////////////////////////////////////////////////
