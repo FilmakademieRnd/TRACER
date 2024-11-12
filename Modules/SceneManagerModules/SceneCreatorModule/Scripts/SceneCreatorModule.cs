@@ -273,7 +273,7 @@ namespace tracer
             {
                 // [REVIEW]
                 // create ParameterObjects
-                DynamicParameterObject obj = (DynamicParameterObject) DynamicParameterObject.Attach(coreObject, 255);
+                DynamicParameterObject obj = DynamicParameterObject.Attach(coreObject, 255);
                 obj.objectName = po.name;
 
                 customMenu = customMenu.Add(po.name, true);

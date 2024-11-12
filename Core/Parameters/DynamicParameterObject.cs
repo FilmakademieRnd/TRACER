@@ -39,6 +39,21 @@ using UnityEngine;
 public class DynamicParameterObject : ParameterObject
 {
     //!
+    //! Factory to create a new ParameterObject and do it's initialisation.
+    //! Use this function instead GameObject.AddComponen<>!
+    //!
+    //! @param gameObject The gameObject the new ParameterObject will be attached to.
+    //! @sceneID The scene ID for the new ParameterObject.
+    //!
+    public new static DynamicParameterObject Attach(GameObject gameObject, byte sceneID = 254)
+    {
+        DynamicParameterObject obj = gameObject.AddComponent<DynamicParameterObject>();
+        obj.Init(sceneID);
+
+        return obj;
+    }
+
+    //!
     //! Function to subscribe to the HasChanged Parameter Event
     ///
     /// @param parameter The parameter whose HasChanged event will be subscribed to
