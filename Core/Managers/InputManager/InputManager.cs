@@ -67,6 +67,11 @@ namespace tracer
         public event EventHandler<Vector2> ControllerObjectSelectionEvent;
 
         //!
+        //! Event to hook into to check e.g. if we have a selected object and do focus on it
+        //!
+        public event EventHandler<EventArgs> doubleClickedEvent;
+
+        //!
         //! Press start event, i.e. the begin of a click.
         //!
         public event EventHandler<Vector2> inputPressTapp;
@@ -281,6 +286,10 @@ namespace tracer
         //! Simple latch for in-editor middle click input.
         //!
         private bool dragClick = false;
+        //!
+        //! timer to check if we made a double click / tap (right now only used to focuse on an object)
+        //!
+        private float doubleClickCheckTimer = 0f;
 
         //!
         //! Constructor initializing member variables.
@@ -725,15 +734,30 @@ namespace tracer
         {
             //Debug.Log("<color=green>Tap Function</color> phase: "+c.phase);
             if (c.performed){
+                //check it this is a double click / tap!
+                bool doubleClickPerformance = Time.time - doubleClickCheckTimer < 0.4f;
+                doubleClickCheckTimer = Time.time;
+                
                 //TAP never changes m_inputLayerType, because we get this after "Press End" and would never reset it to SCREEN
                 Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
                 if(TappedUI(point)){
                     //m_inputLayerType = InputLayerType.UI;
+                    //Debug.Log("tpd ui");
                 }else if(Tapped3DUI(point)){
                     //m_inputLayerType = InputLayerType.WORLD;
+                    //Debug.Log("TPD 3D!");
+                    if(doubleClickPerformance){
+                        //focus on the object if we do so!
+                        doubleClickedEvent.Invoke(this, null);
+                    }
                 }else{
                     //m_inputLayerType = InputLayerType.SCREEN;
                     objectSelectionEvent?.Invoke(this, point);
+                    if(doubleClickPerformance){
+                        //focus on the object if we do so!
+                        doubleClickedEvent.Invoke(this, null);
+                    }
+                    
                 }
             }
 

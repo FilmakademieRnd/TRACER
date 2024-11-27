@@ -105,6 +105,10 @@ namespace tracer
         //!
         public event EventHandler<SceneObject> highlightLocked;
         //!
+        //! Event (for the camera) to focus on a selected object)
+        //!
+        public event EventHandler<SceneObject> selectionFocus;
+        //!
         //! Event emitted to unhighlight a scene object.
         //!
         public event EventHandler<SceneObject> unhighlightLocked;
@@ -555,6 +559,25 @@ namespace tracer
 
                 selectionChanged?.Invoke(this, m_selectedObjects);
                 selectionAdded?.Invoke(this, sceneObject);
+            }
+        }
+
+        //!
+        //! Function that checks if this object is already within our selected list
+        //!
+        //! @ param sceneObject The selected scene object to be added.
+        //!
+        public bool isThisOurSelectedObject(SceneObject sceneObject){
+            return m_selectedObjects.Contains(sceneObject);
+        }
+
+        //!
+        //! Focus on an object if we only have on selcted
+        //!
+        //!
+        public void focusOnSingleSelection(){
+            if(m_selectedObjects.Count == 1){
+                selectionFocus.Invoke(this, m_selectedObjects[0]);
             }
         }
 
