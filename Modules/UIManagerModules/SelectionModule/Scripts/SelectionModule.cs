@@ -179,7 +179,6 @@ namespace tracer
         //!
         private async void SelectFunction(object sender, Vector2 point)
         {
-            Debug.Log("<color=orange>Select Function</color>");
             m_isRenderActive = true;
 
             // give the system some time to render the object _id's
@@ -200,12 +199,12 @@ namespace tracer
             {
                 // Thomas: if obj is already our selected object, do nothing (maybe trigger a refocus, if it was a double click/tap)
                 if(manager.isThisOurSelectedObject(obj)){
-                    Debug.Log("<color=green>already selected</color>");
+                    //Debug.Log("<color=green>already selected</color>");
                     m_isRenderActive = false;
                     return;
                 }else{
                     manager.clearSelectedObject();
-                    Debug.Log("<color=blue>new selected object</color>");
+                    //Debug.Log("<color=blue>new selected object</color>");
                 }
 
                 switch (obj)
@@ -229,7 +228,7 @@ namespace tracer
                 }
             }else{
                 manager.clearSelectedObject();
-                Debug.Log("<color=yellow>.cleared</color>");
+                //Debug.Log("<color=yellow>.cleared</color>");
             }
 
             m_isRenderActive = false;

@@ -45,6 +45,11 @@ namespace tracer
         //! A reference to the _parent Scene Object.
         //!
         public SceneObject m_parentObject;
+
+        //!
+        //! The lock image for lights and camera, since we cannot show an outline on these
+        //!
+        public GameObject m_lockImage;
         
         //!
         //! Start is called before the first frame update
@@ -54,6 +59,26 @@ namespace tracer
             Core core = GameObject.Find("TRACER").GetComponent<Core>();
             m_iconScale = Vector3.one * core.getManager<UIManager>().settings.uiScale.value;
             transform.right = Camera.main.transform.right;
+        }
+
+        public void CreateLockIcon(){
+            if(m_parentObject.GetComponent<Camera>() || m_parentObject.GetComponent<Light>()){
+                m_lockImage = new GameObject("Lock Viz");
+                SpriteRenderer sr = m_lockImage.AddComponent<SpriteRenderer>();
+                sr.sprite = Resources.Load<Sprite>("Images/SceneObjectLocked");
+                sr.material = GetComponent<SpriteRenderer>().material;
+                m_lockImage.transform.parent = transform;
+                m_lockImage.transform.localPosition = new Vector3(transform.localScale.x/2f,-transform.localScale.y/2f,-0.1f);
+                m_lockImage.transform.localScale = Vector3.one * 0.5f;
+                HideLock();
+            }
+        }
+
+        private void ShowLock(){
+            if(m_lockImage) m_lockImage.SetActive(true);
+        }
+        private void HideLock(){
+            if(m_lockImage) m_lockImage.SetActive(false);
         }
 
         //!
@@ -67,6 +92,20 @@ namespace tracer
             transform.position = m_parentObject.transform.position;
             transform.rotation = camera.rotation;
             transform.localScale = m_iconScale * Mathf.Abs(depth * 0.1f);
+            
+            if(!m_lockImage)
+                return;
+
+            //TODO: only necessary to check, if icon is visible by any camera!
+            if(m_parentObject._lock){
+                if(!m_lockImage.activeSelf){
+                    ShowLock();
+                }
+            }else{
+                if(m_lockImage.activeSelf){
+                    HideLock();
+                }
+            }
         }
     }
 }

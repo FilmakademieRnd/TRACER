@@ -140,6 +140,7 @@ namespace tracer
                         {
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);
                             icon.GetComponent<IconUpdate>().m_parentObject = sceneObject;
+                            icon.GetComponent<IconUpdate>().CreateLockIcon();
                             renderer = icon.GetComponent<SpriteRenderer>();
                             renderer.sprite = m_lightSprite;
                             Parameter<Color> colorParameter = sceneObject.getParameter<Color>("color");
@@ -154,6 +155,7 @@ namespace tracer
                         {
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);
                             icon.GetComponent<IconUpdate>().m_parentObject = sceneObject;
+                            icon.GetComponent<IconUpdate>().CreateLockIcon();
                             renderer = icon.GetComponent<SpriteRenderer>();
                             renderer.sprite = m_cameraSprite;
                             m_sceneObjects.Add(sceneObject);

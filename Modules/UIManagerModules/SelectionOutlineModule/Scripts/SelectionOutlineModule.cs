@@ -84,8 +84,11 @@ namespace tracer
         //!
         private void HighlightLocked(object sender, SceneObject sceneObject)
         {
-            if ((sceneObject is SceneObjectCamera) || sceneObject is SceneObjectLight)
+            if ((sceneObject is SceneObjectCamera) || sceneObject is SceneObjectLight){
+                //show 3d ui lock
+                
                 return;
+            }
 
             Renderer[] renderers = sceneObject.GetComponentsInChildren<Renderer>();
 
