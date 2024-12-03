@@ -35,7 +35,7 @@ TRACER is a development by [Filmakademie Baden-Wuerttemberg](https://filmakademi
 
 ## Funding
 
-![Animationsinstitut R&D](.doc/img/EN_FundedbytheEU_RGB_POS_rs.png)
+![Animationsinstitut R&D](.doc/img/EN_Co-fundedbytheEU_RGB_POS.png)
 
 This project has received funding from the European Union's Horizon Europe Research and Innovation Programme under Grant Agreement No 101070072 MAX-R.
 This development was inspired by projects under the the European Union’s Horizon 2020 Research and Innovation Programme under Grant Agreement No 780470 SAUCE and the European Commission’s Seventh Framework Programme under grant agreement no 610005 DREAMSPACE.
