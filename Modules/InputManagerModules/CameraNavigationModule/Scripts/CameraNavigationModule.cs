@@ -318,14 +318,21 @@ namespace tracer
             GameObject go = sceneObject.gameObject;
             //calculate bounds
             Bounds b = new Bounds(go.transform.position, Vector3.zero);
-            UnityEngine.Object[] rList = go.GetComponentsInChildren(typeof(Renderer));
-            foreach (Renderer r in rList){
-                b.Encapsulate(r.bounds);
+            switch(sceneObject){
+                case SceneObjectCamera:
+                case SceneObjectLight:
+                    break;
+                default:
+                    UnityEngine.Object[] rList = go.GetComponentsInChildren(typeof(Renderer));
+                    foreach (Renderer r in rList){
+                        b.Encapsulate(r.bounds);
+                    }
+                    break;
             }
 
             Vector3 max = b.size;
             // Get the radius of a sphere circumscribing the bounds, multiply by s_focusDistance (the higher the multiply, the farther away)
-            float radius = max.magnitude / 2f * s_focusDistance;
+            float radius = Mathf.Max(max.magnitude, 1f) / 2f * s_focusDistance;
             // Get the horizontal FOV, since it may be the limiting of the two FOVs to properly encapsulate the objects
             float horizontalFOV = 2f * Mathf.Atan(Mathf.Tan(m_cam.fieldOfView * Mathf.Deg2Rad / 2f) * m_cam.aspect) * Mathf.Rad2Deg;
             // Use the smaller FOV as it limits what would get cut off by the frustum		

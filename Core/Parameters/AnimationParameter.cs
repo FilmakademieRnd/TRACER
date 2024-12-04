@@ -164,6 +164,8 @@ namespace tracer
                     _animationManager.animationUpdate -= updateParameterValue;
                     _isAnimated = false;
                 }
+                _prevIdx = 0;
+                _nextIdx = 0;
                 InvokeHasChanged();
             }
         }
@@ -184,6 +186,8 @@ namespace tracer
                     _animationManager.animationUpdate -= updateParameterValue;
                     _isAnimated = false;
                 }
+                _prevIdx = 0;
+                _nextIdx = 0;
                 InvokeHasChanged();
             }
         }
@@ -311,6 +315,7 @@ namespace tracer
 
         //!
         //! Calculate the parameters value based on the keylist and given time.
+        //! TODO: add as option to all "still update animation ... "
         //!
         //! @param o A reference to the Animation Manager.
         //! @param time The given time used to calulate the parameters new value.
@@ -351,9 +356,11 @@ namespace tracer
                         }
                     }
                 }
-                else
+                else 
                 {
                     _nextIdx = _prevIdx = 0;
+                    if (_keyList.Count == 1)    //still update animation to the left key's value
+                        value = ((Key<T>)_keyList[_prevIdx]).value;
                     
                 }
             }

@@ -197,7 +197,7 @@ namespace tracer
 
             if (obj)
             {
-                // Thomas: if obj is already our selected object, do nothing (maybe trigger a refocus, if it was a double click/tap)
+                // Thomas: if obj is already our selected object, trigger a refocus, if it was a double click/tap
                 if(manager.isThisOurSelectedObject(obj)){
                     //Debug.Log("<color=green>already selected</color>");
                     m_isRenderActive = false;
@@ -236,7 +236,6 @@ namespace tracer
 
         //!
         //! If we have a single selected object, focus on it
-        //! 
         //!
         private void FocusFunction(object sender, EventArgs e){
             manager.focusOnSingleSelection();

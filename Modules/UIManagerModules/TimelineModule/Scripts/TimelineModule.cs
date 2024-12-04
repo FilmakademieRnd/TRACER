@@ -41,9 +41,11 @@ namespace tracer
 {
     public class TimelineModule : UIManagerModule
     {
-
+        //TODO add these options to the settings
+        //furthermore: add option to loop from first to last keyframe in current view
         private const int TIMELINE_START_MINIMUM = -10;     //the most minimum frameNr StartTime can become
         private const bool STOP_ON_LAST_KEYFRAME = false;   //if so, timeline stops playing on current selected last keyframe
+        private const bool LOOP_IN_CURRENT_VIEW = true;     //while playing, loop if end time is reached
         private const bool SET_TIME_TO_MARKED_KEYFRAME = true; //if so, the red line jumps to the marked keyframe AND updates if we move it
         
         //private const bool ONLY_ALLOW_KEYFRAMES_AT_EMPTY_INTS = true; //minimum distance between keyframes is _ONE_ frame
@@ -865,10 +867,12 @@ namespace tracer
             if (removeKey && !removeAll && m_activeKeyframeIndex > -1)
             {
                 int idx = m_activeKeyframeIndex;
-                if (idx >= 0)
-                {
+                if (idx >= 0){
                     parameter.removeKeyAtIndex(idx);
                     m_activeKeyframeIndex = -1;
+                    //update selected object to show the correct values
+                    //OnKeyframeUpdated(null, null);
+                    m_animationManager.timelineUpdated(m_currentTime);
                 }
             }
             else if (!removeKey)
@@ -947,7 +951,7 @@ namespace tracer
                 nextKeyFrame.select();
                 setTime(nextKeyFrame.key.time, false);
                 if(wouldTimelineTimeBeOutOfScope(nextKeyFrame.key.time)){
-                    focuseOnCurrentTime();
+                    focusOnCurrentTime();
                 }
             }
             updateButtonInteractability();
@@ -989,7 +993,7 @@ namespace tracer
                 prevKeyFrame.select();
                 setTime(prevKeyFrame.key.time, false);
                 if(wouldTimelineTimeBeOutOfScope(prevKeyFrame.key.time)){
-                    focuseOnCurrentTime();
+                    focusOnCurrentTime();
                 }
             }
             updateButtonInteractability();
@@ -1004,7 +1008,7 @@ namespace tracer
                 core.StopCoroutine(playCoroutine());
             }else{
                 deselectKeyframe();
-                focuseOnCurrentTime();
+                focusOnCurrentTime();
                 m_isPlaying = true;
                 m_playCoroutine = core.StartCoroutine(playCoroutine());
             }
@@ -1036,13 +1040,15 @@ namespace tracer
                     continue;
                 }
                 
-                focuseOnCurrentTime();
+                focusOnCurrentTime();
                 setTime(m_currentTime + (1f / m_framerate));
 
                 //if bigger than last keyframe, stop playback (if no keyframes are there, play endless)
                 if(STOP_ON_LAST_KEYFRAME && lastKeyFrame && m_currentTime > lastKeyFrame.key.time){
                     play();
                     setTime(lastKeyFrame.key.time);
+                }else if(LOOP_IN_CURRENT_VIEW && m_currentTime >= EndTime){
+                    setTime(StartTime);
                 }
             }
         }
@@ -1050,11 +1056,14 @@ namespace tracer
         //!
         //! if current time (red line) is out of scope, move timeline so its on the left side. During m_isPlaying, 'fix' it on 40% on timeline
         //!
-        private void focuseOnCurrentTime(){
+        private void focusOnCurrentTime(){
             float distance = EndTime - StartTime;
             if(m_isPlaying){
                 //if last keyframe is visible on timeline (below 90%) dont move the timeline as it plays
                 if(STOP_ON_LAST_KEYFRAME && lastKeyFrame && lastKeyFrame.key.time < (EndTime-distance*0.1f))
+                    return;
+
+                if(LOOP_IN_CURRENT_VIEW)
                     return;
 
                 //move the timeline so the red-line stays at the same position (40%) for a more convenient way to watch
@@ -1246,10 +1255,16 @@ namespace tracer
         //!
         private void OnPinchDetail(object sender, InputManager.DetailedEventArgs detailedArgs)
         {
+            bool simulateRelease = false;
             if (!m_isSelected){
                 //if we are not on touch (e.g. scroll wheel) select this if point is here
                 if(!m_inputManager.IsInputTouch() && Raycast(detailedArgs.point) == m_timeLine){
                     //act like its selected
+                    //if we zoom via scroll wheel, we do not have an "end" event and need a dummy click to reset the 'special action'
+                    //therefore we'll fake an end after every call right now and right here!
+                    #if (!UNITY_IOS && !UNITY_ANDROID) || UNITY_EDITOR
+                    simulateRelease = true;
+                    #endif
                 }else{
                     //Debug.Log("ignore <color=cyan>TIMELINE::OnPinchDetail</color> due to !m_isSelected");
                     return;
@@ -1263,6 +1278,10 @@ namespace tracer
             
 
             ZoomTimeline(detailedArgs.point, detailedArgs.delta.x);
+
+            if(simulateRelease){
+                OnMiddleClickRelease(null, Vector2.zero);
+            }
         }
 
         //!
