@@ -574,7 +574,6 @@ namespace tracer
         //!
         //! Focus on an object if we only have on selcted
         //!
-        //!
         public void focusOnSingleSelection(){
             if(m_selectedObjects.Count == 1){
                 selectionFocus.Invoke(this, m_selectedObjects[0]);

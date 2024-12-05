@@ -28,6 +28,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 23.03.2022
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -98,6 +99,10 @@ namespace tracer
         //! A parameter defining how close to the edge an object can be and still act as center of interest
         //!
         private float screenTolerance = .05f;
+        //!
+        //! dont run the coroutine to focus on an object via double click twice
+        //!
+        private bool m_smoothCameraFocusIsRunning = false;
 
         //!
         //! Constructor.
@@ -340,12 +345,50 @@ namespace tracer
             float dist = radius /  (Mathf.Sin(fov * Mathf.Deg2Rad / 2f));
             //Debug.Log("Radius = " + radius + " dist = " + dist);
 
-            if (m_cam.orthographic)
-                m_cam.orthographicSize = radius;
+            //Smooth transition
+            sceneObject.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - m_camXform.forward * dist));
             
-            // Frame the object hierarchy
-            m_camXform.LookAt(b.center);
-            m_camXform.position = b.center - m_camXform.forward * dist;
+            // if (m_cam.orthographic)
+            //     m_cam.orthographicSize = radius;
+            
+            // // Frame the object hierarchy
+            // m_camXform.LookAt(b.center);
+            // m_camXform.position = b.center - m_camXform.forward * dist;
+        }
+
+        //!
+        //! coroutine to smoothly focus an object
+        //!
+        private IEnumerator SmoothCameraFocus(float orthSize, Vector3 lookAt, Vector3 pos){
+            while(m_smoothCameraFocusIsRunning){
+                yield return null;
+            }
+            m_smoothCameraFocusIsRunning = true;
+
+            float t = 0f;
+            float easeProgress;
+            float duration = 1f;
+            Vector3 currentPos = m_camXform.position;
+            Vector3 currentLookAt = currentPos + m_camXform.forward;
+            float currentOrth = m_cam.orthographicSize;
+            while(t<1f){
+                t += Time.deltaTime / duration;
+                easeProgress = EaseOutCirc(t);
+                m_camXform.position = Vector3.Lerp(currentPos, pos, easeProgress);
+                m_camXform.LookAt(Vector3.Lerp(currentLookAt, lookAt, easeProgress));
+                if (m_cam.orthographic)
+                    m_cam.orthographicSize = Mathf.Lerp(currentOrth, orthSize, easeProgress);
+                //invoke to update the gizmo sizes
+                manager.SmoothCameraFocusChange();
+                yield return null;
+            }
+
+
+            m_smoothCameraFocusIsRunning = false;
+        }
+
+        public static float EaseOutCirc(float progress01){
+            return Mathf.Sqrt(1 - Mathf.Pow(progress01 - 1f, 2f));
         }
 
     }

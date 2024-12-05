@@ -134,7 +134,7 @@ namespace tracer
         public event EventHandler<Vector2> threeDragEvent;
 
         //!
-        //! Event to announce there is a finger gestures operation happening
+        //! Event to announce there is a finger gestures operation happening (only used for updateing the gizmo sized)
         //!
         public event EventHandler<bool> fingerGestureEvent;
 
@@ -223,18 +223,6 @@ namespace tracer
         //!
         private bool m_isPinch;
         //!
-        //! Simple latch for buffering operations. 
-        //!
-        private bool m_doOnce;
-        //!
-        //! Buffer Vector2 for input position comparison.
-        //!
-        private Vector2 m_posBuffer;
-        //!
-        //! Buffer float for input distance comparison.
-        //!
-        private float m_distBuffer;
-        //!
         //! Buffers the main cameras initial rotation.
         //!
         private Quaternion m_cameraMainOffset;
@@ -290,6 +278,42 @@ namespace tracer
         //! timer to check if we made a double click / tap (right now only used to focuse on an object)
         //!
         private float doubleClickCheckTimer = 0f;
+        //!
+        //! Have a different doOnce bool for every buffer object, because it could be triggered earlier, if e.g. 3 fingers are not down simulteanously
+        //!
+        public class SeparateBufferClass{
+            private Vector2 buffer;
+            private bool bufferedOnce = false;
+
+            public void Reset(){
+                bufferedOnce = false;
+            }
+            public void SetBufferOnce(Vector2 v2ToBuffer){
+                if(!bufferedOnce){
+                    bufferedOnce = true;
+                    buffer = v2ToBuffer;
+                }
+            }
+            public void SetBufferOnce(float x, float y){
+                if(!bufferedOnce){
+                    bufferedOnce = true;
+                    buffer.x = x; buffer.y = y;
+                }
+            }
+            public void OverrideBuffer(Vector2 v2ToBuffer){ buffer = v2ToBuffer; }
+            public void OverrideBuffer(float x, float y){ buffer.x = x; buffer.y = y; }
+            public bool WasValueBuffered(){ return bufferedOnce; }
+            public Vector2 GetBufferValue(){ return buffer;}
+            public float GetBufferValueX(){ return buffer.x;}
+        }
+        //!
+        //! the position buffer for a two finger camera manipulation
+        //!
+        private SeparateBufferClass m_posBuffer;
+        //!
+        //! the distance (zoom) buffer for a two finger camera manipulation
+        //!
+        private SeparateBufferClass m_distBuffer;
 
         //!
         //! Constructor initializing member variables.
@@ -364,6 +388,8 @@ namespace tracer
             m_inputs.VPETMap.MiddleClick.canceled += MiddleClick_ended;
             
 #endif
+            m_posBuffer = new SeparateBufferClass();
+            m_distBuffer = new SeparateBufferClass();
             
             m_raycastList = new List<RaycastResult>(5);
         }
@@ -456,7 +482,7 @@ namespace tracer
         private void OrbitClick_canceled(InputAction.CallbackContext obj)
         {
             orbitClick = false;
-            m_doOnce = true;
+            m_posBuffer.Reset();
         }
 
         //!
@@ -473,7 +499,7 @@ namespace tracer
         private void DragClick_canceled(InputAction.CallbackContext obj)
         {
             dragClick = false;
-            m_doOnce = true;
+            m_posBuffer.Reset();
         }
 
         //!
@@ -485,38 +511,36 @@ namespace tracer
             {
                 Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
 
-                // Store it once
-                if (m_doOnce)
-                {
-                    m_posBuffer = pos;
-                    m_doOnce = false;
-                }
+                m_posBuffer.SetBufferOnce(pos);
+
+                Vector2 bufferedValueDifference = pos - m_posBuffer.GetBufferValue();
 
                 // Invoke event
-                twoDragEvent?.Invoke(this, pos - m_posBuffer);
+                twoDragEvent?.Invoke(this, bufferedValueDifference);
                 // Invoke detail event
-                twoDragDetailEvent?.Invoke(this, new DetailedEventArgs(pos, pos - m_posBuffer));
+                twoDragDetailEvent?.Invoke(this, new DetailedEventArgs(pos, bufferedValueDifference));
 
                 // Update buffer
-                m_posBuffer = pos;
+                m_posBuffer.OverrideBuffer(pos);
+
+                //HACK TO update gizmo size!
+                fingerGestureEvent?.Invoke(this, true);
             }
             else if (dragClick)
             {
                 // Grab the position
                 Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
 
-                // Store it once
-                if (m_doOnce)
-                {
-                    m_posBuffer = pos;
-                    m_doOnce = false;
-                }
+                m_posBuffer.SetBufferOnce(pos);
 
                 // Invoke event
-                threeDragEvent?.Invoke(this, pos - m_posBuffer);
+                threeDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
 
                 // Update buffer
-                m_posBuffer = pos;
+                m_posBuffer.OverrideBuffer(pos);
+
+                //HACK TO update gizmo size!
+                fingerGestureEvent?.Invoke(this, true);
             }    
         }
 
@@ -549,6 +573,9 @@ namespace tracer
             Vector2 delta = Vector2.zero;
             delta.x = dist;
             pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
+
+            //HACK TO update gizmo size!
+            fingerGestureEvent?.Invoke(this, true);
 
             // Reset it again
             if(resetInputLayer)
@@ -583,6 +610,7 @@ namespace tracer
         private void MiddleClick_performed(InputAction.CallbackContext obj)
         {
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            
             // Invoke event
             middleClickMoveEvent?.Invoke(this, point);
         }
@@ -593,11 +621,14 @@ namespace tracer
         private void MiddleClick_ended(InputAction.CallbackContext obj)
         {
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            
             // Invoke event
             middleClickReleaseEvent?.Invoke(this, point);
 
             // Reset
             m_inputLayerType = InputLayerType.SCREEN;
+
+            m_posBuffer.Reset();
         }
 
         //! 
@@ -611,7 +642,6 @@ namespace tracer
             base.Init(sender, e);
             // Global variables initialization
             m_isPinch = false;
-            m_doOnce = true;
             m_touchType = InputTouchType.NONE;
         }
 
@@ -757,7 +787,6 @@ namespace tracer
                         //focus on the object if we do so!
                         doubleClickedEvent.Invoke(this, null);
                     }
-                    
                 }
             }
 
@@ -906,7 +935,6 @@ namespace tracer
             m_isTouchDrag = false;
             m_inputIsTouch = false;
             m_inputLayerType = InputLayerType.SCREEN;
-            m_doOnce = true;
 
 
             // Restore UI Interaction
@@ -953,68 +981,51 @@ namespace tracer
             // Are they moving in the same direction?
             float dotProd = Vector2.Dot(tcs[0].delta, tcs[1].delta);
             // If yes, it's a two finger drag
-            if (dotProd > 0)
-            {
+            if (dotProd > 0){
                 // Reset control variables
-                if (m_isPinch)
-                    m_doOnce = true;
-                m_isPinch = false;
+                if (m_isPinch){
+                    m_distBuffer.Reset();
+                    m_isPinch = false;
+                }
             }
             // Else it's a two finger pinch
-            else if (dotProd < 0)
-            {
+            else if (dotProd < 0){
                 // Reset control variables
-                if (!m_isPinch)
-                    m_doOnce = true;
-                m_isPinch = true;
+                if (!m_isPinch){
+                    m_posBuffer.Reset();
+                    m_isPinch = true;
+                }
             }
 
+            OverrideCameraMode(CameraControl.TOUCH);
 
             // Two finger drag (used for orbit)
-            if(!m_isPinch && (m_cameraControl == CameraControl.NONE || m_cameraControl == CameraControl.TOUCH))
-            { 
+            if(!m_isPinch){ 
                 // Grab the average position
                 Vector2 pos = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
                 //Debug.Log("<color=yellow>Two Finger Move</color> is drag (orbit)");
-
+                
                 // Store it once
-                if (m_doOnce)
-                {
-                    m_posBuffer = pos;
-                    m_doOnce = false;
-                }
+                m_posBuffer.SetBufferOnce(pos);
 
                 // Invoke event
-                if(m_cameraControl != CameraControl.TOUCH)
-                    m_oldcameraControl = m_cameraControl;
-                m_cameraControl = CameraControl.TOUCH;
-
-                twoDragEvent?.Invoke(this, pos - m_posBuffer);
+                twoDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
 
                 // Update buffer
-                m_posBuffer = pos;
+                m_posBuffer.OverrideBuffer(pos);
             }
             // Two finger pinch (used for zoom)
-            else
-            {
+            else{
                 // Grab the distance
                 float dist = Vector2.Distance(tcs[0].screenPosition, tcs[1].screenPosition);
                 //Debug.Log("<color=yellow>Two Finger Move</color> is pinch (zoom)");
 
                 // Store it once
-                if (m_doOnce)
-                {
-                    m_distBuffer = dist;
-                    m_doOnce = false;
-                }
-
-                if (m_cameraControl != CameraControl.TOUCH)
-                    m_oldcameraControl = m_cameraControl;
-                m_cameraControl = CameraControl.TOUCH;
+                m_distBuffer.SetBufferOnce(dist, 0);
 
                 Vector2 point = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
                 Vector2 delta = Vector2.zero;
-                delta.x = dist - m_distBuffer;
+                delta.x = dist - m_distBuffer.GetBufferValueX();
 
                 // Invoke event
                 pinchEvent?.Invoke(this, delta.x);
@@ -1023,7 +1034,7 @@ namespace tracer
                 pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
 
                 // Update buffer
-                m_distBuffer = dist;
+                m_distBuffer.OverrideBuffer(dist, 0);
             }
             // Announce gesture event
             fingerGestureEvent?.Invoke(this, true);
@@ -1047,24 +1058,38 @@ namespace tracer
             Vector2 pos = 1f / 3f * (tcs[0].screenPosition + tcs[1].screenPosition + tcs[2].screenPosition);
 
             // Store it once
-            if (m_doOnce)
-            {
-                m_posBuffer = pos;
-                m_doOnce = false;
-            }
+            m_posBuffer.SetBufferOnce(pos);
+            
+
+            OverrideCameraMode(CameraControl.TOUCH);
 
             // Invoke event
-            if (m_cameraControl != CameraControl.TOUCH)
-                m_oldcameraControl = m_cameraControl;
-
-            m_cameraControl = CameraControl.TOUCH;
-            threeDragEvent?.Invoke(this, pos - m_posBuffer);
+            threeDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
 
             // Update buffer
-            m_posBuffer = pos;
+            m_posBuffer.OverrideBuffer(pos);
 
             // Announce gesture event
             fingerGestureEvent?.Invoke(this, true);
+        }
+
+        //!
+        //! override the current mode (e.g. ATTITUDE to TOUCH) and reset it to this mode once the finger is lifted
+        //!
+        private void OverrideCameraMode(CameraControl ct){
+            if(m_cameraControl != ct){
+                m_oldcameraControl = m_cameraControl;
+                //DONT OVERRIDE IF WE ARE IN A SPECIFIC MODE?
+                m_cameraControl = ct;
+            }
+        }
+        
+        //!
+        //! update the gizmo sizes if we selected something after our camera focused an object via double click
+        //!
+        public void SmoothCameraFocusChange(){
+            //anounce to update the gizmo sizes
+            fingerGestureEvent.Invoke(this, true);
         }
 
         //!
@@ -1073,7 +1098,8 @@ namespace tracer
         private void LockUIOperation()
         {
             // Clear monitor variables
-            m_doOnce = true;
+            m_posBuffer.Reset();
+            m_distBuffer.Reset();
 
             // Invoke end of press event
             inputPressEnd?.Invoke(this, Vector2.zero);
@@ -1086,7 +1112,8 @@ namespace tracer
         private void ClearClickInput()
         {
             // Clear monitor variables
-            m_doOnce = true;
+            m_posBuffer.Reset();
+            m_distBuffer.Reset();
 
             // Invoke end of press event
             // [REVIEW]
