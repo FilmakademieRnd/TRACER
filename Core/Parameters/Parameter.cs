@@ -249,6 +249,7 @@ namespace tracer
             switch (_type)
             {
                 case ParameterType.NONE:
+                case ParameterType.ACTION:
                     _dataSize = 0;
                     break;
                 case ParameterType.BOOL:
@@ -494,6 +495,9 @@ namespace tracer
             _networkLock = true;
             hasChanged?.Invoke(this, _value);
             _networkLock = false;
+
+            if (_type == ParameterType.ACTION) 
+                ((Action)(object)_value)?.Invoke();
         }
 
 
@@ -546,7 +550,7 @@ namespace tracer
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void InvokeHasChanged()
+        public void InvokeHasChanged()
         {
             hasChanged?.Invoke(this, _value);
         }

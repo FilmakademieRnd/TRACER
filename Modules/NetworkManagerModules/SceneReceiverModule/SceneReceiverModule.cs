@@ -88,6 +88,7 @@ namespace tracer
         {
             manager.connectUsingQrCode += ReceiveSceneUsingQr;
             Parameter<Action> button = new Parameter<Action>(Connect, "Connect");
+            Parameter<UnityEngine.Quaternion> q = new Parameter<UnityEngine.Quaternion>(UnityEngine.Quaternion.identity, "quat");
 
             List<AbstractParameter> parameterList1 = new List<AbstractParameter>
             {
@@ -107,6 +108,7 @@ namespace tracer
                      .End()
                      .Begin(MenuItem.IType.HSPLIT)
                          .Add(button)
+                           .Add(q)
                      .End()
                 .End();
 

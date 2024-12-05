@@ -101,5 +101,13 @@ public class DynamicParameterObject : ParameterObject
     {
         emitHasChanged((AbstractParameter)sender);
     }
+
+    public delegate void noneDelegate();
+
+    public static void Empty()
+    {
+        // Empty action for action parameters
+        // ...could be replaces by custom code
+    }
     
 }
