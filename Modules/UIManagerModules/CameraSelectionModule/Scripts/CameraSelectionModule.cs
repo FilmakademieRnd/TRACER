@@ -73,10 +73,6 @@ namespace tracer
         //! correct way to "lock" the selected object to its local rotation to the MainCamera
         //!
         private Quaternion m_localRotationWouldBe;
-        //!
-        //! easy way to transform local rotation to world rotation
-        //!
-        private Transform m_localParentInstance;
 
         //!
         //! The UI button for logging the camera to an object.
@@ -298,31 +294,15 @@ namespace tracer
             {
                 if (m_isLocked)
                 {
-                    //Debug.Log("... lockToCamera().unlock");
-                    core.updateEvent -= updateLockToCamera;
-
-                    if(m_localParentInstance)
-                        GameObject.Destroy(m_localParentInstance.gameObject);
-                        
+                    core.updateEvent -= updateLockToCamera;  
                     m_isLocked = false;
                 }
                 else
                 {
-                    //Debug.Log("LOCK "+m_selectedObject.name+" TO CAMERA");
-                    /*m_positionOffset = m_selectedObject.transform.position - Camera.main.transform.position;
-                    m_oldPosition = m_selectedObject.transform.position;
-                    m_oldRotation = m_selectedObject.transform.rotation;
-                    m_oldCamRotation = Camera.main.transform.rotation;
-                    m_inverseOldCamRotation = Quaternion.Inverse(Camera.main.transform.rotation);
-                    */
                     m_localPositionWouldBe = Camera.main.transform.InverseTransformPoint(m_selectedObject.transform.position);
-                    //m_localRotationWouldBe = Quaternion.Inverse(Camera.main.transform.rotation) * m_selectedObject.transform.rotation;
-
-                    if(m_localParentInstance)
-                        GameObject.Destroy(m_localParentInstance.gameObject);
-                    m_localParentInstance = new GameObject("LocalRotationDummyObject").transform;
-                    m_localParentInstance.transform.parent = Camera.main.transform;
-                    m_localParentInstance.transform.rotation = m_selectedObject.transform.rotation;
+                    m_localRotationWouldBe = Quaternion.Inverse(Camera.main.transform.rotation) * m_selectedObject.transform.rotation;
+                    //calculate the local rotation by Quaternion.Inverse(target spaces' object rotation) * world rotation of the object
+                    //BEWARE matrix multiplication - order matters!
 
                     core.updateEvent += updateLockToCamera;
                     m_isLocked = true;
@@ -529,31 +509,23 @@ namespace tracer
         //!
         private void updateLockToCamera(object sender, EventArgs e)
         {
-            // Transform camTransform = Camera.main.transform;
-            // Transform objTransform = m_selectedObject.transform;
-
+            
             switch (m_inputManager.cameraControl)
             {
                 case InputManager.CameraControl.ATTITUDE:
                 case InputManager.CameraControl.AR:
                 case InputManager.CameraControl.TOUCH:
                 case InputManager.CameraControl.NONE:
-                    // Quaternion camRotationOffset = camTransform.rotation * m_inverseOldCamRotation;
-                    // Vector3 newPosition = camRotationOffset * (m_oldPosition - camTransform.position) + camTransform.position;
                     Vector3 localToWorldPos = Camera.main.transform.TransformPoint(m_localPositionWouldBe);
-                    //Quaternion localToWorldRot = m_localRotationWouldBe * Camera.main.transform.rotation;
-                    //Quaternion localToWorldRot = Camera.main.transform.rotation * Quaternion.Inverse(m_selectedObject.transform.parent.rotation);
-
-                    m_selectedObject.position.setValue(localToWorldPos);
+                    Quaternion localToWorldRot = Camera.main.transform.rotation * m_localRotationWouldBe;
+                    //apply the stored local rotation from the camera into world space 
+                    //BEWARE matrix multiplication - order matters!
                     
-                    //m_selectedObject.rotation.setValue(localToWorldRot);
-                    m_selectedObject.rotation.setValue(m_localParentInstance.rotation);
+                    m_selectedObject.position.setValue(localToWorldPos);
+                    m_selectedObject.rotation.setValue(localToWorldRot);
                     
                     break;
                 default:
-                    // Quaternion newRotation = objTransform.rotation * Quaternion.Inverse(m_oldRotation);
-                    // camTransform.position = newRotation * (- m_positionOffset) + objTransform.position;
-                    // camTransform.rotation = newRotation * m_oldCamRotation;
                     break;
             }
         }
