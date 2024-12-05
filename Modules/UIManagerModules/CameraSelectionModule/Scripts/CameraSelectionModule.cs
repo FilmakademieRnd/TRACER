@@ -232,6 +232,7 @@ namespace tracer
             {
                 if (m_isLocked)
                 {
+                    Camera.main.cullingMask = LayerMask.NameToLayer("Everything");
                     core.updateEvent -= updateLookThrough;
                     core.updateEvent -= updateLockToCamera;
                     m_isLocked = false;
@@ -261,10 +262,12 @@ namespace tracer
                     m_isLocked = false;
                     Camera.main.fieldOfView = 60;
                     Camera.main.transform.position -= Camera.main.transform.forward;
+                    Camera.main.cullingMask = LayerMask.NameToLayer("Everything");
                 }
                 else
                 {
                     Debug.Log("LOOK THROUGH "+m_selectedObject.name);
+                    Camera.main.cullingMask &= ~(1 << 11);
                     Camera.main.transform.position = m_selectedObject.transform.position;
                     Camera.main.transform.rotation = m_selectedObject.transform.rotation;
                     m_oldPosition = Vector3.zero;

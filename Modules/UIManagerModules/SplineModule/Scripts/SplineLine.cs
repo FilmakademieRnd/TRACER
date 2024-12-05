@@ -122,6 +122,7 @@ public class SplineLine : UIManagerModule
         _animationManager.renewSplineContainer += executeRenewContainer;
         _splineHolder = new GameObject("SplineHolder");
         _splineHolder.transform.position = new Vector3(0, 0, 0);
+        _splineHolder.layer = 11;
         
     }
 
@@ -322,6 +323,7 @@ public class SplineLine : UIManagerModule
     {
         // Create a new GameObject
         GameObject childObject = new GameObject(childName);
+        childObject.layer = 11;
 
         // Set the _parent of the new GameObject to the specified _parent
         childObject.transform.SetParent(_splineHolder.transform);
@@ -343,6 +345,7 @@ public class SplineLine : UIManagerModule
         _spline.Spline.SetTangentMode(0);
         // Create a new GameObject
         GameObject splineControlPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        splineControlPoint.layer = 11;
         splineControlPoint.GetComponent<Renderer>().material = Resources.Load<Material>("Materials/keySphereMat");
 
         splineControlPoint.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
