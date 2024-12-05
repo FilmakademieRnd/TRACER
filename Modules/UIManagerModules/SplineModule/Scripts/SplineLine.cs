@@ -155,6 +155,10 @@ public class SplineLine : UIManagerModule
                 _inputManager.pinchEvent -= EventCallDrawLineBetweenPoints;
                 _updateLineWhenZooming = false;
             }
+            // Thomas: reset the abstract parameter, otherwise an object could try to show the light settings which obviously does not work
+            // this could be the starting point to save the previous selection to objects, so we remain on any changed field instead of
+            // always going back to 'position'
+            _selectorCurrentSelectedSnapSelectElement = 0;
         }
 
         if (sceneObjects.Count > 0)

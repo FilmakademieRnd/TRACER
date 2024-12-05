@@ -199,12 +199,12 @@ namespace tracer
             {
                 // Thomas: if obj is already our selected object, trigger a refocus, if it was a double click/tap
                 if(manager.isThisOurSelectedObject(obj)){
-                    //Debug.Log("<color=green>already selected</color>");
+                    Debug.Log("<color=green>already selected</color>");
                     m_isRenderActive = false;
                     return;
                 }else{
                     manager.clearSelectedObject();
-                    //Debug.Log("<color=blue>new selected object</color>");
+                    Debug.Log("<color=blue>new selected object</color>");
                 }
 
                 switch (obj)
