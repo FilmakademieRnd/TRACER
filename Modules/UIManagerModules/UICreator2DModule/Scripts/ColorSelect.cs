@@ -34,7 +34,7 @@ using UnityEngine.UI;
 
 namespace tracer
 {
-    public class ColorSelect : UIBehaviour, IBeginDragHandler, IDragHandler
+    public class ColorSelect : UIBehaviour, IBeginDragHandler, IDragHandler, IPointerClickHandler
     {
         private Vector2 pickerSize;
 
@@ -95,6 +95,17 @@ namespace tracer
 
             // Grab material
             mat = GetComponent<Image>().material;
+        }
+
+        //!
+        //! Unity function called by IPointerClickHandler on click
+        //! @param data Data of the click event e.g. postion
+        //!
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            //we need this, otherwise we can not click/tap to change the color
+            OnBeginDrag(eventData);
+            OnDrag(eventData);
         }
 
 

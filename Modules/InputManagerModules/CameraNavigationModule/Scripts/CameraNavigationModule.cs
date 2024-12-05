@@ -75,6 +75,11 @@ namespace tracer
         private static readonly float s_dollySpeed = .007f;
 
         //!
+        //! The higher the multiplier, the farther the camera will be away from the selected object
+        //!
+        private static readonly float s_focusDistance = 1.5f;
+
+        //!
         //! The camera center of interest point
         //!
         private Vector3 centerOfInterest;
@@ -118,6 +123,7 @@ namespace tracer
             manager.threeDragEvent -= CameraPedestalTruck;
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged -= SelectionUpdate;
+            uiManager.selectionFocus -= FocusOnSelection;
             manager.updateCameraUICommand -= CameraUpdated;
         }
 
@@ -140,6 +146,8 @@ namespace tracer
             // Subscribe to selection change
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged += SelectionUpdate;
+            // Subscribe to focus event
+            uiManager.selectionFocus += FocusOnSelection;
 
             // Subscribe to camera change
             manager.updateCameraUICommand += CameraUpdated;
@@ -301,6 +309,43 @@ namespace tracer
 
             // Reset control variable
             stickToOrbit = false;
+        }
+
+        //!
+        //! Focus on the current object (center it, move cam to it)
+        //!
+        private void FocusOnSelection(object sender, SceneObject sceneObject){
+            GameObject go = sceneObject.gameObject;
+            //calculate bounds
+            Bounds b = new Bounds(go.transform.position, Vector3.zero);
+            switch(sceneObject){
+                case SceneObjectCamera:
+                case SceneObjectLight:
+                    break;
+                default:
+                    UnityEngine.Object[] rList = go.GetComponentsInChildren(typeof(Renderer));
+                    foreach (Renderer r in rList){
+                        b.Encapsulate(r.bounds);
+                    }
+                    break;
+            }
+
+            Vector3 max = b.size;
+            // Get the radius of a sphere circumscribing the bounds, multiply by s_focusDistance (the higher the multiply, the farther away)
+            float radius = Mathf.Max(max.magnitude, 1f) / 2f * s_focusDistance;
+            // Get the horizontal FOV, since it may be the limiting of the two FOVs to properly encapsulate the objects
+            float horizontalFOV = 2f * Mathf.Atan(Mathf.Tan(m_cam.fieldOfView * Mathf.Deg2Rad / 2f) * m_cam.aspect) * Mathf.Rad2Deg;
+            // Use the smaller FOV as it limits what would get cut off by the frustum		
+            float fov = Mathf.Min(m_cam.fieldOfView, horizontalFOV);
+            float dist = radius /  (Mathf.Sin(fov * Mathf.Deg2Rad / 2f));
+            //Debug.Log("Radius = " + radius + " dist = " + dist);
+
+            if (m_cam.orthographic)
+                m_cam.orthographicSize = radius;
+            
+            // Frame the object hierarchy
+            m_camXform.LookAt(b.center);
+            m_camXform.position = b.center - m_camXform.forward * dist;
         }
 
     }

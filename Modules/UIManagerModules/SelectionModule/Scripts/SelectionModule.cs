@@ -141,6 +141,7 @@ namespace tracer
 
             // hookup to input events
             m_inputManager.objectSelectionEvent += SelectFunction;
+            m_inputManager.doubleClickedEvent += FocusFunction;
         }
 
         //!
@@ -154,6 +155,7 @@ namespace tracer
             core.updateEvent -= renderUpdate;
             m_sceneManager.sceneReady -= modifyMaterials;
             m_inputManager.objectSelectionEvent -= SelectFunction;
+            m_inputManager.doubleClickedEvent -= FocusFunction;
 
             dataWidth = 0;
             dataHeight = 0;
@@ -180,17 +182,31 @@ namespace tracer
             m_isRenderActive = true;
 
             // give the system some time to render the object _id's
+            // Thomas: this seems highly unstable e.g. on devices that runs at a lower fps?
             await System.Threading.Tasks.Task.Delay(50);
 
-            manager.clearSelectedObject();
+            // Thomas: why do we clear the selection over and over again, if we click an already selected object we trigger the deselection and selection events over and over again - i change this
+            //manager.clearSelectedObject();
+            //Debug.Log("<color=orange>.cleared</color>");
             
             SceneObject obj = GetSelectableAtCollider(point);
-
-            if (!obj)
+            if (!obj){
                 obj = GetSelectableAtPixel(point);
+            }
+
 
             if (obj)
             {
+                // Thomas: if obj is already our selected object, trigger a refocus, if it was a double click/tap
+                if(manager.isThisOurSelectedObject(obj)){
+                    //Debug.Log("<color=green>already selected</color>");
+                    m_isRenderActive = false;
+                    return;
+                }else{
+                    manager.clearSelectedObject();
+                    //Debug.Log("<color=blue>new selected object</color>");
+                }
+
                 switch (obj)
                 {
                     case SceneObjectCamera:
@@ -210,9 +226,19 @@ namespace tracer
                             manager.addSelectedObject(obj);
                         break;
                 }
+            }else{
+                manager.clearSelectedObject();
+                //Debug.Log("<color=yellow>.cleared</color>");
             }
 
             m_isRenderActive = false;
+        }
+
+        //!
+        //! If we have a single selected object, focus on it
+        //!
+        private void FocusFunction(object sender, EventArgs e){
+            manager.focusOnSingleSelection();
         }
 
         //!
