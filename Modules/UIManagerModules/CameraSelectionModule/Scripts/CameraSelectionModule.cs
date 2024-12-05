@@ -66,6 +66,19 @@ namespace tracer
         //!
         private Vector3 m_positionOffset = Vector3.zero;
         //!
+        //! correct way to "lock" the selected object to its local position to the MainCamera
+        //!
+        private Vector3 m_localPositionWouldBe;
+        //!
+        //! correct way to "lock" the selected object to its local rotation to the MainCamera
+        //!
+        private Quaternion m_localRotationWouldBe;
+        //!
+        //! easy way to transform local rotation to world rotation
+        //!
+        private Transform m_localParentInstance;
+
+        //!
         //! The UI button for logging the camera to an object.
         //!
         private MenuButton m_cameraSelectButton;
@@ -246,6 +259,7 @@ namespace tracer
 
                 if (m_isLocked)
                 {
+                    Debug.Log("... lookThrough().unlock");
                     core.updateEvent -= updateLookThrough;
                     m_oldSOCamera.hasChanged -= updateCamera;
                     m_isLocked = false;
@@ -254,6 +268,7 @@ namespace tracer
                 }
                 else
                 {
+                    Debug.Log("LOOK THROUGH "+m_selectedObject.name);
                     Camera.main.transform.position = m_selectedObject.transform.position;
                     Camera.main.transform.rotation = m_selectedObject.transform.rotation;
                     m_oldPosition = Vector3.zero;
@@ -283,16 +298,32 @@ namespace tracer
             {
                 if (m_isLocked)
                 {
+                    //Debug.Log("... lockToCamera().unlock");
                     core.updateEvent -= updateLockToCamera;
+
+                    if(m_localParentInstance)
+                        GameObject.Destroy(m_localParentInstance.gameObject);
+                        
                     m_isLocked = false;
                 }
                 else
                 {
-                    m_positionOffset = m_selectedObject.transform.position - Camera.main.transform.position;
+                    //Debug.Log("LOCK "+m_selectedObject.name+" TO CAMERA");
+                    /*m_positionOffset = m_selectedObject.transform.position - Camera.main.transform.position;
                     m_oldPosition = m_selectedObject.transform.position;
                     m_oldRotation = m_selectedObject.transform.rotation;
                     m_oldCamRotation = Camera.main.transform.rotation;
                     m_inverseOldCamRotation = Quaternion.Inverse(Camera.main.transform.rotation);
+                    */
+                    m_localPositionWouldBe = Camera.main.transform.InverseTransformPoint(m_selectedObject.transform.position);
+                    //m_localRotationWouldBe = Quaternion.Inverse(Camera.main.transform.rotation) * m_selectedObject.transform.rotation;
+
+                    if(m_localParentInstance)
+                        GameObject.Destroy(m_localParentInstance.gameObject);
+                    m_localParentInstance = new GameObject("LocalRotationDummyObject").transform;
+                    m_localParentInstance.transform.parent = Camera.main.transform;
+                    m_localParentInstance.transform.rotation = m_selectedObject.transform.rotation;
+
                     core.updateEvent += updateLockToCamera;
                     m_isLocked = true;
                 }
@@ -498,8 +529,8 @@ namespace tracer
         //!
         private void updateLockToCamera(object sender, EventArgs e)
         {
-            Transform camTransform = Camera.main.transform;
-            Transform objTransform = m_selectedObject.transform;
+            // Transform camTransform = Camera.main.transform;
+            // Transform objTransform = m_selectedObject.transform;
 
             switch (m_inputManager.cameraControl)
             {
@@ -507,15 +538,22 @@ namespace tracer
                 case InputManager.CameraControl.AR:
                 case InputManager.CameraControl.TOUCH:
                 case InputManager.CameraControl.NONE:
-                    Quaternion camRotationOffset = camTransform.rotation * m_inverseOldCamRotation;
-                    Vector3 newPosition = camRotationOffset * (m_oldPosition - camTransform.position) + camTransform.position;
-                    m_selectedObject.position.setValue(objTransform.parent.InverseTransformPoint(newPosition));
-                    m_selectedObject.rotation.setValue(Quaternion.Inverse(objTransform.parent.rotation) * (camRotationOffset * m_oldRotation));
+                    // Quaternion camRotationOffset = camTransform.rotation * m_inverseOldCamRotation;
+                    // Vector3 newPosition = camRotationOffset * (m_oldPosition - camTransform.position) + camTransform.position;
+                    Vector3 localToWorldPos = Camera.main.transform.TransformPoint(m_localPositionWouldBe);
+                    //Quaternion localToWorldRot = m_localRotationWouldBe * Camera.main.transform.rotation;
+                    //Quaternion localToWorldRot = Camera.main.transform.rotation * Quaternion.Inverse(m_selectedObject.transform.parent.rotation);
+
+                    m_selectedObject.position.setValue(localToWorldPos);
+                    
+                    //m_selectedObject.rotation.setValue(localToWorldRot);
+                    m_selectedObject.rotation.setValue(m_localParentInstance.rotation);
+                    
                     break;
                 default:
-                    Quaternion newRotation = objTransform.rotation * Quaternion.Inverse(m_oldRotation);
-                    camTransform.position = newRotation * (- m_positionOffset) + objTransform.position;
-                    camTransform.rotation = newRotation * m_oldCamRotation;
+                    // Quaternion newRotation = objTransform.rotation * Quaternion.Inverse(m_oldRotation);
+                    // camTransform.position = newRotation * (- m_positionOffset) + objTransform.position;
+                    // camTransform.rotation = newRotation * m_oldCamRotation;
                     break;
             }
         }
