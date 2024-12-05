@@ -271,7 +271,6 @@ namespace tracer
 
             foreach (SceneManager.ParameterObjectPackage po in sceneData.parameterObjectList)
             {
-                // [REVIEW]
                 // create ParameterObjects
                 DynamicParameterObject obj = DynamicParameterObject.Attach(coreObject, 255);
                 obj.objectName = po.name;
@@ -289,15 +288,27 @@ namespace tracer
                     else
                         paramType = typeof(Parameter<>).MakeGenericType(type);
 
-                    var parameter = Activator.CreateInstance(paramType, Activator.CreateInstance(type), po.pNames[i],
-                        obj, true);
-                    obj.SubscribeToParameterChange((AbstractParameter)parameter);
+                    AbstractParameter parameter;
+                    if (type == typeof(System.Action))
+                    {
+                        // create delegate to custom Action
+                        var methodInfo = typeof(DynamicParameterObject).GetMethod("Empty");
+                        var dlg = Delegate.CreateDelegate(typeof(Action), methodInfo);
+
+                        parameter = (AbstractParameter) Activator.CreateInstance(paramType, dlg, po.pNames[i], obj, true);
+                    }
+                    else
+                    {
+                        parameter = (AbstractParameter) Activator.CreateInstance(paramType, Activator.CreateInstance(type), po.pNames[i], obj, true);
+                    }
+
+                    obj.SubscribeToParameterChange(parameter);
 
                     customMenu.scrollable = true;
                     customMenu = customMenu.Begin(MenuItem.IType.HSPLIT);  // <<< start HSPLIT
 
                     customMenu.Add(po.pNames[i]);
-                    customMenu.Add((AbstractParameter)parameter);
+                    customMenu.Add(parameter);
 
                     customMenu.End();  // <<< end HSPLIT
                 }
@@ -309,6 +320,8 @@ namespace tracer
 
             uiManager.addMenu(customMenu);
         }
+
+        private void test() { }
 
         //!
         //! Function that creates the textures in the Unity scene.

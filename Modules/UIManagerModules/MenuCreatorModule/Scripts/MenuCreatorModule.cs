@@ -33,7 +33,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using System.Xml.Linq;
 
 namespace tracer
 {
@@ -258,6 +257,7 @@ namespace tracer
                                 button.colors = buttonColors;
                                 Action parameterAction = ((Parameter<Action>)item.Parameter).value;
                                 button.onClick.AddListener(() => parameterAction());
+                                button.onClick.AddListener(delegate { ((Parameter<Action>)item.Parameter).InvokeHasChanged(); });
                                 TextMeshProUGUI textComponent = newObjects[0].GetComponentInChildren<TextMeshProUGUI>();
                                 textComponent.text = item.Parameter.name;
                                 textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
