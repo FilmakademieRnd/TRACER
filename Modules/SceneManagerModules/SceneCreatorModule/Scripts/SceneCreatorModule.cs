@@ -262,7 +262,7 @@ namespace tracer
 
             MenuTree customMenu = new MenuTree();
 
-            //customMenu.iconResourceLocation = "Images/button_network";
+            customMenu.iconResourceLocation = "Images/button_more+gear";
             customMenu.caption = "Custom Menu";
             UIManager uiManager = core.getManager<UIManager>();
             
