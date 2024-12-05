@@ -290,7 +290,7 @@ namespace tracer
                 if (!sceneObject)
                     sceneObject = gameObject.GetComponent<SceneObject>();
 
-                if (!sceneObject)
+                if (!sceneObject && gameObject.transform.parent)
                     sceneObject = gameObject.transform.parent.GetComponent<SceneObject>();
 
             }

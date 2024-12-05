@@ -215,13 +215,17 @@ namespace tracer
         //!
         private bool m_inputIsTouch = false;
         //!
-        //! Flag to determine if a touch drag gesture is being performed.
+        //! Flag to specify type of gesture. 
         //!
-        private bool m_isTouchDrag;
+        public enum GestureTypeEnum{
+            NONE = 0,   //reset, no input
+            PINCH = 10, //zoom
+            DRAG = 20   //move
+        }
         //!
         //! Flag to specify type of gesture. 
         //!
-        private bool m_isPinch;
+        private GestureTypeEnum m_gestureType = GestureTypeEnum.NONE;
         //!
         //! Buffers the main cameras initial rotation.
         //!
@@ -550,7 +554,7 @@ namespace tracer
         private void ZoomWheel_performed(InputAction.CallbackContext obj)
         {
             //if dragging, deny zooming
-            if(m_isTouchDrag)
+            if(m_gestureType != GestureTypeEnum.NONE)
                 return;
             
             float dist = 0.1f * m_inputs.VPETMap.ZoomWheel.ReadValue<float>();
@@ -587,7 +591,7 @@ namespace tracer
         //!
         private void MiddleClick_started(InputAction.CallbackContext obj)
         {
-            if(m_isTouchDrag)
+            if(m_gestureType != GestureTypeEnum.NONE)
                 return;
 
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
@@ -641,7 +645,7 @@ namespace tracer
         {
             base.Init(sender, e);
             // Global variables initialization
-            m_isPinch = false;
+            m_gestureType = GestureTypeEnum.NONE;
             m_touchType = InputTouchType.NONE;
         }
 
@@ -819,8 +823,8 @@ namespace tracer
                 Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
                 inputMove?.Invoke(this, point);
 
-                if (!m_isTouchDrag)
-                    m_isTouchDrag = true;
+                if(m_gestureType == GestureTypeEnum.NONE)
+                    m_gestureType = GestureTypeEnum.DRAG;
             }
         }
 
@@ -878,7 +882,7 @@ namespace tracer
 
             // Reset monitor variables
             m_touchType = InputTouchType.NONE;
-            m_isTouchDrag = false;
+            m_gestureType = GestureTypeEnum.NONE;
             m_inputLayerType = InputLayerType.SCREEN;
         }
 
@@ -888,11 +892,11 @@ namespace tracer
         private void FingerDown(Finger fgr)
         {
             // If a specific gesture is in progress, do not accept new input
-            if (m_isTouchDrag){
+            if(m_gestureType != GestureTypeEnum.NONE){
                 //TODO!
                 //always allow increasing of fingers, because we could have a moving ONE finger because of a high sensitivity
                 //although we want to touch with the other fingers!
-                //Debug.Log("ignore <color=green>Finger Down</color> due to m_isTouchDrag");
+                //Debug.Log("ignore <color=green>Finger Down</color>");
                 return;
             }
 
@@ -932,8 +936,8 @@ namespace tracer
             m_cameraControl = m_oldcameraControl;
 
             // Reset
-            m_isTouchDrag = false;
             m_inputIsTouch = false;
+            m_gestureType = GestureTypeEnum.NONE;
             m_inputLayerType = InputLayerType.SCREEN;
 
 
@@ -947,7 +951,7 @@ namespace tracer
         private void FingerMove(Finger fgr)
         {
             // If a specific gesture is in progress, do not accept new input
-            if (m_isTouchDrag)
+            if(m_gestureType != GestureTypeEnum.NONE)
                 return;
 
             //Debug.Log("<color=yellow>Finger Move</color>");
@@ -972,69 +976,74 @@ namespace tracer
                 return;
             }
 
-            // Register the gesture
-            m_isTouchDrag = true;
-
             // Monitor touches
             var tcs = UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches;
 
-            // Are they moving in the same direction?
-            float dotProd = Vector2.Dot(tcs[0].delta, tcs[1].delta);
-            // If yes, it's a two finger drag
-            if (dotProd > 0){
-                // Reset control variables
-                if (m_isPinch){
+            //DENY ROTATING DURING GYRO!
+            if(m_cameraControl == CameraControl.ATTITUDE || m_oldcameraControl == CameraControl.ATTITUDE){
+                //so only allow zooming
+                if (m_gestureType != GestureTypeEnum.PINCH){
                     m_distBuffer.Reset();
-                    m_isPinch = false;
+                    m_gestureType = GestureTypeEnum.PINCH;
                 }
-            }
-            // Else it's a two finger pinch
-            else if (dotProd < 0){
-                // Reset control variables
-                if (!m_isPinch){
-                    m_posBuffer.Reset();
-                    m_isPinch = true;
+            }else{
+                // Are they moving in the same direction?
+                float dotProd = Vector2.Dot(tcs[0].delta, tcs[1].delta);
+                // If yes, it's a two finger drag
+                if (dotProd > 0){
+                    if (m_gestureType != GestureTypeEnum.DRAG){
+                        m_posBuffer.Reset();
+                        m_gestureType = GestureTypeEnum.DRAG;
+                    }
+                }
+                // Else it's a two finger pinch
+                else if (dotProd < 0){
+                    if (m_gestureType != GestureTypeEnum.PINCH){
+                        m_distBuffer.Reset();
+                        m_gestureType = GestureTypeEnum.PINCH;
+                    }
                 }
             }
 
             OverrideCameraMode(CameraControl.TOUCH);
 
             // Two finger drag (used for orbit)
-            if(!m_isPinch){ 
-                // Grab the average position
-                Vector2 pos = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
-                //Debug.Log("<color=yellow>Two Finger Move</color> is drag (orbit)");
-                
-                // Store it once
-                m_posBuffer.SetBufferOnce(pos);
+            switch(m_gestureType){ 
+                case GestureTypeEnum.DRAG:
+                    // Grab the average position
+                    Vector2 pos = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
+                    //Debug.Log("<color=yellow>Two Finger Move</color> is drag (orbit)");
+                    
+                    // Store it once
+                    m_posBuffer.SetBufferOnce(pos);
 
-                // Invoke event
-                twoDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
+                    // Invoke event
+                    twoDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
 
-                // Update buffer
-                m_posBuffer.OverrideBuffer(pos);
-            }
-            // Two finger pinch (used for zoom)
-            else{
-                // Grab the distance
-                float dist = Vector2.Distance(tcs[0].screenPosition, tcs[1].screenPosition);
-                //Debug.Log("<color=yellow>Two Finger Move</color> is pinch (zoom)");
+                    // Update buffer
+                    m_posBuffer.OverrideBuffer(pos);
+                    break;
+                case GestureTypeEnum.PINCH:
+                    // Grab the distance
+                    float dist = Vector2.Distance(tcs[0].screenPosition, tcs[1].screenPosition);
+                    //Debug.Log("<color=yellow>Two Finger Move</color> is pinch (zoom)");
 
-                // Store it once
-                m_distBuffer.SetBufferOnce(dist, 0);
+                    // Store it once
+                    m_distBuffer.SetBufferOnce(dist, 0);
 
-                Vector2 point = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
-                Vector2 delta = Vector2.zero;
-                delta.x = dist - m_distBuffer.GetBufferValueX();
+                    Vector2 point = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
+                    Vector2 delta = Vector2.zero;
+                    delta.x = dist - m_distBuffer.GetBufferValueX();
 
-                // Invoke event
-                pinchEvent?.Invoke(this, delta.x);
+                    // Invoke event
+                    pinchEvent?.Invoke(this, delta.x);
 
-                // Invoke detail event
-                pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
+                    // Invoke detail event
+                    pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
 
-                // Update buffer
-                m_distBuffer.OverrideBuffer(dist, 0);
+                    // Update buffer
+                    m_distBuffer.OverrideBuffer(dist, 0);
+                break;
             }
             // Announce gesture event
             fingerGestureEvent?.Invoke(this, true);
@@ -1049,7 +1058,7 @@ namespace tracer
                 return;
 
             // Register the gesture
-            m_isTouchDrag = true;
+            m_gestureType = GestureTypeEnum.DRAG;
 
             // Monitor touches
             var tcs = UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches;

@@ -300,6 +300,7 @@ namespace tracer
                 else
                 {
                     m_localPositionWouldBe = Camera.main.transform.InverseTransformPoint(m_selectedObject.transform.position);
+                    Debug.Log("localPositionWouldBe "+m_localPositionWouldBe);
                     m_localRotationWouldBe = Quaternion.Inverse(Camera.main.transform.rotation) * m_selectedObject.transform.rotation;
                     //calculate the local rotation by Quaternion.Inverse(target spaces' object rotation) * world rotation of the object
                     //BEWARE matrix multiplication - order matters!
@@ -517,12 +518,21 @@ namespace tracer
                 case InputManager.CameraControl.TOUCH:
                 case InputManager.CameraControl.NONE:
                     Vector3 localToWorldPos = Camera.main.transform.TransformPoint(m_localPositionWouldBe);
+                    
                     Quaternion localToWorldRot = Camera.main.transform.rotation * m_localRotationWouldBe;
                     //apply the stored local rotation from the camera into world space 
                     //BEWARE matrix multiplication - order matters!
                     
-                    m_selectedObject.position.setValue(localToWorldPos);
-                    m_selectedObject.rotation.setValue(localToWorldRot);
+                    //BEWARE: these will set a localPosition AND localRotation - therefore, transform it once again
+                    if(m_selectedObject.transform.parent){
+                        Vector3 worldToLocalParentPos = m_selectedObject.transform.parent.InverseTransformPoint(localToWorldPos);
+                        Quaternion worldToLocalParentRot = Quaternion.Inverse(m_selectedObject.transform.parent.rotation) * localToWorldRot;
+                        m_selectedObject.position.setValue(worldToLocalParentPos);
+                        m_selectedObject.rotation.setValue(worldToLocalParentRot);
+                    }else{
+                        m_selectedObject.position.setValue(localToWorldPos);
+                        m_selectedObject.rotation.setValue(localToWorldRot);
+                    }
                     
                     break;
                 default:

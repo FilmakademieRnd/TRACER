@@ -102,7 +102,7 @@ namespace tracer
         //!
         //! dont run the coroutine to focus on an object via double click twice
         //!
-        private bool m_smoothCameraFocusIsRunning = false;
+        private int m_smoothCameraFocusIsRunning = 0;
 
         //!
         //! Constructor.
@@ -343,27 +343,23 @@ namespace tracer
             // Use the smaller FOV as it limits what would get cut off by the frustum		
             float fov = Mathf.Min(m_cam.fieldOfView, horizontalFOV);
             float dist = radius /  (Mathf.Sin(fov * Mathf.Deg2Rad / 2f));
+
             //Debug.Log("Radius = " + radius + " dist = " + dist);
+
+            //never go away if dist is bigger, instead keep the distance?
+            dist = Mathf.Min(dist, Vector3.Distance(go.transform.position, m_camXform.position));
 
             //Smooth transition
             sceneObject.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - m_camXform.forward * dist));
-            
-            // if (m_cam.orthographic)
-            //     m_cam.orthographicSize = radius;
-            
-            // // Frame the object hierarchy
-            // m_camXform.LookAt(b.center);
-            // m_camXform.position = b.center - m_camXform.forward * dist;
         }
 
         //!
         //! coroutine to smoothly focus an object
         //!
         private IEnumerator SmoothCameraFocus(float orthSize, Vector3 lookAt, Vector3 pos){
-            while(m_smoothCameraFocusIsRunning){
-                yield return null;
-            }
-            m_smoothCameraFocusIsRunning = true;
+            m_smoothCameraFocusIsRunning++;
+            yield return null;
+            int coroNr = m_smoothCameraFocusIsRunning;
 
             float t = 0f;
             float easeProgress;
@@ -371,7 +367,7 @@ namespace tracer
             Vector3 currentPos = m_camXform.position;
             Vector3 currentLookAt = currentPos + m_camXform.forward;
             float currentOrth = m_cam.orthographicSize;
-            while(t<1f){
+            while(t<1f && coroNr == m_smoothCameraFocusIsRunning){
                 t += Time.deltaTime / duration;
                 easeProgress = EaseOutCirc(t);
                 m_camXform.position = Vector3.Lerp(currentPos, pos, easeProgress);
@@ -382,9 +378,6 @@ namespace tracer
                 manager.SmoothCameraFocusChange();
                 yield return null;
             }
-
-
-            m_smoothCameraFocusIsRunning = false;
         }
 
         public static float EaseOutCirc(float progress01){
