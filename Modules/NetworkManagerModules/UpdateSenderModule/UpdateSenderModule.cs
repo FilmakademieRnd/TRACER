@@ -54,9 +54,19 @@ namespace tracer
         private int m_modifiedParametersDataSize = 0;
 
         //!
-        //! Array of control messages, containing all tracer messages besides parameter updates.
+        //! List of control messages, containing all tracer messages besides parameter updates.
         //!
-        private byte[] m_controlMessage;
+        private NetMQMessage m_controlMessages;
+
+        //!
+        //! List of parameter messages, containing all tracer parameter updat messages.
+        //!
+        private NetMQMessage m_parameterMessages;
+
+        //!
+        //! Object for handling thread locking.
+        //!
+        private readonly object _lock = new object();
 
         //!
         //! Constructor
@@ -101,6 +111,8 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             m_modifiedParameters = new List<AbstractParameter>();
+            m_controlMessages = new NetMQMessage(3);
+            m_parameterMessages = new NetMQMessage(6);
 
             SceneManager sceneManager = core.getManager<SceneManager>();
             sceneManager.sceneReady += connectAndStart;
@@ -170,15 +182,26 @@ namespace tracer
         //!
         private void lockSceneObject(object sender, SceneObject sceneObject)
         {
-            m_controlMessage = new byte[7];
+            byte sceneId;
+            short sceneObjectId;
+            lock (sceneObject)
+            {                      
+                sceneId = sceneObject._sceneID;
+                sceneObjectId = sceneObject._id;
+            }
 
-            // header
-            m_controlMessage[0] = manager.cID;
-            m_controlMessage[1] = core.time;
-            m_controlMessage[2] = (byte)MessageType.LOCK;
-            Helpers.copyArray(BitConverter.GetBytes(sceneObject._sceneID), 0, m_controlMessage, 3, 1);  // ScenetID
-            Helpers.copyArray(BitConverter.GetBytes(sceneObject._id), 0, m_controlMessage, 4, 2);  // SceneObjectID
-            m_controlMessage[6] = Convert.ToByte(true);
+            lock (_lock)
+            {
+                byte[] message = new byte[7];
+                // header
+                message[0] = manager.cID;
+                message[1] = core.time;
+                message[2] = (byte)MessageType.LOCK;
+                Helpers.copyArray(BitConverter.GetBytes(sceneId), 0, message, 3, 1);           // SceneID
+                Helpers.copyArray(BitConverter.GetBytes(sceneObjectId), 0, message, 4, 2);     // SceneObjectID
+                message[6] = Convert.ToByte(true);
+                m_controlMessages.Append(message);
+            }
 
             m_mre.Set();
         }
@@ -191,15 +214,26 @@ namespace tracer
         //!
         private void unlockSceneObject(object sender, SceneObject sceneObject)
         {
-            m_controlMessage = new byte[7];
+            byte sceneId;
+            short sceneObjectId;
+            lock (sceneObject)
+            {                      //can still be altered from any access that is not using lock!
+                sceneId = sceneObject._sceneID;
+                sceneObjectId = sceneObject._id;
+            }
 
-            // header
-            m_controlMessage[0] = manager.cID;
-            m_controlMessage[1] = core.time;
-            m_controlMessage[2] = (byte)MessageType.LOCK;
-            Helpers.copyArray(BitConverter.GetBytes(sceneObject._sceneID), 0, m_controlMessage, 3, 1);  // SceneID
-            Helpers.copyArray(BitConverter.GetBytes(sceneObject._id), 0, m_controlMessage, 4, 2);  // SceneObjectID
-            m_controlMessage[6] = Convert.ToByte(false);
+            lock (_lock)
+            {
+                byte[] message = new byte[7];
+                // header
+                message[0] = manager.cID;
+                message[1] = core.time;
+                message[2] = (byte)MessageType.LOCK;
+                Helpers.copyArray(BitConverter.GetBytes(sceneId), 0, message, 3, 1);           // SceneID
+                Helpers.copyArray(BitConverter.GetBytes(sceneObjectId), 0, message, 4, 2);     // SceneObjectID
+                message[6] = Convert.ToByte(false);
+                m_controlMessages.Append(message);
+            }
 
             m_mre.Set();
         }
@@ -217,22 +251,23 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // Parameter: SceneID, ParameterObjectID, ParameterID, ParameterType, ParameterData
 
-            lock (parameter)
+             lock (_lock)
             {
                 int parameterSize = parameter.dataSize();
-                m_controlMessage = new byte[9 + parameterSize];
-                parameter.Serialize(new Span<byte>(m_controlMessage, 9, parameterSize)); // ParameterData;
+                byte[] message = new byte[9 + parameterSize];
+                parameter.Serialize(new Span<byte>(message, 9, parameterSize)); // ParameterData;
 
                 // header
-                m_controlMessage[0] = manager.cID;
-                m_controlMessage[1] = core.time;
-                m_controlMessage[2] = (byte)MessageType.UNDOREDOADD;
+                message[0] = manager.cID;
+                message[1] = core.time;
+                message[2] = (byte)MessageType.UNDOREDOADD;
 
                 // parameter
-                Helpers.copyArray(BitConverter.GetBytes(parameter._parent._sceneID), 0, m_controlMessage, 3, 1);  // SceneID
-                Helpers.copyArray(BitConverter.GetBytes(parameter._parent._id), 0, m_controlMessage, 4, 2);  // SceneObjectID
-                Helpers.copyArray(BitConverter.GetBytes(parameter._id), 0, m_controlMessage, 6, 2);  // ParameterID
-                m_controlMessage[8] = (byte)parameter.tracerType;  // ParameterType
+                Helpers.copyArray(BitConverter.GetBytes(parameter._parent._sceneID), 0, message, 3, 1);  // SceneID
+                Helpers.copyArray(BitConverter.GetBytes(parameter._parent._id), 0, message, 4, 2);  // SceneObjectID
+                Helpers.copyArray(BitConverter.GetBytes(parameter._id), 0, message, 6, 2);  // ParameterID
+                message[8] = (byte)parameter.tracerType;  // ParameterType
+                m_controlMessages.Append(message);
             }
 
             m_mre.Set();
@@ -249,18 +284,19 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // Parameter: SceneID, ParameterObjectID, ParameterID, ParameterType, ParameterData
 
-            lock (sceneObject)
+            lock (_lock)
             {
-                m_controlMessage = new byte[6]; // ParameterData;
+                byte[] message = new byte[6]; // ParameterData;
 
                 // header
-                m_controlMessage[0] = manager.cID;
-                m_controlMessage[1] = core.time;
-                m_controlMessage[2] = (byte)MessageType.RESETOBJECT;
+                message[0] = manager.cID;
+                message[1] = core.time;
+                message[2] = (byte)MessageType.RESETOBJECT;
 
                 // parameter
-                Helpers.copyArray(BitConverter.GetBytes(sceneObject._sceneID), 0, m_controlMessage, 3, 1);  // SceneID
-                Helpers.copyArray(BitConverter.GetBytes(sceneObject._id), 0, m_controlMessage, 4, 2);  // SceneObjectID
+                Helpers.copyArray(BitConverter.GetBytes(sceneObject._sceneID), 0, message, 3, 1);  // SceneID
+                Helpers.copyArray(BitConverter.GetBytes(sceneObject._id), 0, message, 4, 2);  // SceneObjectID
+                m_controlMessages.Append(message);
             }
 
             m_mre.Set();
@@ -277,27 +313,26 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // Parameter: SceneID, ParameterObjectID, ParameterID, ParameterType, ParameterData
 
-            lock (sender)
-            {
-                m_controlMessage = new byte[3 + parameter.dataSize() + 7];
-                Span<byte> msgSpan = m_controlMessage;
+            byte[] message = new byte[3 + parameter.dataSize() + 7];
+            Span<byte> msgSpan = message;
 
-                // header
-                msgSpan[0] = manager.cID; // ClientID
-                msgSpan[1] = core.time; // Time
-                msgSpan[2] = (byte)MessageType.RPC; // MessageType
+            // header
+            msgSpan[0] = manager.cID; // ClientID
+            msgSpan[1] = core.time; // Time
+            msgSpan[2] = (byte)MessageType.RPC; // MessageType
 
-                int length = 7 + parameter.dataSize();
-                Span<byte> newSpan = msgSpan.Slice(3, length);
+            int length = 7 + parameter.dataSize();
+            Span<byte> newSpan = msgSpan.Slice(3, length);
 
-                newSpan[0] = parameter._parent._sceneID;  // SceneID
-                BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id);  // SceneObjectID
-                BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);  // ParameterID
-                newSpan[5] = (byte)parameter.tracerType;  // ParameterType
-                newSpan[6] = (byte)newSpan.Length;  // Parameter message length
-                parameter.Serialize(newSpan.Slice(7)); // Parameter data
-            }
-            m_mre.Set();
+            newSpan[0] = parameter._parent._sceneID;  // SceneID
+            BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id);  // SceneObjectID
+            BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);  // ParameterID
+            newSpan[5] = (byte)parameter.tracerType;  // ParameterType
+            newSpan[6] = (byte)newSpan.Length;  // Parameter message length
+            parameter.Serialize(newSpan.Slice(7)); // Parameter data
+
+            m_controlMessages.Append(message);
+            //m_mre.Set();
         }
 
         //!
@@ -306,9 +341,10 @@ namespace tracer
         //! @param sender The scene object containing the modified parameter.
         //! @param parameter The modified parameter.
         //!
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void queueModifiedParameter(object sender, AbstractParameter parameter)
         {
-            lock (m_modifiedParameters)
+            lock (_lock)
             {
                 if (parameter._isRPC)
                 {
@@ -361,22 +397,18 @@ namespace tracer
             for (int i = 0; i < m_modifiedParameters.Count; i++)
             {
                 AbstractParameter parameter = m_modifiedParameters[i];
-                lock (parameter)
-                {
-                    int length = 10 + parameter.dataSize();
-                    Span<byte> newSpan = msgSpan.Slice(start, length);
+                int length = 10 + parameter.dataSize();
+                Span<byte> newSpan = msgSpan.Slice(start, length);
 
-                    newSpan[0] = parameter._parent._sceneID;  // SceneID
-                    BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id);  // SceneObjectID
-                    BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);  // ParameterID
-                    newSpan[5] = (byte)parameter.tracerType;  // ParameterType
-                    BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);  // Parameter message length
-                    parameter.Serialize(newSpan.Slice(10)); // Parameter data
+                newSpan[0] = parameter._parent._sceneID;  // SceneID
+                BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id);  // SceneObjectID
+                BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);  // ParameterID
+                newSpan[5] = (byte)parameter.tracerType;  // ParameterType
+                BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);  // Parameter message length
+                parameter.Serialize(newSpan.Slice(10)); // Parameter data
 
-                    start += length;
-                }
+                start += length;
             }
-
             return message;
         }
 
@@ -391,6 +423,8 @@ namespace tracer
             var sender = new PublisherSocket();
             sender.Options.Linger = TimeSpan.FromMilliseconds(0);
             sender.Options.Backlog = 10;
+            const int packageSize = 3;
+            int i = 0;
             m_socket = sender;
 
             sender.Connect("tcp://" + m_ip + ":" + m_port);
@@ -398,21 +432,28 @@ namespace tracer
             while (m_isRunning)
             {
                 m_mre.WaitOne();
-                if (m_controlMessage != null)
+                lock (_lock)
                 {
-                    lock (m_controlMessage)
+                    // send controm messages
+                    if (!m_controlMessages.IsEmpty)
                     {
-                        try { sender.SendFrame(m_controlMessage, false); } catch { } // true not wait 
-                        m_controlMessage = null;
+                        try { sender.SendMultipartMessage(m_controlMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:controlMsg:SendFrame</color> " + e.ToString()); } // true not wait 
+                        m_controlMessages.Clear();
                     }
-                }
-                else if (m_modifiedParameters.Count > 0)
-                {
-                    lock (m_modifiedParameters)
+                    // add parameter message to message buffer
+                    if (m_modifiedParameters.Count > 0)
                     {
-                        try { sender.SendFrame(createParameterMessage(), false); } catch(Exception e) { Debug.Log(e); } // true not wait
+                        m_parameterMessages.Append(createParameterMessage());
                         m_modifiedParameters.Clear();
                         m_modifiedParametersDataSize = 0;
+                    }
+                    // send message buffer if cout > packageSize or time is over
+                    int frameCount = m_parameterMessages.FrameCount;
+                    if (frameCount > packageSize || (i++ > packageSize && frameCount > 0))
+                    {
+                        try { sender.SendMultipartMessage(m_parameterMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:modifiedParameter:SendFrame</color> " + e.ToString()); } // true not wait
+                        m_parameterMessages.Clear();
+                        i = 0;
                     }
                 }
                 // reset to stop the thread after one loop is done
@@ -430,7 +471,7 @@ namespace tracer
         //!
         private void sendParameterMessages(object sender, EventArgs e)
         {
-            if (m_modifiedParameters.Count > 0)
+            //if (m_modifiedParameters.Count > 0)
                 m_mre.Set();
         }
 
