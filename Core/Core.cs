@@ -277,7 +277,6 @@ namespace tracer
         private void updateTime()
         {
             timeEvent?.Invoke(this, EventArgs.Empty);
-
             m_time = (m_time > (m_timesteps-2) ? (byte)0 : m_time+=1);
         }
 
