@@ -53,7 +53,7 @@ namespace tracer
             //!
             //! Default screen size (unused)
             //!
-            public Vector2Int screenSize = new Vector2Int(1280,720);
+            public Vector2Int screenSize = new Vector2Int(1280, 720);
             //! 
             //! VSync on every frame.
             //!
@@ -86,8 +86,8 @@ namespace tracer
         //!
         //! The current local time stores as value between 0 and 255.
         //!
-        public byte time 
-        { 
+        public byte time
+        {
             set => m_time = value;
             get => m_time;
         }
@@ -174,7 +174,7 @@ namespace tracer
             Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
             UnityEngine.Debug.unityLogger.logEnabled = false;
 #endif
-            
+
             if (!string.IsNullOrEmpty(Application.absoluteURL))
             {
                 deepLink = Application.absoluteURL;
@@ -187,7 +187,7 @@ namespace tracer
             // Create network manager
             NetworkManager networkManager = new NetworkManager(typeof(NetworkManagerModule), this);
             m_managerList.Add(typeof(NetworkManager), networkManager);
-            
+
             //Create scene manager
             SceneManager sceneManager = new SceneManager(typeof(SceneManagerModule), this);
             m_managerList.Add(typeof(SceneManager), sceneManager);
@@ -212,7 +212,7 @@ namespace tracer
             awakeEvent?.Invoke(this, new EventArgs());
             lateAwakeEvent?.Invoke(this, new EventArgs());
         }
-        
+
         //!
         //! Unity's Start callback, used for Late initialization.
         //!
@@ -225,7 +225,8 @@ namespace tracer
             m_orientation = Input.deviceOrientation;
 
             InvokeRepeating("checkDeviceOrientation", 0f, 1f);
-            InvokeRepeating("updateTime", 0f, Mathf.FloorToInt(1000f/settings.framerate) / 1000f); // computation to match the ms int scala of an QtTimer used in SyncServer
+            InvokeRepeating("pingDataHub", 0f, 1f);
+            InvokeRepeating("updateTime", 0f, Mathf.FloorToInt(1000f / settings.framerate) / 1000f); // computation to match the ms int scala of an QtTimer used in SyncServer
 
             startEvent?.Invoke(this, new EventArgs());
         }
@@ -276,11 +277,15 @@ namespace tracer
         private void updateTime()
         {
             timeEvent?.Invoke(this, EventArgs.Empty);
+            m_time = (m_time > (m_timesteps - 2) ? (byte)0 : m_time += 1);
+        }
 
-            m_time = (m_time > (m_timesteps-2) ? (byte)0 : m_time+=1);
-
-            if ((m_time % settings.framerate) == 0)
-                syncEvent?.Invoke(this, m_time);
+        //!
+        //! Function that triggers the Tracer to Datahub ping messages.
+        //!
+        private void pingDataHub()
+        {
+            syncEvent?.Invoke(this, (byte)m_time);
         }
 
         //!
@@ -350,7 +355,7 @@ namespace tracer
                 Helpers.Log("Parameter object List in scene ID: " + sceneID.ToString() + " already contains the Parameter Object.", Helpers.logMsgType.WARNING);
         }
 
-        internal void removeParameterObject(ParameterObject parameterObject) 
+        internal void removeParameterObject(ParameterObject parameterObject)
         {
             byte sceneID = parameterObject._sceneID;
             short poID = parameterObject._id;
