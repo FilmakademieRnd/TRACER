@@ -225,6 +225,7 @@ namespace tracer
             m_orientation = Input.deviceOrientation;
 
             InvokeRepeating("checkDeviceOrientation", 0f, 1f);
+            InvokeRepeating("pingDataHub", 0f, 1f);
             InvokeRepeating("updateTime", 0f, Mathf.FloorToInt(1000f/settings.framerate) / 1000f); // computation to match the ms int scala of an QtTimer used in SyncServer
 
             startEvent?.Invoke(this, new EventArgs());
@@ -278,9 +279,14 @@ namespace tracer
             timeEvent?.Invoke(this, EventArgs.Empty);
 
             m_time = (m_time > (m_timesteps-2) ? (byte)0 : m_time+=1);
+        }
 
-            if ((m_time % settings.framerate) == 0)
-                syncEvent?.Invoke(this, m_time);
+        //!
+        //! Function that triggers the Tracer to Datahub ping messages.
+        //!
+        private void pingDataHub()
+        {
+            syncEvent?.Invoke(this, (byte)m_time);
         }
 
         //!
