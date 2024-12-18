@@ -76,7 +76,6 @@ namespace tracer
         {
             base.Cleanup(sender, e);
             core.timeEvent -= consumeMessages;
-            m_sceneManager.sceneReady -= connectAndStart;
         }
 
         //!
@@ -247,11 +246,12 @@ namespace tracer
             byte dhType = message[3];
             bool status = BitConverter.ToBoolean(message, 4);
             byte cID = message[5];
+            bool isServer = BitConverter.ToBoolean(message, 6);
 
             // dhType 0 = client connection status update
             if (dhType == 0 &&
                 cID != manager.cID)
-                manager.ClientConnectionUpdate(status, cID);
+                manager.ClientConnectionUpdate(status, cID, isServer);
         }
 
         //!

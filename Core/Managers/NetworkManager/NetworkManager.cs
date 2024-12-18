@@ -29,6 +29,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 13.10.2021
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
 using NetMQ;
@@ -97,6 +98,11 @@ namespace tracer
         //! Cast for accessing the settings variable with the correct type.
         //!
         public NetworkManagerSettings settings { get => (NetworkManagerSettings)_settings; }
+
+        //!
+        //! A list containung the ID of all registered Tracer clients acting as server.
+        //!
+        private List<byte> m_serverList;
         
         //!
         //! Constructor initializing member variables.
@@ -107,6 +113,9 @@ namespace tracer
         public NetworkManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             settings.ipAddress = new Parameter<string>("127.0.0.1", "ipAddress");
+
+            // initialize the server list with the given server ID
+            m_serverList = new List<byte>() { byte.Parse(settings.ipAddress.value.ToString().Split('.')[3]) };
 
             //reads the network name of the device
             var hostName = Dns.GetHostName();
@@ -194,14 +203,21 @@ namespace tracer
         //! @param connectionStatus Wether a client has been connected or disconnected.
         //! @param clientID The ID of the client that has been connected or disconnected.
         //!
-        public void ClientConnectionUpdate(bool connectionStatus, byte clientID)
+        public void ClientConnectionUpdate(bool connectionStatus, byte clientID, bool isServer)
         {
             if (connectionStatus)
+            {
                 clientRegistered?.Invoke(this, clientID);
+                if (isServer)
+                    m_serverList.Add(clientID);
+            }
             else
+            {
                 clientLost?.Invoke(this, clientID);
+                m_serverList.Remove(clientID);
+            }
             
-            UnityEngine.Debug.Log("ClientConnectionUpdate ID: " + clientID + "Status: " + connectionStatus.ToString());
+            UnityEngine.Debug.Log("ClientConnectionUpdate ID: " + clientID + " Status: " + connectionStatus.ToString());
         }
 
         public void SendServerCommand(byte[] command)

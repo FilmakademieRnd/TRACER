@@ -99,6 +99,7 @@ namespace tracer
                 sceneManager.sceneReady -= connectAndStart;
 
             core.syncEvent -= queuePingMessage;
+            manager.sendServerCommand -= queueCommandMessage;
         }
 
         //!
@@ -116,7 +117,6 @@ namespace tracer
             core.syncEvent += queuePingMessage;
             manager.sendServerCommand += queueCommandMessage;
         }
-
 
         //!
         //! Function that creates a command message for sending.
@@ -140,7 +140,6 @@ namespace tracer
             m_mre.Set();
         }
 
-
         //!
         //! Function that creates a ping message for sending.
         //!
@@ -152,7 +151,7 @@ namespace tracer
         {
             // if (m_commandRequest == null)
             {
-                m_commandRequest = new byte[3];
+                m_commandRequest = new byte[4];
 
                 m_pingStartTime = time;
 
@@ -162,6 +161,7 @@ namespace tracer
                     m_commandRequest[0] = manager.cID;
                     m_commandRequest[1] = time;
                     m_commandRequest[2] = (byte)MessageType.PING;
+                    m_commandRequest[3] = Convert.ToByte(core.isServer);
                 }
 
                 m_mre.Set();
