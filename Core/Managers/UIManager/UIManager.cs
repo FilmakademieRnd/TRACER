@@ -84,6 +84,14 @@ namespace tracer
             get { return m_selectedObjects; }
         }
         //!
+        //! The list containing currently selected scene objects.
+        //!
+        private SceneObject m_lastCickedObject;
+        public SceneObject LastClickedObject
+        {
+            get { return m_lastCickedObject; }
+        }
+        //!
         //! Event when the clolor select Game Object is Active
         //!
         public event EventHandler<GameObject> colorSelectGameObject; 
@@ -572,11 +580,21 @@ namespace tracer
         }
 
         //!
-        //! Focus on an object if we only have on selcted
+        //! Set last clicked object, no matter if its locked or not
+        //! so we can use this for a double click event (e.g. focus on the object)
         //!
-        public void focusOnSingleSelection(){
-            if(m_selectedObjects.Count == 1){
-                selectionFocus.Invoke(this, m_selectedObjects[0]);
+        //! @ param sceneObject that was clicked
+        //!
+        public void setLastClickedObject(SceneObject sceneObject){
+            m_lastCickedObject = sceneObject;
+        }
+
+        //!
+        //! Focus on the last clicked object (e.g. via double click, even if its locked!)
+        //!
+        public void focusOnLastClickedObject(){
+            if(m_lastCickedObject){
+                selectionFocus.Invoke(this, m_lastCickedObject);
             }
         }
 

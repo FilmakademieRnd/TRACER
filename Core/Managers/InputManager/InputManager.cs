@@ -64,7 +64,7 @@ namespace tracer
         //!
         public event EventHandler<Vector2> objectSelectionEvent;
         
-        //public event EventHandler<Vector2> ControllerObjectSelectionEvent;
+        public event EventHandler<Vector2> tappedEvent;
 
         //!
         //! Event to hook into to check e.g. if we have a selected object and do focus on it
@@ -279,9 +279,18 @@ namespace tracer
         //!
         private bool dragClick = false;
         //!
-        //! timer to check if we made a double click / tap (right now only used to focuse on an object)
+        //! timer to check if we made a double click / tap (right now used to focus on an object) todo: add distance check as well
         //!
-        private float doubleClickCheckTimer = 0f;
+        private float m_doubleClickCheckTimer = 0f;
+        //!
+        //! layer for reseting the double click timer
+        //!
+        private InputLayerType m_lastClickedLayer = InputLayerType.SCREEN;
+        //!
+        //! variable to set if recent tap was a double tap/click
+        //!
+        private bool m_wasDoubleClick = false;
+        
         //!
         //! Have a different doOnce bool for every buffer object, because it could be triggered earlier, if e.g. 3 fingers are not down simulteanously
         //!
@@ -327,6 +336,18 @@ namespace tracer
             // Enable input
             m_inputs = new Inputs();
             m_inputs.VPETMap.Enable();
+
+            //THE EXECUTION ORDER (for a click) IS
+            //click.started     (InputManager.PressStarted)
+            //click.canceled    (InputManager.PressEnd)
+            // tap.performed    (Tap Function)
+
+            //THE EXECUTION ORDER (for a touch [in editor test]) IS
+            //click.started     (InputManager.PressStarted)
+            //click.canceled    (InputManager.PressEnd)
+            //touch.onFingerDown(Finger Down 1)    
+            // tap.performed    (Tap Function)
+            //touch.OnFingerUp  (Finger Up)
 
             // Binding of the click event
             m_inputs.VPETMap.Tap.performed += ctx => TapFunction(ctx);
@@ -385,7 +406,7 @@ namespace tracer
 #endif
 
 #if UNITY_EDITOR || (!UNITY_IOS && !UNITY_ANDROID)
-            //excluded for editor only, to work on e.g. standalone-windows as well
+            //excluded for editor only, would work on e.g. standalone-windows as well
             m_inputs.VPETMap.ZoomWheel.performed += ZoomWheel_performed;
             m_inputs.VPETMap.MiddleClick.started += MiddleClick_started;
             m_inputs.VPETMap.MiddleClick.performed += MiddleClick_performed;
@@ -767,31 +788,21 @@ namespace tracer
         private void TapFunction(InputAction.CallbackContext c)
         {
             //Debug.Log("<color=green>Tap Function</color> phase: "+c.phase);
+            
             if (c.performed){
-                //check it this is a double click / tap!
-                bool doubleClickPerformance = Time.time - doubleClickCheckTimer < 0.4f;
-                doubleClickCheckTimer = Time.time;
-                
                 //TAP never changes m_inputLayerType, because we get this after "Press End" and would never reset it to SCREEN
                 Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
                 if(TappedUI(point)){
-                    //m_inputLayerType = InputLayerType.UI;
+                    SetDoubleTapTimer(InputLayerType.UI);
                     //Debug.Log("tpd ui");
                 }else if(Tapped3DUI(point)){
-                    //m_inputLayerType = InputLayerType.WORLD;
+                    SetDoubleTapTimer(InputLayerType.WORLD);
                     //Debug.Log("TPD 3D!");
-                    if(doubleClickPerformance){
-                        //focus on the object if we do so!
-                        doubleClickedEvent.Invoke(this, null);
-                    }
                 }else{
-                    //m_inputLayerType = InputLayerType.SCREEN;
+                    SetDoubleTapTimer(InputLayerType.SCREEN);
                     objectSelectionEvent?.Invoke(this, point);
-                    if(doubleClickPerformance){
-                        //focus on the object if we do so!
-                        doubleClickedEvent.Invoke(this, null);
-                    }
                 }
+                tappedEvent?.Invoke(null, point);
             }
 
             // just an exampe, needs different code to discover correct type and values!
@@ -808,10 +819,40 @@ namespace tracer
             }
 
             // if(c.canceled)
-            //     Debug.Log("... CANCELED");
-
-            
+            //     Debug.Log("... CANCELED");  
         }
+
+        //!
+        //! Set double tap timer, reset if layer is different
+        //! (world & screen as the same, because otherwise we could not focus a not-selected object instantly)
+        //!
+        private void SetDoubleTapTimer(InputLayerType _touchedType){
+            switch(m_lastClickedLayer){
+                case InputLayerType.UI:
+                    if(_touchedType != InputLayerType.UI)
+                        ResetDoubleTapTimer();
+                    break;
+                case InputLayerType.WORLD:
+                case InputLayerType.SCREEN:
+                    if(_touchedType == InputLayerType.UI)
+                        ResetDoubleTapTimer();
+                    break;
+            }
+            m_lastClickedLayer = _touchedType;
+            m_wasDoubleClick = Time.time - m_doubleClickCheckTimer < 0.25f;
+            //Debug.Log("SetDoubleTapTimer "+m_wasDoubleClick);
+            m_doubleClickCheckTimer = Time.time;  
+        }
+
+        //!
+        //! Reset the double tap timer
+        //!
+        private void ResetDoubleTapTimer(){ 
+            m_wasDoubleClick = false;
+            m_doubleClickCheckTimer = 0f;
+        }
+
+        
 
         //!
         //! Input move function, for monitoring the moving of the cursor/finger.
@@ -834,6 +875,8 @@ namespace tracer
         private void PressStarted(InputAction.CallbackContext c)
         {
             //Debug.Log("<color=green>Press Started</color>");    //is only ever called for the first finger, for nothing else. (why though?)
+            //Debug.Log("<color=yellow>InputManager.PressStarted</color>");
+
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
             m_touchType = InputTouchType.ONE;                                   //no, see above. m_touchType = (m_touchType == InputTouchType.ONE) ? InputTouchType.TWO : InputTouchType.ONE;
             
@@ -876,7 +919,7 @@ namespace tracer
         private void PressEnd(InputAction.CallbackContext c)
         {
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            //Debug.Log("<color=blue>Press End</color>");
+            //Debug.Log("<color=blue>InputManager.PressEnd</color>");
 
             inputPressEnd?.Invoke(this, point);
 
@@ -1231,6 +1274,7 @@ namespace tracer
         }
         public bool IsAnyUIUsed(){ return m_inputLayerType == InputLayerType.UI || m_inputLayerType == InputLayerType.WORLD; }
         public bool IsScreenCamNavigationUsed(){ return m_inputLayerType == InputLayerType.SCREEN; }
+        public bool WasDoubleClick(){   return m_wasDoubleClick;  }
     }
 
 }

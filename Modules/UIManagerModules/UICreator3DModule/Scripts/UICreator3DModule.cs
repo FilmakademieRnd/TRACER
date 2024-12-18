@@ -256,6 +256,7 @@ namespace tracer
 
             m_inputManager.inputPressStarted -= PressStart;
             m_inputManager.inputPressEnd -= PressEnd;
+            m_inputManager.tappedEvent -= Tapped;
 
             m_inputManager.fingerGestureEvent -= updateGizmoScale;
             m_inputManager.updateCameraUICommand -= updateGizmoScale;
@@ -304,6 +305,7 @@ namespace tracer
             // Hookup to input events
             m_inputManager.inputPressStarted += PressStart;
             m_inputManager.inputPressEnd += PressEnd;
+            m_inputManager.tappedEvent += Tapped;
 
             m_inputManager.fingerGestureEvent += updateGizmoScale;
             m_inputManager.updateCameraUICommand += updateGizmoScale;
@@ -322,6 +324,23 @@ namespace tracer
 
             this.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
             this.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
+        }
+
+        //!
+        //! Function that is called when a tap is triggered instead of a start/end event
+        //! @param sender m_callback sender
+        //! @param e event reference
+        //!
+        private void Tapped(object sender, Vector2 point){
+             if(!selObj)
+                return;
+
+            if(m_inputManager.WasDoubleClick()){
+                if(manager.LastClickedObject == selObj){  //works with locked objects as well!
+                    manager.focusOnLastClickedObject();
+                }
+                manager.setLastClickedObject(selObj);
+            }
         }
 
 
@@ -428,7 +447,7 @@ namespace tracer
                 visualRot = Quaternion.identity;
                 TransformManipR(visualRot);
             }
-            if(selObj && manipulator)
+            if(selObj && manipulator){
                 switch (modeTRS)
                 {
                     case 0:
@@ -443,6 +462,7 @@ namespace tracer
                     default:
                         break;
                 }
+            }
             manipulator = null;
         }
 

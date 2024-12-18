@@ -113,6 +113,11 @@ namespace tracer
         }
 
         //!
+        //! timer to check if we made a double click / tap
+        //!
+        private float doubleClickCheckTimer = 0f;
+
+        //!
         //! Constructor
         //! @param name Name of this module
         //! @param _core Reference to the TRACER _core
@@ -141,7 +146,7 @@ namespace tracer
 
             // hookup to input events
             m_inputManager.objectSelectionEvent += SelectFunction;
-            m_inputManager.doubleClickedEvent += FocusFunction;
+            
         }
 
         //!
@@ -155,7 +160,6 @@ namespace tracer
             core.updateEvent -= renderUpdate;
             m_sceneManager.sceneReady -= modifyMaterials;
             m_inputManager.objectSelectionEvent -= SelectFunction;
-            m_inputManager.doubleClickedEvent -= FocusFunction;
 
             dataWidth = 0;
             dataHeight = 0;
@@ -195,16 +199,20 @@ namespace tracer
             }
 
 
-            if (obj)
-            {
-                // Thomas: if obj is already our selected object, trigger a refocus, if it was a double click/tap
+            if (obj){
+                
+                CheckDoubleClick(obj);
+
                 if(manager.isThisOurSelectedObject(obj)){
-                    Debug.Log("<color=green>already selected</color>");
+                    //Debug.Log("<color=green>already selected</color>");
                     m_isRenderActive = false;
                     return;
                 }else{
                     manager.clearSelectedObject();
-                    Debug.Log("<color=blue>new selected object</color>");
+                    // if(obj._lock)
+                    //     Debug.Log("<color=red>clicked object is locked</color>");
+                    // else
+                    //     Debug.Log("<color=blue>new selected object</color>");
                 }
 
                 switch (obj)
@@ -228,19 +236,26 @@ namespace tracer
                 }
             }else{
                 manager.clearSelectedObject();
-                //Debug.Log("<color=yellow>.cleared</color>");
+                //Debug.Log("<color=yellow>clicked nothing. selected objects cleared</color>");
             }
 
             m_isRenderActive = false;
         }
+        //!
+        //! Function to check for a double-click/tap to focus on an object
+        //!
+        private void CheckDoubleClick(SceneObject obj){
+            if(!obj)
+                return;
 
-        //!
-        //! If we have a single selected object, focus on it
-        //!
-        private void FocusFunction(object sender, EventArgs e){
-            manager.focusOnSingleSelection();
+            //Double-Click on the same obj -> focus on it
+            if(m_inputManager.WasDoubleClick()){
+                if(manager.LastClickedObject == obj){  //works with locked objects as well!
+                    manager.focusOnLastClickedObject();
+                }
+            }
+            manager.setLastClickedObject(obj);
         }
-
         //!
         //! Retrieve the selectable present at the current location in camera screenspace, if any.
         //! 
