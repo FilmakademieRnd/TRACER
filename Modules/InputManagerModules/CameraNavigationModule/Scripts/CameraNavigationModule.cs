@@ -86,6 +86,16 @@ namespace tracer
         private Vector3 centerOfInterest;
 
         //!
+        //! do we focus an object? If so and we focus it again, lock to the view and follow it!
+        //!
+        private SceneObject currentFocusedObject;
+
+        //!
+        //! Follow this focused object (not if we do any gizmo transformation)
+        //!
+        private SceneObject currentFollowObject;
+
+        //!
         //! A buffer vector storing the position offset between camera and center of interest
         //!
         private Vector3 coiOffset;
@@ -303,6 +313,8 @@ namespace tracer
                 return;
             }
 
+            currentFollowObject = null;
+
             // Calculate the average position
             Vector3 averagePos = Vector3.zero;
             foreach (SceneObject obj in sceneObjects)
@@ -318,8 +330,22 @@ namespace tracer
 
         //!
         //! Focus on the current object (center it, move cam to it)
+        //! if we already focused it, lock to it!
         //!
         private void FocusOnSelection(object sender, SceneObject sceneObject){
+            if(!sceneObject){
+                currentFocusedObject = null;
+                currentFollowObject = null;     //we follow this object, but not if we do any gizmo transformation!
+                return;
+            }
+            if(currentFocusedObject == sceneObject){
+                currentFollowObject = currentFocusedObject;
+                //Start coroutine to follow? Only if locked? another module?
+                return;
+            }else{
+                currentFocusedObject = sceneObject;
+            }
+
             GameObject go = sceneObject.gameObject;
             //calculate bounds
             Bounds b = new Bounds(go.transform.position, Vector3.zero);
@@ -334,6 +360,9 @@ namespace tracer
                     }
                     break;
             }
+
+            //set focus point as well
+            centerOfInterest = b.center;
 
             Vector3 max = b.size;
             // Get the radius of a sphere circumscribing the bounds, multiply by s_focusDistance (the higher the multiply, the farther away)
@@ -351,6 +380,10 @@ namespace tracer
 
             //Smooth transition
             sceneObject.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - m_camXform.forward * dist));
+
+            //TODO: add another function to lock view on a locked object!
+            //AND update its position smoothly (update function?!)
+            //right 
         }
 
         //!

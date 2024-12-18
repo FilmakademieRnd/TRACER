@@ -129,9 +129,10 @@ namespace tracer
             dataSender.Bind("tcp://" + m_ip + ":" + m_port);
             Debug.Log("Enter while.. ");
 
+            string message;
+
             while (m_isRunning)
             {
-                string message = "";
                 dataSender.TryReceiveFrameString(out message);       // TryReceiveFrameString returns null if no message has been received!
                 if (message != null)
                 {
