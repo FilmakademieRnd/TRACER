@@ -172,7 +172,10 @@ namespace tracer
             get { return _ui2Dinteractable; }
             set { _ui2Dinteractable = value; }
         }
-
+        //!
+        //! Event emitted when a uicreator3dmodule finished editing (move gizmo for example)
+        //!
+        public event EventHandler<AbstractParameter> m_manipulation3dDoneEvent;
 
         //!
         //! Constructor initializing member variables.
@@ -253,6 +256,7 @@ namespace tracer
             settings.uiScale.hasChanged -= updateCanvasScales;
             core.orientationChangedEvent -= updateCanvasScales;
             settings.roles.hasChanged -= changeActiveRole;
+            m_manipulation3dDoneEvent = null;
 
         }
 
@@ -634,6 +638,14 @@ namespace tracer
         private void activate2DUIInteraction(object sender, bool e)
         {
             _ui2Dinteractable = e;
+        }
+        //!
+        //! Function that invokes all events listening for changes via the 3d manipulation (e.g. Timeline if Keyframe is selected)
+        //!
+        //! @ param para the changed paramater of the selected scene object (e.g. position, rotation or scale)
+        //! TODO need to be called from manipulation via 2d ui (for example x, xyz, ...)
+        public void Manipulation3dDone(AbstractParameter para){ 
+            m_manipulation3dDoneEvent?.Invoke(this, para);
         }
     }
 }

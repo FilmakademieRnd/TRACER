@@ -176,6 +176,7 @@ namespace tracer
         //!
         private void editingDone(object sender, bool e)
         {
+            Debug.Log("Spinner.editingEnded");
             doneEditing?.Invoke(this, abstractParam);
         }
 

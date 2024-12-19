@@ -42,20 +42,18 @@ namespace tracer
 		private Image m_image;
 	
 	    private Vector3 m_lastPosition = Vector3.zero;
-	
-	    private UnityAction<AbstractKey, float> m_callback;
-	    private UnityAction<GameObject> m_callback1;
-
 		private float m_leftLimit, m_rightLimit = 0.0f;
-	
-	    public UnityAction<AbstractKey, float> Callback
+	    private UnityAction<AbstractKey, float> m_keyframeDragEndEvent;
+	    private UnityAction<GameObject> m_keyframeSelectedEvent;
+
+	    public UnityAction<AbstractKey, float> KeyframeDragEndEvent
 	    {
-	        set { m_callback = value; }
+	        set { m_keyframeDragEndEvent = value; }
 	    }
 
-        public UnityAction<GameObject> Callback1
+        public UnityAction<GameObject> KeyframeSelectedEvent
         {
-            set { m_callback1 = value; }
+            set { m_keyframeSelectedEvent = value; }
         }
 
         protected override void Awake()
@@ -99,13 +97,13 @@ namespace tracer
 	
 	    public void OnEndDrag(PointerEventData data)
 	    {
-	        m_callback?.Invoke(key, m_rectTransform.position.x);
+	        m_keyframeDragEndEvent?.Invoke(key, m_rectTransform.position.x);
 	    }
 
 		public override void OnPointerDown(PointerEventData data)
 		{
 			base.OnPointerDown(data);
-            m_callback1?.Invoke(transform.gameObject);
+            m_keyframeSelectedEvent?.Invoke(transform.gameObject);
         }
     }
 }

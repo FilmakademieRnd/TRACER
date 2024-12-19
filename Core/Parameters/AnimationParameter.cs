@@ -51,6 +51,12 @@ namespace tracer
         //!
         public void setKey();
         //!
+        //! Update the key at given _animationManager.time by manipulated the sceneObject via Gizmo while a keyframe is selected
+        //!
+        //! @ param index The index of the key for which the value is to be changed.
+        //!
+        public void updateKey(int index);
+        //!
         //! Clear the parameters key list and disable the animation functionality.
         //!
         public void clearKeys();
@@ -217,6 +223,17 @@ namespace tracer
         }
 
         //!
+        //! Update the key at given _animationManager.time by manipulated the sceneObject via Gizmo while a keyframe is selected
+        //! 
+        //! @ param index The index of the key for which the value is to be changed.
+        //!
+        public void updateKey(int index)
+        {
+            _keyList.RemoveAt(index);
+            _keyList.Insert(index, new Key<T>(_animationManager.time, _value));
+        }
+
+        //!
         //! Clear the parameters key list and disable the animation functionality.
         //!
         public void clearKeys()
@@ -322,47 +339,45 @@ namespace tracer
         //!
         private void updateParameterValue(object o, float time)
         {
-            if (((SceneObject)_parent)._lock)
+            if (((SceneObject)_parent)._lock || !_isAnimated)
                 return;
 
-            if (_isAnimated)
+            
+            if (_keyList.Count > 1)
             {
-                if (_keyList.Count > 1)
+                if (_keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
+                    value = interpolateLinear(time);
+                else
                 {
-                    if (_keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
-                        value = interpolateLinear(time);
+                    // current time is NOT in between the two active keys
+                    int i = findNextKeyIndex(time);
+                    // current time is bigger than all keys in list
+                    if (i == -1)
+                    {
+                        _prevIdx = _keyList.Count - 1;
+                        value = ((Key<T>)_keyList[_prevIdx]).value; //still update animation to the last key's value
+                    }
+                    // current time is smaller than all keys in list
+                    else if (i == 0)
+                    {
+                        _nextIdx = 0;
+                        value = ((Key<T>)_keyList[_nextIdx]).value; //still update animation to the first key's value
+                    }
+                    // current time is somewhere between all keys in list
                     else
                     {
-                        // current time is NOT in between the two active keys
-                        int i = findNextKeyIndex(time);
-                        // current time is bigger than all keys in list
-                        if (i == -1)
-                        {
-                            _prevIdx = _keyList.Count - 1;
-                            value = ((Key<T>)_keyList[_prevIdx]).value; //still update animation to the last key's value
-                        }
-                        // current time is smaller than all keys in list
-                        else if (i == 0)
-                        {
-                            _nextIdx = 0;
-                            value = ((Key<T>)_keyList[_nextIdx]).value; //still update animation to the first key's value
-                        }
-                        // current time is somewhere between all keys in list
-                        else
-                        {
-                            _nextIdx = i;
-                            _prevIdx = i - 1;
-                            value = interpolateLinear(time);
-                        }
+                        _nextIdx = i;
+                        _prevIdx = i - 1;
+                        value = interpolateLinear(time);
                     }
                 }
-                else 
-                {
-                    _nextIdx = _prevIdx = 0;
-                    if (_keyList.Count == 1)    //still update animation to the left key's value
-                        value = ((Key<T>)_keyList[_prevIdx]).value;
-                    
-                }
+            }
+            else 
+            {
+                _nextIdx = _prevIdx = 0;
+                if (_keyList.Count == 1)    //still update animation to the left key's value
+                    value = ((Key<T>)_keyList[_prevIdx]).value;
+                
             }
         }
 

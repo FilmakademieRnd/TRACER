@@ -253,6 +253,7 @@ namespace tracer
 
             // Unsubscribe
             manager.selectionChanged -= SelectionUpdate;
+            manager.settings.uiScale.hasChanged -= updateUIScale;
 
             m_inputManager.inputPressStarted -= PressStart;
             m_inputManager.inputPressEnd -= PressEnd;
@@ -264,11 +265,10 @@ namespace tracer
             UICreator2DModule UI2DModule = manager.getModule<UICreator2DModule>();
             CameraSelectionModule CamModule = manager.getModule<CameraSelectionModule>();
             UIManager m_UIManager = core.getManager<UIManager>();
-            if (UI2DModule != null && CamModule != null && m_UIManager != null)
+            if (UI2DModule != null && CamModule != null)
             {
                 UI2DModule.parameterChanged -= SetManipulatorMode;
                 CamModule.uiCameraOperation -= SetCameraManipulator;
-                m_UIManager.settings.uiScale.hasChanged -= updateUIScale;
             }
 
             this.doneEditing -= manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
@@ -311,12 +311,8 @@ namespace tracer
             m_inputManager.updateCameraUICommand += updateGizmoScale;
 
             // Grabbing scene scale
-            UIManager m_UIManager = core.getManager<UIManager>();
-            if (m_UIManager != null)
-            {
-                uiScale = m_UIManager.settings.uiScale.value;
-                m_UIManager.settings.uiScale.hasChanged += updateUIScale;
-            }
+            uiScale = manager.settings.uiScale.value;
+            manager.settings.uiScale.hasChanged += updateUIScale;
 
             // Instantiate TRS widgest but keep them hidden
             InstantiateAxes();
@@ -421,7 +417,7 @@ namespace tracer
         //!
         private void PressEnd(object sender, Vector2 point)
         {
-            //Debug.Log("Press end: " + e.point.ToString());
+            //Debug.Log("Press end: " + point.ToString());
 
             // stop monitoring move
             m_inputManager.inputMove -= Move;
@@ -447,16 +443,27 @@ namespace tracer
                 visualRot = Quaternion.identity;
                 TransformManipR(visualRot);
             }
+
+            // if(selObj)
+            //     Debug.Log("selObj: "+selObj.gameObject.name);
+            // if(manipulator)
+            //     Debug.Log("manipulator: "+manipulator.gameObject.name);
+            // Debug.Log("modeTRS: "+modeTRS);
+
             if(selObj && manipulator){
                 switch (modeTRS)
                 {
                     case 0:
+                        //Debug.Log("DONE EDITING (?!)");
+                        manager.Manipulation3dDone(selObj.parameterList[0]);
                         doneEditing?.Invoke(this, selObj.parameterList[0]);
                         break;
                     case 1:
+                        manager.Manipulation3dDone(selObj.parameterList[1]);
                         doneEditing?.Invoke(this, selObj.parameterList[1]);
                         break;
                     case 2:
+                        manager.Manipulation3dDone(selObj.parameterList[2]);
                         doneEditing?.Invoke(this, selObj.parameterList[2]);
                         break;
                     default:

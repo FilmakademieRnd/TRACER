@@ -153,6 +153,10 @@ namespace tracer
         //!
         private SnapSelect m_snapSelect;
         //!
+        //! A reference the the selected spinner UI element.
+        //!
+        private Spinner m_spinner;
+        //!
         //! A reference the current active parameter the key are displayed by the timeline.
         //!
         private IAnimationParameter m_activeParameter = null;
@@ -363,13 +367,16 @@ namespace tracer
             m_inputManager.pinchDetailedEvent += OnPinchDetail;
             manager.selectionChanged += OnSelectionChanged;
 
+            manager.m_manipulation3dDoneEvent += OnKeyframeValueManipulated;
+
             if (manager.SelectedObjects.Count > 0)
             {
                 if (m_activeParameter == null)
                 {
                     m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
-                    m_activeParameter.keyHasChanged += OnKeyframeUpdated;
+                    m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
                 }
+
 
                 CreateFrames(m_activeParameter);
             }
@@ -478,6 +485,7 @@ namespace tracer
             m_inputManager.middleClickReleaseEvent -= OnMiddleClickRelease;
             m_inputManager.pinchDetailedEvent -= OnPinchDetail;
             manager.selectionChanged -= OnSelectionChanged;
+            manager.m_manipulation3dDoneEvent -= OnKeyframeValueManipulated;
         }
 
         //!
@@ -571,12 +579,15 @@ namespace tracer
                 clearFrames();
                 if (m_activeParameter != null)
                 {
-                    m_activeParameter.keyHasChanged -= OnKeyframeUpdated;
+                    m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
                     m_activeParameter = null;
                 }
 
                 if (m_snapSelect)
                     m_snapSelect.parameterChanged -= OnParameterChanged;
+                
+                if(m_spinner)
+                    m_spinner.doneEditing -= OnSpinnerValueChanged;
 
                 StopAnimGen();
             }
@@ -586,7 +597,6 @@ namespace tracer
                 m_sceneObjectSelected = true;
                 StartAnimGen();
             }
-            //Debug.Log("m_sceneObjectSelected: "+m_sceneObjectSelected);
             updateButtonInteractability();
         }
         
@@ -599,16 +609,61 @@ namespace tracer
         {
             m_animationManager.OnStopAnimaGeneration(null);
         }
+
+        public void OnKeyframeValueManipulated(object sender, AbstractParameter parameter)
+        {
+            Debug.Log("<color=yellow>OnKeyframeValueManipulated "+parameter._parent.gameObject.name+"</color>");
+
+            if(m_activeKeyframeIndex < 0 || m_activeParameter == null)
+                return;
+
+            //Parameter<Vector3> pos = (Parameter<Vector3>)parameter;
+            //Debug.Log("\t--> UpdateKey. New value = "+pos.value);
+            
+            // dont change anything
+            // clearFrames();
+            // CreateFrames((IAnimationParameter) parameter);
+
+            // float time = m_activeParameter.getKeys()[m_activeKeyframeIndex].time;
+            // m_activeParameter.removeKeyAtIndex(m_activeKeyframeIndex);
+            // m_activeParameter.setKeyTime((AbstractKey)parameter, time);
+
+            //m_keyframeList[m_activeKeyframeIndex].key.
+
+            // m_activeParameter.updateKey(m_activeKeyframeIndex, pos );
+            // clearFrames();
+            // CreateFrames(m_activeParameter);
+
+            //m_activeParameter.getKeys()[m_activeKeyframeIndex].value
+
+            //m_activeParameter.removeKeyAtIndex(m_activeKeyframeIndex);
+            //m_activeParameter.setKey();
+
+            m_activeParameter.updateKey(m_activeKeyframeIndex);
+            // clearFrames();
+            // CreateFrames(m_activeParameter);
+            //UpdateFrames();
+            
+            if (m_activeParameter is Parameter<Vector3> vector3Param && parameter.name == "position")
+                m_animationManager.OnRenewSplineContainer(null);
+            
+            //(m_activeParameter).InvokeKeyHasChanged();
+
+            //m_activeParameter.setKeyValue(m_activeKeyframeIndex, m_activeParameter.getKeys()[m_activeKeyframeIndex].interpolation);
+            //UpdateKey(false);
+            //should set key (change the value of given key)
+        }
         
         //!
-        //! Function called a keyframe 
+        //! Function called when a keyframe is created
         //! Will remove all keyframes from timeline UI is new selection is empty.
         //!
         //! @param o The UI manager.
         //! @param sceneObjects The list containing the selected objects. 
         //!
-        private void OnKeyframeUpdated(object o, EventArgs e)
+        private void OnKeyAddOrRemoved(object o, EventArgs e)
         {
+            Debug.Log("<color=yellow>OnKeyAddOrRemoved</color>");
             clearFrames();
             CreateFrames((IAnimationParameter) o);
         }
@@ -620,19 +675,37 @@ namespace tracer
         //!
         private void On2DUIReady(object o, UIBehaviour ui)
         {
+            Debug.Log("<color=green>On2DUIReady</color>");
+            if(m_snapSelect)
+                m_snapSelect.parameterChanged -= OnParameterChanged;
+            if(m_spinner)
+                m_spinner.doneEditing -= OnSpinnerValueChanged;
 
             m_snapSelect = (SnapSelect) ui;
-            m_snapSelect.parameterChanged -= OnParameterChanged;
             m_snapSelect.parameterChanged += OnParameterChanged;
+            
+            //Debug.Log("SnapSelect: "+m_snapSelect.gameObject.name);
+            //TODO: somehow get currentManipulator from UICreator2DModule
+            //is this ugly?
+            UICreator2DModule ui2DModule = manager.getModule<UICreator2DModule>();
+            if(ui2DModule != null){
+                GameObject currentManipulator = ui2DModule.GetManipulator();    //not there:m_snapSelect.elements[0]
+                if(currentManipulator){
+                    m_spinner = currentManipulator.GetComponent<Spinner>();
+                    if(m_spinner)
+                        m_spinner.doneEditing += OnSpinnerValueChanged;
+                }
+            }
+            //TODO add the above for color and other values that are not a Spinner (generic value changed function?)
 
             clearFrames();
             
             if (manager.SelectedObjects.Count > 0)
             {
                 if (m_activeParameter != null)
-                    m_activeParameter.keyHasChanged -= OnKeyframeUpdated;
+                    m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
                 m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
-                m_activeParameter.keyHasChanged += OnKeyframeUpdated;
+                m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
                 if (m_showTimeLine)
                     CreateFrames(m_activeParameter);
             }
@@ -649,13 +722,32 @@ namespace tracer
         //!
         private void OnParameterChanged(object o, int idx)
         {
+            Debug.Log("OnParameterChanged at "+idx);
             clearFrames();
             if (m_activeParameter != null)
-                m_activeParameter.keyHasChanged -= OnKeyframeUpdated;
+                m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
             m_activeParameter = manager.SelectedObjects[0].parameterList[idx] as IAnimationParameter;
-            m_activeParameter.keyHasChanged += OnKeyframeUpdated;
+            m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
             CreateFrames(m_activeParameter);
             keyframeDeselected();
+        }
+
+        //! 
+        //! Function called when the parameter selected by the UI changed.
+        //! Updates the timeline widgets based on the parameters data.
+        //!
+        //! @param o The UI element (SnapSelect) that changes the selected parameter.
+        //! @param para changed abstract parameter
+        //!
+        private void OnSpinnerValueChanged(object o, AbstractParameter para)
+        {
+            Debug.Log("OnParameterValueChanged");
+            if(m_activeKeyframeIndex < 0 || m_activeParameter == null)
+                return;
+
+            m_activeParameter.updateKey(m_activeKeyframeIndex);
+            if (m_activeParameter is Parameter<Vector3> vector3Param && para.name == "position")
+                m_animationManager.OnRenewSplineContainer(null);
         }
 
         //!
@@ -691,14 +783,14 @@ namespace tracer
         //!
         public void UpdateFrames()
         {
-            foreach (GameObject img in m_keyframeObjectList)
+            foreach (GameObject kfGo in m_keyframeObjectList)
             {
-                float _time = img.GetComponent<KeyFrame>().key.time;
+                float _time = kfGo.GetComponent<KeyFrame>().key.time;
                 if (_time < m_startTime || _time > m_endTime)
-                    img.SetActive(false);
+                    kfGo.SetActive(false);
                 else
-                    img.SetActive(true);
-                img.GetComponent<RectTransform>().localPosition = new Vector3(mapToTimelinePosition(_time), 0, 0);
+                    kfGo.SetActive(true);
+                kfGo.GetComponent<RectTransform>().localPosition = new Vector3(mapToTimelinePosition(_time), 0, 0);
             }
         }
 
@@ -709,22 +801,22 @@ namespace tracer
         private void addFrame(AbstractKey key)
         {
             float time = key.time;
-            GameObject keyFrame = GameObject.Instantiate<GameObject>(m_keyframePrefab, m_timelineRect, false);
-            KeyFrame keyframeComponent = keyFrame.GetComponent<KeyFrame>();
-            keyFrame.transform.SetAsFirstSibling();
+            GameObject keyframeGO = GameObject.Instantiate<GameObject>(m_keyframePrefab, m_timelineRect, false);
+            KeyFrame keyframeComponent = keyframeGO.GetComponent<KeyFrame>();
+            keyframeGO.transform.SetAsFirstSibling();
             keyframeComponent.key = key;
 
-            keyFrame.name = m_keyframeObjectList.Count.ToString();
-            m_keyframeObjectList.Add(keyFrame);
+            keyframeGO.name = m_keyframeObjectList.Count.ToString();
+            m_keyframeObjectList.Add(keyframeGO);
             m_keyframeList.Add(keyframeComponent);
 
             if (m_startTime <= time && time <= m_endTime)
-                keyFrame.SetActive(true);
+                keyframeGO.SetActive(true);
             else
-                keyFrame.SetActive(false);
+                keyframeGO.SetActive(false);
 
-            keyframeComponent.Callback = setTimeFromGlobalPositionX;
-            keyframeComponent.Callback1 = keyframeSelected;
+            keyframeComponent.KeyframeDragEndEvent = setTimeFromGlobalPositionX;
+            keyframeComponent.KeyframeSelectedEvent = keyframeSelected;
 
             updateButtonInteractability();
         }
@@ -816,7 +908,7 @@ namespace tracer
         //!
         //! Function used to Update a key (add or remove).
         //!
-        public void UpdateKey(bool removeKey, bool removeAll = false)
+        private void UpdateKey(bool removeKey, bool removeAll = false)
         {
             if (m_activeParameter is Parameter<bool> boolParam)
             {
@@ -862,7 +954,7 @@ namespace tracer
         //!
         //! Function used to apply the key update
         //!
-        public void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false)
+        private void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false)
         {
             if (removeKey && !removeAll && m_activeKeyframeIndex > -1)
             {
