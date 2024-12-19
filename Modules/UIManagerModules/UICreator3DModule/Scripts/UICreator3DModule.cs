@@ -941,7 +941,7 @@ namespace tracer
         //!
         public void UpdateManipulatorRotation(object sender, Quaternion rotation)
         {
-            if (selObjs.Count <= 1) // only update here if single selection
+            if (selObjs.Count == 1) // only update here if single selection
             {
                 Quaternion q = selObj.transform.rotation;
                 manipT.transform.localRotation = q;

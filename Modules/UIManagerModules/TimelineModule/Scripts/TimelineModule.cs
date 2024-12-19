@@ -612,8 +612,7 @@ namespace tracer
 
         public void OnKeyframeValueManipulated(object sender, AbstractParameter parameter)
         {
-            Debug.Log("<color=yellow>OnKeyframeValueManipulated "+parameter._parent.gameObject.name+"</color>");
-
+            //Debug.Log("<color=yellow>OnKeyframeValueManipulated "+parameter._parent.gameObject.name+"</color>");
             if(m_activeKeyframeIndex < 0 || m_activeParameter == null)
                 return;
 
@@ -663,7 +662,7 @@ namespace tracer
         //!
         private void OnKeyAddOrRemoved(object o, EventArgs e)
         {
-            Debug.Log("<color=yellow>OnKeyAddOrRemoved</color>");
+            //Debug.Log("<color=yellow>OnKeyAddOrRemoved</color>");
             clearFrames();
             CreateFrames((IAnimationParameter) o);
         }
@@ -722,7 +721,7 @@ namespace tracer
         //!
         private void OnParameterChanged(object o, int idx)
         {
-            Debug.Log("OnParameterChanged at "+idx);
+            //Debug.Log("OnParameterChanged at "+idx);
             clearFrames();
             if (m_activeParameter != null)
                 m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
