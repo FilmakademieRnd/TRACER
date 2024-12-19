@@ -76,7 +76,7 @@ namespace tracer
             set { _settings = value; }
         }
         //!
-        //! Flag determining wether the VPERT instance acts as a server or client.
+        //! Flag determining wether the Tracer instance acts as a server or client.
         //!
         public bool isServer = false;
         //!

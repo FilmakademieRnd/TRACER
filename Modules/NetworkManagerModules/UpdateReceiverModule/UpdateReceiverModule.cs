@@ -60,6 +60,11 @@ namespace tracer
         private SceneManager m_sceneManager;
 
         //!
+        //! Object for handling thread locking.
+        //!
+        private readonly object _lock = new object();
+
+        //!
         //! Constructor
         //!
         //! @param  name  The  name of the module.
@@ -76,7 +81,6 @@ namespace tracer
         {
             base.Cleanup(sender, e);
             core.timeEvent -= consumeMessages;
-            m_sceneManager.sceneReady -= connectAndStart;
         }
 
         //!
@@ -88,9 +92,12 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             // initialize message buffer
-            m_messageBuffer = new List<byte[]>[core.timesteps];
-            for (int i = 0; i < core.timesteps; i++)
-                m_messageBuffer[i] = new List<byte[]>(64);
+            lock (_lock)
+            {
+                m_messageBuffer = new List<byte[]>[core.timesteps];
+                for (int i = 0; i < core.timesteps; i++)
+                    m_messageBuffer[i] = new List<byte[]>(64);
+            }
 
             m_sceneManager = core.getManager<SceneManager>();
             m_sceneManager.sceneReady += connectAndStart;
@@ -124,49 +131,58 @@ namespace tracer
             receiver.Connect("tcp://" + m_ip + ":" + m_port);
             Helpers.Log("Update receiver connected: " + "tcp://" + m_ip + ":" + m_port);
             byte[] message = null;
+            List<byte[]> messages = new List<byte[]>();
             while (m_isRunning)
             {
                 try
                 {
-                    if (receiver.TryReceiveFrameBytes(System.TimeSpan.FromSeconds(1), out message))
+                    if (receiver.TryReceiveMultipartBytes(System.TimeSpan.FromSeconds(1), ref messages))
                     {
-                        if (message != null)
-                            if (message[0] != manager.cID)
+                        for (int i = 0; i < messages.Count; i++)
+                        {
+                            message = messages[i];
+                            if (message != null)
                             {
-                                switch ((MessageType)message[2])
+                                if (message[0] != manager.cID)
                                 {
-                                    case MessageType.LOCK:
-                                        decodeLockMessage(message);
-                                        break;
-                                    case MessageType.SYNC:
-                                        decodeSyncMessage(message);
-                                        break;
-                                    case MessageType.RESETOBJECT:
-                                        decodeResetMessage(message);
-                                        break;
-                                    case MessageType.UNDOREDOADD:
-                                        decodeUndoRedoMessage(message);
-                                        break;
-                                    case MessageType.DATAHUB:
-                                        decodeDataHubMessage(message);
-                                        break;
-                                    case MessageType.PARAMETERUPDATE:
-                                        // make shure that producer and consumer exclude eachother
-                                        lock (m_messageBuffer)
+                                    lock (_lock)
+                                    {
+                                        switch ((MessageType)message[2])
                                         {
-                                            // message[1] is time
-                                            //int time = (message[1] + manager.pingRTT) % _core.timesteps;
-                                            //m_messageBuffer[time].Add(message);
-                                            m_messageBuffer[message[1]].Add(message);
+                                            case MessageType.LOCK:
+                                                decodeLockMessage(message);
+                                                break;
+                                            case MessageType.SYNC:
+                                                decodeSyncMessage(message);
+                                                break;
+                                            case MessageType.RESETOBJECT:
+                                                decodeResetMessage(message);
+                                                break;
+                                            case MessageType.UNDOREDOADD:
+                                                decodeUndoRedoMessage(message);
+                                                break;
+                                            case MessageType.DATAHUB:
+                                                decodeDataHubMessage(message);
+                                                break;
+                                            case MessageType.RPC:
+                                            case MessageType.PARAMETERUPDATE:
+                                                // make sure that producer and consumer exclude eachother
+                                                // message[1] is time
+                                                //int time = (message[1] + (Mathf.RoundToInt((float)manager.pingRTT * 0.5f))) % core.timesteps;
+                                                //m_messageBuffer[time].Add(message);
+                                                m_messageBuffer[message[1]].Add(message);
+                                                break;
+                                            default:
+                                                break;
                                         }
-                                        break;
-                                    default:
-                                        break;
+                                    }
                                 }
                             }
+                        }
+                        messages.Clear();
                     }
                 }
-                catch { }
+                catch (Exception e) { Helpers.Log(e.Message, Helpers.logMsgType.WARNING); }
                 Thread.Yield();
             }
         }
@@ -247,11 +263,12 @@ namespace tracer
             byte dhType = message[3];
             bool status = BitConverter.ToBoolean(message, 4);
             byte cID = message[5];
+            bool isServer = BitConverter.ToBoolean(message, 6);
 
             // dhType 0 = client connection status update
             if (dhType == 0 &&
                 cID != manager.cID)
-                manager.ClientConnectionUpdate(status, cID);
+                manager.ClientConnectionUpdate(status, cID, isServer);
         }
 
         //!
@@ -269,6 +286,7 @@ namespace tracer
                 // caching the ParameterObject
                 byte oldSceneID = 0;
                 short oldParameterObjectID = 0;
+                bool paraObjectNotFound = true;
                 ParameterObject parameterObject = null;
                 List<byte[]> timeSlotBuffer = m_messageBuffer[bufferTime];
 
@@ -287,6 +305,8 @@ namespace tracer
                     }
                     else
                     {
+                        parameterObject = null;
+                        paraObjectNotFound = true;
                         int start = 3;
                         while (start < message.Length)
                         {
@@ -295,12 +315,14 @@ namespace tracer
                             short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3));
                             int length = MemoryMarshal.Read<int>(message.Slice(start + 6));
 
-                            if (sceneID != oldSceneID ||
+                            if (paraObjectNotFound ||
+                                sceneID != oldSceneID ||
                                 parameterObjectID != oldParameterObjectID)
                                 parameterObject = core.getParameterObject(sceneID, parameterObjectID);
 
                             if (parameterObject != null)
                             {
+                                paraObjectNotFound = false;
                                 AbstractParameter  parameter = parameterObject.parameterList[parameterID];
 
                                 // check update if animation is incoming and change parameter type if required 
@@ -317,6 +339,10 @@ namespace tracer
                                 }
                                 
                                 parameter.deSerialize(message.Slice(start + 10));
+                            }
+                            else
+                            {
+                                paraObjectNotFound = true;
                             }
 
                             start += length;
