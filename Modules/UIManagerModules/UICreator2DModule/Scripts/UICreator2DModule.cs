@@ -304,19 +304,22 @@ namespace tracer
                 case AbstractParameter.ParameterType.QUATERNION:
                     GameObject spinnerPrefab = Resources.Load<GameObject>("Prefabs/PRE_UI_Spinner");
                     currentManipulator = SceneObject.Instantiate(spinnerPrefab, manipulatorPanel);
-                    Spinner spinner = currentManipulator.GetComponent<Spinner>();
-                    if (spinner)
-                    {
-                        spinner.manager = manager;
-                        spinner.Init(abstractParam);
-                        spinner.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
-                        spinner.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
+                    Manipulator manipSpinner = currentManipulator.GetComponent<Manipulator>();
+                    if (manipSpinner){
+                        manipSpinner.Init(abstractParam, manager);
+                        manipSpinner.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
+                        manipSpinner.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
                     }
                     break;
                 case AbstractParameter.ParameterType.COLOR:
                     GameObject resourcePrefab = Resources.Load<GameObject>("Prefabs/PRE_UI_ColorPicker");
                     currentManipulator = SceneObject.Instantiate(resourcePrefab, manipulatorPanel);
-                    currentManipulator.GetComponent<ColorSelect>().Init(abstractParam);
+                    Manipulator manipColor = currentManipulator.GetComponent<Manipulator>();
+                    if (manipColor){
+                        manipColor.Init(abstractParam, manager);
+                        manipColor.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
+                        manipColor.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
+                    }
                     manager.ColorGameObjectActive(currentManipulator);
                     break;
                 case AbstractParameter.ParameterType.ACTION:

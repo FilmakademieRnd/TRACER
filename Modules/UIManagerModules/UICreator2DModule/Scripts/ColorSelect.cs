@@ -34,7 +34,7 @@ using UnityEngine.UI;
 
 namespace tracer
 {
-    public class ColorSelect : UIBehaviour, IBeginDragHandler, IDragHandler, IPointerClickHandler
+    public class ColorSelect : Manipulator, IBeginDragHandler, IEndDragHandler, IDragHandler, IPointerClickHandler
     {
         private Vector2 pickerSize;
 
@@ -62,9 +62,12 @@ namespace tracer
         //! Init function of the ColorSelect that needs to be called manually 
         //! @param color This is the color parameter to be displayed and edited
         //!
-        public void Init(AbstractParameter param)
+        public override void Init(AbstractParameter param, UIManager m)
         {
-            col = (Parameter<Color>)param;
+            abstractParam = param;
+
+            col = (Parameter<Color>)abstractParam;
+            col.hasChanged += updateColor;//paramFloat.hasChanged += _snapSelect.setParam; from Spinner
 
             Color inColor = col.value;
 
@@ -82,11 +85,25 @@ namespace tracer
             outputColor = inColor;
         }
 
+        public void updateColor(object sender, Color c)
+        {
+            //Debug.Log("<color=red>ColorSelect.updateColor</color>");
+            Color.RGBToHSV(c, out hue, out sat, out val);
+
+            // Use pure hue for the material input
+            Color shaderColor = Color.HSVToRGB(hue, 1f, 1f);
+            mat.SetColor("_InputColor", shaderColor);
+
+            // Set indicator coordinates
+            mat.SetVector("_InputPos", new(sat * .8f, val, .9f, hue));
+
+            outputColor = c;
+        }
 
         //!
         //! Unity function called when the object becomes enabled and active.
         //!
-        protected override void OnEnable()
+       public void OnEnable()
         {
             _canvas = GetComponentInParent<Canvas>();
             // Grab picker dimensions
@@ -150,6 +167,15 @@ namespace tracer
 
             if (col != null)
                 col.setValue(outputColor);
+        }
+
+        //!
+        //! Unity function called by IEndDragHandler when a drag ends
+        //! @param data Data of the drag event e.g. postion, delta, ...
+        //!
+        public void OnEndDrag(PointerEventData data)
+        {
+            InvokeDoneEditing(this, true);
         }
 
         public void controllerManipulator(Vector3 input)

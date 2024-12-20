@@ -951,6 +951,7 @@ namespace tracer
         {
             if (_selectedAbstractParam != null)
             {
+                Debug.Log("ControllerModule: DoneEditing");
                 ControllerdoneEditing?.Invoke(this, _selectedAbstractParam);
             }
         }

@@ -153,9 +153,9 @@ namespace tracer
         //!
         private SnapSelect m_snapSelect;
         //!
-        //! A reference the the selected spinner UI element.
+        //! A reference the the UI manipualtor element (spinner or color select)
         //!
-        private Spinner m_spinner;
+        private Manipulator m_manipulator;
         //!
         //! A reference the current active parameter the key are displayed by the timeline.
         //!
@@ -586,8 +586,8 @@ namespace tracer
                 if (m_snapSelect)
                     m_snapSelect.parameterChanged -= OnParameterChanged;
                 
-                if(m_spinner)
-                    m_spinner.doneEditing -= OnSpinnerValueChanged;
+                if(m_manipulator)
+                    m_manipulator.doneEditing -= OnManipulatorEditEnded;
 
                 StopAnimGen();
             }
@@ -610,47 +610,14 @@ namespace tracer
             m_animationManager.OnStopAnimaGeneration(null);
         }
 
-        public void OnKeyframeValueManipulated(object sender, AbstractParameter parameter)
-        {
-            //Debug.Log("<color=yellow>OnKeyframeValueManipulated "+parameter._parent.gameObject.name+"</color>");
-            if(m_activeKeyframeIndex < 0 || m_activeParameter == null)
-                return;
-
-            //Parameter<Vector3> pos = (Parameter<Vector3>)parameter;
-            //Debug.Log("\t--> UpdateKey. New value = "+pos.value);
-            
-            // dont change anything
-            // clearFrames();
-            // CreateFrames((IAnimationParameter) parameter);
-
-            // float time = m_activeParameter.getKeys()[m_activeKeyframeIndex].time;
-            // m_activeParameter.removeKeyAtIndex(m_activeKeyframeIndex);
-            // m_activeParameter.setKeyTime((AbstractKey)parameter, time);
-
-            //m_keyframeList[m_activeKeyframeIndex].key.
-
-            // m_activeParameter.updateKey(m_activeKeyframeIndex, pos );
-            // clearFrames();
-            // CreateFrames(m_activeParameter);
-
-            //m_activeParameter.getKeys()[m_activeKeyframeIndex].value
-
-            //m_activeParameter.removeKeyAtIndex(m_activeKeyframeIndex);
-            //m_activeParameter.setKey();
-
-            m_activeParameter.updateKey(m_activeKeyframeIndex);
-            // clearFrames();
-            // CreateFrames(m_activeParameter);
-            //UpdateFrames();
-            
-            if (m_activeParameter is Parameter<Vector3> vector3Param && parameter.name == "position")
-                m_animationManager.OnRenewSplineContainer(null);
-            
-            //(m_activeParameter).InvokeKeyHasChanged();
-
-            //m_activeParameter.setKeyValue(m_activeKeyframeIndex, m_activeParameter.getKeys()[m_activeKeyframeIndex].interpolation);
-            //UpdateKey(false);
-            //should set key (change the value of given key)
+        //!
+        //! Callback when a keyframe was manipulated via a 3d module
+        //!
+        //! @param o The UI manager.
+        //! @param sceneObjects The list containing the selected objects. 
+        //!
+        public void OnKeyframeValueManipulated(object sender, AbstractParameter para){
+            UpdateCurrentKeyframeValue(para); 
         }
         
         //!
@@ -674,11 +641,9 @@ namespace tracer
         //!
         private void On2DUIReady(object o, UIBehaviour ui)
         {
-            Debug.Log("<color=green>On2DUIReady</color>");
+            //Debug.Log("<color=green>On2DUIReady</color>");
             if(m_snapSelect)
                 m_snapSelect.parameterChanged -= OnParameterChanged;
-            if(m_spinner)
-                m_spinner.doneEditing -= OnSpinnerValueChanged;
 
             m_snapSelect = (SnapSelect) ui;
             m_snapSelect.parameterChanged += OnParameterChanged;
@@ -686,15 +651,7 @@ namespace tracer
             //Debug.Log("SnapSelect: "+m_snapSelect.gameObject.name);
             //TODO: somehow get currentManipulator from UICreator2DModule
             //is this ugly?
-            UICreator2DModule ui2DModule = manager.getModule<UICreator2DModule>();
-            if(ui2DModule != null){
-                GameObject currentManipulator = ui2DModule.GetManipulator();    //not there:m_snapSelect.elements[0]
-                if(currentManipulator){
-                    m_spinner = currentManipulator.GetComponent<Spinner>();
-                    if(m_spinner)
-                        m_spinner.doneEditing += OnSpinnerValueChanged;
-                }
-            }
+            SetupManipulator();
             //TODO add the above for color and other values that are not a Spinner (generic value changed function?)
 
             clearFrames();
@@ -727,8 +684,22 @@ namespace tracer
                 m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
             m_activeParameter = manager.SelectedObjects[0].parameterList[idx] as IAnimationParameter;
             m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
+            
+            SetupManipulator();
+            
             CreateFrames(m_activeParameter);
             keyframeDeselected();
+        }
+
+        private void SetupManipulator(){
+            if(m_manipulator)
+                m_manipulator.doneEditing -= OnManipulatorEditEnded;
+            UICreator2DModule ui2DModule = manager.getModule<UICreator2DModule>();
+            if(ui2DModule != null && ui2DModule.GetManipulator()){
+                m_manipulator = ui2DModule.GetManipulator().GetComponent<Manipulator>();
+                if(m_manipulator)
+                    m_manipulator.doneEditing += OnManipulatorEditEnded;
+            }
         }
 
         //! 
@@ -738,14 +709,24 @@ namespace tracer
         //! @param o The UI element (SnapSelect) that changes the selected parameter.
         //! @param para changed abstract parameter
         //!
-        private void OnSpinnerValueChanged(object o, AbstractParameter para)
+        private void OnManipulatorEditEnded(object o, AbstractParameter para)
         {
-            Debug.Log("OnParameterValueChanged");
+            //Debug.Log("OnParameterValueChanged");
+            UpdateCurrentKeyframeValue(para);
+        }
+
+        //! 
+        //! Function that change the current selected keyframe value
+        //! because we changed values via gizmo or ui
+        //!
+        //! @param para changed abstract parameter
+        //!
+        private void UpdateCurrentKeyframeValue(AbstractParameter para){
             if(m_activeKeyframeIndex < 0 || m_activeParameter == null)
                 return;
 
             m_activeParameter.updateKey(m_activeKeyframeIndex);
-            if (m_activeParameter is Parameter<Vector3> vector3Param && para.name == "position")
+            if (m_activeParameter is Parameter<Vector3> && para.name == "position")
                 m_animationManager.OnRenewSplineContainer(null);
         }
 

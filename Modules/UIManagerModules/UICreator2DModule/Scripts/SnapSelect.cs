@@ -892,6 +892,7 @@ namespace tracer
         //!
         public void OnEndDrag(PointerEventData data)
         {
+            //Debug.Log("<color=blue>SnapSelect.OnEndDrag</color>");
             if (_manager.ui2Dinteractable)
             {
                 int newAxis;

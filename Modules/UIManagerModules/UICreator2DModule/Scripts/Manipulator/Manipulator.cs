@@ -35,9 +35,9 @@ https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 02.02.2022
 
-using System.Collections;
-using System.Collections.Generic;
+using System;
 using UnityEngine;
+//using UnityEngine.EventSystems;
 
 namespace tracer
 {
@@ -47,5 +47,27 @@ namespace tracer
         //! Reference to the AbstractParameter to be edited by the manipulator
         //!
         protected AbstractParameter abstractParam;
+
+        //!
+        //! Event emitted when parameter has changed
+        //!
+        public event EventHandler<AbstractParameter> doneEditing;
+
+        //!
+        //! function to initalize the spinner or colorselect
+        //!
+        public virtual void Init(AbstractParameter para, UIManager m){
+
+        }
+
+        //!
+        //! event invoking the doneEditing event whenever the user stops editing a parameter (e.g. finger lifted)
+        //! @param sender source of the event
+        //! @param e payload
+        //!
+        protected void InvokeDoneEditing(object sender, bool e){
+            //Debug.Log("<color=yellow>Manipulator.InvokeDoneEditing</color>");
+            doneEditing?.Invoke(this, abstractParam);
+        }
     }
 }

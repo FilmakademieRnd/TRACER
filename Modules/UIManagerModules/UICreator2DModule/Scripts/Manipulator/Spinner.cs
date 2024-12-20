@@ -35,11 +35,7 @@ https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 02.02.2022
 
-using UnityEngine.UI;
 using UnityEngine;
-using System.Collections.Generic;
-using System;
-
 
 namespace tracer
 {
@@ -59,28 +55,21 @@ namespace tracer
         //! Reference to TRACER uiSettings
         //!
         private UIManager _manager;
-        public UIManager manager
-        {
-            set => _manager = value;
-        }
 
-        //!
-        //! Event emitted when parameter has changed
-        //!
-        public event EventHandler<AbstractParameter> doneEditing;
 
         ~Spinner()
         {
             if (abstractParam != null)
-                _snapSelect.editingEnded -= editingDone;
+                _snapSelect.editingEnded -= InvokeDoneEditing;
         }
 
         //!
         //! function to initalize the spinner
         //!
-        public void Init(AbstractParameter p)
+        public override void Init(AbstractParameter p, UIManager m)
         {
             abstractParam = p;
+            _manager = m;
             _snapSelect = this.GetComponent<SnapSelect>();
             _snapSelect.uiSettings = _manager.uiAppearanceSettings;
             _snapSelect.manager = _manager;
@@ -166,18 +155,7 @@ namespace tracer
         {
             _snapSelect.parameterChanged += changeAxis;
             _snapSelect.valueChanged += setValue;
-            _snapSelect.editingEnded += editingDone;
-        }
-
-        //!
-        //! event invoking the doneEditing event whenever the user stops editing a parameter (e.g. finger lifted)
-        //! @param sender source of the event
-        //! @param e payload
-        //!
-        private void editingDone(object sender, bool e)
-        {
-            Debug.Log("Spinner.editingEnded");
-            doneEditing?.Invoke(this, abstractParam);
+            _snapSelect.editingEnded += InvokeDoneEditing;
         }
 
         //!
