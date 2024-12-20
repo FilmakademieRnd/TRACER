@@ -49,6 +49,11 @@ namespace tracer
         //!
         private bool m_highlightLock = false;
         //!
+        //! Is any parameter value of this sceneObject currently modified by the timeline? (timeline playing or time of timeline modified per drag)
+        //! used to deny an unlock if we deselect a currently animated object
+        //!
+        public bool playedByTimeline = false;
+        //!
         //! Is the sceneObject reacting to physics
         //!
         private bool _physicsActive = false;
@@ -136,6 +141,14 @@ namespace tracer
                 sceneManager.LockSceneObject(this);
             else
                 sceneManager.UnlockSceneObject(this);
+        }
+
+        //!
+        //! Function to set whether object is currently animated (modified) by a playing timeline (or moving time manually)
+        //!
+        public void setObjectPlayedByTimeline(bool b)
+        {
+            playedByTimeline = b;
         }
 
         //!

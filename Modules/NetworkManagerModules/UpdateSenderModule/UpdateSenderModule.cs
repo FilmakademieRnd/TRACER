@@ -214,6 +214,9 @@ namespace tracer
         //!
         private void unlockSceneObject(object sender, SceneObject sceneObject)
         {
+            if(sceneObject.playedByTimeline)   //dont send unlock event if object is currently played via timeline
+                return;
+
             byte sceneId;
             short sceneObjectId;
             lock (sceneObject)

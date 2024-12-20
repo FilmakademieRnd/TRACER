@@ -131,11 +131,10 @@ namespace tracer
         //!
         private void DisableHighlightSelection(object sender, SceneObject sceneObject)
         {
-            if (sceneObject)
-            {
+            if (sceneObject){
                 if ((sceneObject is SceneObjectCamera) || sceneObject is SceneObjectLight)
                     return;
-
+                
                 Renderer[] renderers = sceneObject.GetComponentsInChildren<Renderer>();
 
                 foreach (Renderer renderer in renderers)

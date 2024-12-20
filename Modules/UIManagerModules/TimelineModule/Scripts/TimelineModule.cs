@@ -161,6 +161,19 @@ namespace tracer
         //!
         private IAnimationParameter m_activeParameter = null;
         //!
+        //! All objects that were animated, to check for _lock
+        //!
+        private List<SceneObject> m_allAnimatedObjects = null;
+        //!
+        //! Time we touch/clicked, needed to check if we drag the time or just click
+        //!
+        private float m_initialTouchTime = 0f;
+        //!
+        //! did we call to lock and set all animated sceneobject to playedByTimeline? necessary for scrubbing
+        //!
+        private bool m_animatedSceneObjectsLockCalled = false;
+        
+        //!
         //! The visible start time of the timeline.
         //!
         private float m_startTime = 0;
@@ -263,6 +276,8 @@ namespace tracer
             m_inputManager = core.getManager<InputManager>();
             m_animationManager = core.getManager<AnimationManager>();
             manager.UI2DCreated += On2DUIReady;
+
+            m_allAnimatedObjects = new();
         }
 
         //! 
@@ -369,17 +384,21 @@ namespace tracer
 
             manager.m_manipulation3dDoneEvent += OnKeyframeValueManipulated;
 
+
             if (manager.SelectedObjects.Count > 0)
+                CreateFrames(m_activeParameter);
+
+            /*if (manager.SelectedObjects.Count > 0)
             {
                 if (m_activeParameter == null)
                 {
                     m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
                     m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
+                    Debug.Log("<color=green>+= OnKeyAddOrRemoved</color>");
                 }
 
-
                 CreateFrames(m_activeParameter);
-            }
+            }*/
 
             m_sceneObjectSelected = manager.SelectedObjects.Count > 0;
 
@@ -573,32 +592,51 @@ namespace tracer
         //!
         private void OnSelectionChanged(object o, List<SceneObject> sceneObjects)
         {
+            Debug.Log("<color=yellow>Timeline.OnSelectionChanged</color>");
             if (sceneObjects.Count < 1)
             {
                 m_sceneObjectSelected = false;
                 clearFrames();
-                if (m_activeParameter != null)
-                {
-                    m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
-                    m_activeParameter = null;
-                }
-
-                if (m_snapSelect)
-                    m_snapSelect.parameterChanged -= OnParameterChanged;
                 
-                if(m_manipulator)
-                    m_manipulator.doneEditing -= OnManipulatorEditEnded;
+                RemoveCallbacks(true);
+                /*RemoveActiveParameter();
+                UpdateParameterChangedCallback(null);
+                SetupManipulator();*/
 
                 StopAnimGen();
+
+                //if we are playing, do not unlock the selected object
             }
 
             if (sceneObjects.Count > 0)
             {
+                //UpdateCallbacks();
                 m_sceneObjectSelected = true;
                 StartAnimGen();
             }
             updateButtonInteractability();
         }
+
+        /*private void SetActiveParameter(){
+            if(!m_showTimeLine)
+                return;
+
+            if (manager.SelectedObjects.Count > 0){
+                if (m_activeParameter == null){
+                    m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
+                    m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
+                    Debug.Log("<color=green>+= OnKeyAddOrRemoved</color>");
+                }
+            }
+        }
+
+        private void RemoveActiveParameter(){
+            if (m_activeParameter != null){
+                m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
+                Debug.Log("<color=red>-= OnKeyAddOrRemoved</color>");
+                m_activeParameter = null;
+            }
+        }*/
         
         private void StartAnimGen()
         {
@@ -621,7 +659,7 @@ namespace tracer
         }
         
         //!
-        //! Function called when a keyframe is created
+        //! Function called when a keyframe is created (actually is called via parameter everytime the value changes!)
         //! Will remove all keyframes from timeline UI is new selection is empty.
         //!
         //! @param o The UI manager.
@@ -629,8 +667,13 @@ namespace tracer
         //!
         private void OnKeyAddOrRemoved(object o, EventArgs e)
         {
-            //Debug.Log("<color=yellow>OnKeyAddOrRemoved</color>");
+            //only execute for creation: only if selected and visible
+            if(manager.SelectedObjects.Count < 0 || !m_showTimeLine)
+                return;
+
+            Debug.Log("<color=yellow>OnKeyAddOrRemoved</color>");
             clearFrames();
+            //CreateFrames(m_activeParameter);  //-> did not update the light color correctly!
             CreateFrames((IAnimationParameter) o);
         }
 
@@ -641,59 +684,66 @@ namespace tracer
         //!
         private void On2DUIReady(object o, UIBehaviour ui)
         {
-            //Debug.Log("<color=green>On2DUIReady</color>");
-            if(m_snapSelect)
-                m_snapSelect.parameterChanged -= OnParameterChanged;
 
-            m_snapSelect = (SnapSelect) ui;
-            m_snapSelect.parameterChanged += OnParameterChanged;
+            Debug.Log("<color=green>On2DUIReady</color>");
             
-            //Debug.Log("SnapSelect: "+m_snapSelect.gameObject.name);
-            //TODO: somehow get currentManipulator from UICreator2DModule
-            //is this ugly?
-            SetupManipulator();
-            //TODO add the above for color and other values that are not a Spinner (generic value changed function?)
-
+            UpdateCallbacks(ui);
+            
+            if(!m_showTimeLine)
+                return;
+            
+            //clear frames
+            //show frames
             clearFrames();
-            
-            if (manager.SelectedObjects.Count > 0)
+            CreateFrames(m_activeParameter);
+
+            /*if (manager.SelectedObjects.Count > 0)
             {
-                if (m_activeParameter != null)
+                if (m_activeParameter != null){
                     m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
+                    Debug.Log("<color=red>-= OnKeyAddOrRemoved</color>");
+                }
                 m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
                 m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
+                Debug.Log("<color=green>+= OnKeyAddOrRemoved</color>");
                 if (m_showTimeLine)
                     CreateFrames(m_activeParameter);
-            }
-
-            UpdateFrames();
+            }*/
+            
+            //UpdateFrames();
         }
 
-        //! 
-        //! Function called when the parameter selected by the UI changed.
-        //! Updates the timeline widgets based on the parameters data.
-        //!
-        //! @param o The UI element (SnapSelect) that changes the selected parameter.
-        //! @param idx The index of the parameter in the selected objects parameter list.
-        //!
-        private void OnParameterChanged(object o, int idx)
-        {
-            //Debug.Log("OnParameterChanged at "+idx);
-            clearFrames();
-            if (m_activeParameter != null)
+        //remove and add callbacks
+        private void UpdateCallbacks(UIBehaviour ui, int parameterIndex = 0){
+            //******************* remove
+            RemoveCallbacks(ui != null);
+
+            //******************* add
+            AddCallbacks(ui, parameterIndex);
+        }
+
+        private void RemoveCallbacks(bool removeSnapSelect){
+            if (m_activeParameter != null){
                 m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
-            m_activeParameter = manager.SelectedObjects[0].parameterList[idx] as IAnimationParameter;
-            m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
-            
-            SetupManipulator();
-            
-            CreateFrames(m_activeParameter);
-            keyframeDeselected();
-        }
-
-        private void SetupManipulator(){
+                m_activeParameter = null;
+            }
+            if(removeSnapSelect && m_snapSelect)
+                m_snapSelect.parameterChanged -= OnParameterChanged;
             if(m_manipulator)
                 m_manipulator.doneEditing -= OnManipulatorEditEnded;
+        }
+
+        private void AddCallbacks(UIBehaviour ui, int parameterIndex){
+            if (manager.SelectedObjects.Count > 0){
+                m_activeParameter = manager.SelectedObjects[0].parameterList[parameterIndex] as IAnimationParameter;
+                m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
+            }
+            if(ui){
+                m_snapSelect = (SnapSelect) ui;
+                m_snapSelect.parameterChanged += OnParameterChanged;
+            }
+            //TODO: somehow get currentManipulator from UICreator2DModule
+            //is this ugly?
             UICreator2DModule ui2DModule = manager.getModule<UICreator2DModule>();
             if(ui2DModule != null && ui2DModule.GetManipulator()){
                 m_manipulator = ui2DModule.GetManipulator().GetComponent<Manipulator>();
@@ -707,11 +757,63 @@ namespace tracer
         //! Updates the timeline widgets based on the parameters data.
         //!
         //! @param o The UI element (SnapSelect) that changes the selected parameter.
+        //! @param idx The index of the parameter in the selected objects parameter list.
+        //!
+        private void OnParameterChanged(object o, int idx)
+        {
+            Debug.Log("<color=green>OnParameterChanged for index "+idx+"</color>");
+            clearFrames();
+            /*if (m_activeParameter != null){
+                m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
+                Debug.Log("<color=red>-= OnKeyAddOrRemoved</color>");
+            }
+            m_activeParameter = manager.SelectedObjects[0].parameterList[idx] as IAnimationParameter;
+            m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
+            Debug.Log("<color=green>+= OnKeyAddOrRemoved</color>");
+            */
+            //SetActiveParameter();
+            //SetupManipulator();
+            UpdateCallbacks(null, idx);
+            
+            CreateFrames(m_activeParameter);
+
+            keyframeDeselected();
+        }
+
+        /*private void SetupManipulator(){
+            if(m_manipulator)
+                m_manipulator.doneEditing -= OnManipulatorEditEnded;
+
+            //TODO: somehow get currentManipulator from UICreator2DModule
+            //is this ugly?
+            UICreator2DModule ui2DModule = manager.getModule<UICreator2DModule>();
+            if(ui2DModule != null && ui2DModule.GetManipulator()){
+                m_manipulator = ui2DModule.GetManipulator().GetComponent<Manipulator>();
+                if(m_manipulator)
+                    m_manipulator.doneEditing += OnManipulatorEditEnded;
+            }
+        }
+
+        private void UpdateParameterChangedCallback(UIBehaviour ui){
+            if(m_snapSelect)
+                m_snapSelect.parameterChanged -= OnParameterChanged;
+
+            if(ui){
+                m_snapSelect = (SnapSelect) ui;
+                m_snapSelect.parameterChanged += OnParameterChanged;
+            }
+        }*/
+
+        //! 
+        //! Function called when the parameter selected by the UI changed.
+        //! Updates the timeline widgets based on the parameters data.
+        //!
+        //! @param o The UI element (SnapSelect) that changes the selected parameter.
         //! @param para changed abstract parameter
         //!
         private void OnManipulatorEditEnded(object o, AbstractParameter para)
         {
-            //Debug.Log("OnParameterValueChanged");
+            Debug.Log("<color=green>OnManipulatorEditEnded</color>");
             UpdateCurrentKeyframeValue(para);
         }
 
@@ -725,6 +827,7 @@ namespace tracer
             if(m_activeKeyframeIndex < 0 || m_activeParameter == null)
                 return;
 
+            Debug.Log("<color=green>UpdateCurrentKeyframeValue</color>");
             m_activeParameter.updateKey(m_activeKeyframeIndex);
             if (m_activeParameter is Parameter<Vector3> && para.name == "position")
                 m_animationManager.OnRenewSplineContainer(null);
@@ -739,6 +842,9 @@ namespace tracer
         //!
         public void CreateFrames(IAnimationParameter parameter)
         {
+            if(!m_showTimeLine || parameter == null || parameter.getKeys() == null)
+                return;
+
             foreach (AbstractKey key in parameter.getKeys())
             {
                 bool exists = false;
@@ -815,6 +921,7 @@ namespace tracer
         {
             float _x = m_timelineRect.InverseTransformPoint(new Vector3(x, m_timelineRect.position.y, m_timelineRect.position.z)).x;
             float time = mapToCurrentTime(_x);
+            Debug.Log("<color=green>setTimeFromGlobalPositionX</color>");
             m_activeParameter.setKeyTime(key, time);
             clearFrames();
             CreateFrames(m_activeParameter);
@@ -857,6 +964,7 @@ namespace tracer
         {
             if (m_activeParameter != null)
             {
+                Debug.Log("<color=yellow>AddKey</color>");
                 UpdateKey(false);
             }
         }
@@ -868,6 +976,7 @@ namespace tracer
         {
             if (m_activeParameter != null)
             {
+                Debug.Log("<color=yellow>RemoveKey</color>");
                 UpdateKey(true);
                 keyframeDeselected();
             }
@@ -880,6 +989,7 @@ namespace tracer
         {
             if (m_activeParameter != null)
             {
+                Debug.Log("<color=yellow>RemoveAllKeys</color>");
                 UpdateKey(false, true);
                 keyframeDeselected();
             }
@@ -950,6 +1060,7 @@ namespace tracer
             else if (!removeKey)
             {
                 parameter.setKey();
+                //this will be transfered via network?
             }
 
             if (removeAll)
@@ -1078,14 +1189,69 @@ namespace tracer
             if (m_isPlaying){
                 m_isPlaying = false;
                 core.StopCoroutine(playCoroutine());
+                UnlockAllAnimatedObjects();
             }else{
+                GatherAllAnimatedSceneObjects();
+                Debug.Log("<color=blue>Animation. We have "+m_allAnimatedObjects.Count+" animated SceneObjects</color>");
+                
+                /* uncomment if we only want to allow playing the animation if all can be locked
+                if(!AreAllAnimatedObjectsUnlocked()){
+                    //if we do this, also ensure while an animation is playing anywhere, do not allow to create animations
+                    //Debug.Log("<color=red>Cannot play animation, because "+so.gameObject.name+" is locked from elsewhere</color>");
+                    return;
+                }
+                */
+                LockAllAnimatedObjects();
+
                 deselectKeyframe();
                 focusOnCurrentTime();
                 m_isPlaying = true;
                 m_playCoroutine = core.StartCoroutine(playCoroutine());
             }
+
             updateButtonInteractability();
         }
+
+        #region Animation Locking
+
+        //!
+        //! Store all animated scene objects locally, so we do not need to call the get function for locking
+        //!
+        private void GatherAllAnimatedSceneObjects(){
+            m_allAnimatedObjects = core.getManager<SceneManager>().getAllAnimatedSceneObjects();
+        }
+
+        private bool AreAllAnimatedObjectsUnlocked(){
+            foreach(SceneObject so in m_allAnimatedObjects){
+                if(so._lock){
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void LockAllAnimatedObjects(){
+            m_animatedSceneObjectsLockCalled = true;
+            foreach(SceneObject so in m_allAnimatedObjects){
+                so.setObjectPlayedByTimeline(true); //should always be set, because it could be unlocked on the client and then will be manipulated?
+                if(!so._lock){
+                    so.lockObject(true);
+                }
+            }
+        }
+
+        private void UnlockAllAnimatedObjects(){
+            m_animatedSceneObjectsLockCalled = false;
+            foreach(SceneObject so in m_allAnimatedObjects){
+                so.setObjectPlayedByTimeline(false);
+                if(!so._lock){
+                    //dont unlock a selected object
+                    if(!manager.SelectedObjects.Contains(so))
+                        so.lockObject(false);
+                }
+            }
+        }
+        #endregion
 
 
         //!
@@ -1193,6 +1359,7 @@ namespace tracer
             m_isSelected = true;
             m_posDragBuffer = point;
             m_initalTouchPos = point;
+            m_initialTouchTime = Time.time;
 
             //InputManager.FingerDown is executed after this, so I cannot differentiate between a touch and a click
             //but i want to move the timeline to the *click* (if not key is pressed)
@@ -1222,6 +1389,10 @@ namespace tracer
                     UpdateTime(m_timelineRect.InverseTransformPoint(point).x);
                     deselectKeyframe();
                     updateButtonInteractability();
+
+                    if(m_animatedSceneObjectsLockCalled){
+                        UnlockAllAnimatedObjects();
+                    }
                 }
             }
             m_isSelected = false;
@@ -1261,6 +1432,12 @@ namespace tracer
                 }
             }else{ // move time cursor
                 deselectKeyframe();
+                //we should/need to lock animated sceneobject if we are scrubbing the timeline manually
+                if(!m_animatedSceneObjectsLockCalled && Time.time - m_initialTouchTime > 0.2f){
+                    GatherAllAnimatedSceneObjects();
+                    LockAllAnimatedObjects();
+                    m_animatedSceneObjectsLockCalled = true;
+                }
                 setTime(mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x));
             }
 

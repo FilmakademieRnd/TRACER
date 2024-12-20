@@ -227,6 +227,11 @@ namespace tracer
 
                 SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, sceneObjectID);
                 sceneObject._lock = lockState;
+                if(sceneObject.playedByTimeline){   //if we are animating the object, lock it!
+                    sceneObject.lockObject(true);
+                    Debug.Log("instantly lock unlocked object we received because its playing!");
+                }
+                
             }
             // delay unlock message
             else
@@ -302,6 +307,10 @@ namespace tracer
 
                         SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, parameterObjectID);
                         sceneObject._lock = lockState;
+                        if(sceneObject.playedByTimeline){   //if we are animating the object, lock it!
+                            sceneObject.lockObject(true);
+                            Debug.Log("instantly lock unlocked object we received because its playing!");
+                        }
                     }
                     else
                     {

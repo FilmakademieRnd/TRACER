@@ -198,7 +198,6 @@ namespace tracer
                 obj = GetSelectableAtPixel(point);
             }
 
-
             if (obj){
                 
                 CheckDoubleClick(obj);

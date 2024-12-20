@@ -620,8 +620,9 @@ namespace tracer
         //!
         public void clearSelectedObject()
         {
-            foreach (SceneObject sceneObject in m_selectedObjects)
+            foreach (SceneObject sceneObject in m_selectedObjects){
                 selectionRemoved?.Invoke(this, sceneObject);
+            }
 
             m_selectedObjects.Clear();
             selectionChanged?.Invoke(this, m_selectedObjects);

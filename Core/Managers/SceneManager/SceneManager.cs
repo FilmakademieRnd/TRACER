@@ -117,6 +117,33 @@ namespace tracer
             }
             return returnvalue;
         }
+
+        //!
+        //! Function that returns a list containing all animated scene objects.
+        //!
+        //! @return The list containing all animated scene objects.
+        //!
+        public List<SceneObject> getAllAnimatedSceneObjects()
+        {
+            List<SceneObject> returnvalue = new List<SceneObject>();
+
+            foreach (Dictionary<short, ParameterObject> dict in core.parameterObjectList.Values)
+            {
+                foreach (ParameterObject parameterObject in dict.Values)
+                {
+                    SceneObject sceneObject = parameterObject as SceneObject;
+                    if (sceneObject){
+                        foreach(AbstractParameter apara in sceneObject.parameterList){
+                            if(apara._isAnimated){
+                                returnvalue.Add((SceneObject) parameterObject);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            return returnvalue;
+        }
         
         //!
         //! The list storing selectable Unity lights in scene.
