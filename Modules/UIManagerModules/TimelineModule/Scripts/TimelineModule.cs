@@ -388,18 +388,6 @@ namespace tracer
             if (manager.SelectedObjects.Count > 0)
                 CreateFrames(m_activeParameter);
 
-            /*if (manager.SelectedObjects.Count > 0)
-            {
-                if (m_activeParameter == null)
-                {
-                    m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
-                    m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
-                    Debug.Log("<color=green>+= OnKeyAddOrRemoved</color>");
-                }
-
-                CreateFrames(m_activeParameter);
-            }*/
-
             m_sceneObjectSelected = manager.SelectedObjects.Count > 0;
 
             updateButtonInteractability();
@@ -599,13 +587,8 @@ namespace tracer
                 clearFrames();
                 
                 RemoveCallbacks(true);
-                /*RemoveActiveParameter();
-                UpdateParameterChangedCallback(null);
-                SetupManipulator();*/
 
                 StopAnimGen();
-
-                //if we are playing, do not unlock the selected object
             }
 
             if (sceneObjects.Count > 0)
@@ -617,26 +600,6 @@ namespace tracer
             updateButtonInteractability();
         }
 
-        /*private void SetActiveParameter(){
-            if(!m_showTimeLine)
-                return;
-
-            if (manager.SelectedObjects.Count > 0){
-                if (m_activeParameter == null){
-                    m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
-                    m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
-                    Debug.Log("<color=green>+= OnKeyAddOrRemoved</color>");
-                }
-            }
-        }
-
-        private void RemoveActiveParameter(){
-            if (m_activeParameter != null){
-                m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
-                Debug.Log("<color=red>-= OnKeyAddOrRemoved</color>");
-                m_activeParameter = null;
-            }
-        }*/
         
         private void StartAnimGen()
         {
@@ -692,25 +655,9 @@ namespace tracer
             if(!m_showTimeLine)
                 return;
             
-            //clear frames
-            //show frames
             clearFrames();
             CreateFrames(m_activeParameter);
 
-            /*if (manager.SelectedObjects.Count > 0)
-            {
-                if (m_activeParameter != null){
-                    m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
-                    Debug.Log("<color=red>-= OnKeyAddOrRemoved</color>");
-                }
-                m_activeParameter = manager.SelectedObjects[0].parameterList[0] as IAnimationParameter;
-                m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
-                Debug.Log("<color=green>+= OnKeyAddOrRemoved</color>");
-                if (m_showTimeLine)
-                    CreateFrames(m_activeParameter);
-            }*/
-            
-            //UpdateFrames();
         }
 
         //remove and add callbacks
@@ -763,46 +710,13 @@ namespace tracer
         {
             Debug.Log("<color=green>OnParameterChanged for index "+idx+"</color>");
             clearFrames();
-            /*if (m_activeParameter != null){
-                m_activeParameter.keyHasChanged -= OnKeyAddOrRemoved;
-                Debug.Log("<color=red>-= OnKeyAddOrRemoved</color>");
-            }
-            m_activeParameter = manager.SelectedObjects[0].parameterList[idx] as IAnimationParameter;
-            m_activeParameter.keyHasChanged += OnKeyAddOrRemoved;
-            Debug.Log("<color=green>+= OnKeyAddOrRemoved</color>");
-            */
-            //SetActiveParameter();
-            //SetupManipulator();
+
             UpdateCallbacks(null, idx);
             
             CreateFrames(m_activeParameter);
 
             keyframeDeselected();
         }
-
-        /*private void SetupManipulator(){
-            if(m_manipulator)
-                m_manipulator.doneEditing -= OnManipulatorEditEnded;
-
-            //TODO: somehow get currentManipulator from UICreator2DModule
-            //is this ugly?
-            UICreator2DModule ui2DModule = manager.getModule<UICreator2DModule>();
-            if(ui2DModule != null && ui2DModule.GetManipulator()){
-                m_manipulator = ui2DModule.GetManipulator().GetComponent<Manipulator>();
-                if(m_manipulator)
-                    m_manipulator.doneEditing += OnManipulatorEditEnded;
-            }
-        }
-
-        private void UpdateParameterChangedCallback(UIBehaviour ui){
-            if(m_snapSelect)
-                m_snapSelect.parameterChanged -= OnParameterChanged;
-
-            if(ui){
-                m_snapSelect = (SnapSelect) ui;
-                m_snapSelect.parameterChanged += OnParameterChanged;
-            }
-        }*/
 
         //! 
         //! Function called when the parameter selected by the UI changed.
