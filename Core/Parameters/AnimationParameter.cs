@@ -291,6 +291,11 @@ namespace tracer
         //!
         public void setKeyTime(int index, float time)
         {
+            Debug.Log("setKeyTime at index "+index);
+            if(index < 0 || index >= _keyList.Count){
+                Debug.LogWarning("setKeyTime::index ("+index+") of _keyList would be out of bounds.");
+                return;
+            }
             Key<T> key = (Key<T>)_keyList[index];
             int count = _keyList.Count;
             key.time = time;

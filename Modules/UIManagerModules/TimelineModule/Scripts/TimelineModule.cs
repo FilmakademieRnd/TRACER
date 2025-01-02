@@ -362,28 +362,7 @@ namespace tracer
             m_startFrameDisplay.text = Mathf.RoundToInt(m_startTime * m_framerate).ToString();
             m_endFrameDisplay.text = Mathf.RoundToInt(m_endTime * m_framerate).ToString();
 
-            m_playButton.onClick.AddListener(play);
-            m_prevButton.onClick.AddListener(prevFrame);
-            m_nextButton.onClick.AddListener(nextFrame);
-            m_addKeyButton.onClick.AddListener(AddKey);
-            m_removeKeyButton.onClick.AddListener(RemoveKey);
-            m_removeAllKeysButton.onClick.AddListener(RemoveAllKeys);
-
-            m_inputManager.inputPressStartedUI += OnPointerDown; //OnBeginDrag;
-            m_inputManager.inputPressEnd += OnPointerEnd;
-            //obsolete m_inputManager.inputPressPerformedUI += OnPointerDown;
-            m_inputManager.inputMove += OnMove;
-            m_inputManager.twoDragEvent += OnTwoFingerDrag;
-            
-            m_inputManager.middleClickPressEvent += OnMiddleClickPress;
-            m_inputManager.middleClickMoveEvent += OnMiddleClickHold;
-            m_inputManager.middleClickReleaseEvent += OnMiddleClickRelease;
-            
-            m_inputManager.pinchDetailedEvent += OnPinchDetail;
-            manager.selectionChanged += OnSelectionChanged;
-
-            manager.m_manipulation3dDoneEvent += OnKeyframeValueManipulated;
-
+            AddOrRemoveListener(true);
 
             if (manager.SelectedObjects.Count > 0)
                 CreateFrames(m_activeParameter);
@@ -392,6 +371,52 @@ namespace tracer
 
             updateButtonInteractability();
             setTime(m_animationManager.time);
+        }
+
+        private void AddOrRemoveListener(bool addListener){
+            if(addListener){
+                m_playButton.onClick.                   AddListener(play);
+                m_prevButton.onClick.                   AddListener(prevFrame);
+                m_nextButton.onClick.                   AddListener(nextFrame);
+                m_addKeyButton.onClick.                 AddListener(AddKey);
+                m_removeKeyButton.onClick.              AddListener(RemoveKey);
+                m_removeAllKeysButton.onClick.          AddListener(RemoveAllKeys);
+
+                m_inputManager.inputPressStartedUI      += OnPointerDown; //OnBeginDrag;
+                m_inputManager.inputPressEnd            += OnPointerEnd;
+                m_inputManager.inputMove                += OnMove;
+                m_inputManager.twoDragEvent             += OnTwoFingerDrag;
+                
+                m_inputManager.middleClickPressEvent    += OnMiddleClickPress;
+                m_inputManager.middleClickMoveEvent     += OnMiddleClickHold;
+                m_inputManager.middleClickReleaseEvent  += OnMiddleClickRelease;
+                
+                m_inputManager.pinchDetailedEvent       += OnPinchDetail;
+                manager.selectionChanged                += OnSelectionChanged;
+
+                manager.m_manipulation3dDoneEvent       += OnKeyframeValueManipulated;
+            }else{
+                m_playButton.onClick.                   RemoveListener(play);
+                m_prevButton.onClick.                   RemoveListener(prevFrame);
+                m_nextButton.onClick.                   RemoveListener(nextFrame);
+                m_addKeyButton.onClick.                 RemoveListener(AddKey);
+                m_removeKeyButton.onClick.              RemoveListener(RemoveKey);
+                m_removeAllKeysButton.onClick.          RemoveListener(RemoveAllKeys);
+
+                m_inputManager.inputPressStartedUI      -= OnPointerDown; //OnBeginDrag;
+                m_inputManager.inputPressEnd            -= OnPointerEnd;
+                m_inputManager.inputMove                -= OnMove;
+                m_inputManager.twoDragEvent             -= OnTwoFingerDrag;
+                
+                m_inputManager.middleClickPressEvent    -= OnMiddleClickPress;
+                m_inputManager.middleClickMoveEvent     -= OnMiddleClickHold;
+                m_inputManager.middleClickReleaseEvent  -= OnMiddleClickRelease;
+                
+                m_inputManager.pinchDetailedEvent       -= OnPinchDetail;
+                manager.selectionChanged                -= OnSelectionChanged;
+
+                manager.m_manipulation3dDoneEvent       -= OnKeyframeValueManipulated;
+            }
         }
 
         //!
@@ -484,15 +509,7 @@ namespace tracer
             clearFrames();
             clearUI();
 
-            m_inputManager.inputPressStartedUI -= OnPointerDown;
-            m_inputManager.inputPressEnd -= OnPointerEnd;
-            m_inputManager.inputMove -= OnMove;
-            m_inputManager.twoDragEvent -= OnTwoFingerDrag;
-            m_inputManager.middleClickMoveEvent -= OnMiddleClickHold;
-            m_inputManager.middleClickReleaseEvent -= OnMiddleClickRelease;
-            m_inputManager.pinchDetailedEvent -= OnPinchDetail;
-            manager.selectionChanged -= OnSelectionChanged;
-            manager.m_manipulation3dDoneEvent -= OnKeyframeValueManipulated;
+            AddOrRemoveListener(false);
         }
 
         //!
@@ -1364,8 +1381,7 @@ namespace tracer
         //! @param sender A reference to the input manager.
         //! @param point The point in screen space the on drag event happened.
         //!
-        private void OnMiddleClickPress(object sender, Vector2 point)
-        {
+        private void OnMiddleClickPress(object sender, Vector2 point){
             if (!m_isSelected){
                 if(!m_isMiddleClickDrag && Raycast(point) == m_timeLine){
                     m_posDragBuffer = point;
