@@ -201,30 +201,30 @@ namespace tracer
         //!
         private void selection(object sender, List<SceneObject> sceneObjects)
         {
-            if (m_cameraSelectButton != null)
-            {
+            //TODO do not reset and redo if the same object has been selected!
+            // if(m_selectedObject != null && sceneObjects.Count > 0 && m_selectedObject == sceneObjects[0])
+            //     return;
+
+            if (m_cameraSelectButton != null){
                 m_uiManager.removeButton(m_cameraSelectButton);
                 m_cameraSelectButton = null;
             }
 
             if (sceneObjects.Count > 0)
             {
-                if (sceneObjects[0].GetType() == typeof(SceneObjectCamera))
-                {
-                    m_cameraIndex = m_sceneManager.sceneCameraList.FindIndex(x => x.Equals((SceneObjectCamera)sceneObjects[0]));
-                }
-                else
-                {
-                    m_cameraIndex = -1;
-                }
-
+                m_cameraIndex = -1;
                 m_selectedObject = sceneObjects[0];
+
                 Type selectionType = m_selectedObject.GetType();
+                if (selectionType == typeof(SceneObjectCamera))
+                   m_cameraIndex = m_sceneManager.sceneCameraList.FindIndex(x => x.Equals((SceneObjectCamera)m_selectedObject));
+                
+                
                 if (selectionType == typeof(SceneObjectCamera) ||
                     selectionType == typeof(SceneObjectDirectionalLight) ||
                     selectionType == typeof(SceneObjectSpotLight))
                 {
-                    m_cameraSelectButton = new MenuButton("", lookThrough, null, "CameraSelectionButton");
+                    m_cameraSelectButton = new MenuButton("", LockOnLookThrough, null, "CameraSelectionButton");
                     m_cameraSelectButton.setIcon("Images/button_lookTrough");
                 }
                 else
@@ -236,42 +236,42 @@ namespace tracer
             }
             else
             {
-                if (m_lockType != CameraLockageType.none)
-                {
+                if (m_lockType != CameraLockageType.none){
+                    if (m_lockType == CameraLockageType.lookThrough)
+                        ResetRatio();
                     UnlockCam();
-                    ResetRatio();
-                    uiCameraOperation.Invoke(this, IsCamLocked());
+                    uiCameraOperation?.Invoke(this, true); //always true: since we clicked nowhere, we want to hide the gizmo!
                 }
-
                 m_selectedObject = null;
+
             }
         }
 
         //!
         //! Returns a more readable way whether the camera view is currently locked onto something
         //!
-        public bool IsCamLocked(){ return m_lockType != CameraLockageType.none; }
+        private bool IsCamLocked(){ return m_lockType != CameraLockageType.none; }
 
         //!
         //! The function that moves the main camera to the selected object (light or cam)
         //!
-        public void lookThrough(){
+        public void LockOnLookThrough(){
             if (m_selectedObject == null)
                 return;
             
-            Type selectionType = m_selectedObject.GetType();
             
-            if(selectionType == typeof(SceneObjectCamera)){
-                copyCamera();
-            }else if(selectionType == typeof(SceneObjectDirectionalLight) || (selectionType == typeof(SceneObjectSpotLight))){
-                
-            }
-
-            if (IsCamLocked()){    //UNLOCK AND REVERT
+            if (IsCamLocked()){     //UNLOCK AND REVERT
                 UnlockCam();
                 ResetRatio();
-            }else{              //LOCK
+            }else{                  //LOCK
                 //Debug.Log("LOOK THROUGH "+m_selectedObject.name);
+                Type selectionType = m_selectedObject.GetType();
+                if(selectionType == typeof(SceneObjectCamera)){
+                    copyCamera();
+                }else if(selectionType == typeof(SceneObjectDirectionalLight) || (selectionType == typeof(SceneObjectSpotLight))){
+                    
+                }
+
                 Camera.main.cullingMask &= ~(1 << 11);
                 Camera.main.transform.position = m_selectedObject.transform.position;
                 Camera.main.transform.rotation = m_selectedObject.transform.rotation;
@@ -290,9 +290,12 @@ namespace tracer
                 m_lockType = CameraLockageType.lookThrough;
             }
 
-            uiCameraOperation.Invoke(this, IsCamLocked());
+            uiCameraOperation?.Invoke(this, IsCamLocked());
         }
 
+        //!
+        //! Unlock the camera and remove the events
+        //!
         private void UnlockCam(){
             switch(m_lockType){
                 case CameraLockageType.lookThrough:
@@ -306,6 +309,10 @@ namespace tracer
             }            
             m_lockType = CameraLockageType.none;
         }
+
+        //!
+        //! resets the cams values to standard (and move it one step backwar - most likely because we looked through a camera before)
+        //!
         private void ResetRatio(){
             Camera.main.fieldOfView = 60;
             Camera.main.transform.position -= Camera.main.transform.forward;
@@ -324,7 +331,7 @@ namespace tracer
                 UnlockCam();
             }else{
                 m_localPositionWouldBe = Camera.main.transform.InverseTransformPoint(m_selectedObject.transform.position);
-                Debug.Log("localPositionWouldBe "+m_localPositionWouldBe);
+                //Debug.Log("localPositionWouldBe "+m_localPositionWouldBe);
                 m_localRotationWouldBe = Quaternion.Inverse(Camera.main.transform.rotation) * m_selectedObject.transform.rotation;
                 //calculate the local rotation by Quaternion.Inverse(target spaces' object rotation) * world rotation of the object
                 //BEWARE matrix multiplication - order matters!
@@ -333,8 +340,7 @@ namespace tracer
                 m_lockType = CameraLockageType.lockObjectToCam;
             }
 
-            uiCameraOperation.Invoke(this, IsCamLocked());
-            
+            uiCameraOperation?.Invoke(this, IsCamLocked());
         }
 
         //!
@@ -522,8 +528,6 @@ namespace tracer
                     m_selectedObject.rotation.setValue(newRotation);
                     break;
                 default:
-                    camTransform.position = objTransform.position;
-                    camTransform.rotation = objTransform.rotation;
                     break;
             }
         }

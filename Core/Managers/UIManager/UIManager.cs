@@ -611,8 +611,8 @@ namespace tracer
         {
             m_selectedObjects.Remove(sceneObject);
 
-            selectionChanged?.Invoke(this, m_selectedObjects);
             selectionRemoved?.Invoke(this, sceneObject);
+            selectionChanged?.Invoke(this, m_selectedObjects);
         }
 
         //!
@@ -623,7 +623,6 @@ namespace tracer
             foreach (SceneObject sceneObject in m_selectedObjects){
                 selectionRemoved?.Invoke(this, sceneObject);
             }
-
             m_selectedObjects.Clear();
             selectionChanged?.Invoke(this, m_selectedObjects);
         }

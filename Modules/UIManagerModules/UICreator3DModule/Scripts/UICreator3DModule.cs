@@ -205,6 +205,11 @@ namespace tracer
         int modeTRS = -1;
 
         //!
+        //! store previous mode to restore when unhiding
+        //!
+        private int previousTrsMode = -1;
+
+        //!
         //! Auxiliary preconstructed vector - XY plane
         //!
         readonly Vector3 vecXY = new(1, 1, 0);
@@ -289,9 +294,7 @@ namespace tracer
             manager.selectionChanged += SelectionUpdate;
 
             // Subscribe to manipulator change
-            //manager.manipulatorChange += SetManipulatorMode;
             UICreator2DModule UI2DModule = manager.getModule<UICreator2DModule>();
-            // is a safety non-null check need?
             UI2DModule.parameterChanged += SetManipulatorMode;
 
             // Subscribe to camera change?
@@ -348,14 +351,14 @@ namespace tracer
         //!
         private void PressStart(object sender, Vector2 point)
         {
-            //Debug.Log("Press start: " + e.point.ToString());
+            //Debug.Log("<color=black>PressStart</color>");
 
             // grab the hit manip
             manipulator = CameraRaycast(point);
 
             if (manipulator)
             {
-                //Debug.Log(manipulator);
+                //Debug.Log("<color=green> hit "+manipulator.name+"</color>");
 
                 // make a plane based on it
                 planeVec = manipulator.transform.forward;
@@ -388,6 +391,7 @@ namespace tracer
             // hack - storing initial scale in case of ui operation
             if (selObj)
             {
+                //Debug.Log("<color=green> selected obj "+selObj.gameObject.name+"</color>");
                 Parameter<Vector3> sca = (Parameter<Vector3>)selObj.parameterList[sIndex];
                 initialSca = sca.value;
             }
@@ -485,9 +489,13 @@ namespace tracer
         private void Move(object sender, Vector2 point)
         {
 
-            //Debug.Log("Moving: " + e.point.ToString());
+            //Debug.Log("<color=black>Move</color>");
+
             if (selObj == null)
                 return;
+
+            //Debug.Log("<color=green> selObj "+selObj.gameObject.name+"</color>");
+            //Debug.Log("<color=green> mode:  "+modeTRS+"</color>");
 
             // drag object - translate
             if (modeTRS == 0) // multi obj dev
@@ -496,6 +504,8 @@ namespace tracer
                 Ray ray = mainCamera.ScreenPointToRay(point);
                 if (helperPlane.Raycast(ray, out float enter))
                 {
+                    //Debug.Log("<color=green> ray hit helperPlane!</color>");
+
                     //Get the point that is clicked
                     Vector3 hitPoint = ray.GetPoint(enter);
 
@@ -520,8 +530,10 @@ namespace tracer
                             //Debug.Log("OFFSET: " + (obj.transform.position - manipulator.transform.position).ToString());
                         }
                     }
+
                     // adjust
                     projectedVec -= hitPosOffset;
+                    //Debug.Log("<color=green> projectedVec: "+projectedVec+"</color>");
 
                     // Actual translation operation
                     // For a single object
@@ -530,6 +542,7 @@ namespace tracer
                         Vector3 localVec = selObj.transform.parent.transform.InverseTransformPoint(projectedVec);
                         Parameter<Vector3> pos = (Parameter<Vector3>)selObj.parameterList[tIndex];
                         pos.setValue(localVec);
+                        //Debug.Log("<color=green> set value for single selection!</color>");
                     }
                     // For multiple objects
                     else
@@ -808,6 +821,9 @@ namespace tracer
         private void UnhideAxis()
         {
             lastActiveManip.SetActive(true);
+            //also update scale!
+            lastActiveManip.transform.localScale = GetModifierScale();
+            modeTRS = previousTrsMode;
         }
 
         //!
@@ -831,7 +847,7 @@ namespace tracer
                 averagePos += obj.transform.position;
             }
             averagePos /= selObjs.Count;
-
+            
             manip.transform.SetPositionAndRotation(averagePos, selObj.transform.rotation);
             if (selObjs.Count > 1)
                 manip.transform.rotation = Quaternion.identity;
@@ -877,6 +893,7 @@ namespace tracer
             manipT.transform.rotation = Quaternion.identity;
             manipT.transform.localScale = GetModifierScale();
             modeTRS = 0;
+            previousTrsMode = modeTRS;
             // Incomplete function - lacking manipulator mode
         }
 
@@ -893,8 +910,11 @@ namespace tracer
                 // Place manipulator out of range to avoid unwanted click recognition when it's activated
                 // [REVIEW]
                 // float max might not be the best choice for hiding an object
-                if (manipT)
-                    manipT.transform.position = float.MaxValue * Vector3.one;
+                // [THOMAS]
+                // of fking course its not. so many errors "Invalid worldAABB. Object is too large or too far away from the origin."
+                // it should just remain hidden via the above!
+                // if (manipT)
+                //     manipT.transform.position = float.MaxValue * Vector3.one;
                 return;
             }
 
@@ -976,9 +996,8 @@ namespace tracer
         //!
         //! Function coupled with UI camera operation to hide/unhide the manipulator
         //!
-        private void SetCameraManipulator(object sender, bool cameraMode)
-        {
-            if (cameraMode)
+        private void SetCameraManipulator(object sender, bool hide){
+            if (hide)
                 HideAxes();
             else
                 UnhideAxis();
@@ -1033,6 +1052,7 @@ namespace tracer
                 ShowAxis(manipT);
                 TransformAxisMulti(manipT);
                 modeTRS = 0;
+                previousTrsMode = modeTRS;
             }
         }
 
@@ -1048,6 +1068,7 @@ namespace tracer
                 ShowAxis(manipR);
                 TransformAxisMulti(manipR);
                 modeTRS = 1;
+                previousTrsMode = modeTRS;
             }
         }
 
@@ -1063,6 +1084,7 @@ namespace tracer
                 ShowAxis(manipS);
                 TransformAxisMulti(manipS);
                 modeTRS = 2;
+                previousTrsMode = modeTRS;
             }
         }
 

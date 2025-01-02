@@ -875,7 +875,6 @@ namespace tracer
         private void PressStarted(InputAction.CallbackContext c)
         {
             //Debug.Log("<color=green>Press Started</color>");    //is only ever called for the first finger, for nothing else. (why though?)
-            //Debug.Log("<color=yellow>InputManager.PressStarted</color>");
 
             Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
             m_touchType = InputTouchType.ONE;                                   //no, see above. m_touchType = (m_touchType == InputTouchType.ONE) ? InputTouchType.TWO : InputTouchType.ONE;
@@ -897,6 +896,8 @@ namespace tracer
                 m_inputLayerType = InputLayerType.SCREEN;
                 inputPressStarted?.Invoke(this, point);
             }
+
+            //Debug.Log("\tLayerType is "+m_inputLayerType.ToString());
         }
 
 

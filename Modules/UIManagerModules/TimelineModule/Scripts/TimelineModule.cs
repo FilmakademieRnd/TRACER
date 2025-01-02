@@ -665,7 +665,7 @@ namespace tracer
         private void On2DUIReady(object o, UIBehaviour ui)
         {
 
-            Debug.Log("<color=green>On2DUIReady</color>");
+            //Debug.Log("<color=green>On2DUIReady</color>");
             
             UpdateCallbacks(ui);
             
