@@ -28,6 +28,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 02.01.2025
 
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -35,9 +36,10 @@ namespace tracer
 {
     //!
     //! Dynamic component to take care of 
-    //!     TODO lines (ab)
-    //!     TODO angles
+    //!     lines (ab)
+    //!     angles
     //!     TODO waypoints (a..z)
+    //!     travel
     //!     TODO areas (a,b,c, ..)
     //! just via ingame objects we can move, carry, rotate
     //!
@@ -59,7 +61,8 @@ namespace tracer
         public enum MeasureTypeEnum{
             line = 0,
             angle = 10,
-            travel = 20
+            travel = 20,
+            waypoints = 30
         }
 
         public enum TextPositioningEnum{
@@ -94,6 +97,9 @@ namespace tracer
         [Header("Type - Travel")][Tooltip("these values are only necessary of this measure type was choosen")]
         public Transform travelObject;
 
+        [Header("Type - Waypoints")][Tooltip("these values are only necessary of this measure type was choosen")]
+        public Transform startWaypoint;
+
 
         private UIManager manager;
         private MeasureModule module;
@@ -103,8 +109,19 @@ namespace tracer
         private float currentAngle;
         private Vector3 previousTraveledPos;        //used for traveled distance calculation
         private float lastDistanceForLinePoint;     //used to only add new points above a treshold
+        private List<Transform> measurementObjects;
+        private TextMeshProUGUI uiDistanceText;
         
         void Start(){
+            Init();
+        }
+
+        public bool IsInited(){ return manager != null;}
+
+        public void Init(){
+            if(IsInited()) //already inited
+                return;
+
             manager = GameObject.FindWithTag("Core").GetComponent<Core>().getManager<UIManager>();
             module = manager.getModule<MeasureModule>();
 
@@ -124,7 +141,56 @@ namespace tracer
             }
             textObj.gameObject.SetActive(false);
 
+            InitiateMeasurementObjectList();
+
             module.measurementUIActiveEvent += OnMeasureUIChanged;
+        }
+
+        private void InitiateMeasurementObjectList(){
+            measurementObjects = new();
+            switch(measureType){
+                case MeasureTypeEnum.line:
+                    measurementObjects.Add(startObject);
+                    measurementObjects.Add(endObject);
+                    break;
+                case MeasureTypeEnum.angle:
+                    measurementObjects.Add(angleObjectA);
+                    measurementObjects.Add(angleObjectB);
+                    measurementObjects.Add(angleObjectC);
+                    break;
+                case MeasureTypeEnum.travel:
+                    measurementObjects.Add(travelObject);
+                    break;
+                case MeasureTypeEnum.waypoints:
+                    measurementObjects.Add(startWaypoint);
+                    break;
+            }
+        }
+
+        public void AddMeasurementObject(GameObject _go){
+            measurementObjects.Add(_go.transform);
+        }
+        public void RemoveMeasurementObject(GameObject _go){
+            measurementObjects.Remove(_go.transform);
+        }
+
+        public bool IsSceneObjectFromMeasurement(SceneObject _so){
+            Transform trToFind = _so.transform;
+            return measurementObjects.Contains(trToFind);
+        }
+
+        //necessary if we create pools at runtime, because the initial listiner on module.measurementUIActiveEvent += OnMeasureUIChanged; will not get fired
+        public void SetMeasureUIAsActive(){
+            OnMeasureUIChanged(null, true);
+        }
+        //sets a reference to an ui text we can show the calculated distance too
+        public void SetDistanceText(TextMeshProUGUI _tmp){ 
+            uiDistanceText = _tmp; 
+            if(uiDistanceText && textObj)
+                uiDistanceText.text = textObj.text;
+        }
+        public void TriggerMeasureChange(){
+            SceneObjectHasChanged(null, null);
         }
 
         #region EVENT CALLBACKS
@@ -174,6 +240,20 @@ namespace tracer
                     }
                     currentDistance = 0f;
                     break;
+                case MeasureTypeEnum.waypoints:
+                    //use this for every type!
+                    line.positionCount = measurementObjects.Count;
+                    if(_isActive){
+                        //subscribe to the sceneObject.hasChanged event, to not always calculate the line!
+                        for(int x = 0; x<measurementObjects.Count; x++)
+                            measurementObjects[x].GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+                        
+                    }else{
+                        for(int x = 0; x<measurementObjects.Count; x++)
+                            measurementObjects[x].GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
+                    }
+                    
+                    break;
             }
 
             if(_isActive)
@@ -213,11 +293,16 @@ namespace tracer
                 case MeasureTypeEnum.line:
                     line.SetPosition(0, startObject.position);
                     line.SetPosition(1, endObject.position);
+                    currentDistance = Vector3.Distance(startObject.position, endObject.position) * distanceMultiplier;
                     break;
                 case MeasureTypeEnum.angle:
                     line.SetPosition(0, angleObjectA.position);
                     line.SetPosition(1, angleObjectB.position);
                     line.SetPosition(2, angleObjectC.position);
+                    currentAngle = Vector2.SignedAngle(
+                        (angleObjectB.position-angleObjectA.position).normalized,
+                        (angleObjectB.position-angleObjectC.position).normalized
+                    );
                     break;
                 case MeasureTypeEnum.travel:
                     //add travel points on the fly if distance is bigger a certain treshold
@@ -225,6 +310,21 @@ namespace tracer
                         lastDistanceForLinePoint = currentDistance;
                         line.positionCount++;
                         line.SetPosition(line.positionCount-1, previousTraveledPos);
+                    }
+                    currentDistance += Vector3.Distance(previousTraveledPos, travelObject.position) * distanceMultiplier;
+                    previousTraveledPos = travelObject.position;
+                    break;
+                case MeasureTypeEnum.waypoints:
+                    line.positionCount = measurementObjects.Count;
+                    for(int x = 0; x<measurementObjects.Count; x++){
+                        line.SetPosition(x, measurementObjects[x].position);
+                    }
+                    currentDistance = 0f;
+                    for(int x = 1; x<measurementObjects.Count; x++){
+                        currentDistance += Vector3.Distance(
+                                measurementObjects[x].position, 
+                                measurementObjects[x-1].position
+                            ) * distanceMultiplier;
                     }
                     break;
             }
@@ -242,6 +342,7 @@ namespace tracer
                         case MeasureTypeEnum.angle:
                             break;
                         case MeasureTypeEnum.travel:
+                        case MeasureTypeEnum.waypoints:
                             textObj.transform.position = line.GetPosition(0);
                             break;
                     }
@@ -257,6 +358,9 @@ namespace tracer
                         case MeasureTypeEnum.travel:
                             textObj.transform.position = travelObject.position + Vector3.up;
                             break;
+                        case MeasureTypeEnum.waypoints:
+                            textObj.transform.position = measurementObjects[^1].position + Vector3.up;
+                            break;
                     }
                     break;
                 case TextPositioningEnum.atCenter:
@@ -270,29 +374,31 @@ namespace tracer
                         case MeasureTypeEnum.travel:
                             textObj.transform.position = (line.GetPosition(0)+travelObject.position)/2f + Vector3.up;
                             break;
+                        case MeasureTypeEnum.waypoints:
+                            //TODO calc center of all points...
+                            textObj.transform.position = (measurementObjects[0].position+measurementObjects[^1].position)/2f + Vector3.up;
+                            break;
                     }
                     break;
             }
             
             switch(measureType){
                 case MeasureTypeEnum.line:
-                    currentDistance = Vector3.Distance(startObject.position, endObject.position) * distanceMultiplier;
                     textObj.text = currentDistance.ToString(textFormat);
                     break;
                 case MeasureTypeEnum.angle:
-                    currentAngle = Vector2.SignedAngle(
-                        (angleObjectB.position-angleObjectA.position).normalized,
-                        (angleObjectB.position-angleObjectC.position).normalized
-                    );
                     textObj.text = currentAngle.ToString(textFormat);
                     break;
                 case MeasureTypeEnum.travel:
-                    currentDistance += Vector3.Distance(previousTraveledPos, travelObject.position) * distanceMultiplier;
-                    previousTraveledPos = travelObject.position;
+                    textObj.text = currentDistance.ToString(textFormat);
+                    break;
+                case MeasureTypeEnum.waypoints:
                     textObj.text = currentDistance.ToString(textFormat);
                     break;
             }
             textObj.text += textAffix;
+            if(uiDistanceText)
+                uiDistanceText.text = textObj.text;
 
         }
         private void RotateText(){

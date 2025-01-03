@@ -256,6 +256,32 @@ namespace tracer
             manager.setLastClickedObject(obj);
         }
         //!
+        //! Function to simulate Select
+        //!
+        public void SetSelectedObjectViaScript(SceneObject obj){
+            if(!obj || manager.isThisOurSelectedObject(obj))
+                return;
+            manager.clearSelectedObject();
+            switch (obj){
+                case SceneObjectCamera:
+                    if (manager.activeRole == UIManager.Roles.EXPERT ||
+                        manager.activeRole == UIManager.Roles.DOP)
+                        manager.addSelectedObject(obj);
+                    break;
+                case SceneObjectLight:
+                    if (manager.activeRole == UIManager.Roles.EXPERT ||
+                        manager.activeRole == UIManager.Roles.LIGHTING ||
+                        manager.activeRole == UIManager.Roles.SET)
+                        manager.addSelectedObject(obj);
+                    break;
+                default:
+                    if (manager.activeRole == UIManager.Roles.EXPERT ||
+                        manager.activeRole == UIManager.Roles.SET)
+                        manager.addSelectedObject(obj);
+                    break;
+            }
+        }
+        //!
         //! Retrieve the selectable present at the current location in camera screenspace, if any.
         //! 
         //! @param screenPosition The position to get the selectable at.
