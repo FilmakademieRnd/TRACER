@@ -214,31 +214,37 @@ namespace tracer
                     //     Debug.Log("<color=blue>new selected object</color>");
                 }
 
-                switch (obj)
-                {
-                    case SceneObjectCamera:
-                        if (manager.activeRole == UIManager.Roles.EXPERT ||
-                            manager.activeRole == UIManager.Roles.DOP)
-                            manager.addSelectedObject(obj);
-                        break;
-                    case SceneObjectLight:
-                        if (manager.activeRole == UIManager.Roles.EXPERT ||
-                            manager.activeRole == UIManager.Roles.LIGHTING ||
-                            manager.activeRole == UIManager.Roles.SET)
-                            manager.addSelectedObject(obj);
-                        break;
-                    default:
-                        if (manager.activeRole == UIManager.Roles.EXPERT ||
-                            manager.activeRole == UIManager.Roles.SET)
-                            manager.addSelectedObject(obj);
-                        break;
-                }
+                AddSelectionByRole(obj);
             }else{
                 manager.clearSelectedObject();
                 //Debug.Log("<color=yellow>clicked nothing. selected objects cleared</color>");
             }
 
             m_isRenderActive = false;
+        }
+        //!
+        //! Function to add the found selected object to the manager, depending by our Role
+        //!
+        private void AddSelectionByRole(SceneObject clickedSceneObject){
+            switch (clickedSceneObject)
+            {
+                case SceneObjectCamera:
+                    if (manager.activeRole == UIManager.Roles.EXPERT ||
+                        manager.activeRole == UIManager.Roles.DOP)
+                        manager.addSelectedObject(clickedSceneObject);
+                    break;
+                case SceneObjectLight:
+                    if (manager.activeRole == UIManager.Roles.EXPERT ||
+                        manager.activeRole == UIManager.Roles.LIGHTING ||
+                        manager.activeRole == UIManager.Roles.SET)
+                        manager.addSelectedObject(clickedSceneObject);
+                    break;
+                default:
+                    if (manager.activeRole == UIManager.Roles.EXPERT ||
+                        manager.activeRole == UIManager.Roles.SET)
+                        manager.addSelectedObject(clickedSceneObject);
+                    break;
+            }
         }
         //!
         //! Function to check for a double-click/tap to focus on an object

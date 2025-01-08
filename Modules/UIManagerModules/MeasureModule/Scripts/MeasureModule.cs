@@ -48,13 +48,20 @@ namespace tracer{
 
     public class MeasureModule : UIManagerModule{
 
-        public const string     LOCATION_CANVAS_PREFAB      = "Prefabs/MeasurementCanvas";
+        public const string     LOCATION_CANVAS_PREFAB      = "Prefabs/Measurement_Canvas";
         public const string     LOCATION_LINEPOOL_PREFAB    = "Prefabs/MeasurementPool_Line";
+        public const string     LOCATION_WPPOOL_PREFAB      = "Prefabs/MeasurementPool_Waypoints";
+        public const string     LOCATION_ANGLEPOOL_PREFAB   = "Prefabs/MeasurementPool_Angle";
+        public const string     LOCATION_TRVLPOOL_PREFAB    = "Prefabs/MeasurementPool_Travel";
         public const int        CANVAS_SORTING_ORDER        = 15;
         public const string     BUTTON_NAME_PLACE           = "SelectionSensitive/Button_PlaceViaRay";
         public const string     BUTTON_NAME_CREATE_LINE     = "Creation/Button_CreateLine";
+        public const string     BUTTON_NAME_CREATE_WP       = "Creation/Button_CreateWaypoints";
+        public const string     BUTTON_NAME_CREATE_ANGLE    = "Creation/Button_CreateAngle";
+        public const string     BUTTON_NAME_CREATE_TRAVEL   = "Creation/Button_CreateTraveller";
         public const string     BUTTON_NAME_ADD_WP          = "SelectionSensitive/Button_AddWaypoint";
         public const string     BUTTON_NAME_REM_WP          = "SelectionSensitive/Button_RemoveWaypoint";
+        public const string     BUTTON_NAME_RESET_DST       = "SelectionSensitive/Button_ResetDistance";
         public const string     BLOCKER_NAME_PLACE          = "SelectionSensitive/InputBlocker";
         public const string     TEXT_NAME_UI_DISTANCE       = "UIDistanceViz";
 
@@ -86,6 +93,10 @@ namespace tracer{
         //!
         private SceneObject sceneObjectToPlace;
         //!
+        //! the standard Color of selected SceneObject we want to place (during selection it will become green!)
+        //!
+        private Color objectToPlaceStandardColor;
+        //!
         //! to utilite the place function from other functions and execute additional code
         //!
         private UnityEvent additionalPlaceEvent;
@@ -93,8 +104,12 @@ namespace tracer{
         #region Selfdescribing Buttons
         private Button button_placeSelectedObjectViaRay;
         private Button button_createLine;
+        private Button button_createWaypoints;
+        private Button button_createAngle;
+        private Button button_createTraveller;
         private Button button_addWaypoint;
         private Button button_removeWaypoint;
+        private Button button_resetDistance;        //reset distance during traveller and waypoints
 
         #endregion
 
@@ -145,9 +160,11 @@ namespace tracer{
         private void ToggleMeasureUI(){
             isActive = !isActive;
 
-            if(isActive)
+            if(isActive){
                 CreateMeasureUI();
-            else
+                //trigger it once, because if we already selected an object, it would not fire up this listener
+                OnSelectionChanged(null, manager.SelectedObjects);
+            }else
                 DestroyMeasureUI();
 
             AddOrRemoveListener(isActive);
@@ -171,11 +188,34 @@ namespace tracer{
 
             button_createLine = measureCanvasHolder.transform.Find(BUTTON_NAME_CREATE_LINE).GetComponent<Button>();
             button_createLine.onClick.AddListener(OnClick_StartCreation_Line);
+            button_createWaypoints = measureCanvasHolder.transform.Find(BUTTON_NAME_CREATE_WP).GetComponent<Button>();
+            button_createWaypoints.onClick.AddListener(OnClick_StartCreation_Waypoints);
+            button_createAngle = measureCanvasHolder.transform.Find(BUTTON_NAME_CREATE_ANGLE).GetComponent<Button>();
+            button_createAngle.onClick.AddListener(OnClick_StartCreation_Angle);
+            button_createTraveller = measureCanvasHolder.transform.Find(BUTTON_NAME_CREATE_TRAVEL).GetComponent<Button>();
+            button_createTraveller.onClick.AddListener(OnClick_StartCreation_Traveller);
+            
+            
+            
 
             button_addWaypoint = measureCanvasHolder.transform.Find(BUTTON_NAME_ADD_WP).GetComponent<Button>();
             button_addWaypoint.onClick.AddListener(OnClick_AddWaypoint);
             button_removeWaypoint = measureCanvasHolder.transform.Find(BUTTON_NAME_REM_WP).GetComponent<Button>();
             button_removeWaypoint.onClick.AddListener(OnClick_RemoveWaypoint);
+
+            button_resetDistance = measureCanvasHolder.transform.Find(BUTTON_NAME_RESET_DST).GetComponent<Button>();
+            button_resetDistance.onClick.AddListener(OnClick_ResetDistance);
+
+            HideAllButtons();
+            ShowCreationButtons();
+        }
+
+        private void HideAllButtons(){
+            HideCreationButtons();
+            button_addWaypoint.gameObject.SetActive(false);
+            button_removeWaypoint.gameObject.SetActive(false);
+            button_resetDistance.gameObject.SetActive(false);
+            button_placeSelectedObjectViaRay.gameObject.SetActive(false);
         }
 
         private void DestroyMeasureUI(){
@@ -200,37 +240,59 @@ namespace tracer{
         //! @param sceneObjects The list containing the selected objects. 
         //!
         private void OnSelectionChanged(object _o, List<SceneObject> _sceneObjects){
+            //ignore during placing or other functions
+            if(inputBlockingCanvas.activeSelf)
+                return;
+
             //Debug.Log("<color=yellow>Measurement.OnSelectionChanged: "+_sceneObjects.Count+"</color>");
             if (_sceneObjects.Count < 1){
                 DeactivateSelectionSensitiveButtons();
+                ShowCreationButtons();
             }else{
                 //Debug.Log("selected "+_sceneObjects[0].gameObject.name);
                 MeasurePool selectedMeasurePool = _sceneObjects[0].GetComponentInParent<MeasurePool>();
                 if(!selectedMeasurePool || !selectedMeasurePool.IsSceneObjectFromMeasurement(_sceneObjects[0])){
                     DeactivateSelectionSensitiveButtons();
+                    ShowCreationButtons();
                     Debug.Log("<color=black>no measure object selected</color>");
+                    //reset distance ui
+                    uiDistanceText.text = "";
                     return;
                 }
                 sceneObjectToPlace = _sceneObjects[0];
-                button_placeSelectedObjectViaRay.interactable = true;
 
+                button_placeSelectedObjectViaRay.gameObject.SetActive(true);
+                //if visible, always interactable button_placeSelectedObjectViaRay.interactable = true;
                 selectedMeasurePool.SetDistanceText(uiDistanceText);
+
+                HideCreationButtons();
+
+
                 switch(selectedMeasurePool.measureType){
                     case MeasurePool.MeasureTypeEnum.line:
                         button_addWaypoint.gameObject.SetActive(false);
                         button_removeWaypoint.gameObject.SetActive(false);
+                        button_resetDistance.gameObject.SetActive(false);
                         break;
                     case MeasurePool.MeasureTypeEnum.angle:
                         button_addWaypoint.gameObject.SetActive(false);
                         button_removeWaypoint.gameObject.SetActive(false);
+                        button_resetDistance.gameObject.SetActive(false);
                         break;
                     case MeasurePool.MeasureTypeEnum.travel:
                         button_addWaypoint.gameObject.SetActive(false);
                         button_removeWaypoint.gameObject.SetActive(false);
+                        button_resetDistance.gameObject.SetActive(true);
+
+                        button_resetDistance.interactable = selectedMeasurePool.GetDistance() > 0;
                         break;
                     case MeasurePool.MeasureTypeEnum.waypoints:
                         button_addWaypoint.gameObject.SetActive(true);
                         button_removeWaypoint.gameObject.SetActive(true);
+                        button_resetDistance.gameObject.SetActive(true);
+
+                        button_removeWaypoint.interactable = selectedMeasurePool.GetMeasureObjectCount() > 1;
+                        button_resetDistance.interactable = true;   //always enabled, because we have no callback implemented for moving this object
                         //enable adding/removing waypoints
                         //- adding should wait for click to query and place it there (but how is "adding" enabled? we would need to select another waypoint...)
                         //- removing should only be enabled if we select a waypoint 
@@ -254,8 +316,35 @@ namespace tracer{
 
             inputBlockingCanvas.SetActive(false);            
 
-            RaycastHit hit;
-            if(SceneRaycastHelper.RaycastIntoScene(core.getManager<SceneManager>().scnRoot, point, out hit)){
+            MeshRenderer[] ignoreTheseForRaycasting;
+            //ignore (selection) itself
+            ignoreTheseForRaycasting = sceneObjectToPlace.GetComponents<MeshRenderer>();
+
+            //TODO for performance we would not need to gather all MeshRenderer on every click (only if we modify any)
+            if (SceneRaycastHelper.RaycastIntoScene(core.getManager<SceneManager>().scnRoot, point, out RaycastHit hit, ignoreTheseForRaycasting)){
+                //if we hit another measurement-pool object, select this for placing, instead of change  the current position
+                //no need to position a measure-object onto any other measure-object
+                //TODO: if we are in placement-mode via waypoint-creation, just end placement-mode
+                SceneObject sceneObjectWeHit = hit.transform.GetComponent<SceneObject>();
+                if(!sceneObjectWeHit)
+                    sceneObjectWeHit = hit.transform.GetComponentInParent<SceneObject>();
+
+                if (sceneObjectWeHit){
+                    Debug.Log("Hit SceneObject Check if it is a Measure-Object");
+                    MeasurePool selectedMeasurePool = sceneObjectWeHit.GetComponentInParent<MeasurePool>();
+                    if (selectedMeasurePool && selectedMeasurePool.IsSceneObjectFromMeasurement(sceneObjectWeHit)){
+                        Debug.Log("\tYES!");
+                        //revert color
+                        sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
+                        //save color
+                        objectToPlaceStandardColor = sceneObjectWeHit.GetComponent<MeshRenderer>().material.color;
+                        sceneObjectWeHit.GetComponent<MeshRenderer>().material.color = Color.green;
+                        OnSelectionChanged(null, new List<SceneObject>() { sceneObjectWeHit });
+                        inputBlockingCanvas.SetActive(true);
+                        return;
+                    }
+                }
+
                 //place this object: sceneObjectToPlace
                 //sceneObjectToPlace.position.setValue(hit.point); || THIS SET LOCAL-POSITION, IF PARENT IS MOVE ANYWHERE, THIS FUCKS UP EVERYTHING!! WHY IN GODS NAME DO WE USE LOCAL POSITION????
                 sceneObjectToPlace.transform.position = hit.point;
@@ -263,15 +352,41 @@ namespace tracer{
                 //sceneObjectToPlace.rotation.setValue(Quaternion.FromToRotation(Vector3.up, hit.normal));    //SAME AS ABOVE - WHYYYYYYY?
                 sceneObjectToPlace.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
 
+                //reset this before, e.g. if we have these events deactivating it
+                inputBlockingCanvas.SetActive(true);
+
                 additionalPlaceEvent?.Invoke();
+            }else{
+                inputBlockingCanvas.SetActive(true);
             }
-            
-            inputBlockingCanvas.SetActive(true);
+
+
         }
 
         #endregion
         private void DeactivateSelectionSensitiveButtons(){
-            button_placeSelectedObjectViaRay.interactable = false;
+            //always visible
+            //button_placeSelectedObjectViaRay.interactable = false;
+            button_placeSelectedObjectViaRay.gameObject.SetActive(false);
+
+            //only possible for certain selected waypoint-pool-types
+            button_addWaypoint.gameObject.SetActive(false);
+            button_removeWaypoint.gameObject.SetActive(false);
+            button_resetDistance.gameObject.SetActive(false);
+        }
+
+        private void ShowCreationButtons(){
+            button_createLine.gameObject.SetActive(true);
+            button_createWaypoints.gameObject.SetActive(true);
+            button_createAngle.gameObject.SetActive(true);
+            button_createTraveller.gameObject.SetActive(true);
+        }
+
+        private void HideCreationButtons(){
+            button_createLine.gameObject.SetActive(false);
+            button_createWaypoints.gameObject.SetActive(false);
+            button_createAngle.gameObject.SetActive(false);
+            button_createTraveller.gameObject.SetActive(false);
         }
 
         #region Button Events
@@ -284,10 +399,19 @@ namespace tracer{
             //otherwise we could not measure a big object that is a movable scene object (e.g. a car)
             inputBlockingCanvas.SetActive(true);
 
+            HideAllButtons();
+            button_placeSelectedObjectViaRay.gameObject.SetActive(true);
+
+            //TODO enable overlay that indicates what to do (frame + text AND "abort"/"finish") (enable overlay for as long as user press another of our button)
+
+            //Save Standard Color
+            objectToPlaceStandardColor = sceneObjectToPlace.GetComponent<MeshRenderer>().material.color;
+            sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = Color.green;
+
+            //hide gizmo and TRS ui --> we simulate this by de-selecting!
+            manager.clearSelectedObject();
             //add event to input manager
             core.getManager<InputManager>().inputPressStartedUI += OnPointerDown_Place; //needed UI, because of the above input blocking
-
-            //enable overlay that indicates what to do (frame + text AND "abort"/"finish") (enable overlay for as long as user press another of our button)
 
             button_placeSelectedObjectViaRay.onClick.RemoveListener(OnClick_StartPlaceViaRay);
             button_placeSelectedObjectViaRay.onClick.AddListener(OnClick_StopPlaceViaRay);
@@ -299,6 +423,13 @@ namespace tracer{
 
             inputBlockingCanvas.SetActive(false);
 
+            //revert color
+            sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
+
+            //re-enable gizmos by simulate a "reselection"
+            manager.clearSelectedObject();
+            manager.addSelectedObject(sceneObjectToPlace);
+
             core.getManager<InputManager>().inputPressStartedUI -= OnPointerDown_Place;
 
             button_placeSelectedObjectViaRay.onClick.RemoveListener(OnClick_StopPlaceViaRay);
@@ -306,29 +437,16 @@ namespace tracer{
         }
 
         private void OnClick_StartCreation_Line(){
-            //button_createLine.GetComponentsInChildren<Image>()[1].color = Color.green; //0 is BG, 1 is IMAGE
-            //inputBlockingCanvas.SetActive(true);
-            
-            //Instaniate Prefab (out of view) and 
-            GameObject linePool = GameObject.Instantiate(Resources.Load(LOCATION_LINEPOOL_PREFAB) as GameObject);
-            foreach(Transform child in linePool.GetComponentInChildren<Transform>()){
-                if (child.gameObject.tag == "editable"){
-                    //if (core.isServer){
-                        core.getManager<SceneManager>().simpleSceneObjectList.Add((SceneObject)SceneObject.Attach(child.gameObject, core.getManager<NetworkManager>().cID));
-                    //}
-                }
-                core.StartCoroutine(QuickColorHighlight(child.GetComponent<MeshRenderer>(), Color.green));
-            }
-
-            linePool.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 1f;
-            linePool.GetComponent<MeasurePool>().Init();
-            linePool.GetComponent<MeasurePool>().SetMeasureUIAsActive();
-    
-            //select it (not necessary)
-            manager.getModule<SelectionModule>().SetSelectedObjectViaScript(linePool.GetComponentInChildren<SceneObject>());
-            
-            //start placing specific objects (or simply let this be done via the ingame behaviour [at least for line])
-            //core.getManager<InputManager>().inputPressStartedUI += OnPointerDown_CreateLine;
+            CreateMeasurePoolAtRuntime(GameObject.Instantiate(Resources.Load(LOCATION_LINEPOOL_PREFAB) as GameObject).GetComponent<MeasurePool>());
+        }
+        private void OnClick_StartCreation_Waypoints(){
+            CreateMeasurePoolAtRuntime(GameObject.Instantiate(Resources.Load(LOCATION_WPPOOL_PREFAB) as GameObject).GetComponent<MeasurePool>());
+        }
+        private void OnClick_StartCreation_Angle(){
+            CreateMeasurePoolAtRuntime(GameObject.Instantiate(Resources.Load(LOCATION_ANGLEPOOL_PREFAB) as GameObject).GetComponent<MeasurePool>());
+        }
+        private void OnClick_StartCreation_Traveller(){
+            CreateMeasurePoolAtRuntime(GameObject.Instantiate(Resources.Load(LOCATION_TRVLPOOL_PREFAB) as GameObject).GetComponent<MeasurePool>());
         }
 
         private void OnClick_AddWaypoint(){
@@ -338,31 +456,75 @@ namespace tracer{
             Component.DestroyImmediate(newWaypoint.GetComponent<SceneObject>());
             core.getManager<SceneManager>().simpleSceneObjectList.Add((SceneObject)SceneObject.Attach(newWaypoint, core.getManager<NetworkManager>().cID));
             newWaypoint.transform.parent = sceneObjectToPlace.transform.parent;
-            newWaypoint.GetComponentInParent<MeasurePool>().AddMeasurementObject(newWaypoint);
+            //insert after selected waypoint
+            newWaypoint.GetComponentInParent<MeasurePool>().AddMeasurementObject(newWaypoint, sceneObjectToPlace.transform);
+            //make sure color is correct, because coroutine could still "pingpong" the creation-color (TODO: make fool-proof, could still be the wrong color)
+            sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
+            
+            //place visual next to current selection (in distance relation of current cameras viewport)
+            Vector3 viewportPosition = Camera.main.WorldToViewportPoint(newWaypoint.transform.position);
+            viewportPosition.x += Mathf.Min((1f - viewportPosition.x)/2f, viewportPosition.x);
+            newWaypoint.transform.position = Camera.main.ViewportToWorldPoint(viewportPosition); //newWaypoint.transform.right;
+
             //set as object we want to place
             sceneObjectToPlace = newWaypoint.GetComponent<SceneObject>();
 
+            //Trigger same Behaviour
+            OnClick_StartPlaceViaRay();
+            //except that we stop it after placed once
             additionalPlaceEvent = new UnityEvent();
-            inputBlockingCanvas.SetActive(true);
-            core.getManager<InputManager>().inputPressStartedUI += OnPointerDown_Place;
-            button_addWaypoint.onClick.RemoveListener(OnClick_AddWaypoint);
-
+            additionalPlaceEvent.AddListener(OnClick_StopPlaceViaRay);
             additionalPlaceEvent.AddListener(WaypointPlaced);
+
+            // inputBlockingCanvas.SetActive(true);
+            // core.getManager<InputManager>().inputPressStartedUI += OnPointerDown_Place;
+            // button_addWaypoint.onClick.RemoveListener(OnClick_AddWaypoint);
         }
 
         private void OnClick_RemoveWaypoint(){
-            sceneObjectToPlace.GetComponentInParent<MeasurePool>().RemoveMeasurementObject(sceneObjectToPlace.gameObject);
+            Transform newWaypointToSelect = sceneObjectToPlace.GetComponentInParent<MeasurePool>().RemoveMeasurementObject(sceneObjectToPlace.gameObject);
+            if(!newWaypointToSelect)
+                return;
+
             sceneObjectToPlace.GetComponentInParent<MeasurePool>().TriggerMeasureChange();
+
             //Destroying SceneObjects currently not supported. Implement as well as adding!
             GameObject.Destroy(sceneObjectToPlace.gameObject);
-            
+
+            manager.clearSelectedObject();
+            manager.addSelectedObject(newWaypointToSelect.GetComponent<SceneObject>());
+        }
+
+        private void OnClick_ResetDistance(){
+            sceneObjectToPlace.GetComponentInParent<MeasurePool>().ResetDistance();
         }
         #endregion
 
+        #region Additional Functions
+
+        private void CreateMeasurePoolAtRuntime(MeasurePool _mp){
+            foreach(Transform child in _mp.GetComponentInChildren<Transform>()){
+                if (child.gameObject.tag == "editable"){
+                    //if (core.isServer){
+                        core.getManager<SceneManager>().simpleSceneObjectList.Add((SceneObject)SceneObject.Attach(child.gameObject, core.getManager<NetworkManager>().cID));
+                    //}
+                }
+                core.StartCoroutine(QuickColorHighlight(child.GetComponent<MeshRenderer>(), Color.green));
+            }
+
+            Transform cameraTransform = Camera.main.transform;
+            //position in front of camera
+            _mp.transform.position = cameraTransform.position + cameraTransform.forward * 1f;
+            //align to camera rotation
+            _mp.transform.LookAt(cameraTransform);
+
+            _mp.GetComponent<MeasurePool>().Init();
+            _mp.GetComponent<MeasurePool>().SetMeasureUIAsActive();
+    
+            //select it (not necessary)
+            manager.getModule<SelectionModule>().SetSelectedObjectViaScript(_mp.GetComponentInChildren<SceneObject>());
+        }
         private void WaypointPlaced(){
-            inputBlockingCanvas.SetActive(false);
-            button_addWaypoint.onClick.AddListener(OnClick_AddWaypoint);
-            core.getManager<InputManager>().inputPressStartedUI -= OnPointerDown_Place;
             core.StartCoroutine(QuickColorHighlight(sceneObjectToPlace.GetComponent<MeshRenderer>(), Color.green));
             sceneObjectToPlace.GetComponentInParent<MeasurePool>().TriggerMeasureChange();
             additionalPlaceEvent = new UnityEvent();
@@ -394,6 +556,8 @@ namespace tracer{
             }
             m.color = colorWas;
         }
+
+        #endregion
 
     }
 }

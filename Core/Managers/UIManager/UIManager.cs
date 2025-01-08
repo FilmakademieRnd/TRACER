@@ -84,7 +84,7 @@ namespace tracer
             get { return m_selectedObjects; }
         }
         //!
-        //! The list containing currently selected scene objects.
+        //! The list containing the latest clicked scene objects.
         //!
         private SceneObject m_lastCickedObject;
         public SceneObject LastClickedObject

@@ -18,17 +18,22 @@ public class SceneRaycastHelper{
         return false;
     }
 
-    public static bool RaycastIntoScene(GameObject sceneRoot, Vector2 point, out RaycastHit finalHit){
-        //?? mixture of raycast and depth buffer check to place object in scene ??
-        //check each renderer bounds extents if eligible
-
+    public static bool RaycastIntoScene(GameObject sceneRoot, Vector2 point, out RaycastHit finalHit, params MeshRenderer[] ignoreTheseObjects){
         //quick and dirty
-
         finalHit = new RaycastHit();
         
+        /****** TODO
+        * bool ignoreGizmos
+        * bool ignoreSelection
+        * param MeshRenderer[] ignoreTheseToo
+        *******/
+        //TODO ignore gizmos and uis !?
+
         //gather all objects in current views frustrum
         List<SphereCollider> tmpColliders;
         List<MeshRenderer> allVisibleMeshRenderer = GatherVisibleMeshRenderer(sceneRoot.GetComponentsInChildren<MeshRenderer>(), out tmpColliders);
+        foreach(MeshRenderer toIgnoreMr in ignoreTheseObjects)
+            allVisibleMeshRenderer.Remove(toIgnoreMr);
         
         Debug.Log("<color=yellow>"+allVisibleMeshRenderer.Count+" VISIBLE OBJECTS FOUND</color>");
 
@@ -75,15 +80,15 @@ public class SceneRaycastHelper{
             //Debug.DrawLine(Camera.main.ScreenPointToRay(point).origin, finalHit.point, Color.red, 4f);
             //visualize hit at object we hit and with particle that is aligned like an arrow-target
             Debug.Log("<color=green>HIT AT"+finalHit.point+" on "+finalHit.transform.gameObject.name+"</color>");
-            //remove sphere collider, add MeshCollider to these hit objects
+            //remove added colliders
             foreach(MeshCollider c in tmpMeshColliders)
-                Component.DestroyImmediate(c);
+                Component.Destroy(c);//Component.DestroyImmediate(c);
             return true;
         }else{
             Debug.Log("<color=red>NO FINAL HIT</color>");
-            //remove sphere collider, add MeshCollider to these hit objects
+            //remove added colliders
             foreach(MeshCollider c in tmpMeshColliders)
-                Component.DestroyImmediate(c);
+                Component.Destroy(c);//Component.DestroyImmediate(c);
             return false;
         }
     }
@@ -94,8 +99,6 @@ public class SceneRaycastHelper{
         _tmpColliders = new();
         foreach(MeshRenderer mr in _mrs){
             if(mr.isVisible){
-                //TODO ignore gizmos and uis !?
-
                 visibleMrs.Add(mr);
                 //add sphere collider to objects encapuslating its bounds
                 if(!mr.GetComponent<Collider>()){

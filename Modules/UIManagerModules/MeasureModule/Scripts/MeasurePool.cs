@@ -62,7 +62,7 @@ namespace tracer
             line = 0,
             angle = 10,
             travel = 20,
-            waypoints = 30
+            waypoints = 30      //TODO: would be nice to control this one via the thumbstick on iOS, even more if we will walk along the ground
         }
 
         public enum TextPositioningEnum{
@@ -125,7 +125,7 @@ namespace tracer
             manager = GameObject.FindWithTag("Core").GetComponent<Core>().getManager<UIManager>();
             module = manager.getModule<MeasureModule>();
 
-            line = Instantiate(linePrefab).GetComponent<LineRenderer>();
+            line = Instantiate(linePrefab, transform).GetComponent<LineRenderer>();
             if(!line){
                 Debug.LogWarning("There is no LineRenderer attached to linePrefab: "+linePrefab.name);
                 this.enabled = false;
@@ -133,13 +133,15 @@ namespace tracer
             }
             line.gameObject.SetActive(false);
 
-            textObj = Instantiate(textPrefab).GetComponent<TextMeshPro>();
+            textObj = Instantiate(textPrefab, transform).GetComponent<TextMeshPro>();
             if(!textObj){
                 Debug.LogWarning("There is no TextMeshPro attached to textPrefab: "+textPrefab.name);
-                this.enabled = false;
+                //this.enabled = false; we can just do not connect this, to not have an ingame ui! (TODO: or enable ingame viz via ui button)
                 return;
+            }else{
+                textObj.transform.localScale = textPrefab.transform.localScale;
+                textObj.gameObject.SetActive(false);
             }
-            textObj.gameObject.SetActive(false);
 
             InitiateMeasurementObjectList();
 
@@ -167,11 +169,29 @@ namespace tracer
             }
         }
 
-        public void AddMeasurementObject(GameObject _go){
-            measurementObjects.Add(_go.transform);
+        public void AddMeasurementObject(GameObject _go, Transform _insertAfter = null){
+            if(!_insertAfter){
+                measurementObjects.Add(_go.transform);
+                measurementObjects[^1].GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+            }else{
+               int index = measurementObjects.FindIndex(tr => tr == _insertAfter);
+                if(index < 0)
+                    return; 
+                measurementObjects.Insert(index, _go.transform);
+                measurementObjects[index].GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+            }
         }
-        public void RemoveMeasurementObject(GameObject _go){
-            measurementObjects.Remove(_go.transform);
+        //removes a waypoint and return a another waypoint we should select
+        public Transform RemoveMeasurementObject(GameObject _go){
+            int index = measurementObjects.FindIndex(tr => tr == _go.transform);
+            if(index < 0)
+                return null;
+            measurementObjects[index].GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
+            measurementObjects.RemoveAt(index);
+            if(measurementObjects.Count > 0)
+                return measurementObjects[(index+1) % measurementObjects.Count];
+            else
+                return null;
         }
 
         public bool IsSceneObjectFromMeasurement(SceneObject _so){
@@ -179,7 +199,7 @@ namespace tracer
             return measurementObjects.Contains(trToFind);
         }
 
-        //necessary if we create pools at runtime, because the initial listiner on module.measurementUIActiveEvent += OnMeasureUIChanged; will not get fired
+        //necessary if we create pools at runtime, because the initial listener on module.measurementUIActiveEvent += OnMeasureUIChanged; will not get fired
         public void SetMeasureUIAsActive(){
             OnMeasureUIChanged(null, true);
         }
@@ -192,6 +212,36 @@ namespace tracer
         public void TriggerMeasureChange(){
             SceneObjectHasChanged(null, null);
         }
+
+        public float GetDistance(){ return currentDistance; }
+        public void ResetDistance(){
+            currentDistance = 0f;
+            switch(measureType){
+                case MeasureTypeEnum.line:
+                case MeasureTypeEnum.angle:
+                    //nothing to do here
+                    break;
+                case MeasureTypeEnum.travel:
+                    //destroy line and set distance to zero
+                    lastDistanceForLinePoint = currentDistance;
+                    line.positionCount = 1;
+                    line.SetPosition(0, travelObject.position);
+                    previousTraveledPos = travelObject.position;
+                    break;
+                case MeasureTypeEnum.waypoints:
+                    //equivalent to deleting all waypoints (except the first)
+                    for(int x = 1; x<measurementObjects.Count; x++){
+                        Destroy(measurementObjects[x].gameObject);
+                    }
+                    measurementObjects = new List<Transform>(){measurementObjects[0]};
+                    line.positionCount = 1;
+                    line.SetPosition(0, measurementObjects[0].position);
+                    break;
+            }
+            UpdateText();
+        }
+
+        public int GetMeasureObjectCount(){ return measurementObjects.Count; }
 
         #region EVENT CALLBACKS
 
@@ -332,6 +382,9 @@ namespace tracer
         }
 
         private void UpdateText(){
+            if(!textObj)
+                return;
+
             //place text as set in the settings
             switch(textPositioning){
                 case TextPositioningEnum.fixedPos:
@@ -350,33 +403,33 @@ namespace tracer
                 case TextPositioningEnum.atLastElement:
                     switch(measureType){
                         case MeasureTypeEnum.line:
-                            textObj.transform.position = endObject.position + Vector3.up;
+                            textObj.transform.position = endObject.position + Vector3.up * endObject.localScale.y*2f;
                             break;
                         case MeasureTypeEnum.angle:
-                            textObj.transform.position = angleObjectB.position + Vector3.up;
+                            textObj.transform.position = angleObjectB.position + Vector3.up * angleObjectB.localScale.y*2f;
                             break;
                         case MeasureTypeEnum.travel:
-                            textObj.transform.position = travelObject.position + Vector3.up;
+                            textObj.transform.position = travelObject.position + Vector3.up * travelObject.localScale.y*2f;
                             break;
                         case MeasureTypeEnum.waypoints:
-                            textObj.transform.position = measurementObjects[^1].position + Vector3.up;
+                            textObj.transform.position = measurementObjects[^1].position + Vector3.up * measurementObjects[^1].localScale.y*2f;
                             break;
                     }
                     break;
                 case TextPositioningEnum.atCenter:
                     switch(measureType){
                         case MeasureTypeEnum.line:
-                            textObj.transform.position = (startObject.position + endObject.position)/2f + Vector3.up;
+                            textObj.transform.position = (startObject.position + endObject.position)/2f + Vector3.up * endObject.localScale.y*2f;
                             break;
                         case MeasureTypeEnum.angle:
                             textObj.transform.position = (angleObjectA.position + angleObjectB.position + angleObjectC.position)/3f;
                             break;
                         case MeasureTypeEnum.travel:
-                            textObj.transform.position = (line.GetPosition(0)+travelObject.position)/2f + Vector3.up;
+                            textObj.transform.position = (line.GetPosition(0)+travelObject.position)/2f + Vector3.up * travelObject.localScale.y*2f;
                             break;
                         case MeasureTypeEnum.waypoints:
                             //TODO calc center of all points...
-                            textObj.transform.position = (measurementObjects[0].position+measurementObjects[^1].position)/2f + Vector3.up;
+                            textObj.transform.position = (measurementObjects[0].position+measurementObjects[^1].position)/2f + Vector3.up * measurementObjects[0].localScale.y*2f;
                             break;
                     }
                     break;

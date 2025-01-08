@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 8819791546007317559}
   - component: {fileID: 2882637533184137551}
   m_Layer: 0
-  m_Name: MeasurementLinePrefab
+  m_Name: Measurement_Line
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
