@@ -530,7 +530,7 @@ namespace tracer{
             manager.clearSelectedObject();
             manager.addSelectedObject(sceneObjectToPlace);
 
-            core.getManager<InputManager>().inputPressStartedUI -= OnPointerDown_Place;
+            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_Place;
 
             button_placeSelectedObjectViaRay.onClick.RemoveListener(OnClick_StopPlaceViaRay);
             button_placeSelectedObjectViaRay.onClick.AddListener(OnClick_StartPlaceViaRay);

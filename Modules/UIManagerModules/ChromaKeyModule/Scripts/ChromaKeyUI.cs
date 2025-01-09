@@ -273,7 +273,7 @@ namespace tracer
                 _manipulatorPanel.SetActive(true);
                 _chromaKeyCanvasSliders.SetActive(true);
                 _currentManipulator = Object.Instantiate(_uiColorPicker, _manipulatorPanel.transform);
-                _currentManipulator.GetComponent<ColorSelect>().Init(_materialColor);
+                _currentManipulator.GetComponent<ColorSelect>().Init(_materialColor, manager);
                 _radiusSlider = _chromaKeyCanvas.transform.GetChild(2).GetChild(1).GetComponent<Slider>();
                 _thresholdSlider = _chromaKeyCanvas.transform.GetChild(2).GetChild(3).GetComponent<Slider>();
                 
