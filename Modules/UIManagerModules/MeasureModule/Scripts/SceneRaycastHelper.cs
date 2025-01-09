@@ -18,7 +18,7 @@ public class SceneRaycastHelper{
         return false;
     }
 
-    public static bool RaycastIntoScene(GameObject sceneRoot, Vector2 point, out RaycastHit finalHit, params MeshRenderer[] ignoreTheseObjects){
+    public static bool RaycastIntoScene(GameObject sceneRoot, Vector2 point, out RaycastHit finalHit, MeshRenderer[] ignoreTheseObjects){
         //quick and dirty
         finalHit = new RaycastHit();
         
@@ -31,23 +31,21 @@ public class SceneRaycastHelper{
 
         //gather all objects in current views frustrum
         List<SphereCollider> tmpColliders;
-        List<MeshRenderer> allVisibleMeshRenderer = GatherVisibleMeshRenderer(sceneRoot.GetComponentsInChildren<MeshRenderer>(), out tmpColliders);
-        foreach(MeshRenderer toIgnoreMr in ignoreTheseObjects)
-            allVisibleMeshRenderer.Remove(toIgnoreMr);
+        List<MeshRenderer> allVisibleMeshRenderer = GatherVisibleMeshRenderer(sceneRoot.GetComponentsInChildren<MeshRenderer>(), ignoreTheseObjects, out tmpColliders);
         
         Debug.Log("<color=yellow>"+allVisibleMeshRenderer.Count+" VISIBLE OBJECTS FOUND</color>");
 
         Ray ray = Camera.main.ScreenPointToRay(point);
-
-        //also use all collider when we are within (e.g. we are above a ground plane - the SphereCollider would be very big!)
         List<Transform> objectsToCheckList = new();
+
+        //also use all collider we start within (e.g. we are above a ground plane - the SphereCollider would be very big!)
         foreach(SphereCollider sphere in tmpColliders){
             if(sphere.bounds.Contains(ray.origin))
                 objectsToCheckList.Add(sphere.transform);
         }
         
         RaycastHit[] hits;
-        int layerMaskNoUI = ~(1 << 5); //5 is UI and use the inverse
+        int layerMaskNoUI = ~(1 << 5); //5 is UI, do not use it -> use the inverse
         hits = Physics.RaycastAll(ray, 100, layerMaskNoUI);
         foreach(RaycastHit hit in hits){
             objectsToCheckList.Add(hit.transform);
@@ -60,18 +58,19 @@ public class SceneRaycastHelper{
             return false;
         }
 
-        //cast ray, check first X hits (must allow hit from within?)
-        Debug.Log("<color=green>HIT "+objectsToCheckList.Count+" OBJECTS</color>");
-    
+        Debug.Log("<color=green>DETECT "+objectsToCheckList.Count+" VALID OBJECTS WE COULD HIT</color>");
+        
+        //cast ray against SphereColliders, check first hit
         List<MeshCollider> tmpMeshColliders = new();
         foreach(Transform hitTransforms in objectsToCheckList){
             Debug.Log("<color=green>\t"+hitTransforms.gameObject.name+"</color>");
             if(!hitTransforms.GetComponent<MeshCollider>() && hitTransforms.GetComponent<MeshRenderer>()){
+                //add mesh collider to objects we could hit, that do not already have one
                 tmpMeshColliders.Add(hitTransforms.gameObject.AddComponent<MeshCollider>());
             }
         }
         
-        //remove sphere collider, add MeshCollider to these hit objects
+        //remove all tmp sphere collider
         foreach(SphereCollider c in tmpColliders)
             Component.DestroyImmediate(c);
 
@@ -80,25 +79,28 @@ public class SceneRaycastHelper{
             //Debug.DrawLine(Camera.main.ScreenPointToRay(point).origin, finalHit.point, Color.red, 4f);
             //visualize hit at object we hit and with particle that is aligned like an arrow-target
             Debug.Log("<color=green>HIT AT"+finalHit.point+" on "+finalHit.transform.gameObject.name+"</color>");
-            //remove added colliders
+            //remove added tmp MeshColliders
             foreach(MeshCollider c in tmpMeshColliders)
-                Component.Destroy(c);//Component.DestroyImmediate(c);
+                Component.Destroy(c);
             return true;
         }else{
             Debug.Log("<color=red>NO FINAL HIT</color>");
-            //remove added colliders
+            //remove added tmp MeshColliders
             foreach(MeshCollider c in tmpMeshColliders)
-                Component.Destroy(c);//Component.DestroyImmediate(c);
+                Component.Destroy(c);
             return false;
         }
     }
 
-    private static List<MeshRenderer> GatherVisibleMeshRenderer(MeshRenderer[] _mrs, out List<SphereCollider> _tmpColliders){
+    public static List<MeshRenderer> GatherVisibleMeshRenderer(MeshRenderer[] _mrs, MeshRenderer[] _ignoreTheseMrs, out List<SphereCollider> _tmpColliders){
         Vector3 boundsSize;
         List<MeshRenderer> visibleMrs = new();
         _tmpColliders = new();
+        List<MeshRenderer> mrsToIgnore = new();
+        if(_ignoreTheseMrs != null)
+            mrsToIgnore.AddRange(_ignoreTheseMrs);
         foreach(MeshRenderer mr in _mrs){
-            if(mr.isVisible){
+            if(mr.isVisible && !mrsToIgnore.Contains(mr)){
                 visibleMrs.Add(mr);
                 //add sphere collider to objects encapuslating its bounds
                 if(!mr.GetComponent<Collider>()){

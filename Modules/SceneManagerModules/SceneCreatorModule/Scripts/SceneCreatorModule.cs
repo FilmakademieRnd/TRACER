@@ -723,7 +723,9 @@ namespace tracer
                     camera.nearClipPlane = nodeCam.near;
                     camera.farClipPlane = nodeCam.far;
                     //camera.focalDistance = nodeCam.focalDist;     // not available in unity
-                    //camera.aperture = nodeCam.aperture;       // not available in unity
+                    //camera.aperture = nodeCam.aperture;           // not available in unity
+                    //disable the component, because its only used for its value and to modify them
+                    camera.enabled = false;
 
                     if (nodeCam.editable)
                     {
