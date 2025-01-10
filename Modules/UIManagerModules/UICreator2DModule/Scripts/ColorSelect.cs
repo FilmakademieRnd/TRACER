@@ -64,10 +64,12 @@ namespace tracer
         //!
         public override void Init(AbstractParameter param, UIManager m)
         {
-            abstractParam = param;
+            
+            //on ios the color field is always white, therefore this needs to be off
+            //abstractParam = param;
 
-            col = (Parameter<Color>)abstractParam;
-            col.hasChanged += updateColor;//paramFloat.hasChanged += _snapSelect.setParam; from Spinner
+            col = (Parameter<Color>)param;
+            col.hasChanged += updateColor;
 
             Color inColor = col.value;
             Debug.Log("<color=red>ColorSelect.Init inColor: "+inColor+"</color>");
