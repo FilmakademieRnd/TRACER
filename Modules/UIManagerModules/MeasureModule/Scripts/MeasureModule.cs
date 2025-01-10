@@ -94,7 +94,7 @@ namespace tracer{
         //!
         //! the standard Color of selected SceneObject we want to place (during selection it will become green!)
         //!
-        private Color objectToPlaceStandardColor;
+        private Color objectToPlaceStandardColor = Color.white;
         //!
         //! to utilite the place function from other functions and execute additional code
         //!
@@ -138,9 +138,9 @@ namespace tracer{
         protected override void Init(object _sender, EventArgs _e)
         {
             Debug.Log("<color=orange>Init MeasureModule</color>");
-            MenuButton measureUIButton = new MenuButton("", ToggleMeasureUI, new List<UIManager.Roles>() { UIManager.Roles.SET });
-            measureUIButton.setIcon("Images/button_measure_off");
-            manager.addButton(measureUIButton);
+            MenuButton measureUIMenuButton = new MenuButton("", ToggleMeasureUI, new List<UIManager.Roles>() { UIManager.Roles.SET });
+            measureUIMenuButton.setIcon("Images/button_measure_off");
+            manager.addButton(measureUIMenuButton);
         }
 
         //! 
@@ -168,7 +168,19 @@ namespace tracer{
 
             AddOrRemoveListener(isActive);
 
+            additionalPlaceEvent = new();
+
             measurementUIActiveEvent?.Invoke(this, isActive);
+
+            if(!isActive){
+                //revert color
+                if(sceneObjectToPlace)
+                    sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
+                //check if measurement object was selected and undo if so
+                if(manager.isThisOurSelectedObject(sceneObjectToPlace)){
+                    manager.clearSelectedObject();
+                }
+            }
             Debug.Log("<color=orange>ToggleMeasureUI: "+isActive+"</color>");
         }
 
@@ -193,9 +205,6 @@ namespace tracer{
             button_createAngle.onClick.AddListener(OnClick_StartCreation_Angle);
             button_createTraveller = measureCanvasHolder.transform.Find(BUTTON_NAME_CREATE_TRAVEL).GetComponent<Button>();
             button_createTraveller.onClick.AddListener(OnClick_StartCreation_Traveller);
-            
-            
-            
 
             button_addWaypoint = measureCanvasHolder.transform.Find(BUTTON_NAME_ADD_WP).GetComponent<Button>();
             button_addWaypoint.onClick.AddListener(OnClick_AddWaypoint);
@@ -226,6 +235,8 @@ namespace tracer{
                 manager.selectionChanged += OnSelectionChanged;
             }else{
                 manager.selectionChanged -= OnSelectionChanged;
+                //remove listener if we are within this mode, just to be sure
+                core.getManager<InputManager>().inputPressEnd -= OnPointerDown_Place;
             }
         }
 
@@ -239,11 +250,11 @@ namespace tracer{
         //! @param sceneObjects The list containing the selected objects. 
         //!
         private void OnSelectionChanged(object _o, List<SceneObject> _sceneObjects){
+            //Debug.Log("<color=yellow>Measurement.OnSelectionChanged: "+_sceneObjects.Count+"</color>");
             //ignore during placing or other functions
             if(inputBlockingCanvas.activeSelf)
                 return;
 
-            //Debug.Log("<color=yellow>Measurement.OnSelectionChanged: "+_sceneObjects.Count+"</color>");
             if (_sceneObjects.Count < 1){
                 DeactivateSelectionSensitiveButtons();
                 ShowCreationButtons();
@@ -266,37 +277,7 @@ namespace tracer{
 
                 HideCreationButtons();
 
-
-                switch(selectedMeasurePool.measureType){
-                    case MeasurePool.MeasureTypeEnum.line:
-                        button_addWaypoint.gameObject.SetActive(false);
-                        button_removeWaypoint.gameObject.SetActive(false);
-                        button_resetDistance.gameObject.SetActive(false);
-                        break;
-                    case MeasurePool.MeasureTypeEnum.angle:
-                        button_addWaypoint.gameObject.SetActive(false);
-                        button_removeWaypoint.gameObject.SetActive(false);
-                        button_resetDistance.gameObject.SetActive(false);
-                        break;
-                    case MeasurePool.MeasureTypeEnum.travel:
-                        button_addWaypoint.gameObject.SetActive(false);
-                        button_removeWaypoint.gameObject.SetActive(false);
-                        button_resetDistance.gameObject.SetActive(true);
-
-                        button_resetDistance.interactable = selectedMeasurePool.GetDistance() > 0;
-                        break;
-                    case MeasurePool.MeasureTypeEnum.waypoints:
-                        button_addWaypoint.gameObject.SetActive(true);
-                        button_removeWaypoint.gameObject.SetActive(true);
-                        button_resetDistance.gameObject.SetActive(true);
-
-                        button_removeWaypoint.interactable = selectedMeasurePool.GetMeasureObjectCount() > 1;
-                        button_resetDistance.interactable = true;   //always enabled, because we have no callback implemented for moving this object
-                        //enable adding/removing waypoints
-                        //- adding should wait for click to query and place it there (but how is "adding" enabled? we would need to select another waypoint...)
-                        //- removing should only be enabled if we select a waypoint 
-                        break;
-                }
+                ShowCaseSensitiveButtons(selectedMeasurePool);
             }
         }
 
@@ -308,7 +289,10 @@ namespace tracer{
         //! @param point The point in screen space the pointer down event happened.
         //!
         private void OnPointerDown_Place(object sender, Vector2 point){
-            if(SceneRaycastHelper.DidHitSpecificUI(point, button_placeSelectedObjectViaRay.gameObject)){
+            //check if any ui (despite our blocker) was hit
+            GameObject uiGo = TimelineModule.GetGameObjectAtUIRaycast(point);
+            if(uiGo != inputBlockingCanvas.gameObject){
+            //if(SceneRaycastHelper.DidHitSpecificUI(point, button_placeSelectedObjectViaRay.gameObject)){
                 //Debug.Log("Hit Button to stop placing - so dont do any raycast positioning queries!");
                 return;
             }
@@ -355,6 +339,54 @@ namespace tracer{
                 inputBlockingCanvas.SetActive(true);
 
                 additionalPlaceEvent?.Invoke();
+            }else{
+                inputBlockingCanvas.SetActive(true);
+            }
+        }
+
+        private void OnPointerDown_AlignToNormal(object sender, Vector2 point){
+            //check if any ui (despite our blocker) was hit
+            GameObject uiGo = TimelineModule.GetGameObjectAtUIRaycast(point);
+            if(uiGo != inputBlockingCanvas.gameObject){
+                return;
+            }
+
+            inputBlockingCanvas.SetActive(false);            
+
+            MeshRenderer[] ignoreTheseForRaycasting;
+            //ignore (selection) itself
+            ignoreTheseForRaycasting = sceneObjectToPlace.GetComponents<MeshRenderer>();
+
+            //TODO for performance we would not need to gather all MeshRenderer on every click (only if we modify any)
+            if (SceneRaycastHelper.RaycastIntoScene(core.getManager<SceneManager>().scnRoot, point, out RaycastHit hit, ignoreTheseForRaycasting)){
+                //if we hit another measurement-pool object, select this for placing, instead of change  the current position
+                //no need to position a measure-object onto any other measure-object
+                //TODO: if we are in placement-mode via waypoint-creation, just end placement-mode
+                SceneObject sceneObjectWeHit = hit.transform.GetComponent<SceneObject>();
+                if(!sceneObjectWeHit)
+                    sceneObjectWeHit = hit.transform.GetComponentInParent<SceneObject>();
+
+                if (sceneObjectWeHit){
+                    Debug.Log("Hit SceneObject Check if it is a Measure-Object");
+                    MeasurePool selectedMeasurePool = sceneObjectWeHit.GetComponentInParent<MeasurePool>();
+                    if (selectedMeasurePool && selectedMeasurePool.IsSceneObjectFromMeasurement(sceneObjectWeHit)){
+                        Debug.Log("\tYES!");
+                        //revert color
+                        sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
+                        //save color
+                        objectToPlaceStandardColor = sceneObjectWeHit.GetComponent<MeshRenderer>().material.color;
+                        sceneObjectWeHit.GetComponent<MeshRenderer>().material.color = Color.green;
+                        OnSelectionChanged(null, new List<SceneObject>() { sceneObjectWeHit });
+                        inputBlockingCanvas.SetActive(true);
+                        return;
+                    }
+                }
+
+                sceneObjectToPlace.GetComponentInParent<MeasurePool>().AlignToNormal(hit.normal);
+
+                //reset this before, e.g. if we have these events deactivating it
+                inputBlockingCanvas.SetActive(true);
+
             }else{
                 inputBlockingCanvas.SetActive(true);
             }
@@ -484,6 +516,39 @@ namespace tracer{
             button_createTraveller.gameObject.SetActive(false);
         }
 
+        private void ShowCaseSensitiveButtons(MeasurePool _selectedMeasurePool){
+            switch(_selectedMeasurePool.measureType){
+                    case MeasurePool.MeasureTypeEnum.line:
+                        button_addWaypoint.gameObject.SetActive(false);
+                        button_removeWaypoint.gameObject.SetActive(false);
+                        button_resetDistance.gameObject.SetActive(false);
+                        break;
+                    case MeasurePool.MeasureTypeEnum.angle:
+                        button_addWaypoint.gameObject.SetActive(false);
+                        button_removeWaypoint.gameObject.SetActive(false);
+                        button_resetDistance.gameObject.SetActive(false);
+                        break;
+                    case MeasurePool.MeasureTypeEnum.travel:
+                        button_addWaypoint.gameObject.SetActive(false);
+                        button_removeWaypoint.gameObject.SetActive(false);
+                        button_resetDistance.gameObject.SetActive(true);
+
+                        button_resetDistance.interactable = _selectedMeasurePool.GetDistance() > 0;
+                        break;
+                    case MeasurePool.MeasureTypeEnum.waypoints:
+                        button_addWaypoint.gameObject.SetActive(true);
+                        button_removeWaypoint.gameObject.SetActive(true);
+                        button_resetDistance.gameObject.SetActive(true);
+
+                        button_removeWaypoint.interactable = _selectedMeasurePool.GetMeasureObjectCount() > 1;
+                        button_resetDistance.interactable = true;   //always enabled, because we have no callback implemented for moving this object
+                        //enable adding/removing waypoints
+                        //- adding should wait for click to query and place it there (but how is "adding" enabled? we would need to select another waypoint...)
+                        //- removing should only be enabled if we select a waypoint 
+                        break;
+                }
+        }
+
         #region Button Events
         private void OnClick_StartPlaceViaRay(){
             button_placeSelectedObjectViaRay.GetComponentsInChildren<Image>()[1].color = Color.green; //0 is BG, 1 is IMAGE
@@ -506,7 +571,7 @@ namespace tracer{
             //hide gizmo and TRS ui --> we simulate this by de-selecting!
             manager.clearSelectedObject();
             //add event to input manager
-            core.getManager<InputManager>().inputPressEnd += OnPointerDown_Place; //needed UI, because of the above input blocking
+            core.getManager<InputManager>().inputPressEnd += OnPointerDown_Place; //needed UI, because of inputBlockingCanvas
             //use the below for testing ongoing alignment
                 // did not work properly
                 // core.getManager<InputManager>().inputPressStartedUI += OnPointerDown_PlaceOngoing_Start;
@@ -519,21 +584,32 @@ namespace tracer{
 
         private void OnClick_StopPlaceViaRay(){
             button_placeSelectedObjectViaRay.GetComponentsInChildren<Image>()[1].color = Color.white; //0 is BG, 1 is IMAGE
-            //enable other buttons again
-
-            inputBlockingCanvas.SetActive(false);
-
+            
             //revert color
             sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
+            
+            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_Place;
 
             //re-enable gizmos by simulate a "reselection"
             manager.clearSelectedObject();
             manager.addSelectedObject(sceneObjectToPlace);
 
-            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_Place;
+            //show correct buttons
+            HideCreationButtons();
+            ShowCaseSensitiveButtons(sceneObjectToPlace.GetComponentInParent<MeasurePool>());
 
             button_placeSelectedObjectViaRay.onClick.RemoveListener(OnClick_StopPlaceViaRay);
             button_placeSelectedObjectViaRay.onClick.AddListener(OnClick_StartPlaceViaRay);
+
+            core.StartCoroutine(DelayDisableInputBlockingCanvas());
+            //inputBlockingCanvas.SetActive(false);
+        }
+
+        private IEnumerator DelayDisableInputBlockingCanvas(){
+            //this NEEDS to be done delayed, after the clear & addSelection event. Otherwise the triggered SelectionModule.SelectFunction function
+            //will be executed via InputManager.TapFunction which runs into else (TappedUI and Tapped3DUI not correct, since the point)
+            yield return new WaitForEndOfFrame();
+            inputBlockingCanvas.SetActive(false);
         }
 
         private void OnClick_StartCreation_Line(){
@@ -562,19 +638,21 @@ namespace tracer{
             sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
             
             //place visual next to current selection (in distance relation of current cameras viewport)
-            Vector3 viewportPosition = Camera.main.WorldToViewportPoint(newWaypoint.transform.position);
-            viewportPosition.x += Mathf.Min((1f - viewportPosition.x)/2f, viewportPosition.x);
-            newWaypoint.transform.position = Camera.main.ViewportToWorldPoint(viewportPosition); //newWaypoint.transform.right;
+            // Vector3 viewportPosition = Camera.main.WorldToViewportPoint(newWaypoint.transform.position);
+            // viewportPosition.x += Mathf.Min((1f - viewportPosition.x)/2f, viewportPosition.x);
+            // newWaypoint.transform.position = Camera.main.ViewportToWorldPoint(viewportPosition); //newWaypoint.transform.right;
+            newWaypoint.transform.position = sceneObjectToPlace.transform.position - Camera.main.transform.forward/3f;
 
             //set as object we want to place
             sceneObjectToPlace = newWaypoint.GetComponent<SceneObject>();
 
-            //Trigger same Behaviour
-            OnClick_StartPlaceViaRay();
             //except that we stop it after placed once
             additionalPlaceEvent = new UnityEvent();
             additionalPlaceEvent.AddListener(OnClick_StopPlaceViaRay);
             additionalPlaceEvent.AddListener(WaypointPlaced);
+
+            //Trigger same Behaviour
+            OnClick_StartPlaceViaRay();
         }
 
         private void OnClick_RemoveWaypoint(){
@@ -626,7 +704,7 @@ namespace tracer{
             additionalPlaceEvent = new UnityEvent();
         }
 
-        private IEnumerator QuickColorHighlight(MeshRenderer _mrToHighlight, Color _colorForHighlight, float _speedMultiplier = 1f){
+        private IEnumerator QuickColorHighlight(MeshRenderer _mrToHighlight, Color _colorForHighlight, float _speedMultiplier = 2f){
             if(!_mrToHighlight)
                 yield break;
 

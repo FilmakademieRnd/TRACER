@@ -241,6 +241,41 @@ namespace tracer
             UpdateText();
         }
 
+        public void AlignToNormal(Vector3 _normal){
+            switch(measureType){
+                case MeasureTypeEnum.line:
+                    //align via center
+                    //rotate root object 
+                    //all childs will be on localZ = 0
+                    break;
+                case MeasureTypeEnum.angle:
+                    //align via center object 
+                    //(move to localPos 0,0,0)
+                    Vector3 diff = angleObjectB.localPosition;
+                    angleObjectB.localPosition = Vector3.zero;
+                    //move all other objects about the difference
+                    angleObjectA.localPosition -= diff;
+                    angleObjectC.localPosition -= diff;
+                    //all childs will be on localZ = 0
+                    Vector3 zeroPosZ = angleObjectA.localPosition;
+                    zeroPosZ.z = 0;
+                    angleObjectA.localPosition = zeroPosZ;
+                    zeroPosZ = angleObjectC.localPosition;
+                    zeroPosZ.z = 0;
+                    angleObjectC.localPosition = zeroPosZ;
+
+                    //rotate root object to match the normal
+                    transform.rotation = Quaternion.LookRotation(angleObjectB.up, _normal);
+                    break;
+                case MeasureTypeEnum.travel:
+                    //nothing to do here
+                    break;
+                case MeasureTypeEnum.waypoints:
+                    //align via center
+                    break;
+            }
+        }
+
         public int GetMeasureObjectCount(){ return measurementObjects.Count; }
 
         #region EVENT CALLBACKS
@@ -251,6 +286,11 @@ namespace tracer
         private void OnMeasureUIChanged(object sender, bool _isActive){
             line.gameObject.SetActive(_isActive);
             textObj.gameObject.SetActive(_isActive);
+            //also de/activate all of our measureobjects, because they dont need to be visible in the scene otherwise
+            if(measurementObjects != null){
+                foreach(Transform measureObject in measurementObjects)
+                    measureObject.gameObject.SetActive(_isActive);
+            }
 
             switch(measureType){
                 case MeasureTypeEnum.line:

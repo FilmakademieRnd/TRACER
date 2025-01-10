@@ -1284,7 +1284,7 @@ namespace tracer
         //!
         private void OnPointerDown(object sender, Vector2 point)
         {
-            if (Raycast(point) != m_timeLine)
+            if (GetGameObjectAtUIRaycast(point) != m_timeLine)
                 return;
 
             m_isSelected = true;
@@ -1383,7 +1383,7 @@ namespace tracer
         //!
         private void OnMiddleClickPress(object sender, Vector2 point){
             if (!m_isSelected){
-                if(!m_isMiddleClickDrag && Raycast(point) == m_timeLine){
+                if(!m_isMiddleClickDrag && GetGameObjectAtUIRaycast(point) == m_timeLine){
                     m_posDragBuffer = point;
                     m_isMiddleClickDrag = true;
                     m_isSelected = true;
@@ -1437,7 +1437,7 @@ namespace tracer
             bool simulateRelease = false;
             if (!m_isSelected){
                 //if we are not on touch (e.g. scroll wheel) select this if point is here
-                if(!m_inputManager.IsInputTouch() && Raycast(detailedArgs.point) == m_timeLine){
+                if(!m_inputManager.IsInputTouch() && GetGameObjectAtUIRaycast(detailedArgs.point) == m_timeLine){
                     //act like its selected
                     //if we zoom via scroll wheel, we do not have an "end" event and need a dummy click to reset the 'special action'
                     //therefore we'll fake an end after every call right now and right here!
@@ -1577,7 +1577,7 @@ namespace tracer
         //////////////////////
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private GameObject Raycast(Vector2 point)
+        public static GameObject GetGameObjectAtUIRaycast(Vector2 point) //TODO: exclude into specific static holder for these kind of functions
         {
             //Set up the new Pointer Event
             PointerEventData pointerEventData = new PointerEventData(EventSystem.current);
