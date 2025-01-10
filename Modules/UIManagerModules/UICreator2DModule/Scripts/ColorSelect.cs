@@ -32,6 +32,8 @@ using UnityEngine.EventSystems;
 using UnityEngine;
 using UnityEngine.UI;
 
+//TODO: Implement that we cannot move from color-square to color-line
+
 namespace tracer
 {
     public class ColorSelect : Manipulator, IBeginDragHandler, IEndDragHandler, IDragHandler, IPointerClickHandler
@@ -65,8 +67,15 @@ namespace tracer
         public override void Init(AbstractParameter param, UIManager m)
         {
             
-            //on ios the color field is always white, therefore this needs to be off
-            //abstractParam = param;
+            abstractParam = param;
+            
+            _canvas = GetComponentInParent<Canvas>();
+            // Grab picker dimensions
+            RectTransform rect = GetComponent<RectTransform>();
+            pickerSize = rect.rect.size * _canvas.scaleFactor;
+
+            // Grab material
+            mat = GetComponent<Image>().material;
 
             col = (Parameter<Color>)param;
             col.hasChanged += updateColor;
@@ -76,9 +85,10 @@ namespace tracer
 
             // Decompose into HSV components
             Color.RGBToHSV(inColor, out hue, out sat, out val);
-
+            
             // Use pure hue for the material input
             Color shaderColor = Color.HSVToRGB(hue, 1f, 1f);
+
             mat.SetColor("_InputColor", shaderColor);
 
             // Set indicator coordinates
@@ -86,6 +96,7 @@ namespace tracer
 
             // Output starts as the input
             outputColor = inColor;
+
         }
 
         public void updateColor(object sender, Color c)
@@ -101,20 +112,6 @@ namespace tracer
             mat.SetVector("_InputPos", new(sat * .8f, val, .9f, hue));
 
             outputColor = c;
-        }
-
-        //!
-        //! Unity function called when the object becomes enabled and active.
-        //!
-       public void OnEnable()
-        {
-            _canvas = GetComponentInParent<Canvas>();
-            // Grab picker dimensions
-            RectTransform rect = GetComponent<RectTransform>();
-            pickerSize = rect.rect.size * _canvas.scaleFactor;
-
-            // Grab material
-            mat = GetComponent<Image>().material;
         }
 
         //!

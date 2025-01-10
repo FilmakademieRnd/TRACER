@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: ChromaKey
-  m_Shader: {fileID: 4800000, guid: 71fc13c6ec02db841a18f8ba48b669f8, type: 3}
+  m_Name: ColorPickerMaterial
+  m_Shader: {fileID: 4800000, guid: bfb0ee93a3162bc4f9579ae7e259bc96, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -59,19 +59,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _textureCbCr:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _textureY:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _BumpScale: 1
     - _Cutoff: 0.5
-    - _Depth: 10
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _GlossMapScale: 1
@@ -81,18 +72,14 @@ Material:
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.02
-    - _Radius: 0.021035537
     - _SmoothnessTextureChannel: 0
-    - _Softrange: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _Threshold: 0
     - _UVSec: 0
     - _ZWrite: 1
-    - _cropScaleX: 0.25
-    - _cropScaleY: 1
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _KeyColor: {r: 0.3698131, g: 0.36712185, b: 0.55902874, a: 1}
+    - _InputColor: {r: 0.014023781, g: 0, b: 1, a: 1}
+    - _InputPos: {r: 0.27462903, g: 0.55902874, b: 0.9, a: 0.66900396}
   m_BuildTextureStacks: []
