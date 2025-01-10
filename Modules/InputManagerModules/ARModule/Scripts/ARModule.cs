@@ -113,7 +113,7 @@ namespace tracer
         private Parameter<bool> enableMarkerTracking;
 
         private Parameter<bool> enableMatte;
-        private GameObject mattGameObjectPrefab;
+        //private GameObject mattGameObjectPrefab;
         private GameObject mattGameObject;
 
         //!
@@ -224,7 +224,7 @@ namespace tracer
             m_arOrigin = SceneObject.Instantiate(arSessionOriginPrefab, Vector3.zero, Quaternion.identity)
                 .GetComponent<XROrigin>();
             
-            mattGameObjectPrefab = Resources.Load<GameObject>("Prefabs/ARMattGameObject");
+            //mattGameObjectPrefab = Resources.Load<GameObject>("Prefabs/ARMattGameObject");
 
             //m_arOrigin.GetComponent<PlaceScene>().scene = core.getManager<SceneManager>().scnRoot;
 
@@ -418,6 +418,8 @@ namespace tracer
 
             if (mattGameObject != null)
                 mattGameObject.SetActive(true);
+            else
+                return;
 
             Material matteMaterial = mattGameObject.GetComponent<Renderer>().material;
             

@@ -327,6 +327,7 @@ namespace tracer
                 return;
 
             RotateText();
+            ScaleText();
             //its faster and more easy to just align the text view here
             //instead of creating an event in CameraNavigationModule like CameraViewChangedEvent
             //subscribe to this event here, throw it on every CameraDolly,CameraOrbit and CameraPedestalTruck
@@ -385,6 +386,8 @@ namespace tracer
             if(!textObj)
                 return;
 
+            float yDistanceDivisor = 0.9f;
+
             //place text as set in the settings
             switch(textPositioning){
                 case TextPositioningEnum.fixedPos:
@@ -403,33 +406,33 @@ namespace tracer
                 case TextPositioningEnum.atLastElement:
                     switch(measureType){
                         case MeasureTypeEnum.line:
-                            textObj.transform.position = endObject.position + Vector3.up * endObject.localScale.y*2f;
+                            textObj.transform.position = endObject.position + Vector3.up * endObject.localScale.y/yDistanceDivisor;
                             break;
                         case MeasureTypeEnum.angle:
-                            textObj.transform.position = angleObjectB.position + Vector3.up * angleObjectB.localScale.y*2f;
+                            textObj.transform.position = angleObjectB.position + Vector3.up * angleObjectB.localScale.y/yDistanceDivisor;
                             break;
                         case MeasureTypeEnum.travel:
-                            textObj.transform.position = travelObject.position + Vector3.up * travelObject.localScale.y*2f;
+                            textObj.transform.position = travelObject.position + Vector3.up * travelObject.localScale.y/yDistanceDivisor;
                             break;
                         case MeasureTypeEnum.waypoints:
-                            textObj.transform.position = measurementObjects[^1].position + Vector3.up * measurementObjects[^1].localScale.y*2f;
+                            textObj.transform.position = measurementObjects[^1].position + Vector3.up * measurementObjects[^1].localScale.y/yDistanceDivisor;
                             break;
                     }
                     break;
                 case TextPositioningEnum.atCenter:
                     switch(measureType){
                         case MeasureTypeEnum.line:
-                            textObj.transform.position = (startObject.position + endObject.position)/2f + Vector3.up * endObject.localScale.y*2f;
+                            textObj.transform.position = (startObject.position + endObject.position)/2f + Vector3.up * endObject.localScale.y/yDistanceDivisor;
                             break;
                         case MeasureTypeEnum.angle:
                             textObj.transform.position = (angleObjectA.position + angleObjectB.position + angleObjectC.position)/3f;
                             break;
                         case MeasureTypeEnum.travel:
-                            textObj.transform.position = (line.GetPosition(0)+travelObject.position)/2f + Vector3.up * travelObject.localScale.y*2f;
+                            textObj.transform.position = (line.GetPosition(0)+travelObject.position)/2f + Vector3.up * travelObject.localScale.y/yDistanceDivisor;
                             break;
                         case MeasureTypeEnum.waypoints:
                             //TODO calc center of all points...
-                            textObj.transform.position = (measurementObjects[0].position+measurementObjects[^1].position)/2f + Vector3.up * measurementObjects[0].localScale.y*2f;
+                            textObj.transform.position = (measurementObjects[0].position+measurementObjects[^1].position)/2f + Vector3.up * measurementObjects[0].localScale.y/yDistanceDivisor;
                             break;
                     }
                     break;
@@ -457,6 +460,19 @@ namespace tracer
         private void RotateText(){
             textObj.transform.LookAt(Camera.main.transform);
             textObj.transform.Rotate(0, 180, 0);    //we need to rotate it, otherwise its oriented wrongly
+        }
+        private void ScaleText(){
+            //scale text semi-dynamically. e.g. it should not be bigger than a certain portion of the screen
+            float dist = Vector3.Distance(textObj.transform.position, Camera.main.transform.position);
+            dist /= 3f;
+            textObj.transform.localScale = 
+                Vector3.one * 
+                    Mathf.Min(
+                        1f,                 //standard (and max) scale
+                        Mathf.Clamp(
+                            dist, 0.1f, 100 //0.01f/10 = min scale
+                        )
+                    )/10f;
         }
         #endregion
     }
