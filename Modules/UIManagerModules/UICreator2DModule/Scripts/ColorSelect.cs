@@ -70,6 +70,7 @@ namespace tracer
             col.hasChanged += updateColor;//paramFloat.hasChanged += _snapSelect.setParam; from Spinner
 
             Color inColor = col.value;
+            Debug.Log("<color=red>ColorSelect.Init inColor: "+inColor+"</color>");
 
             // Decompose into HSV components
             Color.RGBToHSV(inColor, out hue, out sat, out val);

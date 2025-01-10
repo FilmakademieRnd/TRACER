@@ -162,6 +162,14 @@ namespace tracer
             _materialColor.hasChanged += UpdateColor;
         }
 
+        #if UNITY_EDITOR
+        //ability to test this function in the editor
+        protected override void Init(object _sender, EventArgs _e){
+           Start(_sender, _e);
+           ChromaKeyStart();
+        }
+        #endif
+
         //!
         //! Load necessary resources for the UI
         //!
@@ -236,6 +244,11 @@ namespace tracer
 
                 // Configure ARCameraBackground and Chroma Key materials
                 if (Camera.main != null) _mCameraBg = Camera.main.gameObject.GetComponent<ARCameraBackground>();
+                #if UNITY_EDITOR
+                if(!_mCameraBg){
+                    return;
+                }
+                #endif
                 _mCameraBg.customMaterial = Resources.Load<Material>("Materials/ChromaKey");
                 _camMaterial = _mCameraBg.material;
                 _mCameraBg.useCustomMaterial = true;
@@ -260,7 +273,7 @@ namespace tracer
                 // Remove event listeners and UI elements
                 _radiusSlider.onValueChanged.RemoveListener(RadiusSliderValueChangeCheck);
                 _thresholdSlider.onValueChanged.RemoveListener(ThresholdSliderValueChangeCheck);
-                Object.DestroyImmediate(_currentManipulator, true);
+                GameObject.DestroyImmediate(_currentManipulator, true);
                 _chromaKeyCanvasSliders.SetActive(false);
                 _manipulatorPanel.SetActive(false);
                 _radiusSlider = null;
@@ -272,7 +285,7 @@ namespace tracer
                 _chromaSettingsButtonIsOn = true;
                 _manipulatorPanel.SetActive(true);
                 _chromaKeyCanvasSliders.SetActive(true);
-                _currentManipulator = Object.Instantiate(_uiColorPicker, _manipulatorPanel.transform);
+                _currentManipulator = SceneObject.Instantiate(_uiColorPicker, _manipulatorPanel.transform);
                 _currentManipulator.GetComponent<ColorSelect>().Init(_materialColor, manager);
                 _radiusSlider = _chromaKeyCanvas.transform.GetChild(2).GetChild(1).GetComponent<Slider>();
                 _thresholdSlider = _chromaKeyCanvas.transform.GetChild(2).GetChild(3).GetComponent<Slider>();
@@ -310,8 +323,12 @@ namespace tracer
         //!
         private void UpdateChromaKeyButton(object sender, InputManager.CameraControl c)
         {
-            if (c == InputManager.CameraControl.AR)
-            {
+            //test it in the editor
+            #if UNITY_EDITOR
+            if(true){
+            #else
+            if (c == InputManager.CameraControl.AR){
+            #endif
                 // Show Chroma Key button
                 if (!core.getManager<UIManager>().getButtons().Contains(_chromaButton))
                     core.getManager<UIManager>().addButton(_chromaButton);
