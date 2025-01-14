@@ -237,7 +237,7 @@ namespace tracer
         //! 
         public void receiveScene(string ip, string port)
         {
-            m_requests = new List<string>() { "header", "nodes", "parameterobjects", "objects", "characters", "textures", "materials",  };
+            m_requests = new List<string>() { "header", "nodes", "parameterobjects", "objects", "characters", "textures", "materials"  };
             start(ip, port);
         }
 

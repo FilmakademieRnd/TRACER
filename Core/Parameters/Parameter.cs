@@ -513,6 +513,10 @@ namespace tracer
             T returnvalue;
             switch (_type)
             {
+                // case action: to avoid overwriting the action by a received value
+                case ParameterType.ACTION:  
+                    returnvalue = _value;
+                    break;
                 case ParameterType.BOOL:
                     returnvalue = ToBool(sourceSpan);
                     break;
