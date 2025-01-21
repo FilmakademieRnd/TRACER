@@ -174,6 +174,8 @@ namespace tracer
 
         public abstract int dataSize();
         public abstract int defaultDataSize();
+
+        public abstract void FireAndForget(short objectId);
     }
 
     [Serializable]
@@ -220,9 +222,14 @@ namespace tracer
                     return _dataSize;
             }
         }
+        public override void FireAndForget(short objectId)
+        {
+            _id = objectId;
+        }
         //!
         //! Event emitted when parameter changed.
         //!
+
         public event EventHandler<T> hasChanged;
 
         //!

@@ -142,5 +142,11 @@ namespace tracer
             _core.addParameterObject(this);
         }
 
+        // public short FireAndForget(short objectId){
+        //     short idWas = _id;
+        //     _id = objectId;
+        //     return idWas;
+        // }
+
     }
 }

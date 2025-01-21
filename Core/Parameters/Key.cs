@@ -44,6 +44,8 @@ namespace tracer
         //! The key's type.
         //!
         public InterplolationTypes interpolation;
+
+        public abstract string getValueString();
     }
     //!
     //! Parameter base class.
@@ -75,6 +77,11 @@ namespace tracer
             tangentTime2 = 0;
             tangentValue1 = default(T);
             tangentValue2 = default(T);
+        }
+
+        public override string getValueString()
+        {
+            return value.ToString();
         }
 
         //!

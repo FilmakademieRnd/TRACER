@@ -232,6 +232,9 @@ namespace tracer
                     case "sensorSize":
                         snapSelect.addElement(Resources.Load<Sprite>("Images/button_sensorSize_text"));
                         break;
+                    case "createPath":
+                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_createPath"));
+                        break;
                     default:                        
                         snapSelect.addElement(mainSelection.parameterList[i].name);
                         break;
@@ -322,8 +325,18 @@ namespace tracer
                     }
                     manager.ColorGameObjectActive(currentManipulator);
                     break;
-                case AbstractParameter.ParameterType.ACTION:
                 case AbstractParameter.ParameterType.BOOL:
+                    //TODO: implement and add button (right now used for path creation)
+                    GameObject buttonManipulatorPrefab = Resources.Load<GameObject>("Prefabs/PRE_UI_ButtonManipulator");
+                    currentManipulator = SceneObject.Instantiate(buttonManipulatorPrefab, manipulatorPanel);
+                    ButtonManipulator manipButton = currentManipulator.GetComponent<ButtonManipulator>();
+                    if (manipButton){
+                        manipButton.Init(abstractParam, manager);
+                        //manipButton.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
+                        //manipButton.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
+                    }
+                    break;
+                case AbstractParameter.ParameterType.ACTION:
                 case AbstractParameter.ParameterType.INT:
                 case AbstractParameter.ParameterType.STRING:
                 case AbstractParameter.ParameterType.VECTOR4:

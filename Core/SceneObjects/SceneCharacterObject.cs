@@ -50,6 +50,7 @@ namespace tracer
         private Transform[] bones;
         public List<string> boneNamesOrder;
 
+
         //!
         //! Factory to create a new SceneObject and do it's initialisation.
         //! Use this function instead GameObject.AddComponen<>!
@@ -78,8 +79,7 @@ namespace tracer
             if (_core.isServer)
             {
                 setBones();
-            }
-            
+            }        
         }
         
         //!
@@ -132,6 +132,10 @@ namespace tracer
                     //Debug.Log(_id+"-"+boneTransform.name);
                 }
             }
+            
+            Parameter<int> pathSceneObjectRef = new Parameter<int>(0, "pathSceneObjectRef", this);
+            pathSceneObjectRef.hasChanged += updateSceneObjectRef;
+            pathSceneObjectRef.value = 1;   //hardcoded like ButtonManipulator.174    
         }
        
        //!
@@ -203,9 +207,13 @@ namespace tracer
                         parameter.setValue(boneAtPos.Value.localPosition);
                     }
                 }
-
-               
             }
+        }
+
+        private void updateSceneObjectRef(object sender, int a)
+        {
+            //pathSceneObjectRef.value = a;
+            emitHasChanged((AbstractParameter)sender);
         }
     }
 }

@@ -742,6 +742,7 @@ namespace tracer
                         SceneObject sdo = SceneCharacterObject.Attach(objMain, m_senderID);
                     }
                 }
+                //ADD SCENE OBJECT PATH
                 else
                 {
                     if (node.editable)

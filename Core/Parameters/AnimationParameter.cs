@@ -87,6 +87,9 @@ namespace tracer
         //!
         public event EventHandler keyHasChanged;
         public void InvokeKeyHasChanged();
+
+        public void createKeyList(AbstractKey[] _keys);
+        public void createKey(AbstractKey _key);
     }
 
     //!
@@ -333,6 +336,30 @@ namespace tracer
         public void InvokeKeyHasChanged()
         {
             keyHasChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void createKeyList(AbstractKey[] _keys){
+            if(_keyList == null)
+                _keyList = new();
+            if (!_isAnimated)
+                InitAnimation();
+
+            foreach(AbstractKey k in _keys){
+                _keyList.Add(k);
+                Debug.Log(k.time + ", "+k.getValueString());
+            }
+                
+            InvokeHasChanged();
+        }
+
+        public void createKey(AbstractKey _key){
+            if(_keyList == null)
+                _keyList = new();
+            if (!_isAnimated)
+                InitAnimation();
+
+            _keyList.Add(_key);    
+            InvokeHasChanged();
         }
 
         //!

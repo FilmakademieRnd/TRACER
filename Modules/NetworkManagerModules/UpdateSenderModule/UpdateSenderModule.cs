@@ -316,7 +316,7 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // Parameter: SceneID, ParameterObjectID, ParameterID, ParameterType, ParameterData
 
-            byte[] message = new byte[3 + parameter.dataSize() + 7];
+            byte[] message = new byte[3 + parameter.dataSize() + 10];
             Span<byte> msgSpan = message;
 
             // header
@@ -324,15 +324,16 @@ namespace tracer
             msgSpan[1] = core.time; // Time
             msgSpan[2] = (byte)MessageType.RPC; // MessageType
 
-            int length = 7 + parameter.dataSize();
+            int length = 10 + parameter.dataSize();
             Span<byte> newSpan = msgSpan.Slice(3, length);
 
             newSpan[0] = parameter._parent._sceneID;  // SceneID
             BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id);  // SceneObjectID
             BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);  // ParameterID
             newSpan[5] = (byte)parameter.tracerType;  // ParameterType
-            newSpan[6] = (byte)newSpan.Length;  // Parameter message length
-            parameter.Serialize(newSpan.Slice(7)); // Parameter data
+            //newSpan[6] = (byte)newSpan.Length;  // Parameter message length
+            BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);  // Parameter message length
+            parameter.Serialize(newSpan.Slice(10)); // Parameter data
 
             m_controlMessages.Append(message);
             //m_mre.Set();
@@ -440,12 +441,14 @@ namespace tracer
                     // send controm messages
                     if (!m_controlMessages.IsEmpty)
                     {
+                        Debug.Log("<color=blue>HALLO</color>");
                         try { sender.SendMultipartMessage(m_controlMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:controlMsg:SendFrame</color> " + e.ToString()); } // true not wait 
                         m_controlMessages.Clear();
                     }
                     // add parameter message to message buffer
                     if (m_modifiedParameters.Count > 0)
                     {
+                        Debug.Log("<color=red>HALLO</color>");
                         m_parameterMessages.Append(createParameterMessage());
                         m_modifiedParameters.Clear();
                         m_modifiedParametersDataSize = 0;
@@ -454,6 +457,7 @@ namespace tracer
                     int frameCount = m_parameterMessages.FrameCount;
                     if (frameCount > packageSize || (i++ > packageSize && frameCount > 0))
                     {
+                        Debug.Log("<color=yellow>HALLO</color>");
                         try { sender.SendMultipartMessage(m_parameterMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:modifiedParameter:SendFrame</color> " + e.ToString()); } // true not wait
                         m_parameterMessages.Clear();
                         i = 0;

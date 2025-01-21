@@ -431,7 +431,7 @@ namespace tracer
         {
             //setup overall layout
             _elementSize = this.GetComponent<RectTransform>().sizeDelta;
-            if (_selectableItems < 0)
+            if (_selectableItems < 0 || this.GetComponent<ButtonManipulator>())
             {
                 _menuElementCount = _elementCount;
                 _dragable = false;

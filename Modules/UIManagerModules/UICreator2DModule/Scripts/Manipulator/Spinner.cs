@@ -78,6 +78,19 @@ namespace tracer
 
             switch (type)
             {
+                case AbstractParameter.ParameterType.BOOL:
+                    //add bool for path that can be deleted, also store the path in an additional list (pos-v3, rot-q)
+                    Parameter<bool> paramBool = (Parameter<bool>)abstractParam;
+                    // paramBool.hasChanged += _snapSelect.setParam;
+                    // _snapSelect.setSensitivity(100f);
+                    // _snapSelect._loop = false;
+                    switch (paramBool.name) {
+                        case "createPath":
+                            //show button as element to delete the path, recreate path, add path (and maybe distribute?)
+                            //do we have the possibility to have buttons there?
+                        break;
+                    }   
+                    break;
                 case AbstractParameter.ParameterType.FLOAT:
                     Parameter<float> paramFloat = (Parameter<float>)abstractParam;
                     paramFloat.hasChanged += _snapSelect.setParam;
