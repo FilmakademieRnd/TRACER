@@ -391,28 +391,50 @@ namespace tracer
             byte[] message = new byte[3 + m_modifiedParametersDataSize + 10 * m_modifiedParameters.Count];
             Span<byte> msgSpan = new Span<byte>(message);
 
-            // header
-            msgSpan[0] = manager.cID; // ClientID
-            msgSpan[1] = core.time; // Time
+            Debug.Log("<color=blue>_____ createParameterMessage ____</color>");
+            Debug.Log("\tparameterCount: "+m_modifiedParameters.Count);
+            
+
+            //************************************************ header
+            msgSpan[0] = manager.cID;                       // ClientID
+            msgSpan[1] = core.time;                         // Time
             msgSpan[2] = (byte)MessageType.PARAMETERUPDATE; // MessageType
 
-            // list of parameters
+            //************************************************************************** list of parameters
             int start = 3;
             for (int i = 0; i < m_modifiedParameters.Count; i++)
             {
+                Debug.Log("\t<color=red>index: "+i+"</color>");
                 AbstractParameter parameter = m_modifiedParameters[i];
                 int length = 10 + parameter.dataSize();
+                Debug.Log("\tparaLength: "+length);
                 Span<byte> newSpan = msgSpan.Slice(start, length);
 
-                newSpan[0] = parameter._parent._sceneID;  // SceneID
-                BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id);  // SceneObjectID
-                BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);  // ParameterID
-                newSpan[5] = (byte)parameter.tracerType;  // ParameterType
-                BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);  // Parameter message length
-                parameter.Serialize(newSpan.Slice(10)); // Parameter data
+
+                newSpan[0] = parameter._parent._sceneID;                                // SceneID
+                BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id); // SceneObjectID
+                BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);         // ParameterID
+                newSpan[5] = (byte)parameter.tracerType;                                // ParameterType
+                Debug.Log("\ttype: "+newSpan[5]);
+                BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);        // Parameter message length
+                Debug.Log("\tmsg length: "+newSpan[6]);
+                Debug.Log("\tnewSpan.Length: "+newSpan.Length);
+                parameter.Serialize(newSpan.Slice(10));                                 // Parameter data
+
+                // string spanString = "";
+                // foreach(byte b in newSpan)
+                //     spanString += b;
+                // Debug.Log("SPAN-STRING: "+spanString);
 
                 start += length;
             }
+
+            //Debug.Log("<color=blue>_______________________</color>");
+            string msg = "";
+            foreach(byte b in message)
+                msg += b + "\n";
+            Debug.Log("<color=blue MSG DATA\n"+msg+"</color>");
+
             return message;
         }
 
