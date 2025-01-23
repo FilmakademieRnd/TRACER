@@ -210,6 +210,8 @@ namespace tracer{
 
         private LineRenderer pathLine;
         private void ShowAvailablePath(bool show, Parameter<Vector3> paraPathPos){
+            return;
+            
             if(!show){
                 if(pathLine){
                     Destroy(pathLine.gameObject);
@@ -342,6 +344,8 @@ namespace tracer{
             start.z = 0f;
             
             end.y = start.y;
+
+            end = Quaternion.Inverse(abstractParam._parent.gameObject.transform.rotation) * end;
 
             float tangentTime = endTime / 2f;   //mitte
 
