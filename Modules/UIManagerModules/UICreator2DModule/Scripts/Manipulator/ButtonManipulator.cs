@@ -40,7 +40,8 @@ using UnityEngine;
 namespace tracer{
     public class ButtonManipulator : Manipulator{
 
-        public const string     LOCATION_INPUT_BLOCKING_CANVAS_PREFAB      = "Prefabs/INputBlocking_Canvas";
+        public const string     LOCATION_INPUT_BLOCKING_CANVAS_PREFAB       = "Prefabs/InputBlocking_Canvas";
+        public const string     LOCATION_PATH_LINERENDERER_PREFAB           = "Prefabs/PathLineRenderer";
 
         //!
         //! current mode: delete path, create new path, add path
@@ -61,7 +62,7 @@ namespace tracer{
         //! object that should prevent selecting new objects during other phases (see MeasureModule)
         //!
 
-        private GameObject inputBlockingCanvas;
+        private GameObject inputBlockerInCanvas;
 
 
         ~ButtonManipulator()
@@ -95,8 +96,8 @@ namespace tracer{
                     // _snapSelect._loop = false;
                     switch (paramBool.name) {
                         case "createPath":
-                            inputBlockingCanvas = GameObject.Instantiate(Resources.Load(LOCATION_INPUT_BLOCKING_CANVAS_PREFAB) as GameObject);
-                            inputBlockingCanvas.SetActive(false);
+                            inputBlockerInCanvas = GameObject.Instantiate(Resources.Load(LOCATION_INPUT_BLOCKING_CANVAS_PREFAB) as GameObject).transform.GetChild(0).gameObject;
+                            inputBlockerInCanvas.SetActive(false);
                             //show button as element to delete the path, recreate path, add path (and maybe distribute?)
                             //do we have the possibility to have buttons there?
                             _snapSelect.addElement(Resources.Load<Sprite>("Images/button_generatePath"), 0);
@@ -175,41 +176,125 @@ namespace tracer{
                 case 0: 
                     byte dontChangeID = sco._sceneID;
                     sco.OverrideTracerValues(dontChangeID, 1, 0);
-                    SetPathTarget();
-                    inputBlockingCanvas.SetActive(true);
+                    SetListenerForPathTarget();
+                    inputBlockerInCanvas.SetActive(true);
+                    ShowAvailablePath(true, sco.pathPos);
                     break;
                 case 1:
+                    sco.pathPos.clearKeys();   //ignore TRS (0) -> use 3
+                    sco.pathRot.clearKeys();   //ignore TRS (1) -> use 4
+                    m_activeParameter.clearKeys();
+                    ShowAvailablePath(false, null);
+                    break;
                 case 2:
-                    //set
-                    sco.OverrideTracerValues(255, 1, 0);
-                    //trigger send
-                    sco.TriggerAnimHost();
+                    //save
+                    sco.SafeParametersBeforeOverwrite();
+
+                    sco.SendOutAnimHostTrigger();
+                    // //set
+                    // sco.OverrideTracerValues(255, 1, 0);
+                    // //trigger send
+                    // sco.TriggerAnimHost();
+                    
                     //reset values
                     //(too early?)
                     sco.ResetOverwrittenTracerValues();
+
+                    //DESELECT, SO WE ARE NOT LOCKED
+                    //_manager.clearSelectedObject();
+
                     break;
             }
             
         }
 
+        private LineRenderer pathLine;
+        private void ShowAvailablePath(bool show, Parameter<Vector3> paraPathPos){
+            if(!show){
+                if(pathLine){
+                    Destroy(pathLine.gameObject);
+                    pathLine = null;
+                }
+                return;
+            }else{
+                Vector3 upwardsVizOffset = Vector3.up * 0.2f;
+                Vector3 startPos = abstractParam._parent.gameObject.GetComponent<SceneCharacterObject>().transform.position;
+                List<Vector3> pathList = new();
+                if(paraPathPos.getKeys() != null && paraPathPos.getKeys().Count > 0){
+                    foreach(var ak in paraPathPos.getKeys()){
+                        pathList.Add(
+                            //only local pos right now
+                            startPos + 
+                            ((Key<Vector3>)ak).value + upwardsVizOffset
+                        );
+                    }
+                }
+                
+                if(!pathLine){
+                    pathLine = GameObject.Instantiate(Resources.Load(LOCATION_PATH_LINERENDERER_PREFAB) as GameObject).GetComponentInChildren<LineRenderer>();
+                    //new GameObject("PathLineRendererObject").AddComponent<LineRenderer>();
+                    //pathLine.widthMultiplier = 0.1f;
+                    //Material defaultParticleMaterial = Resources.Load(LOCATION_INPUT_BLOCKING_CANVAS_PREFAB) as Material;
+                    //pathLine.SetPositions(new Vector3[]{Vector3.zero, Vector3.zero});
+                }
+                pathLine.positionCount = pathList.Count;
+                pathLine.SetPositions(pathList.ToArray());
+                if(pathList.Count > 1)
+                    StartCoroutine(VisualizePath());
+            }
+        }
+
+        private IEnumerator VisualizePath(){
+            float t = 0f;
+            Gradient lineGradient = pathLine.colorGradient;
+            GradientAlphaKey[] alphaKeys = lineGradient.alphaKeys;
+            //IN
+            while(pathLine && t<1f){
+                t += Time.deltaTime*2f;
+                for(int x = 0; x<alphaKeys.Length; x++){
+                    alphaKeys[x].alpha = t;
+                }
+                lineGradient.alphaKeys = alphaKeys;
+                pathLine.colorGradient = lineGradient;
+                yield return null;
+            }
+            //OUT
+            while(pathLine && t>0f){
+                t -= Time.deltaTime/4f;
+                for(int x = 0; x<alphaKeys.Length; x++){
+                    alphaKeys[x].alpha = t;
+                }
+                lineGradient.alphaKeys = alphaKeys;
+                pathLine.colorGradient = lineGradient;
+                yield return null;
+            }
+        }
+
+
         #region QUICK&DIRTY: CREATE PATH
-        private void SetPathTarget(){
+        private void SetListenerForPathTarget(){
             _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
             _manager.core.getManager<InputManager>().inputPressEnd += OnPointerEnd;
         }
         void OnDestroy(){
             _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
+            if(pathLine){
+                Destroy(pathLine.gameObject);
+                pathLine = null;
+            }
         }
         private void OnPointerEnd(object sender, Vector2 point){
             GameObject uiGo = TimelineModule.GetGameObjectAtUIRaycast(point);
-            if(uiGo != inputBlockingCanvas.gameObject){
+            if(uiGo != inputBlockerInCanvas.gameObject){
+                Debug.Log("OnPointerEnd hit something else than our input blocker");
                 //hit something else then our input blocking canvas - so ignore and reset
                 _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
-                inputBlockingCanvas.SetActive(false);
+                inputBlockerInCanvas.SetActive(false);
                 return;
             }
 
-            inputBlockingCanvas.SetActive(false);
+            inputBlockerInCanvas.SetActive(false);
+            Debug.Log("OnPointerEnd");
 
             MeshRenderer[] ignoreTheseForRaycasting = null;
             //ignore (selection) itself
@@ -222,12 +307,19 @@ namespace tracer{
                 Debug.Log("<color=green>Path End: "+hit.point+"</color>");
                 //align to hit normal with upwards vector
                 //abstractParam._parent.gameObject.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+
+                ShowAvailablePath(true, _manager.SelectedObjects[0].GetComponent<SceneCharacterObject>().pathPos);
             }
 
             _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
-            //_manager.clearSelectedObject();
-            //_manager.addSelectedObject(abstractParam._parent.gameObject.GetComponent<SceneObject>());
-            inputBlockingCanvas.SetActive(false);
+            inputBlockerInCanvas.SetActive(true);
+            StartCoroutine(DisableInputBlockerAfter(1));
+        }
+
+        private IEnumerator DisableInputBlockerAfter(int yieldFrames){
+            for(int x = 0; x<yieldFrames; x++)
+                yield return new WaitForEndOfFrame();
+            inputBlockerInCanvas.SetActive(false);
         }
 
         private IAnimationParameter m_activeParameter = null;
@@ -237,21 +329,39 @@ namespace tracer{
             end.y = start.y;
             //create animated parameter list
             
+            //ALWAYS NEWS
+            float endTime = 300;
+            Vector3 centerPosForTangent = (start+end)/2f;
+
+            //offset from local start
+            end = (end-start);
+
+            //local position, not world!
+            start.x = 0f;
+            start.y = 0f;
+            start.z = 0f;
+            
+            end.y = start.y;
+
+            float tangentTime = endTime / 2f;   //mitte
+
             //-- v3 position
             m_activeParameter =  _manager.SelectedObjects[0].parameterList[3] as IAnimationParameter;   //ignore TRS (0) -> use 3
+            m_activeParameter.clearKeys();
             AbstractKey[] keyList = new AbstractKey[]{
-                new Key<Vector3>(0f, start),            //start position
-                new Key<Vector3>(30f, end)              //end position
+                new Key<Vector3>(0f, start, tangentTime, centerPosForTangent, tangentTime, centerPosForTangent),                  //start position
+                new Key<Vector3>(endTime, end, tangentTime, centerPosForTangent, tangentTime, centerPosForTangent)      //end position
             };
             m_activeParameter.createKeyList(keyList);
             
             //-- q rotation
             m_activeParameter =  _manager.SelectedObjects[0].parameterList[4] as IAnimationParameter;   //ignore TRS (1) -> use 4
+            m_activeParameter.clearKeys();
             //this should right now be a rotation, looking from startpos to endpos
             Quaternion endRotation = Quaternion.LookRotation((end-start).normalized);
             keyList = new AbstractKey[]{
-                new Key<Quaternion>(0f, abstractParam._parent.gameObject.transform.rotation),   //start rotation
-                new Key<Quaternion>(30f, endRotation)                                           //end rotation
+                new Key<Quaternion>(0f, abstractParam._parent.gameObject.transform.rotation, tangentTime, abstractParam._parent.gameObject.transform.rotation, tangentTime, abstractParam._parent.gameObject.transform.rotation),   //start rotation
+                new Key<Quaternion>(endTime, endRotation, tangentTime, endRotation, tangentTime, endRotation)                                           //end rotation
             };
             m_activeParameter.createKeyList(keyList);
         }
@@ -266,7 +376,7 @@ namespace tracer{
                 return pathData;
             }
 
-            CreateIterativePath(end, pathData, hit);
+            //CreateIterativePath(end, pathData, hit);
             //cast ray from start to end - without intersection - use line
             
 

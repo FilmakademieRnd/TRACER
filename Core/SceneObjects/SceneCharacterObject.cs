@@ -100,10 +100,6 @@ namespace tracer
 
             CreatePathParameters();
 
-            sceneIdWeHad = _sceneID;
-            objectIdWeHad = _id;
-            paramterIdRPCParaHad = animHostGen._id;
-
             // Initialize the dictionary to store bone transforms by their IDs.
             boneMap = new Dictionary<int, Transform>();
             
@@ -148,15 +144,21 @@ namespace tracer
         //! @param   a          dummy value
         //!
         private void triggerAnimHostGen(object sender, int i){
-            emitHasChanged((AbstractParameter)sender);
+            //emitHasChanged((AbstractParameter)sender);
             //.call?
-            Debug.Log("called triggerAnimHostGen "+i);
+            //Debug.Log("called triggerAnimHostGen "+i);
         }
         public override void OnDestroy(){
             base.OnDestroy();
             pathPos.hasChanged -= updatePathPosition;
             pathRot.hasChanged -= updatePathRotation;
             animHostGen.hasChanged -= triggerAnimHostGen;
+        }
+
+        public void SafeParametersBeforeOverwrite(){
+            sceneIdWeHad = _sceneID;
+            objectIdWeHad = _id;
+            paramterIdRPCParaHad = animHostGen._id;
         }
         //!
         //! rn necessary to trigger the correct rpc parameter on animhost, which has constant values!
@@ -173,10 +175,18 @@ namespace tracer
         public void ResetOverwrittenTracerValues(){
             _sceneID = sceneIdWeHad;
             _id = objectIdWeHad;
-            animHostGen.OverrideParameterID(paramterIdRPCParaHad);
+            //animHostGen.OverrideParameterID(paramterIdRPCParaHad);
         }
         public void TriggerAnimHost(){
             animHostGen.value = 3;  //const value AnimHost expects
+        }
+
+        public void SendOutAnimHostTrigger(){
+            RPCParameter<int> sendToAnimHost = new RPCParameter<int>(3, "sendToAnimHost", this);
+            _sceneID = 255;
+            _id = 1;
+            sendToAnimHost.OverrideParameterID(0);
+            emitHasChanged((AbstractParameter)sendToAnimHost);
         }
         #endregion
         

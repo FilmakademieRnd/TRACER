@@ -305,6 +305,8 @@ namespace tracer
                         short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(4));
                         bool lockState = MemoryMarshal.Read<bool>(message.Slice(6));
 
+                        //Debug.Log("<color=blue>received lock on sceneId "+sceneID+" paraObjectId "+parameterObjectID+" with state "+lockState+"</color>");
+
                         SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, parameterObjectID);
                         sceneObject._lock = lockState;
                         if(sceneObject.playedByTimeline){   //if we are animating the object, lock it!
@@ -323,6 +325,8 @@ namespace tracer
                             short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(start + 1));
                             short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3));
                             int length = MemoryMarshal.Read<int>(message.Slice(start + 6));
+
+                            //Debug.Log("<color=green>received normalMsg on sceneId "+sceneID+" paraObjectId "+parameterObjectID+" parameterID "+parameterID+"</color>");
 
                             if (paraObjectNotFound ||
                                 sceneID != oldSceneID ||
