@@ -725,7 +725,7 @@ namespace tracer
         //!
         private void OnParameterChanged(object o, int idx)
         {
-            Debug.Log("<color=green>OnParameterChanged for index "+idx+"</color>");
+            //Debug.Log("<color=green>OnParameterChanged for index "+idx+"</color>");
             clearFrames();
 
             UpdateCallbacks(null, idx);

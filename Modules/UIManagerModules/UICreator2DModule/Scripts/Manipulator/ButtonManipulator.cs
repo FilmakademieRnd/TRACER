@@ -34,10 +34,14 @@ https://opensource.org/licenses/MIT
 //! @date 21.01.2025
 
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace tracer{
     public class ButtonManipulator : Manipulator{
+
+        public const string     LOCATION_INPUT_BLOCKING_CANVAS_PREFAB      = "Prefabs/INputBlocking_Canvas";
+
         //!
         //! current mode: delete path, create new path, add path
         //!
@@ -52,6 +56,12 @@ namespace tracer{
         //! Reference to TRACER uiSettings
         //!
         private UIManager _manager;
+
+        //!
+        //! object that should prevent selecting new objects during other phases (see MeasureModule)
+        //!
+
+        private GameObject inputBlockingCanvas;
 
 
         ~ButtonManipulator()
@@ -73,6 +83,8 @@ namespace tracer{
 
             AbstractParameter.ParameterType type = abstractParam.tracerType;
 
+            Debug.Log("<color=red>INIT ButtonManipulator. Type "+type.ToString()+" and paramName: "+abstractParam.name+"</color>");
+
             switch (type)
             {
                 case AbstractParameter.ParameterType.BOOL:
@@ -83,12 +95,13 @@ namespace tracer{
                     // _snapSelect._loop = false;
                     switch (paramBool.name) {
                         case "createPath":
+                            inputBlockingCanvas = GameObject.Instantiate(Resources.Load(LOCATION_INPUT_BLOCKING_CANVAS_PREFAB) as GameObject);
+                            inputBlockingCanvas.SetActive(false);
                             //show button as element to delete the path, recreate path, add path (and maybe distribute?)
                             //do we have the possibility to have buttons there?
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_generatePath"), 0);
                             _snapSelect.addElement(Resources.Load<Sprite>("Images/button_deletePath"), 0);
-                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_recreatePath"), 0);
-                            //_snapSelect.addElement(Resources.Load<Sprite>("Images/button_addPath"), 0);
-                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_distributePath"), 0);
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_triggerAnimHostPathGen"), 0);
                         break;
                     }   
                     break;
@@ -147,49 +160,33 @@ namespace tracer{
         {
             _currentManipulation = index;
             Debug.Log("changed button manipulator to show "+index);
+            //this could also be used as "to activate" element
         }
 
         private void executeElement(object sender, int value)
         {
             Debug.Log("execute value "+value+" on button manipulator "+_currentManipulation+" to execute");
-            //setValue(null, true);
+            
+            SceneCharacterObject sco = abstractParam._parent.gameObject.GetComponent<SceneCharacterObject>();
+            if(!sco)
+                return;
+
             switch(_currentManipulation){
                 case 0: 
-                    byte recentSceneId = abstractParam._parent.gameObject.GetComponent<SceneObject>()._sceneID;
-                    abstractParam._parent.gameObject.GetComponent<SceneObject>().fireAndForgetSceneId(recentSceneId, 1);
+                    byte dontChangeID = sco._sceneID;
+                    sco.OverrideTracerValues(dontChangeID, 1, 0);
                     SetPathTarget();
+                    inputBlockingCanvas.SetActive(true);
                     break;
                 case 1:
                 case 2:
-                    //send 
-                    //Parameter<int> position = new Parameter<int>(transform.localPosition, "position", this);
-                    //ParameterObject nonDynamicPo = ParameterObject.Attach(new GameObject("DynamicPO only for sending"), 254);
-                    //ParameterObject nonDynamicPo = abstractParam._parent;
-                    //short idWas = nonDynamicPo.FireAndForget(0);
-                    //Debug.Log("new parameterobject id is "+nonDynamicPo._id);
-
-                    //RPCParameter<int> rpcPara = new Parameter<int>(1, "sendToWaitForPath", abstractParam._parent);
-                    //rpcPara.setValue(3);    //en bloc animation request
-                    //rpcPara.value = 3;
-                    //nonDynamicPo.FireAndForget(idWas);
-                    RPCParameter<int> para = abstractParam._parent.gameObject.GetComponent<SceneObject>().animHostGen;
-                    byte sceneIdWas = para._parent.gameObject.GetComponent<SceneObject>()._sceneID;
-                    short objectIdWas = abstractParam._parent.gameObject.GetComponent<SceneObject>()._id;
-                    para._parent.gameObject.GetComponent<SceneObject>().fireAndForgetSceneId(255, 1);
-                    short idWas = para._id;
-                    para.FireAndForget(0);
-                    //trigger
-                    para.value = 3;
+                    //set
+                    sco.OverrideTracerValues(255, 1, 0);
+                    //trigger send
+                    sco.TriggerAnimHost();
                     //reset values
-
-                    //vvv DOES NOT WORK vvv
-                    //Test sending dynamic created rpc
-                    // RPCParameter<int> dynamicRPC4Path = new RPCParameter<int>(0, "dynamicRPC4Path", abstractParam._parent);
-                    // idWas = dynamicRPC4Path._id;
-                    // dynamicRPC4Path.FireAndForget(0);
-                    // //trigger
-                    // dynamicRPC4Path.value = 5;
-                    // //reset values
+                    //(too early?)
+                    sco.ResetOverwrittenTracerValues();
                     break;
             }
             
@@ -204,62 +201,120 @@ namespace tracer{
             _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
         }
         private void OnPointerEnd(object sender, Vector2 point){
+            GameObject uiGo = TimelineModule.GetGameObjectAtUIRaycast(point);
+            if(uiGo != inputBlockingCanvas.gameObject){
+                //hit something else then our input blocking canvas - so ignore and reset
+                _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
+                inputBlockingCanvas.SetActive(false);
+                return;
+            }
+
+            inputBlockingCanvas.SetActive(false);
+
             MeshRenderer[] ignoreTheseForRaycasting = null;
             //ignore (selection) itself
-            //ignoreTheseForRaycasting = sceneObjectToPlace.GetComponents<MeshRenderer>();
+            ignoreTheseForRaycasting = _manager.SelectedObjects[0].GetComponentsInChildren<MeshRenderer>();
 
             //TODO for performance we would not need to gather all MeshRenderer on every click (only if we modify any)
             if (SceneRaycastHelper.RaycastIntoScene(_manager.core.getManager<SceneManager>().scnRoot, point, out RaycastHit hit, ignoreTheseForRaycasting)){
                 //TARGET POS
-                //abstractParam._parent.gameObject.transform.position = hit.point;
                 CreatePath(abstractParam._parent.gameObject.transform.position, hit.point);
-                //_manager.core.StartCoroutine(CreatePath(abstractParam._parent.gameObject.transform.position, hit.point));
                 Debug.Log("<color=green>Path End: "+hit.point+"</color>");
                 //align to hit normal with upwards vector
                 //abstractParam._parent.gameObject.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
             }
+
             _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
-            _manager.clearSelectedObject();
-            _manager.addSelectedObject(abstractParam._parent.gameObject.GetComponent<SceneObject>());
+            //_manager.clearSelectedObject();
+            //_manager.addSelectedObject(abstractParam._parent.gameObject.GetComponent<SceneObject>());
+            inputBlockingCanvas.SetActive(false);
         }
 
         private IAnimationParameter m_activeParameter = null;
 
         private void CreatePath(Vector3 start, Vector3 end){
-            //use start y
+            //set to use same height, use start y
             end.y = start.y;
             //create animated parameter list
+            
             //-- v3 position
             m_activeParameter =  _manager.SelectedObjects[0].parameterList[3] as IAnimationParameter;   //ignore TRS (0) -> use 3
-            AbstractKey[] keyList = new AbstractKey[2];
-            Key<Vector3> kv3 = new Key<Vector3>(0f, start);
-            keyList[0] = kv3;
-            // m_activeParameter.createKey(kv3);
-            // yield return null;  
-            //otherwise we'll get a null error (out of range) on UpdateSenderModule.405: Span<byte> newSpan = msgSpan.Slice(start, length);
-            //if we create multiple keys at once and trigger an InvokeHasChanged multiple times per frame! 
-            
-            kv3 = new Key<Vector3>(30f, end);
-            keyList[1] = kv3;
-            // m_activeParameter.createKey(kv3);
-            // yield return null;
+            AbstractKey[] keyList = new AbstractKey[]{
+                new Key<Vector3>(0f, start),            //start position
+                new Key<Vector3>(30f, end)              //end position
+            };
             m_activeParameter.createKeyList(keyList);
             
             //-- q rotation
             m_activeParameter =  _manager.SelectedObjects[0].parameterList[4] as IAnimationParameter;   //ignore TRS (1) -> use 4
-            Key<Quaternion> qr = new Key<Quaternion>(0f, abstractParam._parent.gameObject.transform.rotation);
-            keyList[0] = qr;
-            // m_activeParameter.createKey(qr);
-            // yield return null;
-            
-            qr = new Key<Quaternion>(30f, Quaternion.Euler(5,5,5));
-            keyList[1] = qr;
-            //m_activeParameter.createKey(qr);
+            //this should right now be a rotation, looking from startpos to endpos
+            Quaternion endRotation = Quaternion.LookRotation((end-start).normalized);
+            keyList = new AbstractKey[]{
+                new Key<Quaternion>(0f, abstractParam._parent.gameObject.transform.rotation),   //start rotation
+                new Key<Quaternion>(30f, endRotation)                                           //end rotation
+            };
             m_activeParameter.createKeyList(keyList);
-            
-            //yield return null;
         }
 
+        private List<Vector3> CreatePathViaNavMesh(Vector3 start, Vector3 end){
+            List<Vector3> pathData = new();
+            pathData.Add(start);
+
+            RaycastHit hit;
+            if(!Physics.Raycast(start, (end-start).normalized, out hit, (end-start).magnitude)){
+                pathData.Add(end);
+                return pathData;
+            }
+
+            CreateIterativePath(end, pathData, hit);
+            //cast ray from start to end - without intersection - use line
+            
+
+            //if it has an intersection - try first right, second left and check if we can find another way
+            return null;
+        }
+
+        //right now only on plane-ground
+       /* private bool CreateIterativePath(Vector3 targetPos, List<Vector3> path, RaycastHit objectWeHit){
+            float characterSize = 3f;
+            if(Vector3.Distance(path[^1], targetPos) < characterSize){
+                path.Add(targetPos);
+                return true;
+            }
+
+            Vector3 directionToFace;
+            if(path.Count < 2)
+                directionToFace = (targetPos-path[^1]).normalized;
+            else
+                directionToFace = (path[path.Count-1]-path[path.Count-2]).normalized;
+
+            RaycastHit hit;
+            if(!Physics.Raycast(start, directionToFace, out hit, directionToFace.magnitude)){
+                pathData.Add(end);
+                return pathData;
+            }
+
+
+            RaycastHit hit;
+            Vector3 newStart = objectWeHit.point-directionToFace * characterSize;
+            if(!Physics.Raycast(newStart, directionToCheck, out hit, obstacleSize)){
+                if()
+            }else{
+                //not a valid path
+            }
+
+            //go left or right, depending on the angle
+            Vector3 directionToCheck;
+            if(Vector3.Angle(-directionToFace, objectWeHit.normal) < 90){  //??
+                //right
+                directionToCheck = Vector3.Cross(directionToFace, Vector3.up);
+            }else{
+                //left
+                directionToCheck = Vector3.Cross(directionToFace, Vector3.down);
+            }
+
+            float obstacleSize = objectWeHit.collider.bounds.size.x;
+        }*/
 
         #endregion
     }

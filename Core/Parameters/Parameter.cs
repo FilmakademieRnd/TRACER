@@ -175,7 +175,7 @@ namespace tracer
         public abstract int dataSize();
         public abstract int defaultDataSize();
 
-        public abstract void FireAndForget(short objectId);
+        public abstract void OverrideParameterID(short objectId);
     }
 
     [Serializable]
@@ -222,10 +222,11 @@ namespace tracer
                     return _dataSize;
             }
         }
-        public override void FireAndForget(short objectId)
+        public override void OverrideParameterID(short paraID)
         {
-            _id = objectId;
+            _id = paraID;
         }
+
         //!
         //! Event emitted when parameter changed.
         //!
@@ -391,19 +392,21 @@ namespace tracer
 
                 Debug.Log("<color=yellow>SERIALIZE DATA</color>");
 
-                BitConverter.TryWriteBytes(targetSpan.Slice(offset += 2, 2), keyCount); // nbr. of keys
+                BitConverter.TryWriteBytes(targetSpan.Slice(offset, 2), keyCount); // nbr. of keys
+                offset += 2;
                 Debug.Log("\tnr of key: "+keyCount);
                 for (int i = 0; i < keyCount; i++)
                 {
                     Key<T> key = (Key<T>)_keyList[i];
                     Debug.Log("\tkey "+i+" Value: "+key.value+" at time "+key.time);
-                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 1, 1), (byte)key.interpolation); // interpolation
-                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.time); // time
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset, 1), (byte)key.interpolation); // interpolation
+                    BitConverter.TryWriteBytes(targetSpan.Slice(offset += 1, 4), key.time); // time
                     BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime1); // tangent time 1
                     BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime2); // tangent time 2
-                    SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.value); // value
+                    SerializeData(targetSpan.Slice(offset += 4, _dataSize), key.value); // value
                     SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.tangentValue1); // tangent value 1
-                    SerializeData(targetSpan.Slice(offset, _dataSize), key.tangentValue2); // tangent value 2
+                    SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.tangentValue2); // tangent value 2
+                    offset += _dataSize;
                 }
             }
         }
@@ -477,31 +480,33 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void deSerialize(ReadOnlySpan<byte> sourceSpan)
         {
+            _value = deSerializeData(sourceSpan);
+
             if (_isAnimated)
             {
                 // determine the correct offset in the span
                 int offset = _dataSize;
-                short keyCount = MemoryMarshal.Read<short>(sourceSpan.Slice(offset += 2, 2));
+                short keyCount = MemoryMarshal.Read<short>(sourceSpan.Slice(offset, 2));
+                offset += 2;
 
                 _keyList.Clear();
 
                 for (int i = 0; i < keyCount; i++)
                 {
-                    Key<T>.InterplolationTypes interplolation = MemoryMarshal.Read<Key<T>.InterplolationTypes>(sourceSpan.Slice(offset += 1));
-                    float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    Key<T>.InterplolationTypes interplolation = MemoryMarshal.Read<Key<T>.InterplolationTypes>(sourceSpan.Slice(offset)); 
+                    float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 1));
                     float tangenttime1 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
                     float tangenttime2 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
-                    T value = deSerializeData(sourceSpan.Slice(offset += _dataSize));
+                    T value = deSerializeData(sourceSpan.Slice(offset += 4));
                     T tangentvalue1 = deSerializeData(sourceSpan.Slice(offset += _dataSize));
-                    T tangentvalue2 = deSerializeData(sourceSpan.Slice(offset));
+                    T tangentvalue2 = deSerializeData(sourceSpan.Slice(offset += _dataSize));
+                    offset += _dataSize;
 
                     _keyList.Add(new Key<T>(time, value, tangenttime1, tangentvalue1, tangenttime2, tangentvalue2 , interplolation));
                 }
                 //_animationManager.keyframesUpdated(this);
                 keyHasChanged?.Invoke(this, EventArgs.Empty);
             }
-
-            _value = deSerializeData(sourceSpan);
 
             _networkLock = true;
             hasChanged?.Invoke(this, _value);

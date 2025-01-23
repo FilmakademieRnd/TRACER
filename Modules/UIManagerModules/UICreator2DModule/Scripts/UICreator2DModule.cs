@@ -235,8 +235,16 @@ namespace tracer
                     case "createPath":
                         snapSelect.addElement(Resources.Load<Sprite>("Images/button_createPath"));
                         break;
+                    case "pathPosition":
+                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
+                        break;
+                    case "pathRotation":
+                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
+                        break;
+                    case "animHostGen":
+                        break;
                     default:                        
-                        snapSelect.addElement(mainSelection.parameterList[i].name);
+                        //snapSelect.addElement(mainSelection.parameterList[i].name);
                         break;
                 }
             }

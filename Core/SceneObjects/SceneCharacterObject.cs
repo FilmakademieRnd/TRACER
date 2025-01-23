@@ -40,6 +40,28 @@ namespace tracer
     //!
     public class SceneCharacterObject : SceneObject
     {
+
+        #region PATH VALUES
+        //!
+        //! path position parameter, these will be AnimationParameter and <s>are hidden in ui by their name</s> (not hidden, because index will still iterate over it!)
+        //! needs to be at paremterList index 3
+        //!
+        public Parameter<Vector3> pathPos;      
+        //!
+        //! path rotation parameter, these will be AnimationParameter and <s>are hidden in ui by their name</s> (not hidden, because index will still iterate over it!)
+        //! needs to be at paremterList index 4
+        //!
+        public Parameter<Quaternion> pathRot;
+        //!
+        //! this will be used to generate a new ui icon we can select for further options
+        //!
+        public Parameter<bool> createPath;
+        //!
+        //! necessary rpcparameter to trigger AnimHost. Hidden by name (take care of index - UICreator2DModule.createManipulator()
+        //!
+        public RPCParameter<int> animHostGen;
+        #endregion
+
         //!
         //! Dictionary to store bone transforms by their IDs
         //!
@@ -49,6 +71,9 @@ namespace tracer
         //!
         private Transform[] bones;
         public List<string> boneNamesOrder;
+
+        private byte sceneIdWeHad;
+        private short objectIdWeHad, paramterIdRPCParaHad;
 
 
         //!
@@ -72,6 +97,13 @@ namespace tracer
         public override void Awake()
         {
             base.Awake();
+
+            CreatePathParameters();
+
+            sceneIdWeHad = _sceneID;
+            objectIdWeHad = _id;
+            paramterIdRPCParaHad = animHostGen._id;
+
             // Initialize the dictionary to store bone transforms by their IDs.
             boneMap = new Dictionary<int, Transform>();
             
@@ -81,6 +113,72 @@ namespace tracer
                 setBones();
             }        
         }
+
+        #region PATH FUNCTIONS
+        private void CreatePathParameters(){
+            pathPos = new Parameter<Vector3>(transform.localPosition, "pathPosition", this);
+            pathPos.hasChanged += updatePathPosition;
+            pathRot = new Parameter<Quaternion>(transform.localRotation, "pathRotation", this);
+            pathRot.hasChanged += updatePathRotation;
+
+            createPath = new Parameter<bool>(false, "createPath", this); //no hasChanged function necessary(?)
+            createPath.hasChanged += updatePathData;
+
+            animHostGen = new RPCParameter<int>(0, "animHostGen", this);
+            animHostGen.hasChanged += triggerAnimHostGen;
+        }
+        //see updatePosition
+        private void updatePathPosition(object sender, Vector3 a){
+            //necessary to emit? emit only on specific TriggerAnimHost function or "EmitPathFunction"?
+            //overwrite this into the position animation? so it could be changed?
+            //or let these handles to change stuff also be active and possible here?
+            emitHasChanged((AbstractParameter)sender);
+        }
+        //see updateRotation
+        private void updatePathRotation(object sender, Quaternion a){
+            emitHasChanged((AbstractParameter)sender);
+        }
+        private void updatePathData(object sender, bool a){
+            Debug.Log("Path Button clicked (most likely)");
+            emitHasChanged((AbstractParameter)sender);
+        }
+        //!
+        //! Emit the RPCParameter into the network
+        //! @param   sender     Object calling this function
+        //! @param   a          dummy value
+        //!
+        private void triggerAnimHostGen(object sender, int i){
+            emitHasChanged((AbstractParameter)sender);
+            //.call?
+            Debug.Log("called triggerAnimHostGen "+i);
+        }
+        public override void OnDestroy(){
+            base.OnDestroy();
+            pathPos.hasChanged -= updatePathPosition;
+            pathRot.hasChanged -= updatePathRotation;
+            animHostGen.hasChanged -= triggerAnimHostGen;
+        }
+        //!
+        //! rn necessary to trigger the correct rpc parameter on animhost, which has constant values!
+        //! @param   newSceneID     scene id where we want to emit the calls
+        //! @param   newObjectID    id that animhost expects
+        //! @param   newParameterID id that animhost expects
+        //!
+        public void OverrideTracerValues(byte newSceneID, short newObjectID, short newParameterID){
+            _sceneID = newSceneID;
+            _id = newObjectID;
+            animHostGen.OverrideParameterID(newParameterID);
+        }
+        //! see OverrideTracerValues, we reset them values
+        public void ResetOverwrittenTracerValues(){
+            _sceneID = sceneIdWeHad;
+            _id = objectIdWeHad;
+            animHostGen.OverrideParameterID(paramterIdRPCParaHad);
+        }
+        public void TriggerAnimHost(){
+            animHostGen.value = 3;  //const value AnimHost expects
+        }
+        #endregion
         
         //!
         //!Setting up all the bone rotation parameters

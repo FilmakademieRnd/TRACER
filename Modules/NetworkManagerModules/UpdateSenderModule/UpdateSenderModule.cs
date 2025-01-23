@@ -463,14 +463,12 @@ namespace tracer
                     // send controm messages
                     if (!m_controlMessages.IsEmpty)
                     {
-                        Debug.Log("<color=blue>HALLO</color>");
                         try { sender.SendMultipartMessage(m_controlMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:controlMsg:SendFrame</color> " + e.ToString()); } // true not wait 
                         m_controlMessages.Clear();
                     }
                     // add parameter message to message buffer
                     if (m_modifiedParameters.Count > 0)
                     {
-                        Debug.Log("<color=red>HALLO</color>");
                         m_parameterMessages.Append(createParameterMessage());
                         m_modifiedParameters.Clear();
                         m_modifiedParametersDataSize = 0;
@@ -479,7 +477,6 @@ namespace tracer
                     int frameCount = m_parameterMessages.FrameCount;
                     if (frameCount > packageSize || (i++ > packageSize && frameCount > 0))
                     {
-                        Debug.Log("<color=yellow>HALLO</color>");
                         try { sender.SendMultipartMessage(m_parameterMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:modifiedParameter:SendFrame</color> " + e.ToString()); } // true not wait
                         m_parameterMessages.Clear();
                         i = 0;

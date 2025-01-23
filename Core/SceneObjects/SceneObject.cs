@@ -89,16 +89,6 @@ namespace tracer
         //!
         public Parameter<Vector3> scale;
 
-
-        //path thingy testing
-        public Parameter<Vector3> pathPos;
-        public Parameter<Quaternion> pathRot;
-        //!
-        //! Is SceneObject in PathCreationMode?
-        //!
-        public Parameter<bool> createPath;  //ListParameter?
-        public RPCParameter<int> animHostGen;
-
         //!
         //! Factory to create a new SceneObject and do it's initialisation.
         //! Use this function instead GameObject.AddComponen<>!
@@ -129,19 +119,7 @@ namespace tracer
             rotation = new Parameter<Quaternion>(transform.localRotation, "rotation", this);
             rotation.hasChanged += updateRotation;
             scale = new Parameter<Vector3>(transform.localScale, "scale", this);
-            scale.hasChanged += updateScale;
-            
-            pathPos = new Parameter<Vector3>(transform.localPosition, "pathPosition", this);
-            pathPos.hasChanged += updatePathPosition;
-            pathRot = new Parameter<Quaternion>(transform.localRotation, "pathRotation", this);
-            pathRot.hasChanged += updatePathRotation;
-
-            createPath = new Parameter<bool>(false, "createPath", this);
-            createPath.hasChanged += updateCreatePath;
-
-            animHostGen = new RPCParameter<int>(0, "animHostGen", this);
-            animHostGen.hasChanged += triggerAnimHostGen;
-            
+            scale.hasChanged += updateScale;            
         }
 
         //!
@@ -152,8 +130,6 @@ namespace tracer
             position.hasChanged -= updatePosition;
             rotation.hasChanged -= updateRotation;
             scale.hasChanged -= updateScale;
-            position.hasChanged -= updatePathPosition;
-            rotation.hasChanged -= updatePathRotation;
         }
 
         //!
@@ -199,12 +175,6 @@ namespace tracer
             emitHasChanged((AbstractParameter)sender);
         }
 
-        private void updatePathPosition(object sender, Vector3 a)
-        {
-            //transform.localPosition = a;
-            emitHasChanged((AbstractParameter)sender);
-        }
-
         //!
         //! Update GameObject local rotation.
         //! @param   sender     Object calling the update function
@@ -213,12 +183,6 @@ namespace tracer
         private void updateRotation(object sender, Quaternion a)
         {
             transform.localRotation = a;
-            emitHasChanged((AbstractParameter)sender);
-        }
-
-        private void updatePathRotation(object sender, Quaternion a)
-        {
-            //transform.localRotation = a;
             emitHasChanged((AbstractParameter)sender);
         }
 
@@ -231,29 +195,6 @@ namespace tracer
         {
             transform.localScale = a;
             emitHasChanged((AbstractParameter)sender);
-        }
-
-        //!
-        //! Update its value
-        //! @param   sender     Object calling the update function
-        //! @param   b          does the object has a path?
-        //!
-        private void updateCreatePath(object sender, bool b)
-        {
-            //transform.localScale = a;
-            //emitHasChanged((AbstractParameter)sender);
-            Debug.Log("called updateCreatePath "+b);
-        }
-
-        private void triggerAnimHostGen(object sender, int i)
-        {
-            emitHasChanged((AbstractParameter)sender);
-            Debug.Log("called triggerAnimHostGen "+i);
-        }
-
-        public void fireAndForgetSceneId(byte sceneId, short objectId){
-            _sceneID = sceneId;
-            _id = objectId;
         }
 
         //!
