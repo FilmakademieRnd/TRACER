@@ -182,7 +182,7 @@ namespace tracer
         }
 
         public void SendOutAnimHostTrigger(){
-            RPCParameter<int> sendToAnimHost = new RPCParameter<int>(3, "sendToAnimHost", this);
+            RPCParameter<int> sendToAnimHost = new RPCParameter<int>(1, "sendToAnimHost", this);
             _sceneID = 255;
             _id = 1;
             sendToAnimHost.OverrideParameterID(0);

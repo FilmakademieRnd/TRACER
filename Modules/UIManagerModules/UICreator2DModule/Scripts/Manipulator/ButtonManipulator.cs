@@ -211,7 +211,7 @@ namespace tracer{
         private LineRenderer pathLine;
         private void ShowAvailablePath(bool show, Parameter<Vector3> paraPathPos){
             return;
-            
+
             if(!show){
                 if(pathLine){
                     Destroy(pathLine.gameObject);
@@ -364,7 +364,7 @@ namespace tracer{
             //this should right now be a rotation, looking from startpos to endpos
             Quaternion endRotation = Quaternion.LookRotation((end-start).normalized);
             keyList = new AbstractKey[]{
-                new Key<Quaternion>(0f, abstractParam._parent.gameObject.transform.rotation, tangentTime, abstractParam._parent.gameObject.transform.rotation, tangentTime, abstractParam._parent.gameObject.transform.rotation),   //start rotation
+                new Key<Quaternion>(0f, Quaternion.identity, tangentTime, abstractParam._parent.gameObject.transform.rotation, tangentTime, abstractParam._parent.gameObject.transform.rotation),   //start rotation
                 new Key<Quaternion>(endTime, endRotation, tangentTime, endRotation, tangentTime, endRotation)                                           //end rotation
             };
             m_activeParameter.createKeyList(keyList);
