@@ -101,8 +101,11 @@ namespace tracer{
                             //show button as element to delete the path, recreate path, add path (and maybe distribute?)
                             //do we have the possibility to have buttons there?
                             _snapSelect.addElement(Resources.Load<Sprite>("Images/button_generatePath"), 0);
-                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_deletePath"), 0);
+                            //_snapSelect.addElement(Resources.Load<Sprite>("Images/button_deletePath"), 0);
                             _snapSelect.addElement(Resources.Load<Sprite>("Images/button_triggerAnimHostPathGen"), 0);
+                            //dont show send, if no path exist
+                            _snapSelect.elements[^1].gameObject.GetComponent<UnityEngine.UI.Image>().enabled = false;
+                            
                         break;
                     }   
                     break;
@@ -114,6 +117,7 @@ namespace tracer{
                     Helpers.Log("Parameter Type cannot be edited with ButtonManipulator.");
                     break;
             }
+
         }
 
         //!
@@ -173,20 +177,21 @@ namespace tracer{
                 return;
 
             switch(_currentManipulation){
-                case 0: 
+                case 0:     //CREATE PATH
                     byte dontChangeID = sco._sceneID;
                     sco.OverrideTracerValues(dontChangeID, 1, 0);
                     SetListenerForPathTarget();
                     inputBlockerInCanvas.SetActive(true);
                     ShowAvailablePath(true, sco.pathPos);
                     break;
-                case 1:
-                    sco.pathPos.clearKeys();   //ignore TRS (0) -> use 3
-                    sco.pathRot.clearKeys();   //ignore TRS (1) -> use 4
-                    m_activeParameter.clearKeys();
-                    ShowAvailablePath(false, null);
-                    break;
-                case 2:
+                // case 1:  //was delete path
+                //     sco.pathPos.clearKeys();   //ignore TRS (0) -> use 3
+                //     sco.pathRot.clearKeys();   //ignore TRS (1) -> use 4
+                //     m_activeParameter.clearKeys();
+                //     ShowAvailablePath(false, null);
+                //     break;
+
+                case 1: //now send path
                     //save
                     sco.SaveParametersBeforeOverwrite();
 
@@ -199,6 +204,12 @@ namespace tracer{
                     //reset values
                     //(too early?)
                     sco.ResetOverwrittenTracerValues();
+
+                    //hide send button (recreate new path necessary, sending the same would either way makes no sense)
+                    _snapSelect.elements[^1].gameObject.GetComponent<UnityEngine.UI.Image>().enabled = false;
+
+                    //Deselect!(?)
+                    _manager.clearSelectedObject();
 
                     //DESELECT, SO WE ARE NOT LOCKED
                     //_manager.clearSelectedObject();
@@ -298,12 +309,16 @@ namespace tracer{
             inputBlockerInCanvas.SetActive(false);
             Debug.Log("OnPointerEnd");
 
-            MeshRenderer[] ignoreTheseForRaycasting = null;
+            List<MeshRenderer> ignoreTheseForRaycasting = new();
             //ignore (selection) itself
-            ignoreTheseForRaycasting = _manager.SelectedObjects[0].GetComponentsInChildren<MeshRenderer>();
+            ignoreTheseForRaycasting.AddRange(_manager.SelectedObjects[0].GetComponentsInChildren<MeshRenderer>());
+            //ignore all "background" objects (we assume tag "Finish")
+            foreach(GameObject g in GameObject.FindGameObjectsWithTag("Finish")){
+                ignoreTheseForRaycasting.AddRange(g.GetComponentsInChildren<MeshRenderer>());
+            }
 
             //TODO for performance we would not need to gather all MeshRenderer on every click (only if we modify any)
-            if (SceneRaycastHelper.RaycastIntoScene(_manager.core.getManager<SceneManager>().scnRoot, point, out RaycastHit hit, ignoreTheseForRaycasting)){
+            if (SceneRaycastHelper.RaycastIntoScene(_manager.core.getManager<SceneManager>().scnRoot, point, out RaycastHit hit, ignoreTheseForRaycasting.ToArray())){
                 //TARGET POS
                 CreatePath(abstractParam._parent.gameObject.transform.position, hit.point);
                 Debug.Log("<color=green>Path End: "+hit.point+"</color>");
@@ -311,6 +326,9 @@ namespace tracer{
                 //abstractParam._parent.gameObject.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
 
                 ShowAvailablePath(true, _manager.SelectedObjects[0].GetComponent<SceneCharacterObject>().pathPos);
+
+                //show "send" button
+                _snapSelect.elements[^1].gameObject.GetComponent<UnityEngine.UI.Image>().enabled = true;
             }
 
             _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
@@ -327,8 +345,11 @@ namespace tracer{
         private IAnimationParameter m_activeParameter = null;
 
         private void CreatePath(Vector3 start, Vector3 end){
+            
             //set to use same height, use start y
             end.y = start.y;
+            Vector3 particleEndPos = end;
+
             //create animated parameter list
             
             //ALWAYS NEWS
@@ -369,6 +390,12 @@ namespace tracer{
                 new Key<Quaternion>(endTime, endRotation, tangentTime, endRotation, tangentTime, endRotation)                                           //end rotation
             };
             m_activeParameter.createKeyList(keyList);
+
+            //DEBUG PARTICLE
+            //Show Particle with last pathPosition
+            GameObject pathTargetParticle = Instantiate(Resources.Load("Particles_Path_Target") as GameObject) as GameObject;
+            pathTargetParticle.transform.position = particleEndPos;
+            Destroy(pathTargetParticle, 8f);
         }
 
         private List<Vector3> CreatePathViaNavMesh(Vector3 start, Vector3 end){

@@ -165,6 +165,14 @@ namespace tracer
             //emitHasChanged((AbstractParameter)sender);
             //.call?
             Debug.Log("called triggerAnimHostGen "+i);
+
+
+            if(pathPos.getKeys() != null && pathPos.getKeys().Count > 0){
+                //Show Particle with last pathPosition
+                GameObject pathTargetParticle = Resources.Load("Particles_Path_Target", typeof(GameObject)) as GameObject;
+                pathTargetParticle.transform.position = ((Key<Vector3>)pathPos.getKeys()[^1]).value;
+                Destroy(pathTargetParticle, 8f);
+            }
         }
 
         private void triggerAnimPathReady(object sender, int i){
@@ -173,6 +181,10 @@ namespace tracer
             if(i == 5){
                 resetHipAndRootPosRot = true;
                 Debug.Log("YAY. Path has finished");
+                
+                //reselect this object
+                _core.getManager<UIManager>().clearSelectedObject();
+                _core.getManager<UIManager>().addSelectedObject(this);
             }
         }
 
