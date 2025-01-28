@@ -188,7 +188,7 @@ namespace tracer{
                     break;
                 case 2:
                     //save
-                    sco.SafeParametersBeforeOverwrite();
+                    sco.SaveParametersBeforeOverwrite();
 
                     sco.SendOutAnimHostTrigger();
                     // //set
@@ -363,6 +363,7 @@ namespace tracer{
             m_activeParameter.clearKeys();
             //this should right now be a rotation, looking from startpos to endpos
             Quaternion endRotation = Quaternion.LookRotation((end-start).normalized);
+            Object.FindObjectOfType<SceneCharacterObject>().calculatedButtonRot = endRotation;
             keyList = new AbstractKey[]{
                 new Key<Quaternion>(0f, Quaternion.identity, tangentTime, abstractParam._parent.gameObject.transform.rotation, tangentTime, abstractParam._parent.gameObject.transform.rotation),   //start rotation
                 new Key<Quaternion>(endTime, endRotation, tangentTime, endRotation, tangentTime, endRotation)                                           //end rotation

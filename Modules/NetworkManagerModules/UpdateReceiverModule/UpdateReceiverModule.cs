@@ -326,7 +326,7 @@ namespace tracer
                             short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3));
                             int length = MemoryMarshal.Read<int>(message.Slice(start + 6));
 
-                            //Debug.Log("<color=green>received normalMsg on sceneId "+sceneID+" paraObjectId "+parameterObjectID+" parameterID "+parameterID+"</color>");
+                            Debug.Log("<color=green>received normalMsg on sceneId "+sceneID+" paraObjectId "+parameterObjectID+" parameterID "+parameterID+" length "+length+"</color>");
 
                             if (paraObjectNotFound ||
                                 sceneID != oldSceneID ||
@@ -351,6 +351,12 @@ namespace tracer
                                         parameter.InitAnimation();
                                 }
                                 
+                                if ((MessageType)message[2] == MessageType.RPC){
+                                    Debug.Log("<color=red>RPC MESSAGE IS</color>");
+                                    foreach(byte b in message)
+                                        Debug.Log(b);
+                                }
+
                                 parameter.deSerialize(message.Slice(start + 10));
                             }
                             else

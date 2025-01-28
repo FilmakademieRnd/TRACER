@@ -214,6 +214,7 @@ namespace tracer
 //#if UNITY_EDITOR
             updateSceneObjectTransform();
 //#endif
+            EndOfUpdateFunction();
         }
         //!
         //! updates the scene objects transforms and informs all connected parameters about the change
@@ -226,6 +227,11 @@ namespace tracer
                 rotation.value = transform.localRotation;
             if (transform.localScale != scale.value)
                 scale.value = transform.localScale;
+        }
+
+        //override to use stuff from Update without overwriting Update
+        protected virtual void EndOfUpdateFunction(){
+
         }
     }
 }

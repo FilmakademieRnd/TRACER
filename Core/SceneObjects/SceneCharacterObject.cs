@@ -59,6 +59,8 @@ namespace tracer
         //!
         //! necessary rpcparameter to trigger AnimHost. Hidden by name (take care of index - UICreator2DModule.createManipulator()
         //!
+        public Parameter<int> animHostPathAnimFinished;
+        
         public RPCParameter<int> animHostGen;
         #endregion
 
@@ -75,6 +77,7 @@ namespace tracer
         private byte sceneIdWeHad;
         private short objectIdWeHad, paramterIdRPCParaHad;
 
+        private bool resetHipAndRootPosRot = false;
 
         //!
         //! Factory to create a new SceneObject and do it's initialisation.
@@ -108,6 +111,17 @@ namespace tracer
             {
                 setBones();
             }        
+
+            rootStartPos = transform.position;
+            rootStartEulerAngles = transform.eulerAngles;
+
+            hip = transform.FindDeepChild("hip");
+            if(hip){
+                hipStartLocalPos = hip.localPosition;
+                hipParentStartLocalPos = hip.parent.localPosition;
+                hipParentStartLocalRot = hip.parent.localRotation;
+                hipStartLocalRot = hip.localRotation;
+            }
         }
 
         #region PATH FUNCTIONS
@@ -119,6 +133,10 @@ namespace tracer
 
             createPath = new Parameter<bool>(false, "createPath", this); //no hasChanged function necessary(?)
             createPath.hasChanged += updatePathData;
+
+            
+            animHostPathAnimFinished = new Parameter<int>(0, "animHostPathReady", this);
+            animHostPathAnimFinished.hasChanged += triggerAnimPathReady;
 
             animHostGen = new RPCParameter<int>(0, "animHostGen", this);
             animHostGen.hasChanged += triggerAnimHostGen;
@@ -134,7 +152,7 @@ namespace tracer
         private void updatePathRotation(object sender, Quaternion a){
             emitHasChanged((AbstractParameter)sender);
         }
-        private void updatePathData(object sender, bool a){
+        private void updatePathData(object sender, bool b){
             Debug.Log("Path Button clicked (most likely)");
             emitHasChanged((AbstractParameter)sender);
         }
@@ -146,8 +164,18 @@ namespace tracer
         private void triggerAnimHostGen(object sender, int i){
             //emitHasChanged((AbstractParameter)sender);
             //.call?
-            //Debug.Log("called triggerAnimHostGen "+i);
+            Debug.Log("called triggerAnimHostGen "+i);
         }
+
+        private void triggerAnimPathReady(object sender, int i){
+            //emitHasChanged((AbstractParameter)sender);
+            //.call?
+            if(i == 5){
+                resetHipAndRootPosRot = true;
+                Debug.Log("YAY. Path has finished");
+            }
+        }
+
         public override void OnDestroy(){
             base.OnDestroy();
             pathPos.hasChanged -= updatePathPosition;
@@ -155,10 +183,10 @@ namespace tracer
             animHostGen.hasChanged -= triggerAnimHostGen;
         }
 
-        public void SafeParametersBeforeOverwrite(){
+        public void SaveParametersBeforeOverwrite(){
             sceneIdWeHad = _sceneID;
             objectIdWeHad = _id;
-            paramterIdRPCParaHad = animHostGen._id;
+            paramterIdRPCParaHad = 7; //animHostGen._id;
         }
         //!
         //! rn necessary to trigger the correct rpc parameter on animhost, which has constant values!
@@ -175,7 +203,7 @@ namespace tracer
         public void ResetOverwrittenTracerValues(){
             _sceneID = sceneIdWeHad;
             _id = objectIdWeHad;
-            //animHostGen.OverrideParameterID(paramterIdRPCParaHad);
+            animHostGen.OverrideParameterID(paramterIdRPCParaHad);
         }
         public void TriggerAnimHost(){
             animHostGen.value = 3;  //const value AnimHost expects
@@ -187,6 +215,49 @@ namespace tracer
             _id = 1;
             sendToAnimHost.OverrideParameterID(0);
             emitHasChanged((AbstractParameter)sendToAnimHost);
+        }
+
+        private Transform hip;
+        private Vector3 hipParentStartLocalPos, hipStartLocalPos, rootStartPos, rootStartEulerAngles;
+        private Quaternion hipParentStartLocalRot, hipStartLocalRot;
+
+        [HideInInspector] public Quaternion calculatedButtonRot;
+
+        protected override void EndOfUpdateFunction(){
+            if(resetHipAndRootPosRot){
+                resetHipAndRootPosRot = false;
+                if(!hip){
+                    Debug.LogWarning("no hip to unparent found.");
+                    return;
+                }
+
+                rootStartEulerAngles = transform.eulerAngles;
+
+                Vector3 newEndPos = hip.position + Vector3.down*hipParentStartLocalPos.y;
+                newEndPos.y = rootStartPos.y;
+                transform.position = newEndPos;
+                //hip.parent.localPosition = hipParentStartLocalPos;
+                
+                hipStartLocalPos.y = hip.localPosition.y;
+                hip.localPosition = hipStartLocalPos;
+
+                transform.rotation = calculatedButtonRot;
+                transform.Rotate(rootStartEulerAngles);
+
+                rootStartEulerAngles = transform.eulerAngles;
+                
+                hip.parent.localRotation = hipParentStartLocalRot;
+                hip.localRotation = hipStartLocalRot;
+
+
+
+                /*Vector3 newPos = hip.position;
+                Quaternion newRot = hip.rotation;
+                hip.parent.parent = null;
+                transform.position = newPos;
+                transform.rotation = newRot;
+                hip.parent.parent = transform;*/
+            }
         }
         #endregion
         
