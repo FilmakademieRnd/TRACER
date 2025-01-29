@@ -110,8 +110,14 @@ namespace tracer
             if (_core.isServer)
             {
                 setBones();
-            }        
+                connectAndStart(null, null);
+            }else
+                _core.getManager<SceneManager>().sceneReady += connectAndStart;    
 
+        }
+
+        private void connectAndStart(object sender, EventArgs e)
+        {
             rootStartPos = transform.position;
             rootStartEulerAngles = transform.eulerAngles;
 
@@ -178,7 +184,9 @@ namespace tracer
         private void triggerAnimPathReady(object sender, int i){
             //emitHasChanged((AbstractParameter)sender);
             //.call?
-            if(i == 5){
+            if(i == 5 && allowResetLocalPosAtEnd){
+                allowResetLocalPosAtEnd = false;
+
                 resetHipAndRootPosRot = true;
                 Debug.Log("YAY. Path has finished");
                 
@@ -193,12 +201,16 @@ namespace tracer
             pathPos.hasChanged -= updatePathPosition;
             pathRot.hasChanged -= updatePathRotation;
             animHostGen.hasChanged -= triggerAnimHostGen;
+             _core.getManager<SceneManager>().sceneReady -= connectAndStart;
         }
 
         public void SaveParametersBeforeOverwrite(){
-            sceneIdWeHad = _sceneID;
-            objectIdWeHad = _id;
-            paramterIdRPCParaHad = 7; //animHostGen._id;
+            if(!onlyDoOnce){
+                onlyDoOnce = true;
+                sceneIdWeHad = _sceneID;
+                objectIdWeHad = _id;
+                paramterIdRPCParaHad = 7; //animHostGen._id;
+            }
         }
         //!
         //! rn necessary to trigger the correct rpc parameter on animhost, which has constant values!
@@ -222,6 +234,7 @@ namespace tracer
         }
 
         public void SendOutAnimHostTrigger(){
+            allowResetLocalPosAtEnd = true;
             RPCParameter<int> sendToAnimHost = new RPCParameter<int>(1, "sendToAnimHost", this);
             _sceneID = 255;
             _id = 1;
@@ -229,6 +242,8 @@ namespace tracer
             emitHasChanged((AbstractParameter)sendToAnimHost);
         }
 
+        private bool allowResetLocalPosAtEnd = false;
+        private bool onlyDoOnce = false;
         private Transform hip;
         private Vector3 hipParentStartLocalPos, hipStartLocalPos, rootStartPos, rootStartEulerAngles;
         private Quaternion hipParentStartLocalRot, hipStartLocalRot;
@@ -236,6 +251,8 @@ namespace tracer
         [HideInInspector] public Quaternion calculatedButtonRot;
 
         protected override void EndOfUpdateFunction(){
+            if(_lock)
+                return;
             if(resetHipAndRootPosRot){
                 resetHipAndRootPosRot = false;
                 if(!hip){
@@ -261,7 +278,7 @@ namespace tracer
                 hip.parent.localRotation = hipParentStartLocalRot;
                 hip.localRotation = hipStartLocalRot;
 
-
+                //Debug.Log("EndOfUpdate Reset. lock: "+_lock);
 
                 /*Vector3 newPos = hip.position;
                 Quaternion newRot = hip.rotation;
