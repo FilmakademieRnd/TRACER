@@ -516,14 +516,23 @@ namespace tracer
 
             Transform camTransform = Camera.main.transform;
             Transform objTransform = m_selectedObject.transform;
+            Vector3 newPosition;
+            Quaternion newRotation;
 
             switch (m_inputManager.cameraControl)
             {
                 case InputManager.CameraControl.ATTITUDE: 
                 case InputManager.CameraControl.AR:
                 case InputManager.CameraControl.TOUCH:
-                    Vector3 newPosition = camTransform.position - objTransform.parent.position;
-                    Quaternion newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
+                    newPosition = camTransform.position - objTransform.parent.position;
+                    newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
+                    m_selectedObject.position.setValue(newPosition);
+                    m_selectedObject.rotation.setValue(newRotation);
+                    break;
+                case InputManager.CameraControl.NONE:
+                    //do the same here right now, because the behaviour seems to be set to None from time to time (specifically AR mode did not work well anymore)
+                    newPosition = camTransform.position - objTransform.parent.position;
+                    newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
                     m_selectedObject.position.setValue(newPosition);
                     m_selectedObject.rotation.setValue(newRotation);
                     break;
