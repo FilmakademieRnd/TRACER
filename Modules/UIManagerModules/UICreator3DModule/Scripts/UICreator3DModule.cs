@@ -331,15 +331,17 @@ namespace tracer
         //! @param e event reference
         //!
         private void Tapped(object sender, Vector2 point){
-             if(!selObj)
+             if(!selObj){
+                manager.setLastClickedObject(null);
                 return;
+             }
 
             if(m_inputManager.WasDoubleClick()){
                 if(manager.LastClickedObject == selObj){  //works with locked objects as well!
                     manager.focusOnLastClickedObject();
                 }
-                manager.setLastClickedObject(selObj);
             }
+            manager.setLastClickedObject(selObj);
         }
 
 

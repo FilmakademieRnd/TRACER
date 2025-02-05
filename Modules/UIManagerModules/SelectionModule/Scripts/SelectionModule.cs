@@ -30,6 +30,7 @@ if not go to https://opensource.org/licenses/MIT
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -81,7 +82,7 @@ namespace tracer
         //!
         //! The async redner request.
         //!
-        private AsyncGPUReadbackRequest request;
+        //private AsyncGPUReadbackRequest request;
         //!
         //! Re-used property block used to set selectable _id.
         //!
@@ -99,9 +100,9 @@ namespace tracer
         //!
         private int scaleDivisor = 4;
         //!
-        //! Flag to determine a selection render request. 
+        //! Flag to wait for execution to finish
         //!
-        private bool m_hasAsyncRequest;
+        private bool m_gpuReadbackRequested = false;
         //!
         //! Flag to determine if touch is active.
         //!
@@ -112,10 +113,10 @@ namespace tracer
             set => m_isRenderActive = value;
         }
 
-        //!
-        //! timer to check if we made a double click / tap
-        //!
-        private float doubleClickCheckTimer = 0f;
+        #if UNITY_EDITOR
+        private int debugRenderTextureInScene_Counter = 0;
+        private bool debugRenderTextureCreation = false;
+        #endif
 
         //!
         //! Constructor
@@ -137,6 +138,9 @@ namespace tracer
         //! 
         protected override void Init(object sender, EventArgs e)
         {
+            //DEBUGGING
+            //Debug.unityLogger.logEnabled = false;
+
             core.updateEvent += renderUpdate;
            
             m_sceneManager = core.getManager<SceneManager>();
@@ -170,8 +174,8 @@ namespace tracer
             if (cpuData.IsCreated)
                 cpuData.Dispose();
 
-            m_hasAsyncRequest = false;
-            request = default(AsyncGPUReadbackRequest);
+            //m_hasAsyncRequest = false;
+            //request = default(AsyncGPUReadbackRequest);
         }
 
         //!
@@ -181,25 +185,23 @@ namespace tracer
         //! @param sender The input manager.
         //! @param e The screen coorinates from the input event.
         //!
-        private async void SelectFunction(object sender, Vector2 point)
-        {
-            m_isRenderActive = true;
+        private async void SelectFunction(object sender, Vector2 point){
+            //Debug.Log("<color=orange>SelectFunction called</color>");
 
-            // give the system some time to render the object _id's
-            // Thomas: this seems highly unstable e.g. on devices that runs at a lower fps?
-            await System.Threading.Tasks.Task.Delay(50);
-
-            // Thomas: why do we clear the selection over and over again, if we click an already selected object we trigger the deselection and selection events over and over again - i change this
-            //manager.clearSelectedObject();
-            //Debug.Log("<color=orange>.cleared</color>");
-            
             SceneObject obj = GetSelectableAtCollider(point);
             if (!obj){
-                obj = GetSelectableAtPixel(point);
-            }
+                //Debug.Log("<color=yellow>GetSelectableAtCollider did not find an object. Testing with Pixel</color>");
+                m_isRenderActive = true;
+                // give the system some time to render the object _id's
+                while(m_isRenderActive || m_gpuReadbackRequested)
+                    await System.Threading.Tasks.Task.Delay(50);
 
-            if (obj){
-                
+                obj = GetSelectableAtPixel(point);
+            }//else{
+            //    Debug.Log("<color=green>Found clicked object via GetSelectableAtCollider</color>");
+            //}
+
+            if (obj){                
                 CheckDoubleClick(obj);
 
                 if(manager.isThisOurSelectedObject(obj)){
@@ -217,17 +219,14 @@ namespace tracer
                 AddSelectionByRole(obj);
             }else{
                 manager.clearSelectedObject();
-                //Debug.Log("<color=yellow>clicked nothing. selected objects cleared</color>");
+                //Debug.Log("<color=red>clicked nothing. selected objects cleared</color>");
             }
-
-            m_isRenderActive = false;
         }
         //!
         //! Function to add the found selected object to the manager, depending by our Role
         //!
         private void AddSelectionByRole(SceneObject clickedSceneObject){
-            switch (clickedSceneObject)
-            {
+            switch (clickedSceneObject){
                 case SceneObjectCamera:
                     if (manager.activeRole == UIManager.Roles.EXPERT ||
                         manager.activeRole == UIManager.Roles.DOP)
@@ -250,8 +249,10 @@ namespace tracer
         //! Function to check for a double-click/tap to focus on an object
         //!
         private void CheckDoubleClick(SceneObject obj){
-            if(!obj)
+            if(!obj){
+                manager.setLastClickedObject(null);
                 return;
+            }
 
             //Double-Click on the same obj -> focus on it
             if(m_inputManager.WasDoubleClick()){
@@ -295,20 +296,41 @@ namespace tracer
         //!
         public SceneObject GetSelectableAtPixel(Vector2 screenPosition)
         {
-            
-            if (!cpuData.IsCreated)
+            if (!cpuData.IsCreated){
+                //Debug.Log("<color=red>GetSelectableAtPixel cpuData.IsCreated = false!</color>");
                 return null;
+            }
 
             int scaledX = (int)screenPosition.x / scaleDivisor;
             int scaledY = (int)screenPosition.y / scaleDivisor;
             int pos = scaledX + dataWidth * scaledY;
             
-            if (cpuData.Length < pos || pos < 0)
+            if (cpuData.Length < pos || pos < 0){
+                //Debug.Log("<color=red>GetSelectableAtPixel pos wrong ("+cpuData.Length+" /"+pos+") </color>");
                 return null;
+            }
+
+            //Save Texture for debugging
+            #if UNITY_EDITOR
+            if(debugRenderTextureCreation){
+                debugRenderTextureInScene_Counter++;
+
+                Texture2D tex = new Texture2D(gpuTexture.width, gpuTexture.height, TextureFormat.ARGB32, false);
+                tex.LoadRawTextureData(cpuData);
+                tex.Apply();
+                GameObject debugGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                debugGo.transform.position = new Vector3(10,10,0) + Vector3.right*1.1f*debugRenderTextureInScene_Counter;
+                debugGo.name = "RenderTextureDebugGO_"+Time.time;
+                GameObject.Destroy(debugGo.GetComponent<MeshCollider>());
+                debugGo.GetComponent<MeshRenderer>().material.mainTexture = tex;
+                debugGo.GetComponent<MeshRenderer>().material.shader = Shader.Find("Unlit/Texture");
+            }
+            #endif
             
             byte sceneID = 0;
             short soID = 0;
             DecodeId(cpuData[pos], ref sceneID, ref soID);
+            //Debug.Log("<color=yellow>DecodeId sceneID = "+sceneID+", soID = "+soID+"</color>");
 
             return m_sceneManager.getSceneObject(sceneID, soID);
         }
@@ -336,8 +358,13 @@ namespace tracer
                 if (!sceneObject)
                     sceneObject = gameObject.GetComponent<SceneObject>();
 
-                if (!sceneObject && gameObject.transform.parent)
-                    sceneObject = gameObject.transform.parent.GetComponent<SceneObject>();
+                //changed by Thomas: Try to get SceneObject in any parent
+                if(!sceneObject){
+                    sceneObject = gameObject.GetComponentInParent<SceneObject>();
+                    //Debug.Log("<color=orange>Found GetComponentInParent ? "+(sceneObject != null)+"</color>");
+                }
+                //if (!sceneObject && gameObject.transform.parent)
+                    //sceneObject = gameObject.transform.parent.GetComponent<SceneObject>();
 
             }
 
@@ -375,8 +402,9 @@ namespace tracer
         //!
         private void renderUpdate(object sender, EventArgs e)
         {
-            if (m_isRenderActive)
-            {
+            if (m_isRenderActive){
+                //Debug.Log("renderUpdate called "+Time.time);
+                //Debug.Log("<color=green>ACTIVE renderUpdate called</color>");
                 Camera camera = Camera.main;
 
                 // If camera size changed (e.g. window resize) adjust sizes of selection textures.
@@ -416,21 +444,28 @@ namespace tracer
                 camera.renderingPath = oldRenderingPath;
                 camera.allowMSAA = oldAllowMsaa;
 
-                if (!m_hasAsyncRequest)
-                {
-                    m_hasAsyncRequest = true;
-                    request = AsyncGPUReadback.Request(gpuTexture);
-                }
-                else if (request.done)
-                {
-                    if (!request.hasError)
-                    {
-                        request.GetData<Color32>().CopyTo(cpuData);
-                    }
-
-                    request = AsyncGPUReadback.Request(gpuTexture);
-                }
+                m_isRenderActive = false;
+                m_gpuReadbackRequested = true;
+                
+                //see https://dev.to/alpenglow/unity-fast-pixel-reading-part-2-asyncgpureadback-4kgn for example implementation
+                AsyncGPUReadback.Request(gpuTexture, 0, OnCompleteAsyncGPUReadback);
             }
+        }
+
+        private void OnCompleteAsyncGPUReadback(AsyncGPUReadbackRequest request){
+            m_gpuReadbackRequested = false;
+            if (!request.done){
+                Debug.Log("<color=yellow>request not done</color>");
+                return;
+            }
+
+            if (request.hasError){
+                Debug.Log("<color=red>request.hasError</color>");
+                return;
+            }
+                
+            //Debug.Log("<color=green>request.done</color>");
+            request.GetData<Color32>().CopyTo(cpuData);
         }
 
         //!
