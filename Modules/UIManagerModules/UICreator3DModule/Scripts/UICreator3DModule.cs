@@ -278,7 +278,6 @@ namespace tracer
 
             this.doneEditing -= manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
             this.doneEditing -= core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
-
         }
 
         //!
@@ -460,17 +459,19 @@ namespace tracer
                 switch (modeTRS)
                 {
                     case 0:
-                        //Debug.Log("DONE EDITING (?!)");
                         manager.Manipulation3dDone(selObj.parameterList[0]);
-                        doneEditing?.Invoke(this, selObj.parameterList[0]);
+                        if(selObj && selObj.GetType() != typeof(SceneObjectMeasurement))    //SceneObjectMeasurement is only locally, so we dont execute these network events
+                            doneEditing?.Invoke(this, selObj.parameterList[0]);
                         break;
                     case 1:
                         manager.Manipulation3dDone(selObj.parameterList[1]);
-                        doneEditing?.Invoke(this, selObj.parameterList[1]);
+                        if(selObj && selObj.GetType() != typeof(SceneObjectMeasurement))    //SceneObjectMeasurement is only locally, so we dont execute these network events
+                            doneEditing?.Invoke(this, selObj.parameterList[1]);
                         break;
                     case 2:
                         manager.Manipulation3dDone(selObj.parameterList[2]);
-                        doneEditing?.Invoke(this, selObj.parameterList[2]);
+                        if(selObj && selObj.GetType() != typeof(SceneObjectMeasurement))    //SceneObjectMeasurement is only locally, so we dont execute these network events
+                            doneEditing?.Invoke(this, selObj.parameterList[2]);
                         break;
                     default:
                         break;

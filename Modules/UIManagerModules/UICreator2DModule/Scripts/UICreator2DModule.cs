@@ -182,7 +182,6 @@ namespace tracer
             snapSelect.uiSettings = manager.uiAppearanceSettings;
             snapSelect.manager = manager;
 
-
             for (int i = 0; i < mainSelection.parameterList.Count; i++)
             {
                 switch (mainSelection.parameterList[i].name)
@@ -318,8 +317,11 @@ namespace tracer
                     Manipulator manipSpinner = currentManipulator.GetComponent<Manipulator>();
                     if (manipSpinner){
                         manipSpinner.Init(abstractParam, manager);
-                        manipSpinner.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
-                        manipSpinner.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
+                        //SceneObjectMeasurement is only locally, so we dont add these listener
+                        if(mainSelection.GetType() != typeof(SceneObjectMeasurement)){
+                            manipSpinner.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
+                            manipSpinner.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
+                        }
                     }
                     break;
                 case AbstractParameter.ParameterType.COLOR:
@@ -340,8 +342,6 @@ namespace tracer
                     ButtonManipulator manipButton = currentManipulator.GetComponent<ButtonManipulator>();
                     if (manipButton){
                         manipButton.Init(abstractParam, manager);
-                        //manipButton.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
-                        //manipButton.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
                     }
                     break;
                 case AbstractParameter.ParameterType.ACTION:

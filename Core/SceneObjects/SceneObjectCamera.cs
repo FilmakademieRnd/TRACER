@@ -84,7 +84,7 @@ namespace tracer
         //! @param gameObject The gameObject the new SceneObject will be attached to.
         //! @sceneID The scene ID for the new SceneObject.
         //!
-        public static new SceneObjectCamera Attach(GameObject gameObject, byte sceneID = 254)
+        public static new SceneObjectCamera Attach(GameObject gameObject, byte sceneID)
         {
             SceneObjectCamera obj = gameObject.AddComponent<SceneObjectCamera>();
             obj.Init(sceneID);

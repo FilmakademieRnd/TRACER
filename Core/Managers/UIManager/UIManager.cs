@@ -565,12 +565,20 @@ namespace tracer
         //!
         public void addSelectedObject(SceneObject sceneObject)
         {
-            if (!sceneObject._lock)
-            {
+            if (!sceneObject._lock){
                 m_selectedObjects.Add(sceneObject);
 
                 selectionChanged?.Invoke(this, m_selectedObjects);
                 selectionAdded?.Invoke(this, sceneObject);
+            }else{
+                
+                //ability to select the measurement modules SceneObjectMeasurement either way - and never send any data or locks out!
+                if(sceneObject.GetType() == typeof(SceneObjectMeasurement)){
+                    m_selectedObjects.Add(sceneObject);
+                    selectionChanged?.Invoke(this, m_selectedObjects);
+                    // dont invoke network related calls (that one is for highlights as well)
+                    // selectionAdded?.Invoke(this, sceneObject);
+                }
             }
         }
 
@@ -611,8 +619,11 @@ namespace tracer
         {
             m_selectedObjects.Remove(sceneObject);
 
-            selectionRemoved?.Invoke(this, sceneObject);
             selectionChanged?.Invoke(this, m_selectedObjects);
+
+            // dont invoke network related calls (that one is for highlights as well)
+            if(sceneObject.GetType() != typeof(SceneObjectMeasurement))
+                selectionRemoved?.Invoke(this, sceneObject);
         }
 
         //!
@@ -621,7 +632,9 @@ namespace tracer
         public void clearSelectedObject()
         {
             foreach (SceneObject sceneObject in m_selectedObjects){
-                selectionRemoved?.Invoke(this, sceneObject);
+                // dont invoke network related calls (that one is for highlights as well)
+                if(sceneObject.GetType() != typeof(SceneObjectMeasurement))
+                    selectionRemoved?.Invoke(this, sceneObject);
             }
             m_selectedObjects.Clear();
             selectionChanged?.Invoke(this, m_selectedObjects);

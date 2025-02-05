@@ -33,7 +33,7 @@ public class SceneRaycastHelper{
         List<SphereCollider> tmpColliders;
         List<MeshRenderer> allVisibleMeshRenderer = GatherVisibleMeshRenderer(sceneRoot.GetComponentsInChildren<MeshRenderer>(), ignoreTheseObjects, out tmpColliders);
         
-        Debug.Log("<color=yellow>"+allVisibleMeshRenderer.Count+" VISIBLE OBJECTS FOUND</color>");
+        //Debug.Log("<color=yellow>"+allVisibleMeshRenderer.Count+" VISIBLE OBJECTS FOUND</color>");
 
         Ray ray = Camera.main.ScreenPointToRay(point);
         List<Transform> objectsToCheckList = new();
@@ -52,18 +52,18 @@ public class SceneRaycastHelper{
         }
 
         if(objectsToCheckList.Count == 0){
-            Debug.Log("<color=red>NO HIT</color>");
+            //Debug.Log("<color=red>NO HIT</color>");
             foreach(SphereCollider c in tmpColliders)
                 Component.DestroyImmediate(c);
             return false;
         }
 
-        Debug.Log("<color=green>DETECT "+objectsToCheckList.Count+" VALID OBJECTS WE COULD HIT</color>");
+        //Debug.Log("<color=green>DETECT "+objectsToCheckList.Count+" VALID OBJECTS WE COULD HIT</color>");
         
         //cast ray against SphereColliders, check first hit
         List<MeshCollider> tmpMeshColliders = new();
         foreach(Transform hitTransforms in objectsToCheckList){
-            Debug.Log("<color=green>\t"+hitTransforms.gameObject.name+"</color>");
+            //Debug.Log("<color=green>\t"+hitTransforms.gameObject.name+"</color>");
             if(!hitTransforms.GetComponent<MeshCollider>() && hitTransforms.GetComponent<MeshRenderer>()){
                 //add mesh collider to objects we could hit, that do not already have one
                 tmpMeshColliders.Add(hitTransforms.gameObject.AddComponent<MeshCollider>());

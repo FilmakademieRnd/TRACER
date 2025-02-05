@@ -46,7 +46,7 @@ namespace tracer
         //! @param gameObject The gameObject the new SceneObject will be attached to.
         //! @sceneID The scene ID for the new SceneObject.
         //!
-        public static new SceneObjectDirectionalLight Attach(GameObject gameObject, byte sceneID = 254)
+        public static new SceneObjectDirectionalLight Attach(GameObject gameObject, byte sceneID)
         {
             SceneObjectDirectionalLight obj = gameObject.AddComponent<SceneObjectDirectionalLight>();
             obj.Init(sceneID);

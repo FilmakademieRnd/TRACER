@@ -172,13 +172,13 @@ namespace tracer
         public void AddMeasurementObject(GameObject _go, Transform _insertAfter = null){
             if(!_insertAfter){
                 measurementObjects.Add(_go.transform);
-                measurementObjects[^1].GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+                measurementObjects[^1].GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
             }else{
                int index = measurementObjects.FindIndex(tr => tr == _insertAfter);
                 if(index < 0)
                     return; 
                 measurementObjects.Insert(index, _go.transform);
-                measurementObjects[index].GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+                measurementObjects[index].GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
             }
         }
         //removes a waypoint and return a another waypoint we should select
@@ -186,7 +186,7 @@ namespace tracer
             int index = measurementObjects.FindIndex(tr => tr == _go.transform);
             if(index < 0)
                 return null;
-            measurementObjects[index].GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
+            measurementObjects[index].GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
             measurementObjects.RemoveAt(index);
             if(measurementObjects.Count > 0)
                 return measurementObjects[(index+1) % measurementObjects.Count];
@@ -297,36 +297,36 @@ namespace tracer
                     line.positionCount = 2;
                     if(_isActive){
                         //subscribe to the sceneObject.hasChanged event, to not always calculate the line!
-                        startObject.GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
-                        endObject.GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+                        startObject.GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
+                        endObject.GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
                     }else{
-                        startObject.GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
-                        endObject.GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
+                        startObject.GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
+                        endObject.GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
                     }
                     break;
                 case MeasureTypeEnum.angle:
                     line.positionCount = 3;
                     if(_isActive){
                         //subscribe to the sceneObject.hasChanged event, to not always calculate the line!
-                        angleObjectA.GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
-                        angleObjectB.GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
-                        angleObjectC.GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+                        angleObjectA.GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
+                        angleObjectB.GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
+                        angleObjectC.GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
                     }else{
-                        angleObjectA.GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
-                        angleObjectB.GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
-                        angleObjectC.GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
+                        angleObjectA.GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
+                        angleObjectB.GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
+                        angleObjectC.GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
                     }
                     break;
                 case MeasureTypeEnum.travel:
                     line.positionCount = 1;
                     if(_isActive){
                         //subscribe to the sceneObject.hasChanged event, to not always calculate the line!
-                        travelObject.GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+                        travelObject.GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
                         previousTraveledPos = travelObject.position;
                         lastDistanceForLinePoint = 0;
                         line.SetPosition(0, previousTraveledPos);
                     }else{
-                        travelObject.GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
+                        travelObject.GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
                     }
                     currentDistance = 0f;
                     break;
@@ -336,11 +336,11 @@ namespace tracer
                     if(_isActive){
                         //subscribe to the sceneObject.hasChanged event, to not always calculate the line!
                         for(int x = 0; x<measurementObjects.Count; x++)
-                            measurementObjects[x].GetComponent<SceneObject>().hasChanged += SceneObjectHasChanged;
+                            measurementObjects[x].GetComponent<SceneObjectMeasurement>().posChanged += SceneObjectHasChanged;
                         
                     }else{
                         for(int x = 0; x<measurementObjects.Count; x++)
-                            measurementObjects[x].GetComponent<SceneObject>().hasChanged -= SceneObjectHasChanged;
+                            measurementObjects[x].GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
                     }
                     
                     break;
@@ -351,13 +351,10 @@ namespace tracer
         }
 
         //!
-        //! Callback to update the measurements if a sceneobject has changed
+        //! Callback to update the measurements if a sceneobjects' pos has changed
         //!
-        private void SceneObjectHasChanged(object sender, AbstractParameter parameter){
-            
-            //SceneObject sceneObject = (SceneObject) sender;
+        private void SceneObjectHasChanged(object sender, EventArgs e){
             UpdateMeasurement();
-            
         }
         #endregion
 
@@ -396,13 +393,13 @@ namespace tracer
                     );
                     break;
                 case MeasureTypeEnum.travel:
+                    currentDistance += Vector3.Distance(previousTraveledPos, travelObject.position) * distanceMultiplier;
                     //add travel points on the fly if distance is bigger a certain treshold
                     if(currentDistance - lastDistanceForLinePoint > 0.3f * distanceMultiplier){
                         lastDistanceForLinePoint = currentDistance;
                         line.positionCount++;
-                        line.SetPosition(line.positionCount-1, previousTraveledPos);
+                        line.SetPosition(line.positionCount-1, travelObject.position);
                     }
-                    currentDistance += Vector3.Distance(previousTraveledPos, travelObject.position) * distanceMultiplier;
                     previousTraveledPos = travelObject.position;
                     break;
                 case MeasureTypeEnum.waypoints:

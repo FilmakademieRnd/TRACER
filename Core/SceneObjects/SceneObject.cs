@@ -43,7 +43,14 @@ namespace tracer
         //!
         //! Is the sceneObject locked?
         //!
-        public bool _lock = false;
+        public bool _lock {
+            get => IsLocked();
+            set => SetLocked(value);
+        }
+        
+        private bool m_lock = false;
+        protected virtual bool IsLocked(){ return m_lock;}
+        protected virtual void SetLocked(bool v){ m_lock = v;}
         //!
         //! Previous lock state for highlighting the sceneObject.
         //!
@@ -94,9 +101,9 @@ namespace tracer
         //! Use this function instead GameObject.AddComponen<>!
         //!
         //! @param _parent The gameObject the new SceneObject will be attached to.
-        //! @sceneID The scene ID for the new SceneObject.
+        //! @sceneID The scene ID for the new SceneObject. (255 is used for dynamic abstract parameter)
         //!
-        public static new SceneObject Attach(GameObject parent, byte sceneID = 254)
+        public static new SceneObject Attach(GameObject parent, byte sceneID)
         {
             SceneObject obj = parent.AddComponent<SceneObject>();
             obj.Init(sceneID);

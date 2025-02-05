@@ -630,7 +630,7 @@ namespace tracer{
             GameObject newWaypoint = GameObject.Instantiate(sceneObjectToPlace.gameObject);
             //remove old sceneobject comp
             Component.DestroyImmediate(newWaypoint.GetComponent<SceneObject>());
-            core.getManager<SceneManager>().simpleSceneObjectList.Add((SceneObject)SceneObject.Attach(newWaypoint, core.getManager<NetworkManager>().cID));
+            core.getManager<SceneManager>().simpleSceneObjectList.Add((SceneObject)SceneObjectMeasurement.Attach(newWaypoint));
             newWaypoint.transform.parent = sceneObjectToPlace.transform.parent;
             //insert after selected waypoint
             newWaypoint.GetComponentInParent<MeasurePool>().AddMeasurementObject(newWaypoint, sceneObjectToPlace.transform);
@@ -675,12 +675,11 @@ namespace tracer{
         #endregion
 
         #region Additional Functions
-
         private void CreateMeasurePoolAtRuntime(MeasurePool _mp){
             foreach(Transform child in _mp.GetComponentInChildren<Transform>()){
                 if (child.gameObject.tag == "editable"){
                     //if (core.isServer){
-                        core.getManager<SceneManager>().simpleSceneObjectList.Add((SceneObject)SceneObject.Attach(child.gameObject, core.getManager<NetworkManager>().cID));
+                        core.getManager<SceneManager>().simpleSceneObjectList.Add((SceneObject)SceneObjectMeasurement.Attach(child.gameObject, core.getManager<NetworkManager>().cID));
                     //}
                 }
                 core.StartCoroutine(QuickColorHighlight(child.GetComponent<MeshRenderer>(), Color.green));
