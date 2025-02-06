@@ -551,8 +551,8 @@ namespace tracer
             // Scale
             Vector3 scl = new Vector3(node.scale[0], node.scale[1], node.scale[2]);
 
-            if (!parentTransform.Find(Encoding.ASCII.GetString(node.name)))
-            {
+            if(true){
+            //if (!parentTransform.Find(Encoding.ASCII.GetString(node.name))){
                 // set up object basics
                 objMain = new GameObject();
                 objMain.name = Encoding.ASCII.GetString(node.name);
