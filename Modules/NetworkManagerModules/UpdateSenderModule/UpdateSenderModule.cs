@@ -396,8 +396,8 @@ namespace tracer
             byte[] message = new byte[3 + m_modifiedParametersDataSize + 10 * m_modifiedParameters.Count];
             Span<byte> msgSpan = new Span<byte>(message);
 
-            Debug.Log("<color=blue>_____ createParameterMessage ____</color>");
-            Debug.Log("\tparameterCount: "+m_modifiedParameters.Count);
+//            Debug.Log("<color=blue>_____ createParameterMessage ____</color>");
+//            Debug.Log("\tparameterCount: "+m_modifiedParameters.Count);
             
 
             //************************************************ header
@@ -409,10 +409,10 @@ namespace tracer
             int start = 3;
             for (int i = 0; i < m_modifiedParameters.Count; i++)
             {
-                Debug.Log("\t<color=red>index: "+i+"</color>");
+//                Debug.Log("\t<color=red>index: "+i+"</color>");
                 AbstractParameter parameter = m_modifiedParameters[i];
                 int length = 10 + parameter.dataSize();
-                Debug.Log("\tparaLength: "+length);
+//                Debug.Log("\tparaLength: "+length);
                 Span<byte> newSpan = msgSpan.Slice(start, length);
 
 
@@ -420,10 +420,10 @@ namespace tracer
                 BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id); // SceneObjectID
                 BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);         // ParameterID
                 newSpan[5] = (byte)parameter.tracerType;                                // ParameterType
-                Debug.Log("\ttype: "+newSpan[5]);
+//                Debug.Log("\ttype: "+newSpan[5]);
                 BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);        // Parameter message length
-                Debug.Log("\tmsg length: "+newSpan[6]);
-                Debug.Log("\tnewSpan.Length: "+newSpan.Length);
+//                Debug.Log("\tmsg length: "+newSpan[6]);
+//                Debug.Log("\tnewSpan.Length: "+newSpan.Length);
                 parameter.Serialize(newSpan.Slice(10));                                 // Parameter data
 
                 // string spanString = "";
@@ -434,11 +434,11 @@ namespace tracer
                 start += length;
             }
 
-            //Debug.Log("<color=blue>_______________________</color>");
-            string msg = "";
-            foreach(byte b in message)
-                msg += b + "\n";
-            //Debug.Log("<color=blue MSG DATA\n"+msg+"</color>");
+            // Debug.Log("<color=blue>_______________________</color>");
+            // string msg = "";
+            // foreach(byte b in message)
+            //     msg += b + "\n";
+            // Debug.Log("<color=blue MSG DATA\n"+msg+"</color>");
 
             return message;
         }
