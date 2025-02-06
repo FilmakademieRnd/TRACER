@@ -341,7 +341,7 @@ namespace tracer
             if(currentFocusedObject == sceneObject){
                 currentFollowObject = currentFocusedObject;
                 //Start coroutine to follow? Only if locked? another module?
-                return;
+                //return; //focus again!
             }else{
                 currentFocusedObject = sceneObject;
             }

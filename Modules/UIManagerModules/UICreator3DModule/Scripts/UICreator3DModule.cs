@@ -330,8 +330,7 @@ namespace tracer
         //! @param e event reference
         //!
         private void Tapped(object sender, Vector2 point){
-             if(!selObj){
-                manager.setLastClickedObject(null);
+            if(!selObj || !CameraRaycast(point)){
                 return;
              }
 
@@ -340,7 +339,6 @@ namespace tracer
                     manager.focusOnLastClickedObject();
                 }
             }
-            manager.setLastClickedObject(selObj);
         }
 
 
