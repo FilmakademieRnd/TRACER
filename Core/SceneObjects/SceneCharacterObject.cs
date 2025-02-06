@@ -103,7 +103,7 @@ namespace tracer
         {
             base.Awake();
 
-            //CreatePathParameters();
+            CreatePathParameters();
 
             // Initialize the dictionary to store bone transforms by their IDs.
             boneMap = new Dictionary<int, Transform>();
@@ -133,22 +133,23 @@ namespace tracer
         }
 
         #region PATH FUNCTIONS
-        /*private void CreatePathParameters(){
-            pathPos = new Parameter<Vector3>(transform.localPosition, "pathPosition", this);
+        private void CreatePathParameters(){
+            Parameter<Vector3> pathPos = new Parameter<Vector3>(transform.localPosition, "pathPosition", this);
             pathPos.hasChanged += updatePathPosition;
-            pathRot = new Parameter<Quaternion>(transform.localRotation, "pathRotation", this);
+            Parameter<Quaternion> pathRot = new Parameter<Quaternion>(transform.localRotation, "pathRotation", this);
             pathRot.hasChanged += updatePathRotation;
 
-            createPath = new Parameter<bool>(false, "createPath", this); //no hasChanged function necessary(?)
+            Parameter<bool> createPath = new Parameter<bool>(false, "createPath", this); //no hasChanged function necessary(?)
             createPath.hasChanged += updatePathData;
 
             
-            animHostPathAnimFinished = new Parameter<int>(0, "animHostPathReady", this);
+            Parameter<int> animHostPathAnimFinished = new Parameter<int>(0, "animHostPathReady", this);
             animHostPathAnimFinished.hasChanged += triggerAnimPathReady;
 
-            animHostGen = new RPCParameter<int>(0, "animHostGen", this);
+            RPCParameter<int> animHostGen = new RPCParameter<int>(0, "animHostGen", this);
             animHostGen.hasChanged += triggerAnimHostGen;
-        }*/
+        }
+
         //see updatePosition
         private void updatePathPosition(object sender, Vector3 a){
             //necessary to emit? emit only on specific TriggerAnimHost function or "EmitPathFunction"?

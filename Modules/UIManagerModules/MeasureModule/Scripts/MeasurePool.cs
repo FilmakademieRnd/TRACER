@@ -126,6 +126,7 @@ namespace tracer
 
             manager = GameObject.FindWithTag("Core").GetComponent<Core>().getManager<UIManager>();
             module = manager.getModule<MeasureModule>();
+            distanceMultiplier = module.GetDistanceMultiplier();
 
             line = Instantiate(linePrefab, transform).GetComponent<LineRenderer>();
             if(!line){
@@ -356,6 +357,11 @@ namespace tracer
         //! Callback to update the measurements if a sceneobjects' pos has changed
         //!
         private void SceneObjectHasChanged(object sender, EventArgs e){
+            UpdateMeasurement();
+        }
+
+        public void DistanceMultiplierChanged(float newValue){
+            distanceMultiplier = newValue;
             UpdateMeasurement();
         }
         #endregion

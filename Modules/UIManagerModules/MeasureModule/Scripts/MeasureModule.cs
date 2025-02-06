@@ -112,6 +112,8 @@ namespace tracer{
 
         #endregion
 
+        public float GetDistanceMultiplier(){ return manager.settings.measureDistanceMultiplier.value; }
+
 
         //!
         //! Constructor
@@ -141,6 +143,15 @@ namespace tracer{
             MenuButton measureUIMenuButton = new MenuButton("", ToggleMeasureUI, new List<UIManager.Roles>() { UIManager.Roles.SET });
             measureUIMenuButton.setIcon("Images/button_measure_off");
             manager.addButton(measureUIMenuButton);
+
+            manager.settings.measureDistanceMultiplier.hasChanged += MeasureDistanceMultiplierChanged;
+        }
+
+        private void MeasureDistanceMultiplierChanged(object sender, float e){
+            //Update the Multiplier on all existing objects (could also add a listener from there...)
+            foreach(MeasurePool mp in UnityEngine.Object.FindObjectsOfType<MeasurePool>()){
+                mp.DistanceMultiplierChanged(e);
+            }
         }
 
         //! 
@@ -152,6 +163,7 @@ namespace tracer{
         protected override void Cleanup(object sender, EventArgs e)
         {
             base.Cleanup(sender, e);
+            manager.settings.measureDistanceMultiplier.hasChanged -= MeasureDistanceMultiplierChanged;
         }
         #endregion
 

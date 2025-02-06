@@ -232,13 +232,14 @@ namespace tracer
                         snapSelect.addElement(Resources.Load<Sprite>("Images/button_sensorSize_text"));
                         break;
                     case "createPath":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_createPath"));
+                        //snapSelect.addElement(Resources.Load<Sprite>("Images/button_createPath"));
+                        //we dont show an icon, but BEWARE this can be a big problem if we check indices of the icons, since they are messed up big time than!
                         break;
                     case "pathPosition":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
+                        //snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
                         break;
                     case "pathRotation":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
+                        //snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
                         break;
                     case "animHostGen":
                         break;

@@ -51,6 +51,8 @@ namespace tracer
             public Parameter<float> uiScale = new Parameter<float>(1f, "uiScale");
             [ShowInMenu]
             public ListParameter roles;
+            [ShowInMenu]
+            public Parameter<float> measureDistanceMultiplier = new Parameter<float>(1f, "measureMultiplier");
         }
         //!
         //! Getter and setter for the UI settings.

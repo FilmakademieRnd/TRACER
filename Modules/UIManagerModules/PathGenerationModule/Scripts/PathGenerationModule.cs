@@ -172,11 +172,11 @@ namespace tracer{
         }
 
         private void ShowPathGeneration(){
-             if (m_pathGenSelectButton == null){
+            if (m_pathGenSelectButton == null){
                 m_pathGenSelectButton = new MenuButton("", TogglePathGenerationUI, new List<UIManager.Roles>() { UIManager.Roles.SET });
                 m_pathGenSelectButton.setIcon("Images/button_pathgeneration");
                 manager.addButton(m_pathGenSelectButton);
-             }
+            }
         }
 
         private void RemovePathGeneration(){
