@@ -41,7 +41,7 @@ namespace tracer{
         
     //!
     //! UI to enable the ingame distance interface
-    //!     BEWARE: this ui could be active AND the other ui when selected a scene object to edit it (even the Tineline could be active too!)
+    //!     BEWARE: this ui could be active AND the other ui when selected a scene object to edit it (even the Timeline could be active too!)
     //!     TODO and add/remove measurement points
     //!
 

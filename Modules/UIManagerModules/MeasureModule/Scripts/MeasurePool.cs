@@ -112,9 +112,11 @@ namespace tracer
         private List<Transform> measurementObjects;
         private TextMeshProUGUI uiDistanceText;
         
+        #if UNITY_EDITOR
         void Start(){
-            Init();
+            //Init();
         }
+        #endif
 
         public bool IsInited(){ return manager != null;}
 

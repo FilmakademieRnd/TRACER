@@ -201,7 +201,7 @@ namespace tracer
                 Helpers.copyArray(BitConverter.GetBytes(sceneObjectId), 0, message, 4, 2);     // SceneObjectID
                 message[6] = Convert.ToByte(true);
                 m_controlMessages.Append(message);
-                Debug.Log(">>>>>>>>>>>>>>>>>>>> lockSceneObject "+sceneObject.gameObject.name);
+//                Debug.Log(">>>>>>>>>>>>>>>>>>>> lockSceneObject "+sceneObject.gameObject.name);
             }
 
             m_mre.Set();
@@ -237,7 +237,7 @@ namespace tracer
                 Helpers.copyArray(BitConverter.GetBytes(sceneObjectId), 0, message, 4, 2);     // SceneObjectID
                 message[6] = Convert.ToByte(false);
                 m_controlMessages.Append(message);
-                Debug.Log(">>>>>>>>>>>>>>>>>>>> unlockSceneObject "+sceneObject.gameObject.name);
+//                Debug.Log(">>>>>>>>>>>>>>>>>>>> unlockSceneObject "+sceneObject.gameObject.name);
             }
 
             m_mre.Set();
@@ -273,7 +273,7 @@ namespace tracer
                 Helpers.copyArray(BitConverter.GetBytes(parameter._id), 0, message, 6, 2);  // ParameterID
                 message[8] = (byte)parameter.tracerType;  // ParameterType
                 m_controlMessages.Append(message);
-                Debug.Log(">>>>>>>>>>>>>>>>>>>> queueUndoRedoMessage");
+//                Debug.Log(">>>>>>>>>>>>>>>>>>>> queueUndoRedoMessage");
             }
 
             m_mre.Set();
@@ -339,7 +339,7 @@ namespace tracer
             parameter.Serialize(newSpan.Slice(10)); // Parameter data
 
             m_controlMessages.Append(message);
-            Debug.Log(">>>>>>>>>>>>>>>>>>>> queueRPCMessage");
+//            Debug.Log(">>>>>>>>>>>>>>>>>>>> queueRPCMessage");
             //m_mre.Set();
         }
 
@@ -375,7 +375,7 @@ namespace tracer
                     m_modifiedParameters.Add(parameter);
                     m_modifiedParametersDataSize += parameter.dataSize();
                 }
-                Debug.Log(">>>>>>>>>>>>>>>>>>>> queueModifiedParameter");
+//                Debug.Log(">>>>>>>>>>>>>>>>>>>> queueModifiedParameter");
             }
         }
 

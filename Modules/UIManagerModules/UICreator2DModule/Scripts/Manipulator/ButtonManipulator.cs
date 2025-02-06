@@ -28,7 +28,7 @@ https://opensource.org/licenses/MIT
 */
 
 //! @file "ButtonManipulator.cs"
-//! @brief button manipulator used for path creation ui button
+//! @brief button manipulator used for path creation ui button (now in a different module, still here to use for other stuff!)
 //! @author Thomas Krpger
 //! @version 0
 //! @date 21.01.2025
@@ -96,6 +96,8 @@ namespace tracer{
                     // _snapSelect._loop = false;
                     switch (paramBool.name) {
                         case "createPath":
+                            //FUNCTIONALITY REMOVED FOR CURRENT BUILD/BERLINALE
+                            return;
                             inputBlockerInCanvas = GameObject.Instantiate(Resources.Load(LOCATION_INPUT_BLOCKING_CANVAS_PREFAB) as GameObject).transform.GetChild(0).gameObject;
                             inputBlockerInCanvas.SetActive(false);
                             //show button as element to delete the path, recreate path, add path (and maybe distribute?)
@@ -170,6 +172,7 @@ namespace tracer{
 
         private void executeElement(object sender, int value)
         {
+            /*
             Debug.Log("execute value "+value+" on button manipulator "+_currentManipulation+" to execute");
             
             SceneCharacterObject sco = abstractParam._parent.gameObject.GetComponent<SceneCharacterObject>();
@@ -216,7 +219,7 @@ namespace tracer{
 
                     break;
             }
-            
+            */
         }
 
         private LineRenderer pathLine;
@@ -325,7 +328,7 @@ namespace tracer{
                 //align to hit normal with upwards vector
                 //abstractParam._parent.gameObject.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
 
-                ShowAvailablePath(true, _manager.SelectedObjects[0].GetComponent<SceneCharacterObject>().pathPos);
+//                ShowAvailablePath(true, _manager.SelectedObjects[0].GetComponent<SceneCharacterObject>().pathPos);
 
                 //show "send" button
                 _snapSelect.elements[^1].gameObject.GetComponent<UnityEngine.UI.Image>().enabled = true;
@@ -374,7 +377,7 @@ namespace tracer{
             m_activeParameter =  _manager.SelectedObjects[0].parameterList[3] as IAnimationParameter;   //ignore TRS (0) -> use 3
             m_activeParameter.clearKeys();
             AbstractKey[] keyList = new AbstractKey[]{
-                new Key<Vector3>(0f, start, tangentTime, centerPosForTangent, tangentTime, centerPosForTangent),                  //start position
+                new Key<Vector3>(0f, start, tangentTime, centerPosForTangent, tangentTime, centerPosForTangent),        //start position
                 new Key<Vector3>(endTime, end, tangentTime, centerPosForTangent, tangentTime, centerPosForTangent)      //end position
             };
             m_activeParameter.createKeyList(keyList);

@@ -41,7 +41,9 @@ namespace tracer
     public class SceneCharacterObject : SceneObject
     {
 
+        //FUNCTIONALITY REMOVED FOR CURRENT BUILD/BERLINALE
         #region PATH VALUES
+        /*
         //!
         //! path position parameter, these will be AnimationParameter and <s>are hidden in ui by their name</s> (not hidden, because index will still iterate over it!)
         //! needs to be at paremterList index 3
@@ -60,8 +62,8 @@ namespace tracer
         //! necessary rpcparameter to trigger AnimHost. Hidden by name (take care of index - UICreator2DModule.createManipulator()
         //!
         public Parameter<int> animHostPathAnimFinished;
-        
         public RPCParameter<int> animHostGen;
+        */
         #endregion
 
         //!
@@ -101,7 +103,7 @@ namespace tracer
         {
             base.Awake();
 
-            CreatePathParameters();
+            //CreatePathParameters();
 
             // Initialize the dictionary to store bone transforms by their IDs.
             boneMap = new Dictionary<int, Transform>();
@@ -131,7 +133,7 @@ namespace tracer
         }
 
         #region PATH FUNCTIONS
-        private void CreatePathParameters(){
+        /*private void CreatePathParameters(){
             pathPos = new Parameter<Vector3>(transform.localPosition, "pathPosition", this);
             pathPos.hasChanged += updatePathPosition;
             pathRot = new Parameter<Quaternion>(transform.localRotation, "pathRotation", this);
@@ -146,7 +148,7 @@ namespace tracer
 
             animHostGen = new RPCParameter<int>(0, "animHostGen", this);
             animHostGen.hasChanged += triggerAnimHostGen;
-        }
+        }*/
         //see updatePosition
         private void updatePathPosition(object sender, Vector3 a){
             //necessary to emit? emit only on specific TriggerAnimHost function or "EmitPathFunction"?
@@ -173,12 +175,12 @@ namespace tracer
             Debug.Log("called triggerAnimHostGen "+i);
 
 
-            if(pathPos.getKeys() != null && pathPos.getKeys().Count > 0){
+            /*if(pathPos.getKeys() != null && pathPos.getKeys().Count > 0){
                 //Show Particle with last pathPosition
                 GameObject pathTargetParticle = Resources.Load("Particles_Path_Target", typeof(GameObject)) as GameObject;
                 pathTargetParticle.transform.position = ((Key<Vector3>)pathPos.getKeys()[^1]).value;
                 Destroy(pathTargetParticle, 8f);
-            }
+            }*/
         }
 
         private void triggerAnimPathReady(object sender, int i){
@@ -198,9 +200,9 @@ namespace tracer
 
         public override void OnDestroy(){
             base.OnDestroy();
-            pathPos.hasChanged -= updatePathPosition;
-            pathRot.hasChanged -= updatePathRotation;
-            animHostGen.hasChanged -= triggerAnimHostGen;
+            //pathPos.hasChanged -= updatePathPosition;
+            //pathRot.hasChanged -= updatePathRotation;
+            //animHostGen.hasChanged -= triggerAnimHostGen;
              _core.getManager<SceneManager>().sceneReady -= connectAndStart;
         }
 
@@ -221,16 +223,16 @@ namespace tracer
         public void OverrideTracerValues(byte newSceneID, short newObjectID, short newParameterID){
             _sceneID = newSceneID;
             _id = newObjectID;
-            animHostGen.OverrideParameterID(newParameterID);
+            //animHostGen.OverrideParameterID(newParameterID);
         }
         //! see OverrideTracerValues, we reset them values
         public void ResetOverwrittenTracerValues(){
             _sceneID = sceneIdWeHad;
             _id = objectIdWeHad;
-            animHostGen.OverrideParameterID(paramterIdRPCParaHad);
+            //animHostGen.OverrideParameterID(paramterIdRPCParaHad);
         }
         public void TriggerAnimHost(){
-            animHostGen.value = 3;  //const value AnimHost expects
+            //animHostGen.value = 3;  //const value AnimHost expects
         }
 
         public void SendOutAnimHostTrigger(){
