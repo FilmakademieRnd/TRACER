@@ -346,7 +346,7 @@ namespace tracer
 
             foreach(AbstractKey k in _keys){
                 _keyList.Add(k);
-                Debug.Log(k.time + ", "+k.getValueString());
+                //Debug.Log(k.time + ", "+k.getValueString());
             }
                 
             InvokeHasChanged();

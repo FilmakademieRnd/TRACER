@@ -238,7 +238,7 @@ namespace tracer
 
         //override to use stuff from Update without overwriting Update
         protected virtual void EndOfUpdateFunction(){
-
+            //not used in current implementation for PathGeneration (but was prior to it)
         }
     }
 }

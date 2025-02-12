@@ -46,21 +46,23 @@ namespace tracer{
     public class PathGenerationModule : UIManagerModule{
 
         public const string     LOCATION_CANVAS_PREFAB      = "Prefabs/PathGeneration_Canvas";
-        public const string     LOCATION_PATH_PARTICLE      = "Prefabs/PathTargetClickParticle";
-        public const string     LOCATION_LINEPOOL_PREFAB    = "Prefabs/PathLineRenderer";
+        public const string     LOCATION_PATH_PARTICLE      = "Prefabs/PathTarget_Particles";
+        public const string     LOCATION_LINEPOOL_PREFAB    = "Prefabs/Path_LineRenderer";
         //public const string     LOCATION_WPPOOL_PREFAB      = "Prefabs/PathPositionKey";    //this will be(come) SceneObjectPath (should be editable, but not send anything out)
         //public const string     LOCATION_ANGLEPOOL_PREFAB   = "Prefabs/PathRotationKey";
         
         public const int        CANVAS_SORTING_ORDER        = 15;        
-        public const string     BUTTON_NAME_LINEAR_PATH     = "Creation/Button_GenerateLinearPath";
-        //public const string     BUTTON_NAME_WAYPOINT_PATH   = "Creation/Button_ManualWaypointPath";
-        //public const string     BUTTON_NAME_WAYPOINT_ADD    = "Creation/Button_ManualWaypoint_Add";
-        //public const string     BUTTON_NAME_WAYPOINT_REM    = "Creation/Button_ManualWaypoint_Rem";
-        //public const string     BUTTON_NAME_WAYPOINT_QUIT   = "Creation/Button_ManualWaypoint_Quit";
-        public const string     BUTTON_NAME_SEND_PATH       = "Creation/Button_SendPathToAnimHost";
-        //public const string     BUTTON_NAME_EDIT_PATH   = "Creation/Button_ShowEditPath"; //click it again to finish
-        //public const string     BUTTON_NAME_PLAY_ANIM   = "Creation/Button_PlayReceivedAnim";
+        public const string     BUTTON_NAME_GENERATE_PATH   = "Options/Button_CreatePathToClick";
+        public const string     BUTTON_NAME_REGENERATE_PATH = "Options/Button_RegeneratePathToClick";
+        public const string     BUTTON_NAME_SEND_PATH       = "Options/Button_TriggerAnimHostCharAnimation";
+        public const string     BUTTON_NAME_EDIT_PATH       = "Options/Button_EditPath"; //click it again to finish
+
+        //these are case sensitive buttons in the bottom right corner
+        public const string     BUTTON_NAME_WAYPOINT_PLACE  = "PathEditing/Button_ManualWaypointPath";
+        public const string     BUTTON_NAME_WAYPOINT_ADD    = "PathEditing/Button_ManualWaypoint_Add";
+        public const string     BUTTON_NAME_WAYPOINT_REM    = "PathEditing/Button_ManualWaypoint_Rem";
         public const string     BLOCKER_NAME_PLACE          = "InputBlocker";
+        
         //public const string     TEXT_NAME_UI_IUNFO          = "UIFurtherInfoText";
 
         //!
@@ -80,12 +82,19 @@ namespace tracer{
         //!
         //! object that should prevent selecting new objects during other phases
         //!
-        private GameObject inputBlockingCanvas;
-
+        private GameObject inputBlocker;
+        //!
+        //! the line renderer to visualize the path
+        //!
+        private LineRenderer pathLineRenderer;
+        //!
+        //! selected SceneCharacterObject we use for this path generation or editing
+        //!
+        private SceneCharacterObject sceneCharacterForPath;
         //!
         //! selected SceneObject we want to place (for editing the path points or pointing into the world for the path generation)
         //!
-        private SceneObject scenePathObjectToPlace;
+        private SceneObject scenePathObjectToPlace; //TODO: make ScenePathObject (like we did with SceneMeasureObject)
         //!
         //! the standard Color of selected SceneObject we want to place (during selection it will become green!)
         //!
@@ -98,11 +107,14 @@ namespace tracer{
 
 
         #region Selfdescribing Buttons
-        private Button button_generateLinearPath;
-        //private Button button_createWaypoints;
+        private Button button_generatePathViaClick;
+        private Button button_regeneratePathViaClick;    //need to be another button that visualize that a path already exists!
+        private Button button_triggerAnimHostGeneration;
+        private Button button_editPath;
+
+        //private Button button_placeWaypointViaRay;
         //private Button button_addWaypoint;
         //private Button button_removeWaypoint;
-        private Button button_sendPathToAnimHost;
 
         #endregion
 
@@ -113,7 +125,7 @@ namespace tracer{
         //! @param Manager reference for this module
         //!
         public PathGenerationModule(string _name, Manager _manager) : base(_name, _manager){
-            load = false;
+            //load = false;
         }
 
         #region Public Functions
@@ -123,7 +135,7 @@ namespace tracer{
 
         #region Setup
         //!
-        //! Function when Unity is loaded, create the top most ui button
+        //! Function when Unity is loaded, to listening on selecting a character for the topmost ui
         //! 
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
@@ -131,6 +143,7 @@ namespace tracer{
         protected override void Init(object _sender, EventArgs _e)
         {
             Debug.Log("<color=orange>Init PathGenerationModule</color>");
+            manager.selectionChanged += OnSelectionChanged;
         }
 
         //! 
@@ -141,93 +154,159 @@ namespace tracer{
         //! 
         protected override void Cleanup(object sender, EventArgs e){
             base.Cleanup(sender, e);
+            manager.selectionChanged -= OnSelectionChanged;
         }
         #endregion
 
-        //it should be enabled only if we select a SceneCharacterObject |OR| any of its connected/shown path data (SceneObjectPath)
-        private void TogglePathGenerationUI(){
-            isActive = !isActive;
-
-            if(isActive){
-                CreatePathGenerationUI();
-                //trigger it once, because if we already selected an object, it would not fire up this listener
-                OnSelectionChanged(null, manager.SelectedObjects);
-            }else
-                DestroyPathGenerationUI();
-
-            AddOrRemoveListener(isActive);
-
-            pathGenerationUIActiveEvent?.Invoke(this, isActive);
-
-            if(!isActive){
-                //revert color
-                if(scenePathObjectToPlace)
-                    scenePathObjectToPlace.GetComponent<MeshRenderer>().material.color = sceneObjectPathStandardColor;
-                //check if path object was selected and undo if so
-                if(manager.isThisOurSelectedObject(scenePathObjectToPlace)){
-                    manager.clearSelectedObject();
-                }
-            }
-            Debug.Log("<color=orange>TogglePathGenerationUI: "+isActive+"</color>");
-        }
-
-        private void ShowPathGeneration(){
+        private void ShowTopMenuUI(SceneCharacterObject _sco){
             if (m_pathGenSelectButton == null){
-                m_pathGenSelectButton = new MenuButton("", TogglePathGenerationUI, new List<UIManager.Roles>() { UIManager.Roles.SET });
+                m_pathGenSelectButton = new MenuButton("", TogglePathOptionsUI, new List<UIManager.Roles>() { UIManager.Roles.SET });
                 m_pathGenSelectButton.setIcon("Images/button_pathgeneration");
                 manager.addButton(m_pathGenSelectButton);
             }
+            if(sceneCharacterForPath)
+                sceneCharacterForPath.onPathPositionChanged -= PathDataChanged;
+
+            bool newCharacterSelected = sceneCharacterForPath != _sco;
+            sceneCharacterForPath = _sco;
+            sceneCharacterForPath.onPathPositionChanged += PathDataChanged;
+
+            if(newCharacterSelected){
+                DestroyPathObjects();
+                DestroyPathLineRenderer();
+
+                GeneratePathObjects();
+                GeneratePathLineRenderer();
+            }            
+
+            //see MeasurementModule.ShowCaseSensitiveButtons
         }
 
-        private void RemovePathGeneration(){
+        private void RemoveTopMenuUI(){
             //hide the menu button
             if (m_pathGenSelectButton != null){
-                DeactivateSelectionSensitiveButtons();
-                HideAllButtons();
-                TogglePathGenerationUI();
+                Debug.Log("REMOVE PATH GENERATION TOP MENU UI");
+                if(isActive)
+                    TogglePathOptionsUI();
 
                 manager.removeButton(m_pathGenSelectButton);
                 m_pathGenSelectButton = null;
-
-                DestroyPathGenerationUI();
             }
         }
 
-        private void CreatePathGenerationUI(){
+        private void TogglePathOptionsUI(){
+            isActive = !isActive;
+
+            if(isActive){
+                CreatePathOptionUI();
+                HideAllButtons();
+                RefreshOptionButtonsViz();
+
+                GeneratePathObjects();
+                GeneratePathLineRenderer();
+
+                //trigger it once, because if we already selected an object, it would not fire up this listener
+                //OnSelectionChanged(null, manager.SelectedObjects);
+            }else{
+                //remove listener if we are within this mode, just to be sure
+                core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
+
+                if(sceneCharacterForPath)
+                    sceneCharacterForPath.onPathPositionChanged -= PathDataChanged;
+
+                DestroyPathObjects();
+                DestroyPathLineRenderer();
+                DestroyPathOptionUI();
+            }
+
+            pathGenerationUIActiveEvent?.Invoke(this, isActive);
+
+            Debug.Log("<color=yellow>TogglePathGenerationUI: "+isActive+"</color>");
+        }
+
+        private void CreatePathOptionUI(){
             pathCreationCanvasHolder = GameObject.Instantiate(Resources.Load(LOCATION_CANVAS_PREFAB) as GameObject);
             pathCreationCanvasHolder.GetComponent<Canvas>().sortingOrder = CANVAS_SORTING_ORDER;
 
-            inputBlockingCanvas = pathCreationCanvasHolder.transform.Find(BLOCKER_NAME_PLACE).gameObject;
-            inputBlockingCanvas.SetActive(false);
+            inputBlocker = pathCreationCanvasHolder.transform.Find(BLOCKER_NAME_PLACE).gameObject;
+            inputBlocker.SetActive(false);
 
-            button_generateLinearPath = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_LINEAR_PATH).GetComponent<Button>();
-            button_generateLinearPath.onClick.AddListener(OnClick_StartCreation_Line);
+            button_generatePathViaClick = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_GENERATE_PATH).GetComponent<Button>();
+            button_generatePathViaClick.onClick.AddListener(OnClick_StartCreation_ClickTarget);
 
-            button_sendPathToAnimHost = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_SEND_PATH).GetComponent<Button>();
-            button_sendPathToAnimHost.onClick.AddListener(OnClick_SendPathToAnimHost);
+            button_regeneratePathViaClick = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_REGENERATE_PATH).GetComponent<Button>();
+            button_regeneratePathViaClick.onClick.AddListener(OnClick_StartCreation_ClickTarget);
 
-            HideAllButtons();
-            ShowCreationButtons();
+            button_triggerAnimHostGeneration = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_SEND_PATH).GetComponent<Button>();
+            button_triggerAnimHostGeneration.onClick.AddListener(OnClick_SendPathToAnimHost);
+
+            button_editPath = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_EDIT_PATH).GetComponent<Button>();
+            button_editPath.onClick.AddListener(OnClick_SendPathToAnimHost);
         }
 
-        private void HideAllButtons(){
-            HideCreationButtons();
-            button_sendPathToAnimHost.gameObject.SetActive(false);
+        public void PathDataChanged(object sender, EventArgs args){
+            //update our already generated path objects
+            //update the line renderer
+            GeneratePathLineRenderer();
+        }
+        
+        private void GeneratePathObjects(){
+            if(sceneCharacterForPath.HasPath()){
+                //foreach(Vector3 pathPos in sceneCharacterForPath.pathPos)
+                //new gameobject
+                //add ScenePathObject
+                //tell index
+                //rotate via pathRot too
+            }
+        }
+        private void DestroyPathObjects(){
+            //foreach(ScenePathObject pathObject in allOurGeneratedPathObject)
+            //Destroy
+        }
+        private void GeneratePathLineRenderer(){
+            if(!sceneCharacterForPath.HasPath()){
+                DestroyPathLineRenderer();
+                return;
+            }
+            if(!pathLineRenderer)
+                pathLineRenderer = GameObject.Instantiate(Resources.Load(LOCATION_LINEPOOL_PREFAB) as GameObject).GetComponent<LineRenderer>();
+
+            pathLineRenderer.SetPositions(sceneCharacterForPath.GetPathPositions());
+        }
+        private void DestroyPathLineRenderer(){
+            if(pathLineRenderer){
+                GameObject.Destroy(pathLineRenderer.gameObject);
+            }
         }
 
-        private void DestroyPathGenerationUI(){
+        private void DestroyPathOptionUI(){
             GameObject.Destroy(pathCreationCanvasHolder);
         }
 
-        private void AddOrRemoveListener(bool addListener){
-            if(addListener){
-                manager.selectionChanged += OnSelectionChanged;
+        private void RefreshOptionButtonsViz(){
+            if(sceneCharacterForPath.HasPath()){
+                button_generatePathViaClick.gameObject.SetActive(false);
+
+                button_regeneratePathViaClick.gameObject.SetActive(true);
+                //allow generation even if path is the same since last generation, because it could be different
+                button_triggerAnimHostGeneration.gameObject.SetActive(true);
+                button_editPath.gameObject.SetActive(true);
             }else{
-                manager.selectionChanged -= OnSelectionChanged;
-                //remove listener if we are within this mode, just to be sure
-                core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
+                button_generatePathViaClick.gameObject.SetActive(true);
+
+                button_regeneratePathViaClick.gameObject.SetActive(false);
+                button_triggerAnimHostGeneration.gameObject.SetActive(false);
+                button_editPath.gameObject.SetActive(false);
             }
         }
+
+        private void HideAllButtons(){
+            button_generatePathViaClick.gameObject.SetActive(false);
+            button_triggerAnimHostGeneration.gameObject.SetActive(false);
+            button_editPath.gameObject.SetActive(false);
+        }
+
+        
 
 
         #region Manager Callbacks
@@ -239,31 +318,21 @@ namespace tracer{
         //! @param sceneObjects The list containing the selected objects. 
         //!
         private void OnSelectionChanged(object _o, List<SceneObject> _sceneObjects){
-            //Debug.Log("<color=yellow>Measurement.OnSelectionChanged: "+_sceneObjects.Count+"</color>");
+            //Debug.Log("<color=yellow>PathGenerationModule.OnSelectionChanged: "+_sceneObjects.Count+"</color>");
+            
             //ignore during placement
-            if(inputBlockingCanvas.activeSelf)
+            if(inputBlocker && inputBlocker.activeSelf)
                 return;
 
-            if (_sceneObjects.Count < 1){
-                //remove ui
-                RemovePathGeneration();
-            }else{
+            if (_sceneObjects.Count < 1 || !_sceneObjects[0].GetComponentInParent<SceneCharacterObject>()){
                 //check if we selected a SceneCharacterObject or any of its SceneObjectPath "connections"
                 //see MeasureModule OnSelectionChanged.263
                 //Debug.Log("selected "+_sceneObjects[0].gameObject.name);
-                if(!_sceneObjects[0].GetComponentInParent<SceneCharacterObject>()){
-                    RemovePathGeneration();
-                    Debug.Log("<color=black>no SceneCharacterObject selected</color>");
-                    //reset info text too
-                    //uiPathGenerationLogText.text = "";
-                    return;
-                }
-
-                ShowPathGeneration();
-
-                scenePathObjectToPlace = _sceneObjects[0];
-
-                //see MeasurementModule.ShowCaseSensitiveButtons
+                
+                //remove ui
+                RemoveTopMenuUI();
+            }else{
+                ShowTopMenuUI(_sceneObjects[0].GetComponentInParent<SceneCharacterObject>());
             }
         }
 
@@ -277,17 +346,17 @@ namespace tracer{
         private void OnPointerDown_GeneratePath(object sender, Vector2 point){
             //check if any ui (despite our blocker) was hit
             GameObject uiGo = TimelineModule.GetGameObjectAtUIRaycast(point);
-            if(uiGo != inputBlockingCanvas.gameObject){
+            if(uiGo != inputBlocker.gameObject){
             //if(SceneRaycastHelper.DidHitSpecificUI(point, button_placeSelectedObjectViaRay.gameObject)){
                 //Debug.Log("Hit Button to stop placing - so dont do any raycast positioning queries!");
                 return;
             }
 
-            inputBlockingCanvas.SetActive(false);            
+            inputBlocker.SetActive(false);            
 
             List<MeshRenderer> ignoreTheseForRaycasting = new();
             //ignore (selection) itself
-            ignoreTheseForRaycasting.AddRange(scenePathObjectToPlace.GetComponents<MeshRenderer>());
+            ignoreTheseForRaycasting.AddRange(sceneCharacterForPath.GetComponents<MeshRenderer>());
             //also ignore all SceneCharacterObject (TODO: performance improvement - no need to query this all over again all the time)
             foreach(SceneCharacterObject sceneChar in UnityEngine.Object.FindObjectsOfType<SceneCharacterObject>()){
                 ignoreTheseForRaycasting.AddRange(sceneChar.GetComponents<MeshRenderer>());
@@ -296,9 +365,12 @@ namespace tracer{
             foreach(GameObject g in GameObject.FindGameObjectsWithTag("Finish")){
                 ignoreTheseForRaycasting.AddRange(g.GetComponentsInChildren<MeshRenderer>());
             }
+            //ignore all ScenePathObjects, SceneMeasureObjects
+
 
             //TODO for performance we would not need to gather all MeshRenderer on every click (only if we modify any)
             if (SceneRaycastHelper.RaycastIntoScene(core.getManager<SceneManager>().scnRoot, point, out RaycastHit hit, ignoreTheseForRaycasting.ToArray())){
+                inputBlocker.SetActive(true);
                 //if we hit another SceneObjectPath, select this for placing, instead of change  the current position
                 /*SceneObject sceneObjectWeHit = hit.transform.GetComponent<SceneObject>();
                 if(!sceneObjectWeHit)
@@ -314,110 +386,196 @@ namespace tracer{
                     }
                 }*/
 
-                //Generate Path to this point
-                //CreatePath(abstractParam._parent.gameObject.transform.position, hit.point);
-                //Debug.Log("<color=green>Path End: "+hit.point+"</color>");
-                //ShowAvailablePath(true, _manager.SelectedObjects[0].GetComponent<SceneCharacterObject>().pathPos);
-                //show "send" button
+                //would not be visible, since we deactivate the object
+                //core.StartCoroutine(PusleInputBlockerColor((Color.green+Color.green)/2f, 3f));  
+
+                CreateLinearPathToTarget(sceneCharacterForPath.transform.position, hit.point);
+
+                //PARTICLE
+                GameObject pathTargetParticle = GameObject.Instantiate(Resources.Load(LOCATION_PATH_PARTICLE) as GameObject);
+                pathTargetParticle.transform.position = hit.point;
+                pathTargetParticle.transform.rotation = Quaternion.FromToRotation(-pathTargetParticle.transform.up, hit.normal);
+                GameObject.Destroy(pathTargetParticle, 8f);
+
+                GeneratePathLineRenderer();
                 
+                EndPathCreation();
+                
+                //CREATE A SCENEPATHOBJECT (ONLY LOCAL)
+                //THEY ARE SPECIAL
+                //THEY CAN BE HANDLED AND MOVED LIKE OTHER SCENE OBJECTS
+                //... BUUUUUUUUUT
+                //THEY CHANGE THE POS/ROT OF THE SCENECHARACTEROBJECT.pathPos/pathRot AnimatedParameter - knowing their indice
+                //--> they will never send any lock-msg
+                //if the character is locked, all these corresponding ScenePathObjects are locked as well
 
                 //place this object: sceneObjectToPlace (BEWARE: setValue always sets local position and rotation!)
-                scenePathObjectToPlace.transform.position = hit.point;
-                //align to hit normal with upwards vector
-                scenePathObjectToPlace.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
-                //move on normal, so the object is not within the object
-                scenePathObjectToPlace.transform.position += scenePathObjectToPlace.transform.up * scenePathObjectToPlace.transform.localScale.y / 2f;   
+                // scenePathObjectToPlace.transform.position = hit.point;
+                // //align to hit normal with upwards vector
+                // scenePathObjectToPlace.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+                // //move on normal, so the object is not within the object
+                // scenePathObjectToPlace.transform.position += scenePathObjectToPlace.transform.up * scenePathObjectToPlace.transform.localScale.y / 2f;   
+            }else{
+                inputBlocker.SetActive(true);
+                //visualize we do not hit anything by animating the InputBlocker color quickly
+                core.StartCoroutine(PusleInputBlockerColor(Color.red, 3f));  
             }
-            core.StartCoroutine(DelayDisableInputBlockingCanvas());
         }  
 
         #endregion
-        private void DeactivateSelectionSensitiveButtons(){
-            //always visible
 
-            //buttons for deleting specific waypoints, add them, send path to animhost or play the animation
-            //they need some other stuff to happen before, thats why they are "case sensitive"
+        #region Path Generation
+        private void CreateLinearPathToTarget(Vector3 start, Vector3 end){            
+            //set to use same height, use start.y, since AnimHost use a planar calculation
+            end.y = start.y;
 
-            button_sendPathToAnimHost.gameObject.SetActive(false);
+            //AnimatedParameter Creation
+            float endFrameTime = 300;
+            
+            //tangents, right now, use linear interpolation, so same tangent time, pos, center
+            Vector3 centerPosForTangents = (start+end)/2f;
+            float tangentTime = endFrameTime / 2f;            //tangent time is the middle
+
+            // //AnimHost uses a direction, instead absolut position
+            // Vector3 localEnd = (end-start);
+
+            // //local start position (obvious 0,0,0 doo!)
+            // Vector3 localStart = Vector3.zero;
+            // localEnd.y = start.y;
+            // localEnd = Quaternion.Inverse(sceneCharacterForPath.transform.rotation) * localEnd;
+
+            //used to generate the AnimatedParameter KeyList
+            IAnimationParameter m_activeParameter;
+
+            //-- v3 position, ignore TRS (0,1,2) -> use 3
+            m_activeParameter =  sceneCharacterForPath.parameterList[3] as IAnimationParameter;
+            m_activeParameter.clearKeys();
+            AbstractKey[] keyList = new AbstractKey[]{  
+                new Key<Vector3>(0f,            start,  tangentTime, centerPosForTangents, tangentTime, centerPosForTangents),    //start position
+                new Key<Vector3>(endFrameTime,  end,    tangentTime, centerPosForTangents, tangentTime, centerPosForTangents)     //end position
+            };
+            m_activeParameter.createKeyList(keyList);
+            
+            //-- q rotation,  ignore TRS (1) -> use 4
+            m_activeParameter =  sceneCharacterForPath.parameterList[4] as IAnimationParameter;
+            m_activeParameter.clearKeys();
+            Quaternion startRotation = sceneCharacterForPath.transform.rotation;
+            Quaternion endRotation = Quaternion.LookRotation((end-start).normalized);         //this rotation should right now look from start to end
+            keyList = new AbstractKey[]{
+                new Key<Quaternion>(0f, startRotation/*Quaternion.identity*/,   tangentTime, startRotation, tangentTime, startRotation),   //start rotation
+                new Key<Quaternion>(endFrameTime, endRotation, tangentTime, endRotation,   tangentTime, endRotation)      //end rotation
+            };
+
+            m_activeParameter.createKeyList(keyList);
         }
-
-        private void ShowCreationButtons(){
-            button_generateLinearPath.gameObject.SetActive(true);
-            //waypoint path
-        }
-
-        private void HideCreationButtons(){
-            button_generateLinearPath.gameObject.SetActive(false);
-            //waypoint path
-        }
-
-        private void ResetAllButtons(){
-            button_generateLinearPath.GetComponentsInChildren<Image>()[1].color = Color.white; //0 is BG, 1 is IMAGE
-            button_generateLinearPath.onClick.RemoveListener(OnClick_StopPlaceViaRay);
-            button_sendPathToAnimHost.GetComponentsInChildren<Image>()[1].color = Color.white; //0 is BG, 1 is IMAGE
-            button_sendPathToAnimHost.onClick.RemoveListener(OnClick_StopPlaceViaRay);
-        }
+        #endregion
 
 
-        private void StartPlaceViaRay(Button buttonThatTriggeredThis){
-            //deny any other input action (ui element, gizmo, de-selection)
-            //-> maybe enable an overlay that catches all hits?! -> would then need to listen on inputPressStartedUI
-            buttonThatTriggeredThis.GetComponentsInChildren<Image>()[1].color = Color.green; //0 is BG, 1 is IMAGE
+        #region OnClick Events
+        private void OnClick_StartCreation_ClickTarget(){
+            //this will simply let the user click anywhere for the raycasting
+            
+            //if we click the button, stop function
+            if(inputBlocker.activeSelf){
+                AbortPlacementViaRay();
+                return;
+            }
 
             //no need to "save the selected object" - since we really should not be able to select another object if we are in this mode
-            //otherwise we could not measure a big object that is a movable scene object (e.g. a car)
-            inputBlockingCanvas.SetActive(true);
+            inputBlocker.SetActive(true);
 
-            HideAllButtons();
-            buttonThatTriggeredThis.gameObject.SetActive(true);
+            //0 is BG, 1 is IMAGE
+            if(button_generatePathViaClick.gameObject.activeSelf){
+                HideAllButtons();
+                button_generatePathViaClick.GetComponentsInChildren<Image>()[1].color   = Color.green;
+                button_generatePathViaClick.gameObject.SetActive(true);
+            }else{
+                HideAllButtons();
+                button_regeneratePathViaClick.GetComponentsInChildren<Image>()[1].color = Color.green;
+                button_regeneratePathViaClick.gameObject.SetActive(true);
+            }
+                        
 
             //TODO enable overlay that indicates what to do (frame + text AND "abort"/"finish") (enable overlay for as long as user press another of our button)
 
-            //Save Standard Color
-            //sceneObjectPathStandardColor = scenePathObjectToPlace.GetComponent<MeshRenderer>().material.color;
-            //scenePathObjectToPlace.GetComponent<MeshRenderer>().material.color = Color.green;
-
             //hide gizmo and TRS ui --> we simulate this by de-selecting!
             manager.clearSelectedObject();
+            
             //add event to input manager
             core.getManager<InputManager>().inputPressEnd += OnPointerDown_GeneratePath; //needed UI, because of inputBlockingCanvas
-
-            buttonThatTriggeredThis.onClick.AddListener(OnClick_StopPlaceViaRay);
         }
 
-        #region Button Events
-        private void OnClick_StopPlaceViaRay(){
-            ResetAllButtons(); //since (it seems) we cannot dynamically pass parameters (and a delegate could not be removed from the listener besides removing all, which we do not want to)
-            
+        private void OnClick_SendPathToAnimHost(){
+            manager.clearSelectedObject();
+            sceneCharacterForPath.animHostGen.setValue(1);  //0 stop, 1 stream, 2 stream loop, 3 block
+            //trigger function where we wait for the character to become unlocked (after locking) - to know if the animation has finished
+        }
+        #endregion
+
+        #region Specific Button Functions
+
+        private void AbortPlacementViaRay(){
+            if(button_generatePathViaClick.gameObject.activeSelf)   button_generatePathViaClick.GetComponentsInChildren<Image>()[1].color   = Color.white;
+            if(button_regeneratePathViaClick.gameObject.activeSelf) button_regeneratePathViaClick.GetComponentsInChildren<Image>()[1].color = Color.white;
+
             core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
 
             //re-enable gizmos by simulate a "reselection"
-            manager.clearSelectedObject();
-            manager.addSelectedObject(scenePathObjectToPlace);
+            //manager.clearSelectedObject();
+            manager.addSelectedObject(sceneCharacterForPath);
 
             //show correct buttons
-            HideCreationButtons();
-            //see MeasurementModule.ShowCaseSensitiveButtons
+            RefreshOptionButtonsViz();
 
             core.StartCoroutine(DelayDisableInputBlockingCanvas());
         }
 
+        private void EndPathCreation(){
+            if(button_generatePathViaClick.gameObject.activeSelf)   button_generatePathViaClick.GetComponentsInChildren<Image>()[1].color   = Color.white;
+            if(button_regeneratePathViaClick.gameObject.activeSelf) button_regeneratePathViaClick.GetComponentsInChildren<Image>()[1].color = Color.white;
+
+            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
+
+            manager.addSelectedObject(sceneCharacterForPath);
+
+            //show correct buttons
+            RefreshOptionButtonsViz();
+
+            core.StartCoroutine(DelayDisableInputBlockingCanvas());
+        }
         private IEnumerator DelayDisableInputBlockingCanvas(){
             //this NEEDS to be done delayed, after the clear & addSelection event. Otherwise the triggered SelectionModule.SelectFunction function
             //will be executed via InputManager.TapFunction which runs into else (TappedUI and Tapped3DUI not correct, since the point)
             yield return new WaitForEndOfFrame();
-            inputBlockingCanvas.SetActive(false);
+            inputBlocker.SetActive(false);
         }
 
-        private void OnClick_StartCreation_Line(){
-            //this will simply let the user click anywhere for the raycasting
-            StartPlaceViaRay(button_generateLinearPath);
-        }
-
-        private void OnClick_SendPathToAnimHost(){
+        private IEnumerator PusleInputBlockerColor(Color endColor, float speed){
+            float t = 0f;
+            RawImage image = inputBlocker.GetComponent<RawImage>();
+            if(!image){
+                Debug.LogWarning("Cannot execute PusleInputBlockerRed, since the "+BLOCKER_NAME_PLACE+" in the canvas has no RawImage component");
+                yield break;
+            }
+            Color startColor = image.color;
+            //IN
+            while(t<1f && image){
+                t += Time.deltaTime*speed;
+                image.color = Color.Lerp(startColor, endColor, t*t);
+                yield return null;
+            }
+            //OUT
+            while(t<1f && image){
+                t -= Time.deltaTime*speed;
+                image.color = Color.Lerp(startColor, endColor, t*t);
+                yield return null;
+            }
             
+            if(image){
+                startColor.a = 0f;
+                image.color = startColor;
+            }
         }
         #endregion
-
     }
 }

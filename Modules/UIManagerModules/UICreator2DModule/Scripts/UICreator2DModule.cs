@@ -231,17 +231,10 @@ namespace tracer
                     case "sensorSize":
                         snapSelect.addElement(Resources.Load<Sprite>("Images/button_sensorSize_text"));
                         break;
-                    case "createPath":
-                        //snapSelect.addElement(Resources.Load<Sprite>("Images/button_createPath"));
-                        //we dont show an icon, but BEWARE this can be a big problem if we check indices of the icons, since they are messed up big time than!
-                        break;
-                    case "pathPosition":
-                        //snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
-                        break;
-                    case "pathRotation":
-                        //snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
-                        break;
-                    case "animHostGen":
+                    case "pathPositions":   //was a button like TRS before: snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
+                    case "pathRotations":   //was a button like TRS before: snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
+                    case "animHostGen":     //RPC we use to trigger the character animation for a given path (both above) in AnimHost
+                        //not visualized at all (beware that they still increase to index of these snap elements)
                         break;
                     default:                        
                         //snapSelect.addElement(mainSelection.parameterList[i].name);

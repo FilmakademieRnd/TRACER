@@ -18,7 +18,7 @@ public class SceneRaycastHelper{
         return false;
     }
 
-    public static bool RaycastIntoScene(GameObject sceneRoot, Vector2 point, out RaycastHit finalHit, MeshRenderer[] ignoreTheseObjects){
+    public static bool RaycastIntoScene(GameObject sceneRoot, Vector2 point, out RaycastHit finalHit, MeshRenderer[] ignoreTheseObjects, bool visualizeRay = false, bool debug = false){
         //quick and dirty
         finalHit = new RaycastHit();
         
@@ -26,6 +26,7 @@ public class SceneRaycastHelper{
         * bool ignoreGizmos
         * bool ignoreSelection
         * param MeshRenderer[] ignoreTheseToo
+        * bool visualize raycast and hit in scene
         *******/
         //TODO ignore gizmos and uis !?
 
@@ -33,7 +34,8 @@ public class SceneRaycastHelper{
         List<SphereCollider> tmpColliders;
         List<MeshRenderer> allVisibleMeshRenderer = GatherVisibleMeshRenderer(sceneRoot.GetComponentsInChildren<MeshRenderer>(), ignoreTheseObjects, out tmpColliders);
         
-        Debug.Log("<color=yellow>"+allVisibleMeshRenderer.Count+" VISIBLE OBJECTS FOUND</color>");
+        if(debug)
+            Debug.Log("<color=yellow>"+allVisibleMeshRenderer.Count+" VISIBLE OBJECTS FOUND</color>");
 
         Ray ray = Camera.main.ScreenPointToRay(point);
         List<Transform> objectsToCheckList = new();
@@ -51,10 +53,16 @@ public class SceneRaycastHelper{
             objectsToCheckList.Add(hit.transform);
         }
 
+        if(visualizeRay){
+            //show line
+            //show all hits
+        }
+
         if(objectsToCheckList.Count == 0){
-            Debug.Log("<color=red>NO HIT</color>");
-            // foreach(SphereCollider c in tmpColliders)
-            //     Component.DestroyImmediate(c);
+            if(debug)
+                Debug.Log("<color=red>NO HIT</color>");
+            foreach(SphereCollider c in tmpColliders)
+                Component.DestroyImmediate(c);
             return false;
         }
 
@@ -78,13 +86,15 @@ public class SceneRaycastHelper{
         if(Physics.Raycast(ray, out finalHit, 100, layerMaskNoUI)){
             //Debug.DrawLine(Camera.main.ScreenPointToRay(point).origin, finalHit.point, Color.red, 4f);
             //visualize hit at object we hit and with particle that is aligned like an arrow-target
-            Debug.Log("<color=green>HIT AT"+finalHit.point+" on "+finalHit.transform.gameObject.name+"</color>");
+            if(debug)
+                Debug.Log("<color=green>HIT AT"+finalHit.point+" on "+finalHit.transform.gameObject.name+"</color>");
             //remove added tmp MeshColliders
             foreach(MeshCollider c in tmpMeshColliders)
                 Component.Destroy(c);
             return true;
         }else{
-            Debug.Log("<color=red>NO FINAL HIT</color>");
+            if(debug)
+                Debug.Log("<color=red>NO FINAL HIT</color>");
             //remove added tmp MeshColliders
             foreach(MeshCollider c in tmpMeshColliders)
                 Component.Destroy(c);

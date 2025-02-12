@@ -25,6 +25,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @author Alexandru-Sebastian Tufis-Schwartz
+//! @author Thomas 'Kruegbert' Krüger
 //! @version 0
 //! @date 02.08.2023
 
@@ -32,6 +33,7 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Runtime.CompilerServices;
 
 namespace tracer
 {
@@ -43,27 +45,24 @@ namespace tracer
 
         //FUNCTIONALITY REMOVED FOR CURRENT BUILD/BERLINALE
         #region PATH VALUES
-        /*
+        //! workaround for generating ScenePathObjects on the run, but they are not sending any message to the network, but change their respective value in here
+        //! its their indice thats representing their position in the animatedparameter (list)
+        
         //!
-        //! path position parameter, these will be AnimationParameter and <s>are hidden in ui by their name</s> (not hidden, because index will still iterate over it!)
+        //! path position parameter, this will always be AnimationParameter
         //! needs to be at paremterList index 3
         //!
         public Parameter<Vector3> pathPos;      
         //!
-        //! path rotation parameter, these will be AnimationParameter and <s>are hidden in ui by their name</s> (not hidden, because index will still iterate over it!)
+        //! path rotation parameter, this will always be AnimationParameter
         //! needs to be at paremterList index 4
         //!
         public Parameter<Quaternion> pathRot;
         //!
-        //! this will be used to generate a new ui icon we can select for further options
+        //! RPC Call to AnimHost to trigger the generation of the path
+        //! needs to be at paremterList index 6
         //!
-        public Parameter<bool> createPath;
-        //!
-        //! necessary rpcparameter to trigger AnimHost. Hidden by name (take care of index - UICreator2DModule.createManipulator()
-        //!
-        public Parameter<int> animHostPathAnimFinished;
         public RPCParameter<int> animHostGen;
-        */
         #endregion
 
         //!
@@ -75,11 +74,10 @@ namespace tracer
         //!
         private Transform[] bones;
         public List<string> boneNamesOrder;
-
-        private byte sceneIdWeHad;
-        private short objectIdWeHad, paramterIdRPCParaHad;
-
-        private bool resetHipAndRootPosRot = false;
+        //!
+        //! event to listen on from e.g. the PathGenerationModule to update the path lines and scene objects
+        //!
+        public EventHandler onPathPositionChanged;
 
         //!
         //! Factory to create a new SceneObject and do it's initialisation.
@@ -88,8 +86,7 @@ namespace tracer
         //! @param gameObject The gameObject the new SceneObject will be attached to.
         //! @sceneID The scene ID for the new SceneObject.
         //!
-        public static new SceneCharacterObject Attach(GameObject gameObject, byte sceneID = 254)
-        {
+        public static new SceneCharacterObject Attach(GameObject gameObject, byte sceneID = 254){
             SceneCharacterObject obj = gameObject.AddComponent<SceneCharacterObject>();
             obj.Init(sceneID);
 
@@ -118,185 +115,78 @@ namespace tracer
 
         }
 
-        private void connectAndStart(object sender, EventArgs e)
-        {
-            rootStartPos = transform.position;
-            rootStartEulerAngles = transform.eulerAngles;
-
-            hip = transform.FindDeepChild("hip");
-            if(hip){
-                hipStartLocalPos = hip.localPosition;
-                hipParentStartLocalPos = hip.parent.localPosition;
-                hipParentStartLocalRot = hip.parent.localRotation;
-                hipStartLocalRot = hip.localRotation;
-            }
+        private void connectAndStart(object sender, EventArgs e){
+            //do stuff that needs a ready scene prior to this
         }
 
         #region PATH FUNCTIONS
+        public bool HasPath(){
+            return pathPos.getKeys() != null && pathPos.getKeys().Count > 1;
+        }
+        public Vector3[] GetPathPositions(){
+            //generate it here instead of within an update of updatePathPositions, because it would trigger a generation more often!
+            Vector3[] pathPositions = new Vector3[pathPos.getKeys().Count];
+            int i = 0;
+            foreach(var abstractKey in pathPos.getKeys()){
+                pathPositions[i] = ((Key<Vector3>)abstractKey).value;
+                i++;
+            }
+            return pathPositions;
+        }
         private void CreatePathParameters(){
-            Parameter<Vector3> pathPos = new Parameter<Vector3>(transform.localPosition, "pathPosition", this);
-            pathPos.hasChanged += updatePathPosition;
-            Parameter<Quaternion> pathRot = new Parameter<Quaternion>(transform.localRotation, "pathRotation", this);
-            pathRot.hasChanged += updatePathRotation;
+            pathPos = new Parameter<Vector3>(transform.localPosition, "pathPositions", this);
+            pathPos.hasChanged += updatePathPositions;
+            pathRot = new Parameter<Quaternion>(transform.localRotation, "pathRotations", this);
+            pathRot.hasChanged += updatePathRotations;
 
-            Parameter<bool> createPath = new Parameter<bool>(false, "createPath", this); //no hasChanged function necessary(?)
-            createPath.hasChanged += updatePathData;
-
-            
-            Parameter<int> animHostPathAnimFinished = new Parameter<int>(0, "animHostPathReady", this);
-            animHostPathAnimFinished.hasChanged += triggerAnimPathReady;
-
-            RPCParameter<int> animHostGen = new RPCParameter<int>(0, "animHostGen", this);
+            animHostGen = new RPCParameter<int>(0, "animHostGen", this);
             animHostGen.hasChanged += triggerAnimHostGen;
         }
 
-        //see updatePosition
-        private void updatePathPosition(object sender, Vector3 a){
-            //necessary to emit? emit only on specific TriggerAnimHost function or "EmitPathFunction"?
-            //overwrite this into the position animation? so it could be changed?
-            //or let these handles to change stuff also be active and possible here?
-            emitHasChanged((AbstractParameter)sender);
-        }
-        //see updateRotation
-        private void updatePathRotation(object sender, Quaternion a){
-            emitHasChanged((AbstractParameter)sender);
-        }
-        private void updatePathData(object sender, bool b){
-            Debug.Log("Path Button clicked (most likely)");
+        //!
+        //! Emit the new path or change of any animated parameter path position object into the network
+        //! @param   sender     Object calling this function
+        //! @param   a          dummy value
+        //!
+        private void updatePathPositions(object sender, Vector3 a){
+            onPathPositionChanged?.Invoke(null, null);
             emitHasChanged((AbstractParameter)sender);
         }
         //!
-        //! Emit the RPCParameter into the network
+        //! Emit the new path or change of any animated parameter path rotation object into the network
+        //! @param   sender     Object calling this function
+        //! @param   a          dummy value
+        //!
+        private void updatePathRotations(object sender, Quaternion a){
+            emitHasChanged((AbstractParameter)sender);
+        }
+        //!
+        //! Emit the RPCParameter (for AnimHost to trigger the CharacterAnimation) into the network
         //! @param   sender     Object calling this function
         //! @param   a          dummy value
         //!
         private void triggerAnimHostGen(object sender, int i){
-            //emitHasChanged((AbstractParameter)sender);
+            emitHasChanged((AbstractParameter)sender);
             //.call?
             Debug.Log("called triggerAnimHostGen "+i);
 
-
-            /*if(pathPos.getKeys() != null && pathPos.getKeys().Count > 0){
-                //Show Particle with last pathPosition
-                GameObject pathTargetParticle = Resources.Load("Particles_Path_Target", typeof(GameObject)) as GameObject;
-                pathTargetParticle.transform.position = ((Key<Vector3>)pathPos.getKeys()[^1]).value;
-                Destroy(pathTargetParticle, 8f);
-            }*/
-        }
-
-        private void triggerAnimPathReady(object sender, int i){
-            //emitHasChanged((AbstractParameter)sender);
-            //.call?
-            if(i == 5 && allowResetLocalPosAtEnd){
-                allowResetLocalPosAtEnd = false;
-
-                resetHipAndRootPosRot = true;
-                Debug.Log("YAY. Path has finished");
-                
-                //reselect this object
-                _core.getManager<UIManager>().clearSelectedObject();
-                _core.getManager<UIManager>().addSelectedObject(this);
-            }
+            //Show fast path particle (TrailRenderer from start to end)
+            //will be shown on every client!
         }
 
         public override void OnDestroy(){
             base.OnDestroy();
-            //pathPos.hasChanged -= updatePathPosition;
-            //pathRot.hasChanged -= updatePathRotation;
-            //animHostGen.hasChanged -= triggerAnimHostGen;
-             _core.getManager<SceneManager>().sceneReady -= connectAndStart;
-        }
-
-        public void SaveParametersBeforeOverwrite(){
-            if(!onlyDoOnce){
-                onlyDoOnce = true;
-                sceneIdWeHad = _sceneID;
-                objectIdWeHad = _id;
-                paramterIdRPCParaHad = 7; //animHostGen._id;
-            }
-        }
-        //!
-        //! rn necessary to trigger the correct rpc parameter on animhost, which has constant values!
-        //! @param   newSceneID     scene id where we want to emit the calls
-        //! @param   newObjectID    id that animhost expects
-        //! @param   newParameterID id that animhost expects
-        //!
-        public void OverrideTracerValues(byte newSceneID, short newObjectID, short newParameterID){
-            _sceneID = newSceneID;
-            _id = newObjectID;
-            //animHostGen.OverrideParameterID(newParameterID);
-        }
-        //! see OverrideTracerValues, we reset them values
-        public void ResetOverwrittenTracerValues(){
-            _sceneID = sceneIdWeHad;
-            _id = objectIdWeHad;
-            //animHostGen.OverrideParameterID(paramterIdRPCParaHad);
-        }
-        public void TriggerAnimHost(){
-            //animHostGen.value = 3;  //const value AnimHost expects
-        }
-
-        public void SendOutAnimHostTrigger(){
-            allowResetLocalPosAtEnd = true;
-            RPCParameter<int> sendToAnimHost = new RPCParameter<int>(1, "sendToAnimHost", this);
-            _sceneID = 255;
-            _id = 1;
-            sendToAnimHost.OverrideParameterID(0);
-            emitHasChanged((AbstractParameter)sendToAnimHost);
-        }
-
-        private bool allowResetLocalPosAtEnd = false;
-        private bool onlyDoOnce = false;
-        private Transform hip;
-        private Vector3 hipParentStartLocalPos, hipStartLocalPos, rootStartPos, rootStartEulerAngles;
-        private Quaternion hipParentStartLocalRot, hipStartLocalRot;
-
-        [HideInInspector] public Quaternion calculatedButtonRot;
-
-        protected override void EndOfUpdateFunction(){
-            if(_lock)
-                return;
-            if(resetHipAndRootPosRot){
-                resetHipAndRootPosRot = false;
-                if(!hip){
-                    Debug.LogWarning("no hip to unparent found.");
-                    return;
-                }
-
-                rootStartEulerAngles = transform.eulerAngles;
-
-                Vector3 newEndPos = hip.position + Vector3.down*hipParentStartLocalPos.y;
-                newEndPos.y = rootStartPos.y;
-                transform.position = newEndPos;
-                //hip.parent.localPosition = hipParentStartLocalPos;
-                
-                hipStartLocalPos.y = hip.localPosition.y;
-                hip.localPosition = hipStartLocalPos;
-
-                transform.rotation = calculatedButtonRot;
-                transform.Rotate(rootStartEulerAngles);
-
-                rootStartEulerAngles = transform.eulerAngles;
-                
-                hip.parent.localRotation = hipParentStartLocalRot;
-                hip.localRotation = hipStartLocalRot;
-
-                //Debug.Log("EndOfUpdate Reset. lock: "+_lock);
-
-                /*Vector3 newPos = hip.position;
-                Quaternion newRot = hip.rotation;
-                hip.parent.parent = null;
-                transform.position = newPos;
-                transform.rotation = newRot;
-                hip.parent.parent = transform;*/
-            }
+            pathPos.hasChanged -= updatePathPositions;
+            pathRot.hasChanged -= updatePathRotations;
+            animHostGen.hasChanged -= triggerAnimHostGen;
+            _core.getManager<SceneManager>().sceneReady -= connectAndStart;
         }
         #endregion
         
         //!
         //!Setting up all the bone rotation parameters
         //!
-       public void setBones()
+        public void setBones()
         {
             // Get the array of bone transforms from the SkinnedMeshRenderer component.
             bones = GetComponentInChildren<SkinnedMeshRenderer>().bones;
@@ -342,11 +232,7 @@ namespace tracer
                     //boneNamesOrder.Add(boneTransform.name);
                     //Debug.Log(_id+"-"+boneTransform.name);
                 }
-            }
-            
-            Parameter<int> pathSceneObjectRef = new Parameter<int>(0, "pathSceneObjectRef", this);
-            pathSceneObjectRef.hasChanged += updateSceneObjectRef;
-            pathSceneObjectRef.value = 1;   //hardcoded like ButtonManipulator.174    
+            }   
         }
        
        //!
@@ -419,12 +305,6 @@ namespace tracer
                     }
                 }
             }
-        }
-
-        private void updateSceneObjectRef(object sender, int a)
-        {
-            //pathSceneObjectRef.value = a;
-            emitHasChanged((AbstractParameter)sender);
         }
     }
 }

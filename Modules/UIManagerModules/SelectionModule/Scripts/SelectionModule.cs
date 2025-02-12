@@ -43,6 +43,11 @@ namespace tracer
     //!
     public class SelectionModule : UIManagerModule
     {
+        #if UNITY_EDITOR
+        private const bool debugRenderTextureCreation = false;
+        private int debugRenderTextureInScene_Counter = 0;
+        #endif
+
         //!
         //! Name of the shader tag for the selection shader.
         //!
@@ -112,11 +117,6 @@ namespace tracer
         {
             set => m_isRenderActive = value;
         }
-
-        #if UNITY_EDITOR
-        private int debugRenderTextureInScene_Counter = 0;
-        private bool debugRenderTextureCreation = false;
-        #endif
 
         //!
         //! Constructor
