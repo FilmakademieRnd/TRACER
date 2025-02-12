@@ -390,15 +390,15 @@ namespace tracer
                 int offset = _dataSize;
                 short keyCount = (short)_keyList.Count;
 
-                Debug.Log("<color=yellow>SERIALIZE DATA</color>");
+                //Debug.Log("<color=yellow>SERIALIZE DATA</color>");
 
                 BitConverter.TryWriteBytes(targetSpan.Slice(offset, 2), keyCount); // nbr. of keys
                 offset += 2;
-                Debug.Log("\tnr of key: "+keyCount);
+                //Debug.Log("\tnr of key: "+keyCount);
                 for (int i = 0; i < keyCount; i++)
                 {
                     Key<T> key = (Key<T>)_keyList[i];
-                    Debug.Log("\tkey "+i+" Value: "+key.value+" at time "+key.time);
+                    //Debug.Log("\tkey "+i+" Value: "+key.value+" at time "+key.time);
                     BitConverter.TryWriteBytes(targetSpan.Slice(offset, 1), (byte)key.interpolation); // interpolation
                     BitConverter.TryWriteBytes(targetSpan.Slice(offset += 1, 4), key.time); // time
                     BitConverter.TryWriteBytes(targetSpan.Slice(offset += 4, 4), key.tangentTime1); // tangent time 1
