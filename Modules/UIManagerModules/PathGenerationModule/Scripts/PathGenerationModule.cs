@@ -230,8 +230,6 @@ namespace tracer{
                 DestroyPathOptionUI();
                 StopPathAnimations();
                 core.StopCoroutine(WaitForAnimHostToFinish());
-
-                sceneCharacterForPath = null;
             }
 
             pathGenerationUIActiveEvent?.Invoke(this, isActive);
@@ -542,9 +540,7 @@ namespace tracer{
 
         private void OnClick_SendPathToAnimHost(){
             manager.clearSelectedObject();
-            //always throws an error
-            //sceneCharacterForPath.animHostGen.setValue(Mathf.Clamp(animHostAnimationTypeToSend, 1, 3));  //0 stop, 1 stream, 2 stream loop, 3 block
-            sceneCharacterForPath.animHostGen.setValue(1);
+            sceneCharacterForPath.animHostGen.setValue(Mathf.Clamp(animHostAnimationTypeToSend, 1, 3));  //0 stop, 1 stream, 2 stream loop, 3 block
             //trigger function where we wait for the character to become unlocked (after locking) - to know if the animation has finished
             core.StartCoroutine(WaitForAnimHostToFinish());
         }
