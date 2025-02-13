@@ -247,8 +247,10 @@ namespace tracer{
             button_callAnimHost = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_SEND_PATH).GetComponent<Button>();
             button_callAnimHost.onClick.AddListener(OnClick_SendPathToAnimHost);
 
+            //not enabled yet
             button_editPath = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_EDIT_PATH).GetComponent<Button>();
             button_editPath.onClick.AddListener(OnClick_StartPathEditing);
+            button_editPath.interactable = false;
 
             button_playPathAnim = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_PLAY_PATHANIM).GetComponent<Button>();
             button_playPathAnim.onClick.AddListener(OnClick_PlayPathAnim);
@@ -317,7 +319,7 @@ namespace tracer{
             button_generatePath.interactable        = val;
             button_clickToPathTarget.interactable   = val;
             button_callAnimHost.interactable        = sceneCharacterForPath.HasPath();
-            button_editPath.interactable            = sceneCharacterForPath.HasPath();
+            //button_editPath.interactable            = sceneCharacterForPath.HasPath();
             button_playPathAnim.interactable        = sceneCharacterForPath.HasPath() && sceneCharacterForPath.HasPathAnimation();
 
             if(!resetColorToo)
@@ -326,7 +328,7 @@ namespace tracer{
             button_generatePath.GetComponentsInChildren<Image>()[1].color       = Color.white;
             button_clickToPathTarget.GetComponentsInChildren<Image>()[1].color  = Color.white;
             button_callAnimHost.GetComponentsInChildren<Image>()[1].color       = Color.white;
-            button_editPath.GetComponentsInChildren<Image>()[1].color           = Color.white;
+            //button_editPath.GetComponentsInChildren<Image>()[1].color           = Color.white;
             button_playPathAnim.GetComponentsInChildren<Image>()[1].color       = Color.white;
         }
 
@@ -550,7 +552,7 @@ namespace tracer{
             button_generatePath.interactable = false;
             button_clickToPathTarget.interactable = false;
             button_callAnimHost.interactable = false;
-            button_editPath.interactable = false;
+            //button_editPath.interactable = false;
 
             //Start Coro
             core.StartCoroutine(PlayPathCharacterAnimationAgain());
@@ -656,7 +658,7 @@ namespace tracer{
             button_generatePath.interactable = true;
             button_clickToPathTarget.interactable = true;
             button_callAnimHost.interactable = true;
-            button_editPath.interactable = true;
+            //button_editPath.interactable = true;
         }
         #endregion
     }
