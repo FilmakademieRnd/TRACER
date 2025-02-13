@@ -559,7 +559,6 @@ namespace tracer
 
                 //place object
                 objMain.transform.parent = parentTransform; // GameObject.Find( "Scene" ).transform;
-
                 objMain.transform.localPosition = pos;
                 objMain.transform.localRotation = rot;
                 objMain.transform.localScale = scl;
@@ -625,10 +624,13 @@ namespace tracer
                                 bindposes[i][3, 1] = sNodeGeo.bindPoses[i * 16 + 13];
                                 bindposes[i][3, 2] = sNodeGeo.bindPoses[i * 16 + 14];
                                 bindposes[i][3, 3] = sNodeGeo.bindPoses[i * 16 + 15];
+
+                                bindposes[i] = Matrix4x4.Scale(parentTransform.localScale) * Matrix4x4.Rotate(parentTransform.localRotation) * bindposes[i];
                             }
+                            
                             mesh.bindposes = bindposes;
                             sRenderer.sharedMesh = mesh;
-
+                            
                         }
                         else
                         {
