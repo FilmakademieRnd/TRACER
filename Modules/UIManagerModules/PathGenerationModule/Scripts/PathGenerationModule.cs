@@ -52,10 +52,11 @@ namespace tracer{
         //public const string     LOCATION_ANGLEPOOL_PREFAB   = "Prefabs/PathRotationKey";
         
         public const int        CANVAS_SORTING_ORDER        = 15;        
-        public const string     BUTTON_NAME_GENERATE_PATH   = "Options/Button_CreatePathToClick";
-        public const string     BUTTON_NAME_REGENERATE_PATH = "Options/Button_RegeneratePathToClick";
+        public const string     BUTTON_NAME_GENERATE_PATH   = "Options/Button_CreatePath";
+        public const string     BUTTON_NAME_CLICK_TARGET    = "Options/Button_ClickToTarget";    //other UI to be more understandable, but same functionality
         public const string     BUTTON_NAME_SEND_PATH       = "Options/Button_TriggerAnimHostCharAnimation";
         public const string     BUTTON_NAME_EDIT_PATH       = "Options/Button_EditPath"; //click it again to finish
+        public const string     BUTTON_NAME_PLAY_PATHANIM   = "Options/Button_PlayPathAnim";
 
         //these are case sensitive buttons in the bottom right corner
         public const string     BUTTON_NAME_WAYPOINT_PLACE  = "PathEditing/Button_ManualWaypointPath";
@@ -107,10 +108,11 @@ namespace tracer{
 
 
         #region Selfdescribing Buttons
-        private Button button_generatePathViaClick;
-        private Button button_regeneratePathViaClick;    //need to be another button that visualize that a path already exists!
-        private Button button_triggerAnimHostGeneration;
+        private Button button_generatePath;
+        private Button button_clickToPathTarget;    //for viz wizzle
+        private Button button_callAnimHost;
         private Button button_editPath;
+        private Button button_playPathAnim;         //the one we received
 
         //private Button button_placeWaypointViaRay;
         //private Button button_addWaypoint;
@@ -118,6 +120,10 @@ namespace tracer{
 
         #endregion
 
+        //!
+        //! whether the path is currently streamed or played by us
+        //!
+        private bool pathAnimIsPlaying = false;
 
         //!
         //! Constructor
@@ -199,8 +205,8 @@ namespace tracer{
 
             if(isActive){
                 CreatePathOptionUI();
-                HideAllButtons();
                 RefreshOptionButtonsViz();
+                SetButtonInteractability(true, false);
 
                 GeneratePathObjects();
                 GeneratePathLineRenderer();
@@ -217,11 +223,12 @@ namespace tracer{
                 DestroyPathObjects();
                 DestroyPathLineRenderer();
                 DestroyPathOptionUI();
+                StopPathAnimations();
             }
 
             pathGenerationUIActiveEvent?.Invoke(this, isActive);
 
-            Debug.Log("<color=yellow>TogglePathGenerationUI: "+isActive+"</color>");
+            //Debug.Log("<color=yellow>TogglePathGenerationUI: "+isActive+"</color>");
         }
 
         private void CreatePathOptionUI(){
@@ -231,17 +238,21 @@ namespace tracer{
             inputBlocker = pathCreationCanvasHolder.transform.Find(BLOCKER_NAME_PLACE).gameObject;
             inputBlocker.SetActive(false);
 
-            button_generatePathViaClick = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_GENERATE_PATH).GetComponent<Button>();
-            button_generatePathViaClick.onClick.AddListener(OnClick_StartCreation_ClickTarget);
+            button_generatePath = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_GENERATE_PATH).GetComponent<Button>();
+            button_generatePath.onClick.AddListener(OnClick_StartCreation_ClickTarget);
 
-            button_regeneratePathViaClick = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_REGENERATE_PATH).GetComponent<Button>();
-            button_regeneratePathViaClick.onClick.AddListener(OnClick_StartCreation_ClickTarget);
+            button_clickToPathTarget = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_CLICK_TARGET).GetComponent<Button>();
+            button_clickToPathTarget.onClick.AddListener(OnClick_StartCreation_ClickTarget);
 
-            button_triggerAnimHostGeneration = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_SEND_PATH).GetComponent<Button>();
-            button_triggerAnimHostGeneration.onClick.AddListener(OnClick_SendPathToAnimHost);
+            button_callAnimHost = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_SEND_PATH).GetComponent<Button>();
+            button_callAnimHost.onClick.AddListener(OnClick_SendPathToAnimHost);
 
             button_editPath = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_EDIT_PATH).GetComponent<Button>();
-            button_editPath.onClick.AddListener(OnClick_SendPathToAnimHost);
+            button_editPath.onClick.AddListener(OnClick_StartPathEditing);
+
+            button_playPathAnim = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_PLAY_PATHANIM).GetComponent<Button>();
+            button_playPathAnim.onClick.AddListener(OnClick_PlayPathAnim);
+
         }
 
         public void PathDataChanged(object sender, EventArgs args){
@@ -283,27 +294,40 @@ namespace tracer{
             GameObject.Destroy(pathCreationCanvasHolder);
         }
 
+        private void StopPathAnimations(){
+            if(!pathAnimIsPlaying)
+                return;
+
+            core.StopCoroutine(PlayPathCharacterAnimationAgain());
+            if(manager.getModule<TimelineModule>() != null)
+                manager.getModule<TimelineModule>().StopAnimationFromAnotherModule();
+        }
+
         private void RefreshOptionButtonsViz(){
             if(sceneCharacterForPath.HasPath()){
-                button_generatePathViaClick.gameObject.SetActive(false);
-
-                button_regeneratePathViaClick.gameObject.SetActive(true);
-                //allow generation even if path is the same since last generation, because it could be different
-                button_triggerAnimHostGeneration.gameObject.SetActive(true);
-                button_editPath.gameObject.SetActive(true);
+                button_generatePath.gameObject.SetActive(false);
+                button_clickToPathTarget.gameObject.SetActive(true);
             }else{
-                button_generatePathViaClick.gameObject.SetActive(true);
-
-                button_regeneratePathViaClick.gameObject.SetActive(false);
-                button_triggerAnimHostGeneration.gameObject.SetActive(false);
-                button_editPath.gameObject.SetActive(false);
+                button_clickToPathTarget.gameObject.SetActive(false);
+                button_generatePath.gameObject.SetActive(true);
             }
         }
 
-        private void HideAllButtons(){
-            button_generatePathViaClick.gameObject.SetActive(false);
-            button_triggerAnimHostGeneration.gameObject.SetActive(false);
-            button_editPath.gameObject.SetActive(false);
+        private void SetButtonInteractability(bool val, bool resetColorToo = true){
+            button_generatePath.interactable        = val;
+            button_clickToPathTarget.interactable   = val;
+            button_callAnimHost.interactable        = sceneCharacterForPath.HasPath();
+            button_editPath.interactable            = sceneCharacterForPath.HasPath();
+            button_playPathAnim.interactable        = sceneCharacterForPath.HasPath() && sceneCharacterForPath.HasPathAnimation();
+
+            if(!resetColorToo)
+                return;
+
+            button_generatePath.GetComponentsInChildren<Image>()[1].color       = Color.white;
+            button_clickToPathTarget.GetComponentsInChildren<Image>()[1].color  = Color.white;
+            button_callAnimHost.GetComponentsInChildren<Image>()[1].color       = Color.white;
+            button_editPath.GetComponentsInChildren<Image>()[1].color           = Color.white;
+            button_playPathAnim.GetComponentsInChildren<Image>()[1].color       = Color.white;
         }
 
         
@@ -484,18 +508,13 @@ namespace tracer{
             //no need to "save the selected object" - since we really should not be able to select another object if we are in this mode
             inputBlocker.SetActive(true);
 
-            //0 is BG, 1 is IMAGE
-            if(button_generatePathViaClick.gameObject.activeSelf){
-                HideAllButtons();
-                button_generatePathViaClick.GetComponentsInChildren<Image>()[1].color   = Color.green;
-                button_generatePathViaClick.gameObject.SetActive(true);
-            }else{
-                HideAllButtons();
-                button_regeneratePathViaClick.GetComponentsInChildren<Image>()[1].color = Color.green;
-                button_regeneratePathViaClick.gameObject.SetActive(true);
-            }
+            //SWITCH BUTTONS
+            SetButtonInteractability(false);
+            button_generatePath.gameObject.SetActive(false);
+            button_clickToPathTarget.gameObject.SetActive(true);
+            button_clickToPathTarget.interactable = true;
+            button_clickToPathTarget.GetComponentsInChildren<Image>()[1].color   = Color.green;
                         
-
             //TODO enable overlay that indicates what to do (frame + text AND "abort"/"finish") (enable overlay for as long as user press another of our button)
 
             //hide gizmo and TRS ui --> we simulate this by de-selecting!
@@ -510,14 +529,37 @@ namespace tracer{
             sceneCharacterForPath.animHostGen.setValue(1);  //0 stop, 1 stream, 2 stream loop, 3 block
             //trigger function where we wait for the character to become unlocked (after locking) - to know if the animation has finished
         }
+
+        private void OnClick_StartPathEditing(){
+            button_editPath.onClick.RemoveListener(OnClick_StartPathEditing);
+            button_editPath.onClick.AddListener(OnClick_StopPathEditing);
+
+            button_editPath.GetComponentsInChildren<Image>()[1].color   = Color.green;
+        }
+        private void OnClick_StopPathEditing(){
+            button_editPath.onClick.AddListener(OnClick_StartPathEditing);
+            button_editPath.onClick.RemoveListener(OnClick_StopPathEditing);
+
+            button_editPath.GetComponentsInChildren<Image>()[1].color   = Color.white;
+        }
+
+        private void OnClick_PlayPathAnim(){
+            button_playPathAnim.interactable = false;
+            button_playPathAnim.GetComponentsInChildren<Image>()[1].color   = Color.green;
+
+            button_generatePath.interactable = false;
+            button_clickToPathTarget.interactable = false;
+            button_callAnimHost.interactable = false;
+            button_editPath.interactable = false;
+
+            //Start Coro
+            core.StartCoroutine(PlayPathCharacterAnimationAgain());
+        }
         #endregion
 
         #region Specific Button Functions
 
         private void AbortPlacementViaRay(){
-            if(button_generatePathViaClick.gameObject.activeSelf)   button_generatePathViaClick.GetComponentsInChildren<Image>()[1].color   = Color.white;
-            if(button_regeneratePathViaClick.gameObject.activeSelf) button_regeneratePathViaClick.GetComponentsInChildren<Image>()[1].color = Color.white;
-
             core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
 
             //re-enable gizmos by simulate a "reselection"
@@ -526,20 +568,19 @@ namespace tracer{
 
             //show correct buttons
             RefreshOptionButtonsViz();
+            SetButtonInteractability(true);
 
             core.StartCoroutine(DelayDisableInputBlockingCanvas());
         }
 
         private void EndPathCreation(){
-            if(button_generatePathViaClick.gameObject.activeSelf)   button_generatePathViaClick.GetComponentsInChildren<Image>()[1].color   = Color.white;
-            if(button_regeneratePathViaClick.gameObject.activeSelf) button_regeneratePathViaClick.GetComponentsInChildren<Image>()[1].color = Color.white;
-
             core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
 
             manager.addSelectedObject(sceneCharacterForPath);
 
             //show correct buttons
             RefreshOptionButtonsViz();
+            SetButtonInteractability(true);
 
             core.StartCoroutine(DelayDisableInputBlockingCanvas());
         }
@@ -575,6 +616,47 @@ namespace tracer{
                 startColor.a = 0f;
                 image.color = startColor;
             }
+        }
+
+        private IEnumerator PlayPathCharacterAnimationAgain(){
+            AnimationManager animManager = core.getManager<AnimationManager>();
+            if(core.getManager<AnimationManager>() == null){
+                Debug.LogWarning("No AnimationManager exist. Cannot play anim");
+                yield break;
+            }
+
+            float timer = sceneCharacterForPath.pathPos.getKeys()[0].time;
+            float endFrameTime = sceneCharacterForPath.pathPos.getKeys()[^1].time;
+            float framerate = 1f/30f;
+
+            if(manager.getModule<TimelineModule>() == null){
+                Debug.LogWarning("No TimelineModule exist. Will straightforward just change anim time here");
+                pathAnimIsPlaying = true;
+                animManager.timelineUpdated(timer);
+                while (timer < endFrameTime){
+                    yield return new WaitForSecondsRealtime(Mathf.FloorToInt(1000f / core.settings.framerate) / 1000f);
+                    timer += framerate;
+                    animManager.timelineUpdated(timer);
+                }
+            }else{
+                Debug.Log("Replay animation via Timeline module");
+                pathAnimIsPlaying = true;
+                yield return core.StartCoroutine(manager.getModule<TimelineModule>().PlayAnimationFromAnotherModule(timer, endFrameTime));
+            }
+            
+            StopPathAnim();
+        }
+
+        private void StopPathAnim(){
+            pathAnimIsPlaying = false;
+
+            button_playPathAnim.interactable = true;
+            button_playPathAnim.GetComponentsInChildren<Image>()[1].color   = Color.white;
+
+            button_generatePath.interactable = true;
+            button_clickToPathTarget.interactable = true;
+            button_callAnimHost.interactable = true;
+            button_editPath.interactable = true;
         }
         #endregion
     }

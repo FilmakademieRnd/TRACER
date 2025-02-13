@@ -80,16 +80,16 @@ namespace tracer
             {
                 case AbstractParameter.ParameterType.BOOL:
                     //add bool for path that can be deleted, also store the path in an additional list (pos-v3, rot-q)
-                    Parameter<bool> paramBool = (Parameter<bool>)abstractParam;
+                    //Parameter<bool> paramBool = (Parameter<bool>)abstractParam;
                     // paramBool.hasChanged += _snapSelect.setParam;
                     // _snapSelect.setSensitivity(100f);
                     // _snapSelect._loop = false;
-                    switch (paramBool.name) {
-                        case "createPath":
-                            //show button as element to delete the path, recreate path, add path (and maybe distribute?)
-                            //do we have the possibility to have buttons there?
-                        break;
-                    }   
+                    // switch (paramBool.name) {
+                    //     case "createPath":
+                    //         //show button as element to delete the path, recreate path, add path (and maybe distribute?)
+                    //         //do we have the possibility to have buttons there?
+                    //     break;
+                    // }   
                     break;
                 case AbstractParameter.ParameterType.FLOAT:
                     Parameter<float> paramFloat = (Parameter<float>)abstractParam;
@@ -139,21 +139,35 @@ namespace tracer
                     break;
                 case AbstractParameter.ParameterType.VECTOR3:
                     Parameter<Vector3> paramVec3 = (Parameter<Vector3>)abstractParam;
-                    paramVec3.hasChanged += _snapSelect.setParam;
-                    _snapSelect.setSensitivity(10f);
-                    _snapSelect.addElement(Resources.Load<Sprite>("Images/button_x"), paramVec3.value.x);
-                    _snapSelect.addElement(Resources.Load<Sprite>("Images/button_y"), paramVec3.value.y);
-                    _snapSelect.addElement(Resources.Load<Sprite>("Images/button_z"), paramVec3.value.z);                    
-                    _snapSelect.addElement(Resources.Load<Sprite>("Images/button_xyz"), (paramVec3.value.x + paramVec3.value.y + paramVec3.value.z) / 3f);
+                    switch (paramVec3.name) {
+                        case "pathPositions":
+                            //DONT SHOW SPINNER, SINCE WE WANT TO MANIPULATE AN ARBIRTRARY PATH OBJECT (SceneObjectUI)
+                            break;
+                        default:
+                            paramVec3.hasChanged += _snapSelect.setParam;
+                            _snapSelect.setSensitivity(10f);
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_x"), paramVec3.value.x);
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_y"), paramVec3.value.y);
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_z"), paramVec3.value.z);                    
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_xyz"), (paramVec3.value.x + paramVec3.value.y + paramVec3.value.z) / 3f);
+                            break;
+                    }
                     break;
                 case AbstractParameter.ParameterType.QUATERNION:
                     Parameter<Quaternion> paramQuat = (Parameter<Quaternion>)abstractParam;
-                    paramQuat.hasChanged += _snapSelect.setParam;
-                    Vector3 rot = paramQuat.value.eulerAngles;
-                    _snapSelect.setSensitivity(500f);
-                    _snapSelect.addElement(Resources.Load<Sprite>("Images/button_x"), rot.x);
-                    _snapSelect.addElement(Resources.Load<Sprite>("Images/button_y"), rot.y);
-                    _snapSelect.addElement(Resources.Load<Sprite>("Images/button_z"), rot.z);
+                    switch (paramQuat.name) {
+                        case "pathRotations":
+                            //DONT SHOW SPINNER, SINCE WE WANT TO MANIPULATE AN ARBIRTRARY PATH OBJECT (SceneObjectUI)
+                            break;
+                        default:
+                            paramQuat.hasChanged += _snapSelect.setParam;
+                            Vector3 rot = paramQuat.value.eulerAngles;
+                            _snapSelect.setSensitivity(500f);
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_x"), rot.x);
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_y"), rot.y);
+                            _snapSelect.addElement(Resources.Load<Sprite>("Images/button_z"), rot.z);
+                            break;
+                    }
                     break;
                 default:
                     Helpers.Log("Parameter Type cannot be edited with Spinner.");

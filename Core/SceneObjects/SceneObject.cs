@@ -82,7 +82,7 @@ namespace tracer
         //!
         //! A reference to the TRACER UI manager.
         //!
-        private UIManager m_uiManager;
+        protected UIManager m_uiManager;
         //!
         //! Position of the SceneObject
         //!
@@ -119,14 +119,17 @@ namespace tracer
 
             m_uiManager = _core.getManager<UIManager>();
 
-            _physicsActive = false;
+            _physicsActive = false; 
+            InitParameter();      
+        }
 
+        protected virtual void InitParameter(){
             position = new Parameter<Vector3>(transform.localPosition, "position", this);
             position.hasChanged += updatePosition;
             rotation = new Parameter<Quaternion>(transform.localRotation, "rotation", this);
             rotation.hasChanged += updateRotation;
             scale = new Parameter<Vector3>(transform.localScale, "scale", this);
-            scale.hasChanged += updateScale;            
+            scale.hasChanged += updateScale;     
         }
 
         //!

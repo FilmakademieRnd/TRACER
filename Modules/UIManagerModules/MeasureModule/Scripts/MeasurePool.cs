@@ -172,6 +172,20 @@ namespace tracer
             }
         }
 
+        public void DestroyPoolObject(){
+            foreach(Transform t in measurementObjects){
+                if(t.GetComponent<SceneObjectMeasurement>())
+                    t.GetComponent<SceneObjectMeasurement>().posChanged -= SceneObjectHasChanged;
+                Destroy(t.gameObject);
+            }
+            if(line)
+                Destroy(line.gameObject);
+            if(textObj)
+                Destroy(textObj.gameObject);
+            module.measurementUIActiveEvent -= OnMeasureUIChanged;
+            Destroy(gameObject);
+        }
+
         public void AddMeasurementObject(GameObject _go, Transform _insertAfter = null){
             if(!_insertAfter){
                 measurementObjects.Add(_go.transform);

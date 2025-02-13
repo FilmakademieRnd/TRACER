@@ -597,7 +597,6 @@ namespace tracer
         //!
         private void OnSelectionChanged(object o, List<SceneObject> sceneObjects)
         {
-            Debug.Log("<color=yellow>Timeline.OnSelectionChanged</color>");
             if (sceneObjects.Count < 1)
             {
                 m_sceneObjectSelected = false;
@@ -1142,6 +1141,31 @@ namespace tracer
 
             updateButtonInteractability();
         }
+
+        //!
+        //! Function to play an animation from another module, even if the ui is not active!
+        //!
+        public IEnumerator PlayAnimationFromAnotherModule(float _startFrameTime, float _endFrameTime){
+            if(m_isPlaying)
+                yield break;
+            
+            //open timeline, set focus, play
+            if(!m_showTimeLine)
+                toggleTimeLine();
+
+            StartTime = _startFrameTime;
+            EndTime = _endFrameTime;
+            focusOnCurrentTime();
+            play();
+            yield return null;
+            while(m_isPlaying)
+                yield return null;
+        }
+        public void StopAnimationFromAnotherModule(){
+            if(m_isPlaying)
+                play();
+        }
+
 
         #region Animation Locking
 

@@ -182,7 +182,12 @@ namespace tracer
             snapSelect.uiSettings = manager.uiAppearanceSettings;
             snapSelect.manager = manager;
 
-            for (int i = 0; i < mainSelection.parameterList.Count; i++)
+            int lengthToShow = mainSelection.parameterList.Count;
+            //if SceneObjectCharacter - DONT SHOW BONES
+            if(mainSelection.GetType() == typeof(SceneCharacterObject))
+                lengthToShow = 5; //TRS (012) + PathPos (3) + PathRot (4)
+
+            for (int i = 0; i < lengthToShow; i++)
             {
                 switch (mainSelection.parameterList[i].name)
                 {
@@ -231,13 +236,17 @@ namespace tracer
                     case "sensorSize":
                         snapSelect.addElement(Resources.Load<Sprite>("Images/button_sensorSize_text"));
                         break;
-                    case "pathPositions":   //was a button like TRS before: snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
-                    case "pathRotations":   //was a button like TRS before: snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
+                    case "pathPositions":   //was a button like TRS before:
+                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
+                        break;
+                    case "pathRotations":   //was a button like TRS before: 
+                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
+                        break;
                     case "animHostGen":     //RPC we use to trigger the character animation for a given path (both above) in AnimHost
                         //not visualized at all (beware that they still increase to index of these snap elements)
                         break;
                     default:                        
-                        //snapSelect.addElement(mainSelection.parameterList[i].name);
+                        snapSelect.addElement(mainSelection.parameterList[i].name);
                         break;
                 }
             }

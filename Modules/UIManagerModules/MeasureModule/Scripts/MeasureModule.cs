@@ -54,6 +54,7 @@ namespace tracer{
         public const string     LOCATION_TRVLPOOL_PREFAB    = "Prefabs/MeasurementPool_Travel";
         public const int        CANVAS_SORTING_ORDER        = 15;
         public const string     BUTTON_NAME_PLACE           = "SelectionSensitive/Button_PlaceViaRay";
+        public const string     BUTTON_NAME_DELETE          = "Creation/Button_DeleteSelection";
         public const string     BUTTON_NAME_CREATE_LINE     = "Creation/Button_CreateLine";
         public const string     BUTTON_NAME_CREATE_WP       = "Creation/Button_CreateWaypoints";
         public const string     BUTTON_NAME_CREATE_ANGLE    = "Creation/Button_CreateAngle";
@@ -102,6 +103,7 @@ namespace tracer{
 
         #region Selfdescribing Buttons
         private Button button_placeSelectedObjectViaRay;
+        private Button button_deleteSelection;
         private Button button_createLine;
         private Button button_createWaypoints;
         private Button button_createAngle;
@@ -209,6 +211,9 @@ namespace tracer{
             uiDistanceText = measureCanvasHolder.transform.Find(TEXT_NAME_UI_DISTANCE).GetComponent<TextMeshProUGUI>();
             uiDistanceText.text = "";
 
+            button_deleteSelection = measureCanvasHolder.transform.Find(BUTTON_NAME_DELETE).GetComponent<Button>();
+            button_deleteSelection.onClick.AddListener(OnClick_DeleteSelection);
+
             button_createLine = measureCanvasHolder.transform.Find(BUTTON_NAME_CREATE_LINE).GetComponent<Button>();
             button_createLine.onClick.AddListener(OnClick_StartCreation_Line);
             button_createWaypoints = measureCanvasHolder.transform.Find(BUTTON_NAME_CREATE_WP).GetComponent<Button>();
@@ -217,6 +222,12 @@ namespace tracer{
             button_createAngle.onClick.AddListener(OnClick_StartCreation_Angle);
             button_createTraveller = measureCanvasHolder.transform.Find(BUTTON_NAME_CREATE_TRAVEL).GetComponent<Button>();
             button_createTraveller.onClick.AddListener(OnClick_StartCreation_Traveller);
+
+            //safe area problems on iOS notch
+            //the menu canvas will be popped to the right and therefore is in front of our measurement tools
+            #if UNITY_IOS
+            //... cannot use Screen.safeArea, since we are within, but the menu canvas is above us
+            #endif
 
             button_addWaypoint = measureCanvasHolder.transform.Find(BUTTON_NAME_ADD_WP).GetComponent<Button>();
             button_addWaypoint.onClick.AddListener(OnClick_AddWaypoint);
@@ -227,11 +238,11 @@ namespace tracer{
             button_resetDistance.onClick.AddListener(OnClick_ResetDistance);
 
             HideAllButtons();
-            ShowCreationButtons();
+            EnableCreationButtons();
         }
 
         private void HideAllButtons(){
-            HideCreationButtons();
+            DisableCreationButtons();
             button_addWaypoint.gameObject.SetActive(false);
             button_removeWaypoint.gameObject.SetActive(false);
             button_resetDistance.gameObject.SetActive(false);
@@ -269,25 +280,28 @@ namespace tracer{
 
             if (_sceneObjects.Count < 1){
                 DeactivateSelectionSensitiveButtons();
-                ShowCreationButtons();
+                EnableCreationButtons();
             }else{
                 //Debug.Log("selected "+_sceneObjects[0].gameObject.name);
                 MeasurePool selectedMeasurePool = _sceneObjects[0].GetComponentInParent<MeasurePool>();
                 if(!selectedMeasurePool || !selectedMeasurePool.IsSceneObjectFromMeasurement(_sceneObjects[0])){
                     DeactivateSelectionSensitiveButtons();
-                    ShowCreationButtons();
-                    Debug.Log("<color=black>no measure object selected</color>");
+                    EnableCreationButtons();
+                    //Debug.Log("<color=black>no measure object selected</color>");
                     //reset distance ui
                     uiDistanceText.text = "";
                     return;
                 }
                 sceneObjectToPlace = _sceneObjects[0];
 
+                DisableCreationButtons();
+
                 button_placeSelectedObjectViaRay.gameObject.SetActive(true);
+                //only if we are not within pointing via ray mode (TODO: all bool to check in which mode we currently are)
+                button_deleteSelection.interactable = true;
                 //if visible, always interactable button_placeSelectedObjectViaRay.interactable = true;
                 selectedMeasurePool.SetDistanceText(uiDistanceText);
 
-                HideCreationButtons();
 
                 ShowCaseSensitiveButtons(selectedMeasurePool);
             }
@@ -325,10 +339,10 @@ namespace tracer{
                     sceneObjectWeHit = hit.transform.GetComponentInParent<SceneObject>();
 
                 if (sceneObjectWeHit){
-                    Debug.Log("Hit SceneObject Check if it is a Measure-Object");
+                    //Debug.Log("Hit SceneObject Check if it is a Measure-Object");
                     MeasurePool selectedMeasurePool = sceneObjectWeHit.GetComponentInParent<MeasurePool>();
                     if (selectedMeasurePool && selectedMeasurePool.IsSceneObjectFromMeasurement(sceneObjectWeHit)){
-                        Debug.Log("\tYES!");
+                        //Debug.Log("\tYES!");
                         //revert color
                         sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
                         //save color
@@ -379,10 +393,10 @@ namespace tracer{
                     sceneObjectWeHit = hit.transform.GetComponentInParent<SceneObject>();
 
                 if (sceneObjectWeHit){
-                    Debug.Log("Hit SceneObject Check if it is a Measure-Object");
+                    //Debug.Log("Hit SceneObject Check if it is a Measure-Object");
                     MeasurePool selectedMeasurePool = sceneObjectWeHit.GetComponentInParent<MeasurePool>();
                     if (selectedMeasurePool && selectedMeasurePool.IsSceneObjectFromMeasurement(sceneObjectWeHit)){
-                        Debug.Log("\tYES!");
+                        //Debug.Log("\tYES!");
                         //revert color
                         sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
                         //save color
@@ -514,51 +528,55 @@ namespace tracer{
             button_resetDistance.gameObject.SetActive(false);
         }
 
-        private void ShowCreationButtons(){
-            button_createLine.gameObject.SetActive(true);
-            button_createWaypoints.gameObject.SetActive(true);
-            button_createAngle.gameObject.SetActive(true);
-            button_createTraveller.gameObject.SetActive(true);
+        private void EnableCreationButtons(){
+            button_deleteSelection.interactable = false;
+
+            button_createLine.interactable = true;          //gameObject.SetActive(true);
+            button_createWaypoints.interactable = true;     //gameObject.SetActive(true);
+            button_createAngle.interactable = true;         //gameObject.SetActive(true);
+            button_createTraveller.interactable = true;     //gameObject.SetActive(true);
         }
 
-        private void HideCreationButtons(){
-            button_createLine.gameObject.SetActive(false);
-            button_createWaypoints.gameObject.SetActive(false);
-            button_createAngle.gameObject.SetActive(false);
-            button_createTraveller.gameObject.SetActive(false);
+        private void DisableCreationButtons(){
+            button_deleteSelection.interactable = false;
+
+            button_createLine.interactable = false;         //gameObject.SetActive(false);
+            button_createWaypoints.interactable = false;    //gameObject.SetActive(false);
+            button_createAngle.interactable = false;        //gameObject.SetActive(false);
+            button_createTraveller.interactable = false;    //gameObject.SetActive(false);
         }
 
         private void ShowCaseSensitiveButtons(MeasurePool _selectedMeasurePool){
             switch(_selectedMeasurePool.measureType){
-                    case MeasurePool.MeasureTypeEnum.line:
-                        button_addWaypoint.gameObject.SetActive(false);
-                        button_removeWaypoint.gameObject.SetActive(false);
-                        button_resetDistance.gameObject.SetActive(false);
-                        break;
-                    case MeasurePool.MeasureTypeEnum.angle:
-                        button_addWaypoint.gameObject.SetActive(false);
-                        button_removeWaypoint.gameObject.SetActive(false);
-                        button_resetDistance.gameObject.SetActive(false);
-                        break;
-                    case MeasurePool.MeasureTypeEnum.travel:
-                        button_addWaypoint.gameObject.SetActive(false);
-                        button_removeWaypoint.gameObject.SetActive(false);
-                        button_resetDistance.gameObject.SetActive(true);
+                case MeasurePool.MeasureTypeEnum.line:
+                    button_addWaypoint.gameObject.SetActive(false);
+                    button_removeWaypoint.gameObject.SetActive(false);
+                    button_resetDistance.gameObject.SetActive(false);
+                    break;
+                case MeasurePool.MeasureTypeEnum.angle:
+                    button_addWaypoint.gameObject.SetActive(false);
+                    button_removeWaypoint.gameObject.SetActive(false);
+                    button_resetDistance.gameObject.SetActive(false);
+                    break;
+                case MeasurePool.MeasureTypeEnum.travel:
+                    button_addWaypoint.gameObject.SetActive(false);
+                    button_removeWaypoint.gameObject.SetActive(false);
+                    button_resetDistance.gameObject.SetActive(true);
 
-                        button_resetDistance.interactable = _selectedMeasurePool.GetDistance() > 0;
-                        break;
-                    case MeasurePool.MeasureTypeEnum.waypoints:
-                        button_addWaypoint.gameObject.SetActive(true);
-                        button_removeWaypoint.gameObject.SetActive(true);
-                        button_resetDistance.gameObject.SetActive(true);
+                    button_resetDistance.interactable = _selectedMeasurePool.GetDistance() > 0;
+                    break;
+                case MeasurePool.MeasureTypeEnum.waypoints:
+                    button_addWaypoint.gameObject.SetActive(true);
+                    button_removeWaypoint.gameObject.SetActive(true);
+                    button_resetDistance.gameObject.SetActive(true);
 
-                        button_removeWaypoint.interactable = _selectedMeasurePool.GetMeasureObjectCount() > 1;
-                        button_resetDistance.interactable = true;   //always enabled, because we have no callback implemented for moving this object
-                        //enable adding/removing waypoints
-                        //- adding should wait for click to query and place it there (but how is "adding" enabled? we would need to select another waypoint...)
-                        //- removing should only be enabled if we select a waypoint 
-                        break;
-                }
+                    button_removeWaypoint.interactable = _selectedMeasurePool.GetMeasureObjectCount() > 1;
+                    button_resetDistance.interactable = true;   //always enabled, because we have no callback implemented for moving this object
+                    //enable adding/removing waypoints
+                    //- adding should wait for click to query and place it there (but how is "adding" enabled? we would need to select another waypoint...)
+                    //- removing should only be enabled if we select a waypoint 
+                    break;
+            }
         }
 
         #region Button Events
@@ -607,7 +625,8 @@ namespace tracer{
             manager.addSelectedObject(sceneObjectToPlace);
 
             //show correct buttons
-            HideCreationButtons();
+            DisableCreationButtons();
+            button_deleteSelection.interactable = true;
             ShowCaseSensitiveButtons(sceneObjectToPlace.GetComponentInParent<MeasurePool>());
 
             button_placeSelectedObjectViaRay.onClick.RemoveListener(OnClick_StopPlaceViaRay);
@@ -624,6 +643,15 @@ namespace tracer{
             inputBlockingCanvas.SetActive(false);
         }
 
+        private void OnClick_DeleteSelection(){
+            MeasurePool selectedMeasurePool = sceneObjectToPlace.GetComponentInParent<MeasurePool>();
+            if(selectedMeasurePool != null){
+                selectedMeasurePool.DestroyPoolObject();
+                if(uiDistanceText)
+                    uiDistanceText.text = "";
+            }
+            manager.clearSelectedObject();
+        }
         private void OnClick_StartCreation_Line(){
             CreateMeasurePoolAtRuntime(GameObject.Instantiate(Resources.Load(LOCATION_LINEPOOL_PREFAB) as GameObject).GetComponent<MeasurePool>());
         }

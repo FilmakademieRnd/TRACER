@@ -60,19 +60,20 @@ namespace tracer
         public Parameter<Quaternion> pathRot;
         //!
         //! RPC Call to AnimHost to trigger the generation of the path
-        //! needs to be at paremterList index 6
+        //! needs to be at paremterList index 5
         //!
         public RPCParameter<int> animHostGen;
-        #endregion
 
+        #endregion
         //!
-        //! Dictionary to store bone transforms by their IDs
+        //! Dictionary to store bone transforms (position specific for performance in update) by their IDs
         //!
-        private Dictionary<int, Transform> boneMap;
+        private Dictionary<int, Transform> boneMapForPosition;
         //!
-        //! The array of bone transforms from the SkinnedMeshRenderer
+        //! Dictionary to store bone transforms (rotation specific for performance in update) by their IDs
         //!
-        private Transform[] bones;
+        private Dictionary<int, Transform> boneMapForRotation;
+        
         public List<string> boneNamesOrder;
         //!
         //! event to listen on from e.g. the PathGenerationModule to update the path lines and scene objects
@@ -103,7 +104,8 @@ namespace tracer
             CreatePathParameters();
 
             // Initialize the dictionary to store bone transforms by their IDs.
-            boneMap = new Dictionary<int, Transform>();
+            boneMapForPosition = new Dictionary<int, Transform>();
+            boneMapForRotation = new Dictionary<int, Transform>();
             
             //  If server setBones is called on awake if not setBones is called from SceneCreatorModule line 137
             if (_core.isServer)
@@ -121,8 +123,11 @@ namespace tracer
 
         #region PATH FUNCTIONS
         public bool HasPath(){
-            return pathPos.getKeys() != null && pathPos.getKeys().Count > 1;
+            return pathPos._isAnimated;
+            //return pathPos.getKeys() != null && pathPos.getKeys().Count > 1;
         }
+        //check if any bone (just first one) has a valid animated parameter
+        public bool HasPathAnimation(){ return boneMapForPosition.Count > 0 && parameterList[boneMapForPosition.ElementAt(0).Key]._isAnimated; }
         public Vector3[] GetPathPositions(){
             //generate it here instead of within an update of updatePathPositions, because it would trigger a generation more often!
             Vector3[] pathPositions = new Vector3[pathPos.getKeys().Count];
@@ -168,7 +173,6 @@ namespace tracer
         private void triggerAnimHostGen(object sender, int i){
             emitHasChanged((AbstractParameter)sender);
             //.call?
-            Debug.Log("called triggerAnimHostGen "+i);
 
             //Show fast path particle (TrailRenderer from start to end)
             //will be shown on every client!
@@ -189,7 +193,7 @@ namespace tracer
         public void setBones()
         {
             // Get the array of bone transforms from the SkinnedMeshRenderer component.
-            bones = GetComponentInChildren<SkinnedMeshRenderer>().bones;
+            Transform[] bones = GetComponentInChildren<SkinnedMeshRenderer>().bones;
 
             boneNamesOrder = new List<string>();
             // Loop through each bone transform obtained from the SkinnedMeshRenderer.
@@ -204,11 +208,11 @@ namespace tracer
                         new Parameter<Quaternion>(boneTransform.localRotation, boneTransform.name, this);
                     
                     // Attach a callback to the parameter's "hasChanged" event, which is triggered when the bone transform is updated.
-                    localBoneRotationParameter.hasChanged += updateRotation;
+                    localBoneRotationParameter.hasChanged += updateBoneRotation;
                     
                     // Use the parameter's ID as the key to store the bone transform in the dictionary.
                     var id = localBoneRotationParameter._id;
-                    boneMap.Add(id, boneTransform);
+                    boneMapForRotation.Add(id, boneTransform);
                     boneNamesOrder.Add(boneTransform.name);
                     //Debug.Log(_id+"-"+boneTransform.name);
                 }
@@ -224,11 +228,11 @@ namespace tracer
                         new Parameter<Vector3>(boneTransform.localPosition, boneTransform.name, this);
                     
                     // Attach a callback to the parameter's "hasChanged" event, which is triggered when the bone transform is updated.
-                    localBonePositionParameter.hasChanged += updatePosition;
+                    localBonePositionParameter.hasChanged += updateBonePosition;
                     
                     // Use the parameter's ID as the key to store the bone transform in the dictionary.
                     var id = localBonePositionParameter._id;
-                    boneMap.Add(id, boneTransform);
+                    boneMapForPosition.Add(id, boneTransform);
                     //boneNamesOrder.Add(boneTransform.name);
                     //Debug.Log(_id+"-"+boneTransform.name);
                 }
@@ -240,25 +244,25 @@ namespace tracer
        //! @param   sender     Object calling the update function
        //! @param   a          new rotation value
        //!
-       private void updateRotation(object sender, Quaternion a)
+       private void updateBoneRotation(object sender, Quaternion a)
         {
             // Retrieve the ID of the parameter whose value has changed.
             int id = ((Parameter<Quaternion>)sender)._id;
             
             // Update the bone transform's local rotation based on the new value.
-            boneMap[id].localRotation = a;
+            boneMapForRotation[id].localRotation = a;
             
             // Emit a signal to notify that the parameter has changed (if necessary).
             emitHasChanged((AbstractParameter)sender);
         }
        
-        private void updatePosition(object sender, Vector3 a)
+        private void updateBonePosition(object sender, Vector3 a)
         {
             // Retrieve the ID of the parameter whose value has changed.
             int id = ((Parameter<Vector3>)sender)._id;
             
             // Update the bone transform's local rotation based on the new value.
-            boneMap[id].localPosition = a;
+            boneMapForPosition[id].localPosition = a;
             
             // Emit a signal to notify that the parameter has changed (if necessary).
             emitHasChanged((AbstractParameter)sender);
@@ -276,33 +280,47 @@ namespace tracer
         //!
         //! updates the bones rotation and informs all connected parameters about the change
         //!
-        private void UpdateBoneTransform()
-        {
-               // Loop through each bone transform stored in the dictionary.
-            for (int i = 0; i < boneMap.Count; i++)
-            {
-                KeyValuePair<int, Transform> boneAtPos = boneMap.ElementAt(i);
-                if (parameterList[boneAtPos.Key].tracerType == AbstractParameter.ParameterType.QUATERNION)
+        private void UpdateBoneTransform(){
+
+            //much better way to iterate
+            /*foreach(KeyValuePair<int, Transform> bonePair in boneMapForRotation){
+                Parameter<Quaternion> parameter = (Parameter<Quaternion>)parameterList[bonePair.Key];
+                //Quaternion valueAtPos = ;
+                
+                if (boneAtPos.Value.localRotation != (Quaternion)parameter.value)
                 {
-                    Parameter<Quaternion> parameter = ((Parameter<Quaternion>)parameterList[boneAtPos.Key]);
-                    Quaternion valueAtPos = parameter.value;
-                    
-                    if (boneAtPos.Value.localRotation != valueAtPos)
-                    {
-                        // If the local rotation has changed, update the parameter's value to match the bone transform.
-                        parameter.setValue(boneAtPos.Value.localRotation);
-                    }
+                    // If the local rotation has changed, update the parameter's value to match the bone transform.
+                    parameter.setValue(boneAtPos.Value.localRotation);
+                    //Debug.Log("UpdateBoneRotation");
                 }
-                else
+            }*/
+
+            KeyValuePair<int, Transform> boneAtPos;
+            // Loop through each bone transform stored in the dictionary.
+            for (int i = 0; i < boneMapForRotation.Count; i++)
+            {
+                boneAtPos = boneMapForRotation.ElementAt(i);
+                Parameter<Quaternion> parameter = ((Parameter<Quaternion>)parameterList[boneAtPos.Key]);
+                Quaternion valueAtPos = parameter.value;
+                
+                if (boneAtPos.Value.localRotation != valueAtPos)
                 {
-                    Parameter<Vector3> parameter = ((Parameter<Vector3>)parameterList[boneAtPos.Key]);
-                    Vector3 valueAtPos = parameter.value;  
-                    
-                    if (boneAtPos.Value.localPosition != valueAtPos)
-                    {
-                        // If the local rotation has changed, update the parameter's value to match the bone transform.
-                        parameter.setValue(boneAtPos.Value.localPosition);
-                    }
+                    // If the local rotation has changed, update the parameter's value to match the bone transform.
+                    parameter.setValue(boneAtPos.Value.localRotation);
+                    //Debug.Log("UpdateBoneRotation");
+                }
+            }
+
+            for (int i = 0; i < boneMapForPosition.Count; i++){
+                boneAtPos = boneMapForPosition.ElementAt(i);
+                Parameter<Vector3> parameter = ((Parameter<Vector3>)parameterList[boneAtPos.Key]);
+                Vector3 valueAtPos = parameter.value;  
+                
+                if (boneAtPos.Value.localPosition != valueAtPos)
+                {
+                    // If the local position has changed, update the parameter's value to match the bone transform.
+                    parameter.setValue(boneAtPos.Value.localPosition);
+                    //Debug.Log("UpdateBonePosition");
                 }
             }
         }

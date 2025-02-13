@@ -59,10 +59,11 @@ namespace tracer
         // Start is called before the first frame update
         public override void Awake(){
             base.Awake();
-            //dont send any data out
-            position = null;
-            rotation = null;
-            scale = null;   
+            //dont send any data out (but dont set it to null!)
+            position = new Parameter<Vector3>(transform.localPosition, "dnd-position", this);
+            rotation = new Parameter<Quaternion>(transform.localRotation, "dnd-rotation", this);
+            scale = new Parameter<Vector3>(transform.localScale, "dnd-scale", this);
+            
             //thats why its always locked
             _lock = true;
         }
@@ -80,6 +81,9 @@ namespace tracer
         public override void OnDestroy(){
             //since we dont send any data out, we dont need to cleanup
             //base.OnDestroy();
+        }
+
+        protected override void emitHasChanged (AbstractParameter parameter){
         }
 
         protected override bool IsLocked(){ return true;}   //always locked
