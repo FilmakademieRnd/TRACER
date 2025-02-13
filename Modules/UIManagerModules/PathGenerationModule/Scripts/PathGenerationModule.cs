@@ -263,7 +263,7 @@ namespace tracer{
             //not enabled yet (working semi good)
             button_playPathAnim = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_PLAY_PATHANIM).GetComponent<Button>();
             button_playPathAnim.onClick.AddListener(OnClick_PlayPathAnim);
-            button_playPathAnim.enabled = false;
+            button_playPathAnim.interactable = false;
 
         }
 
@@ -542,7 +542,9 @@ namespace tracer{
 
         private void OnClick_SendPathToAnimHost(){
             manager.clearSelectedObject();
-            sceneCharacterForPath.animHostGen.setValue(animHostAnimationTypeToSend);  //0 stop, 1 stream, 2 stream loop, 3 block
+            //always throws an error
+            //sceneCharacterForPath.animHostGen.setValue(Mathf.Clamp(animHostAnimationTypeToSend, 1, 3));  //0 stop, 1 stream, 2 stream loop, 3 block
+            sceneCharacterForPath.animHostGen.setValue(1);
             //trigger function where we wait for the character to become unlocked (after locking) - to know if the animation has finished
             core.StartCoroutine(WaitForAnimHostToFinish());
         }
