@@ -106,7 +106,6 @@ namespace tracer{
         //!
         private MenuButton m_pathGenSelectButton;
 
-
         #region Selfdescribing Buttons
         private Button button_generatePath;
         private Button button_clickToPathTarget;    //for viz wizzle
@@ -124,6 +123,10 @@ namespace tracer{
         //! whether the path is currently streamed or played by us
         //!
         private bool pathAnimIsPlaying = false;
+        //!
+        //! RPC parameter values we send to anim host: 0 stop, 1 stream, 2 stream loop, 3 block
+        //!
+        private int animHostAnimationTypeToSend = 1;
 
         //!
         //! Constructor
@@ -150,6 +153,8 @@ namespace tracer{
         {
             Debug.Log("<color=orange>Init PathGenerationModule</color>");
             manager.selectionChanged += OnSelectionChanged;
+
+            manager.settings.animHostAnimationType.hasChanged += AnimHostAnimationTypeChanged;
         }
 
         //! 
@@ -224,6 +229,9 @@ namespace tracer{
                 DestroyPathLineRenderer();
                 DestroyPathOptionUI();
                 StopPathAnimations();
+                core.StopCoroutine(WaitForAnimHostToFinish());
+
+                sceneCharacterForPath = null;
             }
 
             pathGenerationUIActiveEvent?.Invoke(this, isActive);
@@ -252,8 +260,10 @@ namespace tracer{
             button_editPath.onClick.AddListener(OnClick_StartPathEditing);
             button_editPath.interactable = false;
 
+            //not enabled yet (working semi good)
             button_playPathAnim = pathCreationCanvasHolder.transform.Find(BUTTON_NAME_PLAY_PATHANIM).GetComponent<Button>();
             button_playPathAnim.onClick.AddListener(OnClick_PlayPathAnim);
+            button_playPathAnim.enabled = false;
 
         }
 
@@ -320,7 +330,7 @@ namespace tracer{
             button_clickToPathTarget.interactable   = val;
             button_callAnimHost.interactable        = sceneCharacterForPath.HasPath();
             //button_editPath.interactable            = sceneCharacterForPath.HasPath();
-            button_playPathAnim.interactable        = sceneCharacterForPath.HasPath() && sceneCharacterForPath.HasPathAnimation();
+            //button_playPathAnim.interactable        = sceneCharacterForPath.HasPath() && sceneCharacterForPath.HasPathAnimation();
 
             if(!resetColorToo)
                 return;
@@ -329,7 +339,7 @@ namespace tracer{
             button_clickToPathTarget.GetComponentsInChildren<Image>()[1].color  = Color.white;
             button_callAnimHost.GetComponentsInChildren<Image>()[1].color       = Color.white;
             //button_editPath.GetComponentsInChildren<Image>()[1].color           = Color.white;
-            button_playPathAnim.GetComponentsInChildren<Image>()[1].color       = Color.white;
+            //button_playPathAnim.GetComponentsInChildren<Image>()[1].color       = Color.white;
         }
 
         
@@ -496,6 +506,10 @@ namespace tracer{
         }
         #endregion
 
+        private void AnimHostAnimationTypeChanged(object sender, int i){
+            animHostAnimationTypeToSend = i;
+        }
+
 
         #region OnClick Events
         private void OnClick_StartCreation_ClickTarget(){
@@ -528,8 +542,9 @@ namespace tracer{
 
         private void OnClick_SendPathToAnimHost(){
             manager.clearSelectedObject();
-            sceneCharacterForPath.animHostGen.setValue(1);  //0 stop, 1 stream, 2 stream loop, 3 block
+            sceneCharacterForPath.animHostGen.setValue(animHostAnimationTypeToSend);  //0 stop, 1 stream, 2 stream loop, 3 block
             //trigger function where we wait for the character to become unlocked (after locking) - to know if the animation has finished
+            core.StartCoroutine(WaitForAnimHostToFinish());
         }
 
         private void OnClick_StartPathEditing(){
@@ -652,13 +667,29 @@ namespace tracer{
         private void StopPathAnim(){
             pathAnimIsPlaying = false;
 
-            button_playPathAnim.interactable = true;
+            //button_playPathAnim.interactable = true;
             button_playPathAnim.GetComponentsInChildren<Image>()[1].color   = Color.white;
 
             button_generatePath.interactable = true;
             button_clickToPathTarget.interactable = true;
             button_callAnimHost.interactable = true;
             //button_editPath.interactable = true;
+        }
+
+        private IEnumerator WaitForAnimHostToFinish(){
+            //wait until character becomes unlocked after locked - abort if we press anything or received an onBloc value
+            while(sceneCharacterForPath && !sceneCharacterForPath._lock){
+                //wait for it to become locked first
+                yield return null;
+            }
+            while(sceneCharacterForPath && sceneCharacterForPath._lock){
+                //wait for it to become unlocked again (at end of anim)
+                yield return null;
+            }
+            if(sceneCharacterForPath){
+                manager.clearSelectedObject();
+                manager.addSelectedObject(sceneCharacterForPath);
+            }
         }
         #endregion
     }

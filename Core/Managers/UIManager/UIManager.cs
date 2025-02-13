@@ -53,6 +53,9 @@ namespace tracer
             public ListParameter roles;
             [ShowInMenu]
             public Parameter<float> measureDistanceMultiplier = new Parameter<float>(1f, "measureMultiplier");
+            [ShowInMenu]
+            public Parameter<int> animHostAnimationType = new Parameter<int>(1, "animHostAnimationType");
+            //0 stop, 1 stream, 2 stream loop, 3 block
         }
         //!
         //! Getter and setter for the UI settings.
