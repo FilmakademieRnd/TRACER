@@ -1122,7 +1122,7 @@ namespace tracer
                 UnlockAllAnimatedObjects();
             }else{
                 GatherAllAnimatedSceneObjects();
-                Debug.Log("<color=blue>Animation. We have "+m_allAnimatedObjects.Count+" animated SceneObjects</color>");
+                //Debug.Log("<color=blue>Animation. We have "+m_allAnimatedObjects.Count+" animated SceneObjects</color>");
                 
                 /* uncomment if we only want to allow playing the animation if all can be locked
                 if(!AreAllAnimatedObjectsUnlocked()){

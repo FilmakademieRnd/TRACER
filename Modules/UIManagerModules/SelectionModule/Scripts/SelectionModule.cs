@@ -188,6 +188,11 @@ namespace tracer
         private async void SelectFunction(object sender, Vector2 point){
             //Debug.Log("<color=orange>SelectFunction called</color>");
 
+            //if already waiting for a previous select function to be resolved, abort
+            //very unlikely, but if the system has low fps due something and we'Re spamming clicks, it may be possible
+            if(m_isRenderActive || m_gpuReadbackRequested)
+                return;
+
             SceneObject obj = GetSelectableAtCollider(point);
             if (!obj){
                 //Debug.Log("<color=yellow>GetSelectableAtCollider did not find an object. Testing with Pixel</color>");
@@ -197,7 +202,8 @@ namespace tracer
                     await System.Threading.Tasks.Task.Delay(50);
 
                 obj = GetSelectableAtPixel(point);
-            }//else{
+            }
+            //else{
             //    Debug.Log("<color=green>Found clicked object via GetSelectableAtCollider</color>");
             //}
 

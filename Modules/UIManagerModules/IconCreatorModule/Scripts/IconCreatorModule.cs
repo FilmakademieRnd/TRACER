@@ -187,8 +187,9 @@ namespace tracer
         {
             foreach(SceneObject sceneObject in m_sceneObjects)
             {
-                if (sceneObject.GetType() == typeof(SceneObjectLight))
+                if (sceneObject.GetType().BaseType == typeof(SceneObjectLight)){
                     sceneObject.getParameter<Color>("color").hasChanged -= updateIconColor;
+                }
                 
                 UnityEngine.Object.DestroyImmediate(sceneObject._icon);
             }
