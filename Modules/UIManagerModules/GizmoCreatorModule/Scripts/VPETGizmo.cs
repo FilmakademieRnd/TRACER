@@ -65,11 +65,14 @@ namespace tracer
 
             if (parent != null)
             {
+                
                 m_root.transform.position = parent.transform.position;
-                m_root.transform.rotation = parent.transform.rotation;
+                m_root.transform.rotation = parent.transform.rotation; ;
                 m_root.transform.localScale = parent.transform.localScale;
-
+                
                 m_root.transform.parent = parent;
+
+                
             }
         }
 

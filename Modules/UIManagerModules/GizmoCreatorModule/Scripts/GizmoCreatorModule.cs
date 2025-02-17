@@ -89,6 +89,8 @@ namespace tracer
         //! 
         //!
         private List<Tuple<Parameter<Color>, EventHandler<Color>>> m_eventHandlersColor;
+        
+        private bool _negative = false;
 
         //!
         //! Constructor
@@ -133,6 +135,18 @@ namespace tracer
             manager.selectionChanged -= createGizmos;
             diosposeGizmos();
         }
+        bool HasNegativeScaleInHierarchy(Transform obj)
+        {
+            if (obj == null)
+                return false;
+
+            Vector3 scale = obj.localScale;
+            if (scale.x < 0 || scale.y < 0 || scale.z < 0)
+                return true; // Found a negative scale
+
+            // Recursively check the parent
+            return HasNegativeScaleInHierarchy(obj.parent);
+        }
 
         //!
         //! Function that parses the given list of scene objects to create and
@@ -145,6 +159,10 @@ namespace tracer
             foreach (SceneObject sceneObject in sceneObjects)
             {
                 VPETGizmo gizmo = null;
+                if (HasNegativeScaleInHierarchy(sceneObject.transform))
+                {
+                    _negative = true;
+                }
                 switch (sceneObject)
                 {
                     case SceneObjectLight:
@@ -219,7 +237,14 @@ namespace tracer
             SceneObjectPointLight sceneObject = (SceneObjectPointLight) sender;
 
             float range = sceneObject.range.value;
-            sceneObject._gizmo.transform.localScale = new Vector3(range, range, range);
+            if (!_negative)
+            {
+                sceneObject._gizmo.transform.localScale = new Vector3(range, range, range);
+            }
+            else
+            {
+                sceneObject._gizmo.transform.localScale = new Vector3(range, range, -range);
+            }
         }
 
         //!
@@ -227,14 +252,21 @@ namespace tracer
         //!
         private void updateScaleSpot(object sender, AbstractParameter parameter)
         {
-            SceneObjectSpotLight sceneObject = (SceneObjectSpotLight) sender;
+            SceneObjectSpotLight sceneObject = (SceneObjectSpotLight)sender;
             float range = sceneObject.range.value;
             float angle = sceneObject.spotAngle.value;
 
             // diameter = 2 * distance * tan( angle * 0.5 )
             float dia = 2f * range * MathF.Tan(angle / 180f * Mathf.PI * 0.5f);
+            if (!_negative)
+            {
+                sceneObject._gizmo.transform.localScale = new Vector3(dia, dia, range);
+            }
+            else
+            {
+                sceneObject._gizmo.transform.localScale = new Vector3(dia, dia, -range);
 
-            sceneObject._gizmo.transform.localScale = new Vector3(dia, dia, range);
+            }
         }
 
         //!
@@ -250,7 +282,14 @@ namespace tracer
             // diameter = 2 * distance * tan( angle * 0.5 )
             float dia = 2f * far * MathF.Tan(fov / 180f * Mathf.PI * 0.5f);
 
-            sceneObject._gizmo.transform.localScale = new Vector3(dia * aspect, dia, far);
+            if (!_negative)
+            {
+                sceneObject._gizmo.transform.localScale = new Vector3(dia * aspect, dia, far);
+            }
+            else
+            {
+                sceneObject._gizmo.transform.localScale = new Vector3(dia * aspect, dia, -far);
+            }
         }
 
         //!

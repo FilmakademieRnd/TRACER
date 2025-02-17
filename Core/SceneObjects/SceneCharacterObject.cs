@@ -143,7 +143,6 @@ namespace tracer
             pathPos.hasChanged += updatePathPositions;
             pathRot = new Parameter<Quaternion>(transform.localRotation, "pathRotations", this);
             pathRot.hasChanged += updatePathRotations;
-
             animHostGen = new RPCParameter<int>(0, "animHostGen", this);
             animHostGen.hasChanged += triggerAnimHostGen;
         }

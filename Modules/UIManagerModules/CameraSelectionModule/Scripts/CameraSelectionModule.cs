@@ -275,6 +275,11 @@ namespace tracer
                 Camera.main.cullingMask &= ~(1 << 11);
                 Camera.main.transform.position = m_selectedObject.transform.position;
                 Camera.main.transform.rotation = m_selectedObject.transform.rotation;
+                if (m_selectedObject.transform.parent.name != "Scene")
+                {
+                    Camera.main.transform.position = m_selectedObject.transform.parent.TransformPoint(m_selectedObject.transform.localPosition);
+                    Camera.main.transform.rotation = m_selectedObject.transform.parent.rotation * m_selectedObject.transform.localRotation;
+                }
                 m_oldPosition = Vector3.zero;
                 m_oldRotation = Quaternion.identity;
                 m_inverseOldCamRotation = Quaternion.identity;
@@ -524,15 +529,35 @@ namespace tracer
                 case InputManager.CameraControl.ATTITUDE: 
                 case InputManager.CameraControl.AR:
                 case InputManager.CameraControl.TOUCH:
-                    newPosition = camTransform.position - objTransform.parent.position;
-                    newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
+                   // newPosition = camTransform.position - objTransform.parent.position;
+                    //newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
+                    if (objTransform.parent.name != "Scene")
+                    {
+                        newPosition = objTransform.parent.InverseTransformPoint(camTransform.position);
+                        newRotation = Quaternion.Inverse(objTransform.parent.rotation) * camTransform.rotation;
+                    }
+                    else
+                    {
+                        newPosition = camTransform.position;
+                        newRotation = camTransform.rotation;
+                    }
                     m_selectedObject.position.setValue(newPosition);
                     m_selectedObject.rotation.setValue(newRotation);
                     break;
                 case InputManager.CameraControl.NONE:
                     //do the same here right now, because the behaviour seems to be set to None from time to time (specifically AR mode did not work well anymore)
-                    newPosition = camTransform.position - objTransform.parent.position;
-                    newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
+                    //newPosition = camTransform.position - objTransform.parent.position;
+                    //newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
+                    if (objTransform.parent.name != "Scene")
+                    {
+                        newPosition = objTransform.parent.InverseTransformPoint(camTransform.position);
+                        newRotation = Quaternion.Inverse(objTransform.parent.rotation) * camTransform.rotation;
+                    }
+                    else
+                    {
+                        newPosition = camTransform.position;
+                        newRotation = camTransform.rotation;
+                    }
                     m_selectedObject.position.setValue(newPosition);
                     m_selectedObject.rotation.setValue(newRotation);
                     break;
