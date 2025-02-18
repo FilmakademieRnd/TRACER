@@ -743,7 +743,7 @@ namespace tracer
         //!
         private void OnManipulatorEditEnded(object o, AbstractParameter para)
         {
-            Debug.Log("<color=green>OnManipulatorEditEnded</color>");
+            //Debug.Log("<color=green>OnManipulatorEditEnded</color>");
             UpdateCurrentKeyframeValue(para);
         }
 
@@ -757,7 +757,7 @@ namespace tracer
             if(m_activeKeyframeIndex < 0 || m_activeParameter == null)
                 return;
 
-            Debug.Log("<color=green>UpdateCurrentKeyframeValue</color>");
+            //Debug.Log("<color=green>UpdateCurrentKeyframeValue</color>");
             m_activeParameter.updateKey(m_activeKeyframeIndex);
             if (m_activeParameter is Parameter<Vector3> && para.name == "position")
                 m_animationManager.OnRenewSplineContainer(null);
