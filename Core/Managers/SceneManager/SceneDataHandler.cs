@@ -237,7 +237,7 @@ namespace tracer
             //!
             //! @return A reference to the serialised ParameterObjects data.
             //!
-            public ref byte[] m_parameterObjectsByteDataRef
+            public ref byte[] parameterObjectsByteDataRef
             {
                 get { return ref m_parameterObjectsByteData; }
             }

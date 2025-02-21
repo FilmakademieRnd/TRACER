@@ -43,11 +43,6 @@ namespace tracer
     //!
     public class SelectionModule : UIManagerModule
     {
-        #if UNITY_EDITOR
-        private const bool debugRenderTextureCreation = false;
-        private int debugRenderTextureInScene_Counter = 0;
-        #endif
-
         //!
         //! Name of the shader tag for the selection shader.
         //!
@@ -186,7 +181,6 @@ namespace tracer
         //! @param e The screen coorinates from the input event.
         //!
         private async void SelectFunction(object sender, Vector2 point){
-            //Debug.Log("<color=orange>SelectFunction called</color>");
 
             //if already waiting for a previous select function to be resolved, abort
             //very unlikely, but if the system has low fps due something and we'Re spamming clicks, it may be possible
@@ -195,7 +189,6 @@ namespace tracer
 
             SceneObject obj = GetSelectableAtCollider(point);
             if (!obj){
-                //Debug.Log("<color=yellow>GetSelectableAtCollider did not find an object. Testing with Pixel</color>");
                 m_isRenderActive = true;
                 // give the system some time to render the object _id's
                 while(m_isRenderActive || m_gpuReadbackRequested)
@@ -203,29 +196,20 @@ namespace tracer
 
                 obj = GetSelectableAtPixel(point);
             }
-            //else{
-            //    Debug.Log("<color=green>Found clicked object via GetSelectableAtCollider</color>");
-            //}
 
             if (obj){                
                 CheckDoubleClick(obj);
 
                 if(manager.isThisOurSelectedObject(obj)){
-                    //Debug.Log("<color=green>already selected</color>");
                     m_isRenderActive = false;
                     return;
                 }else{
                     manager.clearSelectedObject();
-                    // if(obj._lock)
-                    //     Debug.Log("<color=red>clicked object is locked</color>");
-                    // else
-                    //     Debug.Log("<color=blue>new selected object</color>");
                 }
 
                 AddSelectionByRole(obj);
             }else{
                 manager.clearSelectedObject();
-                //Debug.Log("<color=red>clicked nothing. selected objects cleared</color>");
             }
         }
         //!
@@ -315,23 +299,6 @@ namespace tracer
                 //Debug.Log("<color=red>GetSelectableAtPixel pos wrong ("+cpuData.Length+" /"+pos+") </color>");
                 return null;
             }
-
-            //Save Texture for debugging
-            #if UNITY_EDITOR
-            if(debugRenderTextureCreation){
-                debugRenderTextureInScene_Counter++;
-
-                Texture2D tex = new Texture2D(gpuTexture.width, gpuTexture.height, TextureFormat.ARGB32, false);
-                tex.LoadRawTextureData(cpuData);
-                tex.Apply();
-                GameObject debugGo = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                debugGo.transform.position = new Vector3(10,10,0) + Vector3.right*1.1f*debugRenderTextureInScene_Counter;
-                debugGo.name = "RenderTextureDebugGO_"+Time.time;
-                GameObject.Destroy(debugGo.GetComponent<MeshCollider>());
-                debugGo.GetComponent<MeshRenderer>().material.mainTexture = tex;
-                debugGo.GetComponent<MeshRenderer>().material.shader = Shader.Find("Unlit/Texture");
-            }
-            #endif
             
             byte sceneID = 0;
             short soID = 0;

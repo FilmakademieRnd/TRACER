@@ -223,42 +223,42 @@ namespace tracer{
         }
 
         private LineRenderer pathLine;
-        private void ShowAvailablePath(bool show, Parameter<Vector3> paraPathPos){
-            return;
+        //private void ShowAvailablePath(bool show, Parameter<Vector3> paraPathPos){
+        //    return;
 
-            if(!show){
-                if(pathLine){
-                    Destroy(pathLine.gameObject);
-                    pathLine = null;
-                }
-                return;
-            }else{
-                Vector3 upwardsVizOffset = Vector3.up * 0.2f;
-                Vector3 startPos = abstractParam._parent.gameObject.GetComponent<SceneCharacterObject>().transform.position;
-                List<Vector3> pathList = new();
-                if(paraPathPos.getKeys() != null && paraPathPos.getKeys().Count > 0){
-                    foreach(var ak in paraPathPos.getKeys()){
-                        pathList.Add(
-                            //only local pos right now
-                            startPos + 
-                            ((Key<Vector3>)ak).value + upwardsVizOffset
-                        );
-                    }
-                }
+        //    if(!show){
+        //        if(pathLine){
+        //            Destroy(pathLine.gameObject);
+        //            pathLine = null;
+        //        }
+        //        return;
+        //    }else{
+        //        Vector3 upwardsVizOffset = Vector3.up * 0.2f;
+        //        Vector3 startPos = abstractParam._parent.gameObject.GetComponent<SceneCharacterObject>().transform.position;
+        //        List<Vector3> pathList = new();
+        //        if(paraPathPos.getKeys() != null && paraPathPos.getKeys().Count > 0){
+        //            foreach(var ak in paraPathPos.getKeys()){
+        //                pathList.Add(
+        //                    //only local pos right now
+        //                    startPos + 
+        //                    ((Key<Vector3>)ak).value + upwardsVizOffset
+        //                );
+        //            }
+        //        }
                 
-                if(!pathLine){
-                    pathLine = GameObject.Instantiate(Resources.Load(LOCATION_PATH_LINERENDERER_PREFAB) as GameObject).GetComponentInChildren<LineRenderer>();
-                    //new GameObject("PathLineRendererObject").AddComponent<LineRenderer>();
-                    //pathLine.widthMultiplier = 0.1f;
-                    //Material defaultParticleMaterial = Resources.Load(LOCATION_INPUT_BLOCKING_CANVAS_PREFAB) as Material;
-                    //pathLine.SetPositions(new Vector3[]{Vector3.zero, Vector3.zero});
-                }
-                pathLine.positionCount = pathList.Count;
-                pathLine.SetPositions(pathList.ToArray());
-                if(pathList.Count > 1)
-                    StartCoroutine(VisualizePath());
-            }
-        }
+        //        if(!pathLine){
+        //            pathLine = GameObject.Instantiate(Resources.Load(LOCATION_PATH_LINERENDERER_PREFAB) as GameObject).GetComponentInChildren<LineRenderer>();
+        //            //new GameObject("PathLineRendererObject").AddComponent<LineRenderer>();
+        //            //pathLine.widthMultiplier = 0.1f;
+        //            //Material defaultParticleMaterial = Resources.Load(LOCATION_INPUT_BLOCKING_CANVAS_PREFAB) as Material;
+        //            //pathLine.SetPositions(new Vector3[]{Vector3.zero, Vector3.zero});
+        //        }
+        //        pathLine.positionCount = pathList.Count;
+        //        pathLine.SetPositions(pathList.ToArray());
+        //        if(pathList.Count > 1)
+        //            StartCoroutine(VisualizePath());
+        //    }
+        //}
 
         private IEnumerator VisualizePath(){
             float t = 0f;

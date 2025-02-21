@@ -32,6 +32,7 @@ using System;
 using System.Collections;
 using System.IO;
 using UnityEngine.Networking;
+using UnityEditor;
 
 namespace tracer
 {
@@ -61,6 +62,7 @@ namespace tracer
             Parameter<Action> loadButton = new Parameter<Action>(LoadScene, "Load");
             Parameter<Action> saveButton = new Parameter<Action>(SaveScene, "Save");
             Parameter<Action> loadDemoButton = new Parameter<Action>(LoadDemoScene, "Load Demo");
+            Parameter<Action> saveDatahubButton = new Parameter<Action>(DataHubSaveScene, "DataHub Save");
 
             m_menu = new MenuTree()
               .Begin(MenuItem.IType.VSPLIT)
@@ -74,6 +76,7 @@ namespace tracer
                    .End()
                    .Begin(MenuItem.IType.HSPLIT)
                        .Add(loadDemoButton)
+                       .Add(saveDatahubButton)
                    .End()
              .End();
 
@@ -111,6 +114,23 @@ namespace tracer
             core.getManager<UIManager>().hideMenu();
         }
 
+        private void DataHubSaveScene()
+        {
+            manager.sceneParsed += SceneParceReady;
+            manager.emitParseScene(false);
+        }
+
+        private void SceneParceReady (object sender, EventArgs e)
+        {
+            manager.sceneParsed -= SceneParceReady;
+
+            byte[] data = new byte[] { (byte)NetworkManagerModule.DataHubMessageType.REQUESTSCENE };
+            NetworkManager networkManager = core.getManager<NetworkManager>();
+            
+            networkManager.RequestSceneSend();
+            networkManager.SendServerCommand(data);
+        }
+
         //!
         //! Function that determines the current scene filepath and calls the load function.
         //!
@@ -130,7 +150,7 @@ namespace tracer
             SceneParserModule sceneParserModule = manager.getModule<SceneParserModule>();
             if (sceneParserModule != null)
             {
-                sceneParserModule.ParseScene(true, false, true, false);
+                manager.emitParseScene(false);
 
                 if (manager.sceneDataHandler.headerByteDataRef != null)
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".header"), manager.sceneDataHandler.headerByteDataRef);

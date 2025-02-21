@@ -129,13 +129,14 @@ namespace tracer
         {
             m_commandRequest = new byte[3 + command.Length];
 
-            // header
-            m_commandRequest[0] = manager.cID;
-            m_commandRequest[1] = core.time;
-            m_commandRequest[2] = (byte)MessageType.DATAHUB;
-            command.CopyTo(m_commandRequest.AsSpan().Slice(3));
-
-            m_pingStartTime = core.time;
+            lock (m_lock)
+            {
+                // header
+                m_commandRequest[0] = manager.cID;
+                m_commandRequest[1] = core.time;
+                m_commandRequest[2] = (byte)MessageType.DATAHUB;
+                command.CopyTo(m_commandRequest.AsSpan().Slice(3));
+            }
 
             m_mre.Set();
         }
@@ -149,13 +150,13 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void queuePingMessage(object sender, byte time)
         {
-            // if (m_commandRequest == null)
+            if (m_commandRequest == null)
             {
                 m_commandRequest = new byte[4];
 
                 m_pingStartTime = time;
 
-                lock (m_commandRequest)
+                lock (m_lock)
                 {
                     // header
                     m_commandRequest[0] = manager.cID;
@@ -227,7 +228,7 @@ namespace tracer
                 m_mre.WaitOne();
                 if (m_commandRequest != null)
                 {
-                    lock (m_commandRequest)
+                    lock (m_lock)
                     {
                         requester.SendFrame(m_commandRequest);
                         try { m_commandResponse = requester.ReceiveFrameBytes(); } catch { }
@@ -253,7 +254,7 @@ namespace tracer
                 }
                 // reset to stop the thread after one loop is done
                 m_mre.Reset();
-
+                m_thredEnded = true;
                 Thread.Yield();
             }
         }

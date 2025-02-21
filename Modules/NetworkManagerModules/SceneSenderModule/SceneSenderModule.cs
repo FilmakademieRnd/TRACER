@@ -46,6 +46,12 @@ namespace tracer
         //! The menu for the network configuration.
         //!
         private MenuTree m_menu;
+        
+        //!
+        //! A reference to the scene manager.
+        //!
+        private SceneManager m_sceneManager;
+
         //!
         //! Preloaded scene data split up into several packages for header, nodes, objects,
         //! characters, textures and materials.
@@ -60,8 +66,8 @@ namespace tracer
         //!
         public SceneSenderModule(string name, Manager manager) : base(name, manager)
         {
-            if (!core.isServer)
-                load = false;
+            //if (!core.isServer)
+              //  load = false;
         }
 
         //! 
@@ -88,6 +94,11 @@ namespace tracer
             m_menu.caption = "Network Settings";
             m_menu.iconResourceLocation = "Images/button_network";
             core.getManager<UIManager>().addMenu(m_menu);
+
+            m_sceneManager = core.getManager<SceneManager>();
+
+            manager.requestSceneSend += SendScene;
+            manager.stopSceneSend += StopSendScene;
         }
 
         //! 
@@ -104,14 +115,27 @@ namespace tracer
         //!
         //! Action called from the start Button, initializing the scene sender.
         //!
+        private void SendScene(object sender, EventArgs e)
+        {
+            sendScene(manager.settings.ipAddress.value, "5555");
+        }
+
+        private void StopSendScene(object sender, EventArgs e)
+        {
+            stop();
+            //m_isRunning = false;
+        }
+
+        //!
+        //! Action called from the start Button, initializing the scene sender.
+        //!
         private void Connect()
         {
             Helpers.Log(manager.settings.ipAddress.value);
 
             core.getManager<UIManager>().hideMenu();
 
-            SceneParserModule sceneParserModule = core.getManager<SceneManager>().getModule<SceneParserModule>();
-            sceneParserModule.ParseScene();
+            m_sceneManager.emitParseScene(true);
 
             sendScene(manager.settings.ipAddress.value, "5555");
         }
@@ -139,7 +163,10 @@ namespace tracer
                     try
                     {
                         if (m_responses.ContainsKey(message))
+                        {
                             dataSender.SendFrame(m_responses[message]);
+                            Helpers.Log(message + " send bytes: " + m_responses[message].Length);
+                        }
                         else
                             dataSender.SendFrame(new byte[0]);
                     }
@@ -148,6 +175,11 @@ namespace tracer
                 }
                 Thread.Sleep(100);
             }
+
+            m_responses.Clear();
+            m_sceneManager.sceneDataHandler.clearSceneByteData();
+            
+            m_thredEnded = true;
         }
 
         //!
@@ -158,10 +190,11 @@ namespace tracer
         public void sendScene(string ip, string port)
         {
             m_responses = new Dictionary<string, byte[]>();
-            SceneManager.SceneDataHandler dataHandler = core.getManager<SceneManager>().sceneDataHandler;
+            SceneManager.SceneDataHandler dataHandler = m_sceneManager.sceneDataHandler;
 
             m_responses.Add("header", dataHandler.headerByteDataRef);
             m_responses.Add("nodes", dataHandler.nodesByteDataRef);
+            m_responses.Add("parameterobjects", dataHandler.parameterObjectsByteDataRef);
             m_responses.Add("objects", dataHandler.objectsByteDataRef);
             m_responses.Add("characters", dataHandler.characterByteDataRef);
             m_responses.Add("textures", dataHandler.texturesByteDataRef);

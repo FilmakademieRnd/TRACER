@@ -75,6 +75,12 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             scene = GameObject.Find("Scene").transform;
+            manager.parseScene += ParseSceneReceived;
+        }
+
+        private void ParseSceneReceived(object sender, bool emitSceneReady)
+        {
+            ParseScene(true, false, true, emitSceneReady);
         }
 
         //!
@@ -84,7 +90,7 @@ namespace tracer
         //! @param getHighLayer Gather only scene elements from LOD high layer.
         //! @param getMixedLayer Gather only scene elements from LOD mixed layer.
         //!
-        public void ParseScene(bool getLowLayer = true, bool getHighLayer = false, bool getMixedLayer = true, bool emitSceneReady = true)
+        private void ParseScene(bool getLowLayer = true, bool getHighLayer = false, bool getMixedLayer = true, bool emitSceneReady = true)
         {
             SceneManager.SceneDataHandler.SceneData sceneData = new SceneManager.SceneDataHandler.SceneData();
             NetworkManager networkManager = core.getManager<NetworkManager>();
@@ -210,6 +216,8 @@ namespace tracer
 
             if (emitSceneReady)
                 manager.emitSceneReady();
+
+            manager.emitSceneParsed();
         }
 
         //!

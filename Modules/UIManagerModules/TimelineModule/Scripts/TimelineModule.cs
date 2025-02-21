@@ -161,7 +161,7 @@ namespace tracer
         //!
         private IAnimationParameter m_activeParameter = null;
         //!
-        //! All objects that were animated, to check for _lock
+        //! All objects that were animated, to check for m_lock
         //!
         private List<SceneObject> m_allAnimatedObjects = null;
         //!
@@ -1293,12 +1293,6 @@ namespace tracer
             }
         }
 
-
-        ///////////
-        // INPUT //
-        ///////////
-        #region Timeline Input
-
         //!
         //! Function that is called when the input manager registers a pointer down event
         //! check whether we hit the timeline, do nothing more
@@ -1594,7 +1588,6 @@ namespace tracer
             //update
             UpdateFrames();
         }
-        #endregion
 
         //////////////////////
         // Helper functions //

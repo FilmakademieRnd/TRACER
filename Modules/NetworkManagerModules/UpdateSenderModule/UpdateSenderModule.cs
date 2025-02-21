@@ -64,11 +64,6 @@ namespace tracer
         private NetMQMessage m_parameterMessages;
 
         //!
-        //! Object for handling thread locking.
-        //!
-        private readonly object _lock = new object();
-
-        //!
         //! Constructor
         //!
         //! @param  name  The  name of the module.
@@ -190,7 +185,7 @@ namespace tracer
                 sceneObjectId = sceneObject._id;
             }
 
-            lock (_lock)
+            lock (m_lock)
             {
                 byte[] message = new byte[7];
                 // header
@@ -226,7 +221,7 @@ namespace tracer
                 sceneObjectId = sceneObject._id;
             }
 
-            lock (_lock)
+            lock (m_lock)
             {
                 byte[] message = new byte[7];
                 // header
@@ -256,7 +251,7 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // Parameter: SceneID, ParameterObjectID, ParameterID, ParameterType, ParameterData
 
-             lock (_lock)
+             lock (m_lock)
             {
                 int parameterSize = parameter.dataSize();
                 byte[] message = new byte[9 + parameterSize];
@@ -290,7 +285,7 @@ namespace tracer
             // Header: ClientID, Time, MessageType
             // Parameter: SceneID, ParameterObjectID, ParameterID, ParameterType, ParameterData
 
-            lock (_lock)
+            lock (m_lock)
             {
                 byte[] message = new byte[6]; // ParameterData;
 
@@ -352,7 +347,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void queueModifiedParameter(object sender, AbstractParameter parameter)
         {
-            lock (_lock)
+            lock (m_lock)
             {
                 if (parameter._isRPC)
                 {
@@ -463,7 +458,7 @@ namespace tracer
             while (m_isRunning)
             {
                 m_mre.WaitOne();
-                lock (_lock)
+                lock (m_lock)
                 {
                     // send controm messages
                     if (!m_controlMessages.IsEmpty)
@@ -490,6 +485,7 @@ namespace tracer
                 // reset to stop the thread after one loop is done
                 m_mre.Reset();
 
+                m_thredEnded = true;
                 Thread.Yield();
             }
         }

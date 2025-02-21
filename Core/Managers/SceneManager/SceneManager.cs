@@ -193,11 +193,21 @@ namespace tracer
         //! The TRACER SceneDataHandler, handling all TRACER scene data relevant conversion.
         //!
         protected SceneDataHandler m_sceneDataHandler;
-        
+
+        //!
+        //! Event emitted to start scene parsing.
+        //!
+        public event EventHandler<bool> parseScene;
+
         //!
         //! Event emitted when scene is prepared.
         //!
         public event EventHandler<EventArgs> sceneReady;
+
+        //!
+        //! Event emitted when scene has been parsed.
+        //!
+        public event EventHandler<EventArgs> sceneParsed;
 
         //!
         //! Event emitted when scene has been reseted.
@@ -258,13 +268,26 @@ namespace tracer
                 scnRoot = new GameObject("VPETScene");
             }
         }
-   
+
+        public void emitParseScene(bool emitSceneReady)
+        {
+            parseScene?.Invoke(this, emitSceneReady);
+        }
+
         //!
         //! Function that emits the scene ready event. 
         //!
         public void emitSceneReady()
         {
             sceneReady?.Invoke(this, new EventArgs());
+        }
+
+        //!
+        //! Function that emits the scene parsed event. 
+        //!
+        public void emitSceneParsed()
+        {
+            sceneParsed?.Invoke(this, new EventArgs());
         }
 
         //!
@@ -301,10 +324,9 @@ namespace tracer
             m_sceneLightList.Clear();
             m_simpleSceneObjectList.Clear();
 
-
             sceneReset?.Invoke(this, EventArgs.Empty);
         }
-        
+
         //!
         //! Function to lock a SceneObject.
         //!

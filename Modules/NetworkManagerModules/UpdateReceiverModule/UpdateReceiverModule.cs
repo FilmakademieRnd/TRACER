@@ -132,6 +132,7 @@ namespace tracer
             Helpers.Log("Update receiver connected: " + "tcp://" + m_ip + ":" + m_port);
             byte[] message = null;
             List<byte[]> messages = new List<byte[]>();
+           
             while (m_isRunning)
             {
                 try
@@ -185,6 +186,8 @@ namespace tracer
                 catch (Exception e) { Helpers.Log(e.Message, Helpers.logMsgType.WARNING); }
                 Thread.Yield();
             }
+            
+            m_thredEnded = true;
         }
 
         //! 
@@ -266,14 +269,20 @@ namespace tracer
         private void decodeDataHubMessage(byte[] message)
         {
             byte dhType = message[3];
-            bool status = BitConverter.ToBoolean(message, 4);
-            byte cID = message[5];
-            bool isServer = BitConverter.ToBoolean(message, 6);
 
-            // dhType 0 = client connection status update
-            if (dhType == 0 &&
-                cID != manager.cID)
-                manager.ClientConnectionUpdate(status, cID, isServer);
+            switch ((DataHubMessageType)message[3])
+            {
+                case DataHubMessageType.CONNECTIONSTATUS:
+                    bool status = BitConverter.ToBoolean(message, 4);
+                    byte cID = message[5];
+                    bool isServer = BitConverter.ToBoolean(message, 6);
+                    if (cID != manager.cID)
+                        manager.ClientConnectionUpdate(status, cID, isServer);
+                    break;
+                case DataHubMessageType.SCENERECEIVED:
+                    manager.StopSceneSend();
+                    break;
+            }
         }
 
         //!
@@ -350,13 +359,6 @@ namespace tracer
                                     if (length > 10 + parameter.dataSize())
                                         parameter.InitAnimation();
                                 }
-                                
-                                // if ((MessageType)message[2] == MessageType.RPC){
-                                //     Debug.Log("<color=red>RPC MESSAGE IS</color>");
-                                //     foreach(byte b in message)
-                                //         Debug.Log(b);
-                                // }
-
                                 parameter.deSerialize(message.Slice(start + 10));
                             }
                             else

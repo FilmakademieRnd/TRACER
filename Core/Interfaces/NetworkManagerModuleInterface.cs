@@ -31,6 +31,7 @@ if not go to https://opensource.org/licenses/MIT
 using NetMQ;
 using System;
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Threading;
 
 namespace tracer
@@ -52,6 +53,20 @@ namespace tracer
             RPC // RPC
         }
 
+        //!
+        //! Enumeration defining DataHub message types.
+        //!
+        public enum DataHubMessageType
+        {
+            CONNECTIONSTATUS,
+            SENDSCENE, REQUESTSCENE, SCENERECEIVED,
+            UNKNOWN = 255
+        }
+
+        //!
+        //! Object for handling thread locking.
+        //!
+        protected readonly object m_lock = new object();
 
         //!
         //! IP address of the network interface to be used.
@@ -67,6 +82,8 @@ namespace tracer
         //! Flag specifing if the thread should stop running.
         //!
         protected bool m_isRunning;
+
+        protected bool m_thredEnded = false;
 
         //!
         //! Action emitted when worker thread has been disposed
@@ -137,7 +154,8 @@ namespace tracer
         //!
         protected virtual void start(string ip, string port)
         {
-            stop();
+            if (m_isRunning)
+                stop();
 
             m_ip = ip;
             m_port = port;
@@ -151,18 +169,28 @@ namespace tracer
         //!
         //! Stop the transeiver.
         //!
-        public void stop()
+        public async void stop()
         {
             m_isRunning = false;
             m_mre.Set();
+
+            while (!m_thredEnded) { await System.Threading.Tasks.Task.Yield(); }
+
             if (m_socket != null)
             {
-                    m_socket.Disconnect("tcp://" + m_ip + ":" + m_port);
-                    //m_socket.Unbind("tcp://" + m_ip + ":" + m_port);
-                    m_socket.Close();
-                    m_socket.Dispose();
-                    Helpers.Log(this.name + " disposed.");
-                    m_disposed?.Invoke();
+                m_socket.Disconnect("tcp://" + m_ip + ":" + m_port);
+                //m_socket.Unbind("tcp://" + m_ip + ":" + m_port);
+                m_socket.Close();
+                m_socket.Dispose();
+                Helpers.Log(this.name + " disposed.");
+                m_socket = null;
+                m_disposed?.Invoke();
+            }
+
+            if (m_transeiverThread != null)
+            {
+                Thread.Sleep(200);
+                m_transeiverThread.Abort();
             }
         }
     }

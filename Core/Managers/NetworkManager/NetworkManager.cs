@@ -70,6 +70,16 @@ namespace tracer
         public event EventHandler<byte[]> sendServerCommand;
 
         //!
+        //! Event that is invoket to request a scene server.
+        //!
+        public event EventHandler<EventArgs> requestSceneSend;
+
+        //!
+        //! Event that is invoket to stop a scene server.
+        //!
+        public event EventHandler<EventArgs> stopSceneSend;
+
+        //!
         //! Event that is invoket when a client has left the network session.
         //!
         public event EventHandler<byte> clientLost;
@@ -223,6 +233,16 @@ namespace tracer
         public void SendServerCommand(byte[] command)
         {
             sendServerCommand?.Invoke(this, command);
+        }
+
+        public void RequestSceneSend()
+        {
+            requestSceneSend?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void StopSceneSend()
+        {
+            stopSceneSend?.Invoke(this, EventArgs.Empty);
         }
 
         public void ConnectUsingQrCode(string ip)
