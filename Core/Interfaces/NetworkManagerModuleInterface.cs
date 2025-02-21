@@ -178,10 +178,9 @@ namespace tracer
 
             if (m_socket != null)
             {
-                m_socket.Disconnect("tcp://" + m_ip + ":" + m_port);
-                //m_socket.Unbind("tcp://" + m_ip + ":" + m_port);
-                m_socket.Close();
+                //m_socket.Disconnect("tcp://" + m_ip + ":" + m_port);
                 m_socket.Dispose();
+                m_socket.Close();
                 Helpers.Log(this.name + " disposed.");
                 m_socket = null;
                 m_disposed?.Invoke();

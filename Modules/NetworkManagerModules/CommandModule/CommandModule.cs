@@ -230,8 +230,11 @@ namespace tracer
                 {
                     lock (m_lock)
                     {
-                        requester.SendFrame(m_commandRequest);
-                        try { m_commandResponse = requester.ReceiveFrameBytes(); } catch { }
+                        try 
+                        { 
+                            requester.TrySendFrame(m_commandRequest); 
+                            requester.TryReceiveFrameBytes(TimeSpan.FromSeconds(1.0), out m_commandResponse); 
+                        } catch { requester.Dispose(); }
                         if (m_commandResponse != null)
                         {
                             if (m_commandResponse[0] != manager.cID)
