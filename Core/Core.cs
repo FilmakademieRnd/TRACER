@@ -245,7 +245,7 @@ namespace tracer
         //!
         private void Update()
         {
-            QualitySettings.vSyncCount = 1;
+            //QualitySettings.vSyncCount = 1;
             updateEvent?.Invoke(this, EventArgs.Empty);
         }
 
