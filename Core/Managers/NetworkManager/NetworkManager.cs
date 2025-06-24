@@ -248,6 +248,7 @@ namespace tracer
         public void ConnectUsingQrCode(string ip)
         {
             connectUsingQrCode?.Invoke(this, ip);
+            settings.ipAddress.setValue(ip);
         }
     }
 }
