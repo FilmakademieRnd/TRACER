@@ -223,6 +223,12 @@ namespace tracer
                     break;
                 case MenuItem.IType.TEXT:
                     {
+                        // prevent wrong scaling if two or more textfields are present 
+                        HorizontalLayoutGroup hlGroup = parentObject.transform.GetComponent<HorizontalLayoutGroup>();
+                        if (parentObject.transform.childCount > 0)
+                            if (hlGroup && parentObject.transform.GetChild(0).GetComponent<TextMeshProUGUI>() != null)
+                                hlGroup.childControlWidth = true;
+                        
                         newObjects.Add(GameObject.Instantiate(m_text, parentObject.transform));
                         TextMeshProUGUI textComponent = newObjects[0].GetComponent<TextMeshProUGUI>();
                         textComponent.text = ((Parameter<string>)item.Parameter).value;
@@ -237,7 +243,7 @@ namespace tracer
                         newObjects.Add(GameObject.Instantiate(m_text, parentObject.transform));
                         TextMeshProUGUI textComponent = newObjects[0].GetComponent<TextMeshProUGUI>();
                         textComponent.text = ((Parameter<string>)item.Parameter).value;
-                        textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                        textComponent.color = manager.uiAppearanceSettings.colors.ElementSelection_Highlight;
                         textComponent.font = manager.uiAppearanceSettings.defaultFont;
                         textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
                         textComponent.fontStyle = FontStyles.Bold;
