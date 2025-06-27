@@ -45,10 +45,6 @@ namespace tracer
         //! The list of request the reqester uses to request the packages.
         //!
         private List<string> m_requests;
-        //!
-        //! The event that is triggerd, when the scene has been received.
-        //!
-        public event EventHandler m_sceneReceived;
 
         //!
         //! The menu for the network configuration.
@@ -126,6 +122,13 @@ namespace tracer
                 .End();
 
             //_core.getManager<UIManager>().showMenu(m_menu);
+
+            manager.requestSceneReceive += Connect;
+        }
+
+        private void Connect(object sender, EventArgs e)
+        {
+            receiveScene(manager.settings.ipAddress.value, "5555", false);
         }
 
         private void Connect()
@@ -134,7 +137,7 @@ namespace tracer
 
             core.getManager<UIManager>().hideMenu();
 
-            receiveScene(manager.settings.ipAddress.value, "5555");
+            receiveScene(manager.settings.ipAddress.value, "5555", true);
         }
 
         //!
@@ -145,21 +148,21 @@ namespace tracer
         //! @param ip IP address of the network interface.
         //! @param port Port number to be used.
         //!
-        protected override void start(string ip, string port)
+        protected void start(string ip, string port, bool emitSceneReady)
         {
             m_ip = ip;
             m_port = port;
 
             NetworkManager.threadCount++;
 
-            core.StartCoroutine(startReceive());
+            core.StartCoroutine(startReceive(emitSceneReady));
         }
 
         //!
         //! Coroutine that creates a new thread receiving the scene data
         //! and yielding to allow the main thread to update the statusDialog.
         //!
-        private IEnumerator startReceive()
+        private IEnumerator startReceive(bool emitSceneReady)
         {
             Dialog statusDialog = new Dialog("Receive Scene", "", Dialog.DTypes.BAR);
             UIManager uiManager = core.getManager<UIManager>();
@@ -174,9 +177,12 @@ namespace tracer
                 statusDialog.progress += 3;
             }
 
+            SceneManager sceneManager = core.getManager<SceneManager>();
             // emit sceneReceived signal to trigger scene cration in the sceneCreator module
-            if (core.getManager<SceneManager>().sceneDataHandler.headerByteDataRef != null)
-                m_sceneReceived?.Invoke(this, EventArgs.Empty);
+            if (sceneManager.sceneDataHandler.headerByteDataRef != null)
+            {
+                sceneManager.emitSceneNew(emitSceneReady);
+            }
 
             uiManager.showDialog(null);
         }
@@ -193,6 +199,7 @@ namespace tracer
 
             SceneManager sceneManager = core.getManager<SceneManager>();
             sceneReceiver.Connect("tcp://" + m_ip + ":" + m_port);
+            Helpers.Log("Scene receiver started: " + "tcp://" + m_ip + ":" + m_port);
             SceneManager.SceneDataHandler sceneDataHandler = sceneManager.sceneDataHandler;
 
             try
@@ -226,7 +233,7 @@ namespace tracer
                     }
                 }
             }
-            catch { }
+            catch (Exception e) { Helpers.Log("SceneSender " + e.ToString(), Helpers.logMsgType.WARNING); }
         }
 
 
@@ -235,16 +242,16 @@ namespace tracer
         //! @param ip The IP address to the server.
         //! @param port The port the server uses to send out the scene data.
         //! 
-        public void receiveScene(string ip, string port)
+        public void receiveScene(string ip, string port, bool emitSceneReady)
         {
             m_requests = new List<string>() { "header", "nodes", "parameterobjects", "objects", "characters", "textures", "materials"  };
-            start(ip, port);
+            start(ip, port, emitSceneReady);
         }
 
         public void ReceiveSceneUsingQr(object o, string ip)
         {
             core.getManager<UIManager>().hideMenu();
-            receiveScene(ip, "5555");
+            receiveScene(ip, "5555", true);
         }
     }
 

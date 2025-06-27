@@ -179,7 +179,7 @@ namespace tracer
             m_responses.Clear();
             m_sceneManager.sceneDataHandler.clearSceneByteData();
             
-            m_thredEnded = true;
+            m_thredEnded.TrySetResult(true);
         }
 
         //!

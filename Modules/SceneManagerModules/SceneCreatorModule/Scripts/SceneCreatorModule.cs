@@ -90,9 +90,8 @@ namespace tracer
             NetworkManager networkManager = core.getManager<NetworkManager>();
             SceneReceiverModule sceneReceiverModule = networkManager.getModule<SceneReceiverModule>();
             SceneStorageModule sceneStorageModule = manager.getModule<SceneStorageModule>();
-            if (sceneReceiverModule != null)
-                sceneReceiverModule.m_sceneReceived -= CreateScene;
-            sceneStorageModule.sceneLoaded -= CreateScene;
+           
+            manager.sceneNew -= CreateScene;
         }
 
         //!
@@ -103,15 +102,14 @@ namespace tracer
             NetworkManager networkManager = core.getManager<NetworkManager>();
             SceneReceiverModule sceneReceiverModule = networkManager.getModule<SceneReceiverModule>();
             SceneStorageModule sceneStorageModule = manager.getModule<SceneStorageModule>();
-            if (sceneReceiverModule != null)
-                sceneReceiverModule.m_sceneReceived += CreateScene;
-            sceneStorageModule.sceneLoaded += CreateScene;
+
+            manager.sceneNew += CreateScene;
         }
 
         //!
         //! Function that creates the Unity scene content.
         //!
-        public void CreateScene(object o, EventArgs e)
+        public void CreateScene(object o, bool emitSceneReady)
         {
             manager.ResetScene();
             SceneManager.SceneDataHandler sceneDataHandler = manager.sceneDataHandler;
@@ -148,7 +146,10 @@ namespace tracer
             sceneData.clear();
             clearData();
 
-            manager.emitSceneReady();
+            if (emitSceneReady)
+                manager.emitSceneReady();
+
+            manager.emitSceneCreated();
         }
 
         //!

@@ -459,10 +459,9 @@ namespace tracer
                 }
                 // reset to stop the thread after one loop is done
                 m_mre.Reset();
-
-                m_thredEnded = true;
                 Thread.Yield();
             }
+            m_thredEnded.TrySetResult(true);
         }
 
         //!

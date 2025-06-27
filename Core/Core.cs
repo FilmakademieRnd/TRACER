@@ -225,12 +225,16 @@ namespace tracer
             m_orientation = Input.deviceOrientation;
 
             InvokeRepeating("checkDeviceOrientation", 0f, 1f);
-            InvokeRepeating("pingDataHub", 0f, 1f);
             InvokeRepeating("updateTime", 0f, Mathf.FloorToInt(1000f / settings.framerate) / 1000f); // computation to match the ms int scala of an QtTimer used in SyncServer
 
             startEvent?.Invoke(this, new EventArgs());
         }
 
+        public void StartSync()
+        {
+            InvokeRepeating("pingDataHub", 0f, 1f);
+        }
+        
         //!
         //! Unity's OnDestroy callback, used to invoke a destroy event to inform TRACER modules.
         //!

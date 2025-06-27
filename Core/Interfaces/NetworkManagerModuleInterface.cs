@@ -33,6 +33,7 @@ using System;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace tracer
 {
@@ -47,7 +48,7 @@ namespace tracer
         public enum MessageType
         {
             PARAMETERUPDATE, LOCK, // node
-            SYNC, PING, RESENDUPDATE, // sync
+            SYNC, RESENDUPDATE, // sync
             UNDOREDOADD, RESETOBJECT, // undo redo
             DATAHUB, // DataHub
             RPC // RPC
@@ -58,8 +59,8 @@ namespace tracer
         //!
         public enum DataHubMessageType
         {
-            CONNECTIONSTATUS,
-            SENDSCENE, REQUESTSCENE, SCENERECEIVED,
+            CONNECTIONSTATUS, IP, PING,
+            SENDSCENE, REQUESTSCENE, SCENERECEIVED, FILEINFO,
             UNKNOWN = 255
         }
 
@@ -83,7 +84,10 @@ namespace tracer
         //!
         protected bool m_isRunning;
 
-        protected bool m_thredEnded = false;
+        //!
+        //! Flag to deterine wether the workers inner loop has been left.
+        //!
+        protected TaskCompletionSource<bool> m_thredEnded;
 
         //!
         //! Action emitted when worker thread has been disposed
@@ -93,7 +97,7 @@ namespace tracer
         //!
         //! The Thread used for receiving or sending messages.
         //!
-        private Thread m_transeiverThread;
+        private Thread m_transceiverThread;
         
         //!
         //! Function, listening for messages and adds them to m_messageQueue (executed in separate thread).
@@ -120,9 +124,10 @@ namespace tracer
         //! @param  name  The  name of the module.
         //! @param _core A reference to the TRACER _core.
         //!
-        public NetworkManagerModule(string name, Manager manager) : base(name, manager) 
+        public NetworkManagerModule(string name, Manager manager) : base(name, manager)
         {
             m_mre = new ManualResetEvent(false);
+            m_thredEnded = new TaskCompletionSource<bool>();
 
             manager.cleanupEvent += stopThread;
             m_disposed += this.manager.NetMQCleanup;
@@ -152,29 +157,29 @@ namespace tracer
         //! @param ip IP address of the network interface.
         //! @param port Port number to be used.
         //!
-        protected virtual void start(string ip, string port)
+        protected virtual async void start(string ip, string port)
         {
             if (m_isRunning)
-                stop();
+               await stop();
 
             m_ip = ip;
             m_port = port;
 
             ThreadStart transeiver = new ThreadStart(run);
-            m_transeiverThread = new Thread(transeiver);
-            m_transeiverThread.Start();
+            m_transceiverThread = new Thread(transeiver);
+            m_transceiverThread.Start();
             NetworkManager.threadCount++;
         }
 
         //!
-        //! Stop the transeiver.
+        //! Stop the tranceiver.
         //!
-        public async void stop()
+        public async Task<bool> stop()
         {
             m_isRunning = false;
             m_mre.Set();
-
-            while (!m_thredEnded) { await System.Threading.Tasks.Task.Yield(); }
+            
+            bool retValue = await m_thredEnded.Task;
 
             if (m_socket != null)
             {
@@ -186,11 +191,13 @@ namespace tracer
                 m_disposed?.Invoke();
             }
 
-            if (m_transeiverThread != null)
+            if (m_transceiverThread != null)
             {
-                Thread.Sleep(200);
-                m_transeiverThread.Abort();
+                //await System.Threading.Tasks.Task.Delay(200);
+                m_transceiverThread.Abort();
             }
+
+            return retValue;
         }
     }
 }

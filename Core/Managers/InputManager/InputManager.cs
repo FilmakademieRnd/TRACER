@@ -67,11 +67,6 @@ namespace tracer
         public event EventHandler<Vector2> tappedEvent;
 
         //!
-        //! Event to hook into to check e.g. if we have a selected object and do focus on it
-        //!
-        public event EventHandler<EventArgs> doubleClickedEvent;
-
-        //!
         //! Press start event, i.e. the begin of a click.
         //!
         //public event EventHandler<Vector2> inputPressTapp;

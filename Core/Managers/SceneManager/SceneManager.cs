@@ -205,12 +205,22 @@ namespace tracer
         public event EventHandler<EventArgs> sceneReady;
 
         //!
-        //! Event emitted when scene has been parsed.
+        //! Event emitted when a scene has been parsed.
         //!
         public event EventHandler<EventArgs> sceneParsed;
 
         //!
-        //! Event emitted when scene has been reseted.
+        //! Event emitted when a new scene has been received or loaded.
+        //!
+        public event EventHandler<bool> sceneNew;
+
+        //!
+        //! Event emitted when a scene has been created.
+        //!
+        public event EventHandler<EventArgs> sceneCreated;
+
+        //!
+        //! Event emitted when a scene has been reseted.
         //!
         public event EventHandler<EventArgs> sceneReset;
 
@@ -289,6 +299,23 @@ namespace tracer
         {
             sceneParsed?.Invoke(this, new EventArgs());
         }
+
+        //!
+        //! Function that emits the scene created event. 
+        //!
+        public void emitSceneCreated()
+        {
+            sceneCreated?.Invoke(this, new EventArgs());
+        }
+
+        //!
+        //! Function that emits the scene received or loaded event. 
+        //!
+        public void emitSceneNew(bool emitSceneReady)
+        {
+            sceneNew?.Invoke(this, emitSceneReady);
+        }
+
 
         //!
         //! Function that returns a scne object based in the given ID.

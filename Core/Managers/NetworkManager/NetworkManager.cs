@@ -31,8 +31,12 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
 using NetMQ;
+using UnityEngine;
 
 namespace tracer
 {
@@ -68,6 +72,16 @@ namespace tracer
         //! Event that is invoket to send an server command.
         //!
         public event EventHandler<byte[]> sendServerCommand;
+
+        //!
+        //! Event that is invoket to start/restart the command server.
+        //!
+        public event EventHandler<EventArgs> requestCommandServer;
+
+        //!
+        //! Event that is invoket to request a scene receiver.
+        //!
+        public event EventHandler<EventArgs> requestSceneReceive;
 
         //!
         //! Event that is invoket to request a scene server.
@@ -113,7 +127,13 @@ namespace tracer
         //! A list containung the ID of all registered Tracer clients acting as server.
         //!
         private List<byte> m_serverList;
-        
+
+        //!
+        //! Watchdog used to create command buffer request/reply asynchrony.
+        //! I also transfers the command reply as a byte array list.
+        //!
+        public Queue<TaskCompletionSource<List<byte[]>>> m_commandBufferWritten { get; private set; } = null;
+
         //!
         //! Constructor initializing member variables.
         //!
@@ -122,29 +142,89 @@ namespace tracer
         //!
         public NetworkManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
+            m_commandBufferWritten = new Queue<TaskCompletionSource<List<byte[]>>>();
             settings.ipAddress = new Parameter<string>("127.0.0.1", "ipAddress");
+        }
 
+        //! 
+        //! Virtual function called when Unity initializes the TRACER _core.
+        //! 
+        //! @param sender A reference to the TRACER _core.
+        //! @param e Arguments for these event. 
+        //! 
+        protected override void Init(object sender, EventArgs e)
+        {
+            base.Init(sender, e);
+
+            settings.ipAddress.hasChanged += startCommantServer;
+
+            startCommantServer(this, "");
+        }
+
+        private void startCommantServer(object o, string ip)
+        {
+            requestCommandServer?.Invoke(this, EventArgs.Empty);
+            determineClientID(o, ip);
+        }
+
+        private async void determineClientID(object o, string startIP)
+        {
             // initialize the server list with the given server ID
-            m_serverList = new List<byte>() { byte.Parse(settings.ipAddress.value.ToString().Split('.')[3]) };
+            string ipString = settings.ipAddress.value.ToString();
+            string[] ips = ipString.Split('.');
+            
+            m_serverList = new List<byte>() { byte.Parse(ipString.Split('.')[3]) };
 
-            //reads the network name of the device
-            var hostName = Dns.GetHostName();
-            var host = Dns.GetHostEntry(hostName);
-
-            //Take last ip adress of local network (which is local wlan ip address)
-            foreach (var ip in host.AddressList)
+            if (core.useRandomCID)
             {
-                if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                // prevent equal cIDs if server and client running on the same machine
+                m_cID = (byte)UnityEngine.Random.Range(2, 250);
+            }
+            else
+            {
+                //reads the network name of the device
+                var hostName = Dns.GetHostName();
+                var host = Dns.GetHostEntry(hostName);
+
+                List<byte[]> responses = await SendServerCommand(new byte[] {
+                            (byte)NetworkManagerModule.DataHubMessageType.IP,
+                            byte.Parse(ips[0]),
+                            byte.Parse(ips[1]),
+                            byte.Parse(ips[2]),
+                            byte.Parse(ips[3]) }, 2);
+
+                // fallback if no correct response or 255 (ip aready taken)
+                if (responses.Count < 1 || responses[1][0] == 255)
                 {
-                    if (core.useRandomCID)
+                    //Take last ip adress of local network (which is local wlan ip address)
+                    foreach (var ip in host.AddressList)
                     {
-                        // prevent equal cIDs if server and client running on the same machine
-                        m_cID = (byte)UnityEngine.Random.Range(2, 250);
+                        byte[] ipb = ip.GetAddressBytes();
+
+                        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
+                            ipb[0].ToString() == ips[0] && ipb[1].ToString() == ips[1])
+                        {
+
+                            m_cID = ipb[3];
+                            Helpers.Log("Got no ID from DataHub, fallback to local IP range! ID is: " + m_cID, Helpers.logMsgType.WARNING);
+                            break;
+                        }
+                        else
+                            m_cID = 254;
                     }
-                    else
-                        m_cID = byte.Parse(ip.ToString().Split('.')[3]);
+                    if (m_cID == 254)
+                    {
+                        m_cID = (byte)UnityEngine.Random.Range(2, 250);
+                        Helpers.Log("Got no ID from DataHub and Server address not in local sub net, create random CID: " + m_cID, Helpers.logMsgType.WARNING);
+                    }
+                }
+                else
+                {
+                    m_cID = responses[1][0];
+                    Helpers.Log("Got ID from DataHub. ID is: " + m_cID, Helpers.logMsgType.NONE);
                 }
             }
+            core.StartSync();
         }
 
         //! 
@@ -230,24 +310,64 @@ namespace tracer
             UnityEngine.Debug.Log("ClientConnectionUpdate ID: " + clientID + " Status: " + connectionStatus.ToString());
         }
 
-        public void SendServerCommand(byte[] command)
+        //! 
+        //! Function to send commands to DataHub.
+        //! 
+        //! @param command The command as a byte array to be send to DataHub.
+        //! @return 
+        public async Task<List<byte[]>> SendServerCommand(byte[] command, int timeout = 5)
         {
+            // enqueue new TCS to for handling message response tasks
+            TaskCompletionSource<List<byte[]>> tcs = new TaskCompletionSource<List<byte[]>>();
+            m_commandBufferWritten.Enqueue(tcs);
+            
+            // send command
             sendServerCommand?.Invoke(this, command);
+
+            // wait up to 'timeout' sconds for reply 
+            Task t = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(timeout)) );
+
+            if (t.GetType() == typeof(Task<List<byte[]>>))
+                return tcs.Task.Result;
+            else
+            {
+                Helpers.Log("DataHub timed out, command not send.", Helpers.logMsgType.WARNING);
+                m_commandBufferWritten.Dequeue();
+                return new List<byte[]>();
+            }
         }
 
+        //!
+        //! Function to request a new scene receive at DataHub.
+        //!
+        public void RequestSceneReceive()
+        {
+            requestSceneReceive?.Invoke(this, EventArgs.Empty);
+        }
+
+        //!
+        //! Function to request a scene from DataHub.
+        //!
         public void RequestSceneSend()
         {
             requestSceneSend?.Invoke(this, EventArgs.Empty);
         }
 
+        //!
+        //! Function to stop all local scene sender. 
+        //!
         public void StopSceneSend()
         {
             stopSceneSend?.Invoke(this, EventArgs.Empty);
         }
 
+        //!
+        //! Function for requesting a scene via QR code.
+        //!
         public void ConnectUsingQrCode(string ip)
         {
             connectUsingQrCode?.Invoke(this, ip);
+            settings.ipAddress.setValue(ip);
         }
     }
 }

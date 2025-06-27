@@ -186,8 +186,7 @@ namespace tracer
                 catch (Exception e) { Helpers.Log(e.Message, Helpers.logMsgType.WARNING); }
                 Thread.Yield();
             }
-            
-            m_thredEnded = true;
+            m_thredEnded.TrySetResult(true);
         }
 
         //! 
@@ -280,7 +279,8 @@ namespace tracer
                         manager.ClientConnectionUpdate(status, cID, isServer);
                     break;
                 case DataHubMessageType.SCENERECEIVED:
-                    manager.StopSceneSend();
+                    if (message[4] == manager.cID)
+                        manager.StopSceneSend();
                     break;
             }
         }
@@ -295,7 +295,7 @@ namespace tracer
             // % time steps to take ring (0 to _core.timesteps) into account
             // set to 1/10 second
             int bufferTime = (((core.time - core.settings.framerate / 6) + core.timesteps) % core.timesteps);
-            lock (m_messageBuffer)
+            lock (_lock)
             {
                 // caching the ParameterObject
                 byte oldSceneID = 0;

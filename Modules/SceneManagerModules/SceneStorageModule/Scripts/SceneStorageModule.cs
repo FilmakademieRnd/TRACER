@@ -32,7 +32,9 @@ using System;
 using System.Collections;
 using System.IO;
 using UnityEngine.Networking;
-using UnityEditor;
+using System.Text;
+using System.Collections.Generic;
+
 
 namespace tracer
 {
@@ -41,7 +43,6 @@ namespace tracer
     //!
     public class SceneStorageModule : SceneManagerModule
     {
-        public event EventHandler<EventArgs> sceneLoaded;
         private MenuTree m_menu;
 
         //!
@@ -63,6 +64,8 @@ namespace tracer
             Parameter<Action> saveButton = new Parameter<Action>(SaveScene, "Save");
             Parameter<Action> loadDemoButton = new Parameter<Action>(LoadDemoScene, "Load Demo");
             Parameter<Action> saveDatahubButton = new Parameter<Action>(DataHubSaveScene, "DataHub Save");
+            Parameter<Action> loadDatahubButton = new Parameter<Action>(DataHubLoadScene, "DataHub Load");
+            Parameter<Action> infoDatahubButton = new Parameter<Action>(DataHubInfoScene, "DataHub Info");
 
             m_menu = new MenuTree()
               .Begin(MenuItem.IType.VSPLIT)
@@ -77,6 +80,8 @@ namespace tracer
                    .Begin(MenuItem.IType.HSPLIT)
                        .Add(loadDemoButton)
                        .Add(saveDatahubButton)
+                       .Add(loadDatahubButton)
+                       .Add(infoDatahubButton)
                    .End()
              .End();
 
@@ -114,22 +119,55 @@ namespace tracer
             core.getManager<UIManager>().hideMenu();
         }
 
+        //!
+        //! Function to request from DataHub information about stored scenes.
+        //!
+        private async void DataHubInfoScene()
+        {
+            NetworkManager networkManager = core.getManager<NetworkManager>();
+            List<byte[]> responses = await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.FILEINFO });
+            foreach (byte[] response in responses)
+                Helpers.Log(Encoding.UTF8.GetString(response));
+        }
+
+        //!
+        //! Function to request a scene send and store to DataHub.
+        //!
         private void DataHubSaveScene()
         {
-            manager.sceneParsed += SceneParceReady;
+            manager.sceneParsed += SceneParseReady;
             manager.emitParseScene(false);
         }
 
-        private void SceneParceReady (object sender, EventArgs e)
+        //!
+        //! Helper function for DataHubSaveScene() that is called when the local
+        //! scene has been parsed and is ready for send and/or storage. 
+        //!
+        private async void SceneParseReady (object sender, EventArgs e)
         {
-            manager.sceneParsed -= SceneParceReady;
+            manager.sceneParsed -= SceneParseReady;
 
-            byte[] data = new byte[] { (byte)NetworkManagerModule.DataHubMessageType.REQUESTSCENE };
             NetworkManager networkManager = core.getManager<NetworkManager>();
             
             networkManager.RequestSceneSend();
-            networkManager.SendServerCommand(data);
+            await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.REQUESTSCENE });
+
+            //await System.Threading.Tasks.Task.Delay(10000); // can be deleted!!!
+
+            networkManager.StopSceneSend();
         }
+
+        //!
+        //! Function to request a scene send and store from DataHub.
+        //!
+        private async void DataHubLoadScene()
+        {
+            NetworkManager networkManager = core.getManager<NetworkManager>();
+
+            await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.SENDSCENE });
+            networkManager.RequestSceneReceive();
+        }
+
 
         //!
         //! Function that determines the current scene filepath and calls the load function.
@@ -204,7 +242,7 @@ namespace tracer
                 if (File.Exists(filepath))
                     manager.sceneDataHandler.materialsByteData = File.ReadAllBytes(filepath);
 
-                sceneLoaded?.Invoke(this, EventArgs.Empty);
+                manager.emitSceneNew(true);
             }
         }
 
@@ -262,7 +300,7 @@ namespace tracer
 
             statusDialog.caption = "Build Scene";
             yield return null;
-            sceneLoaded?.Invoke(this, EventArgs.Empty);
+            manager.emitSceneNew(true);
             statusDialog.progress += 14;
 
             UImanager.showDialog(null);   
@@ -341,7 +379,7 @@ namespace tracer
                     }
                 }
             }
-            sceneLoaded?.Invoke(this, EventArgs.Empty);
+            manager.emitSceneNew(true);
             UImanager.showDialog(null);
         }
 

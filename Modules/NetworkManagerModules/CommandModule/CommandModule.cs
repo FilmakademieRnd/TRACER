@@ -36,6 +36,7 @@ using NetMQ;
 using NetMQ.Sockets;
 using UnityEngine;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace tracer
 {
@@ -53,15 +54,11 @@ namespace tracer
         //! A Queue containung the last 5 ping RTT's;
         //!
         private Queue<byte> m_pingTimes = null;
+        
         //!
         //! Array of command requests to be send.
         //!
         private byte[] m_commandRequest = null;
-
-        //!
-        //! Array of received command responses.
-        //!
-        private byte[] m_commandResponse = null;
 
         //!
         //! Constructor
@@ -82,9 +79,10 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             m_pingTimes = new Queue<byte>(new byte[] { 0, 0, 0, 0, 0 });
-
-            SceneManager sceneManager = core.getManager<SceneManager>();
-            sceneManager.sceneReady += connectAndStart;
+            manager.requestCommandServer += connectAndStart;
+            //SceneManager sceneManager = core.getManager<SceneManager>();
+            //sceneManager.sceneReady += connectAndStart;
+            //connectAndStart(this, EventArgs.Empty);
         }
 
         //!
@@ -95,11 +93,12 @@ namespace tracer
             base.Dispose();
             SceneManager sceneManager = core.getManager<SceneManager>();
 
-            if (sceneManager != null)
-                sceneManager.sceneReady -= connectAndStart;
+            //if (sceneManager != null)
+            //    sceneManager.sceneReady -= connectAndStart;
 
             core.syncEvent -= queuePingMessage;
             manager.sendServerCommand -= queueCommandMessage;
+            manager.requestCommandServer -= connectAndStart;
         }
 
         //!
@@ -112,37 +111,34 @@ namespace tracer
         {
             start(manager.settings.ipAddress.value, "5558");
 
-            SceneManager sceneManager = core.getManager<SceneManager>();
-
             core.syncEvent += queuePingMessage;
             manager.sendServerCommand += queueCommandMessage;
         }
 
         //!
-        //! Function that creates a command message for sending.
+        //! Function that creates a command responses for sending.
         //!
-        //! @param sender The TRACER _core.
+        //! @param sender The TRACER core.
         //! @param time The clients global time.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void queueCommandMessage(object sender, byte[] command)
         {
-            m_commandRequest = new byte[3 + command.Length];
 
             lock (m_lock)
             {
+                m_commandRequest = new byte[3 + command.Length];
                 // header
                 m_commandRequest[0] = manager.cID;
                 m_commandRequest[1] = core.time;
-                m_commandRequest[2] = (byte)MessageType.DATAHUB;
-                command.CopyTo(m_commandRequest.AsSpan().Slice(3));
+                command.CopyTo(m_commandRequest.AsSpan().Slice(2));
             }
 
             m_mre.Set();
         }
 
         //!
-        //! Function that creates a ping message for sending.
+        //! Function that creates a ping responses for sending.
         //!
         //! @param sender The TRACER _core.
         //! @param time The clients global time.
@@ -161,18 +157,18 @@ namespace tracer
                     // header
                     m_commandRequest[0] = manager.cID;
                     m_commandRequest[1] = time;
-                    m_commandRequest[2] = (byte)MessageType.PING;
+                    m_commandRequest[2] = (byte)DataHubMessageType.PING;
                     m_commandRequest[3] = Convert.ToByte(core.isServer);
                 }
 
-                m_mre.Set();
             }
+            m_mre.Set();
         }
 
         //! 
-        //! Function that decodes a sync message and set the clients global time.
+        //! Function that decodes a sync responses and set the clients global time.
         //!
-        //! @param message The message to be decoded.
+        //! @param responses The responses to be decoded.
         //! 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void decodePongMessage(byte[] message)
@@ -204,10 +200,31 @@ namespace tracer
             //Debug.Log("Pong received! RTT: " + rtt);
         }
 
+        //! 
+        //! Function that decodes file info response message list.
+        //! The responses are formated as a list of bytes.
+        //!
+        //! @param responses The responses to be decoded a alist of bytes.
+        //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void decodeDatahubMessage(byte[] message)
+        private void decodeReplyMessage(List<byte[]> responses)
         {
-            // ...
+            lock (m_lock)
+            {
+                TaskCompletionSource<List<byte[]>> tcs = manager.m_commandBufferWritten.Dequeue();
+                tcs.TrySetResult(responses.ConvertAll(x => x.ToArray()));
+            }
+
+            // just for debugging...
+            //switch ((DataHubMessageType) responses[0][2])
+            //{
+            //    case DataHubMessageType.FILEINFO:
+            //        for (int i = 1; i < responses.Count; i++)
+            //            Helpers.Log(System.Text.Encoding.UTF8.GetString(responses[i]));
+            //        break;
+            //    default:
+            //        break;
+            //}
         }
 
         //!
@@ -220,6 +237,7 @@ namespace tracer
             AsyncIO.ForceDotNet.Force();
             RequestSocket requester = new RequestSocket();
             m_socket = requester;
+            List<byte[]> responses = new List<byte[]>();
 
             requester.Connect("tcp://" + m_ip + ":" + m_port);
             Helpers.Log("Command Module connected: " + "tcp://" + m_ip + ":" + m_port);
@@ -231,35 +249,46 @@ namespace tracer
                     lock (m_lock)
                     {
                         try 
-                        { 
-                            requester.TrySendFrame(m_commandRequest); 
-                            requester.TryReceiveFrameBytes(TimeSpan.FromSeconds(1.0), out m_commandResponse); 
-                        } catch { requester.Dispose(); }
-                        if (m_commandResponse != null)
                         {
-                            if (m_commandResponse[0] != manager.cID)
+                            if (requester.HasOut)
+                                requester.TrySendFrame(m_commandRequest);
+                            else
+                                Helpers.Log("Command responses not send, no DataHub reachable!", Helpers.logMsgType.WARNING);
+
+                            if (!requester.TryReceiveMultipartBytes(TimeSpan.FromSeconds(1.0), ref responses))
                             {
-                                switch ((MessageType)m_commandResponse[2])
+                                //Helpers.Log("Command responses reply not received, no DataHub reachable!", Helpers.logMsgType.WARNING);
+                                m_mre.Reset();
+
+                                continue;
+                            }
+                        } catch { requester.Dispose(); }
+                        if (responses.Count > 0)
+                        {
+                            byte[] header = responses[0];
+                            if (header[0] != manager.cID)
+                            {
+
+                                switch ((DataHubMessageType)header[2])
                                 {
-                                    case MessageType.PING:
-                                        decodePongMessage(m_commandResponse);
-                                        break;
-                                    case MessageType.DATAHUB:
-                                        decodeDatahubMessage(m_commandResponse);
+                                    case DataHubMessageType.PING:
+                                        decodePongMessage(header);
                                         break;
                                     default:
+                                        decodeReplyMessage(responses);
                                         break;
                                 }
                                 m_commandRequest = null;
                             }
+                            responses.Clear();
                         }
                     }
                 }
                 // reset to stop the thread after one loop is done
                 m_mre.Reset();
-                m_thredEnded = true;
                 Thread.Yield();
             }
+            m_thredEnded.TrySetResult(true);
         }
     }
 }
