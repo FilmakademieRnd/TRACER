@@ -79,10 +79,9 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             m_pingTimes = new Queue<byte>(new byte[] { 0, 0, 0, 0, 0 });
+            core.syncEvent += queuePingMessage;
+            manager.sendServerCommand += queueCommandMessage;
             manager.requestCommandServer += connectAndStart;
-            //SceneManager sceneManager = core.getManager<SceneManager>();
-            //sceneManager.sceneReady += connectAndStart;
-            //connectAndStart(this, EventArgs.Empty);
         }
 
         //!
@@ -92,9 +91,6 @@ namespace tracer
         {
             base.Dispose();
             SceneManager sceneManager = core.getManager<SceneManager>();
-
-            //if (sceneManager != null)
-            //    sceneManager.sceneReady -= connectAndStart;
 
             core.syncEvent -= queuePingMessage;
             manager.sendServerCommand -= queueCommandMessage;
@@ -110,9 +106,6 @@ namespace tracer
         private void connectAndStart(object sender, EventArgs e)
         {
             start(manager.settings.ipAddress.value, "5558");
-
-            core.syncEvent += queuePingMessage;
-            manager.sendServerCommand += queueCommandMessage;
         }
 
         //!
@@ -124,10 +117,10 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void queueCommandMessage(object sender, byte[] command)
         {
-
             lock (m_lock)
             {
-                m_commandRequest = new byte[3 + command.Length];
+                Helpers.Log("queue command");
+                m_commandRequest = new byte[2 + command.Length];
                 // header
                 m_commandRequest[0] = manager.cID;
                 m_commandRequest[1] = core.time;
@@ -211,8 +204,8 @@ namespace tracer
         {
             lock (m_lock)
             {
-                TaskCompletionSource<List<byte[]>> tcs = manager.m_commandBufferWritten.Dequeue();
-                tcs.TrySetResult(responses.ConvertAll(x => x.ToArray()));
+                    Helpers.Log("decode reply");
+                    manager.m_commandBufferWritten.TrySetResult(responses.ConvertAll(x => x.ToArray()));
             }
 
             // just for debugging...
@@ -252,8 +245,8 @@ namespace tracer
                         {
                             if (requester.HasOut)
                                 requester.TrySendFrame(m_commandRequest);
-                            else
-                                Helpers.Log("Command responses not send, no DataHub reachable!", Helpers.logMsgType.WARNING);
+                            //else
+                                //Helpers.Log("Command responses not send, no DataHub reachable!", Helpers.logMsgType.WARNING);
 
                             if (!requester.TryReceiveMultipartBytes(TimeSpan.FromSeconds(1.0), ref responses))
                             {

@@ -132,7 +132,7 @@ namespace tracer
         //! Watchdog used to create command buffer request/reply asynchrony.
         //! I also transfers the command reply as a byte array list.
         //!
-        public Queue<TaskCompletionSource<List<byte[]>>> m_commandBufferWritten { get; private set; } = null;
+        public TaskCompletionSource<List<byte[]>> m_commandBufferWritten { get; private set; } = null;
 
         //!
         //! Constructor initializing member variables.
@@ -142,7 +142,7 @@ namespace tracer
         //!
         public NetworkManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
-            m_commandBufferWritten = new Queue<TaskCompletionSource<List<byte[]>>>();
+            m_commandBufferWritten = new TaskCompletionSource<List<byte[]>>();
             settings.ipAddress = new Parameter<string>("127.0.0.1", "ipAddress");
         }
 
@@ -172,7 +172,7 @@ namespace tracer
             // initialize the server list with the given server ID
             string ipString = settings.ipAddress.value.ToString();
             string[] ips = ipString.Split('.');
-            
+
             m_serverList = new List<byte>() { byte.Parse(ipString.Split('.')[3]) };
 
             if (core.useRandomCID)
@@ -182,50 +182,49 @@ namespace tracer
             }
             else
             {
+                m_cID = 254;
                 //reads the network name of the device
                 var hostName = Dns.GetHostName();
                 var host = Dns.GetHostEntry(hostName);
 
-                List<byte[]> responses = await SendServerCommand(new byte[] {
-                            (byte)NetworkManagerModule.DataHubMessageType.IP,
-                            byte.Parse(ips[0]),
-                            byte.Parse(ips[1]),
-                            byte.Parse(ips[2]),
-                            byte.Parse(ips[3]) }, 2);
-
-                // fallback if no correct response or 255 (ip aready taken)
-                if (responses.Count < 1 || responses[1][0] == 255)
+                //Take last ip adress of local network (which is local wlan ip address)
+                foreach (var ip in host.AddressList)
                 {
-                    //Take last ip adress of local network (which is local wlan ip address)
-                    foreach (var ip in host.AddressList)
+                    byte[] ipb = ip.GetAddressBytes();
+
+                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                     {
-                        byte[] ipb = ip.GetAddressBytes();
+                        Helpers.Log(ip.ToString());
+                        List<byte[]> responses = await SendServerCommand(
+                            new byte[] { (byte)NetworkManagerModule.DataHubMessageType.IP, ipb[0], ipb[1], ipb[2], ipb[3] },
+                            2f);
 
-                        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
-                            ipb[0].ToString() == ips[0] && ipb[1].ToString() == ips[1])
+                        //for (int i = 0; i < 10; i++)
+                        //{
+                        //    List<byte[]> responsesT = await SendServerCommand(new byte[] {
+                        //            (byte)NetworkManagerModule.DataHubMessageType.IP,
+                        //            000,
+                        //            111,
+                        //            222,
+                        //            (byte)i }, 2);
+                        //    Helpers.Log(responsesT[1][0].ToString());
+                        //}
+
+                        //fallback if no correct response or 255(ip aready taken)
+                        if (responses.Count > 0 && responses[1][0] != 255)
                         {
-
-                            m_cID = ipb[3];
-                            Helpers.Log("Got no ID from DataHub, fallback to local IP range! ID is: " + m_cID, Helpers.logMsgType.WARNING);
+                            m_cID = responses[1][0];
+                            Helpers.Log("Got ID from DataHub. ID is: " + m_cID, Helpers.logMsgType.NONE);
                             break;
                         }
-                        else
-                            m_cID = 254;
-                    }
-                    if (m_cID == 254)
-                    {
-                        m_cID = (byte)UnityEngine.Random.Range(2, 250);
-                        Helpers.Log("Got no ID from DataHub and Server address not in local sub net, create random CID: " + m_cID, Helpers.logMsgType.WARNING);
                     }
                 }
-                else
-                {
-                    m_cID = responses[1][0];
-                    Helpers.Log("Got ID from DataHub. ID is: " + m_cID, Helpers.logMsgType.NONE);
-                }
+
             }
+            Helpers.Log("Set cID to: " + m_cID);
             core.StartSync();
         }
+        
 
         //! 
         //! Cleanup function called before Unity destroys the TRACER _core.
@@ -248,7 +247,7 @@ namespace tracer
             {
                 try
                 {
-                    NetMQConfig.Cleanup(false);
+                    NetMQConfig.Cleanup(true);
                 }
                 catch { }
                 finally
@@ -315,24 +314,24 @@ namespace tracer
         //! 
         //! @param command The command as a byte array to be send to DataHub.
         //! @return 
-        public async Task<List<byte[]>> SendServerCommand(byte[] command, int timeout = 5)
+        public async Task<List<byte[]>> SendServerCommand(byte[] command, float timeout = 5)
         {
             // enqueue new TCS to for handling message response tasks
-            TaskCompletionSource<List<byte[]>> tcs = new TaskCompletionSource<List<byte[]>>();
-            m_commandBufferWritten.Enqueue(tcs);
+            m_commandBufferWritten = new TaskCompletionSource<List<byte[]>>(TaskContinuationOptions.RunContinuationsAsynchronously);
             
             // send command
             sendServerCommand?.Invoke(this, command);
 
             // wait up to 'timeout' sconds for reply 
-            Task t = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(timeout)) );
+            Task t = await Task.WhenAny(m_commandBufferWritten.Task, Task.Delay(TimeSpan.FromSeconds(timeout)) );
 
             if (t.GetType() == typeof(Task<List<byte[]>>))
-                return tcs.Task.Result;
+            {
+                return m_commandBufferWritten.Task.Result;
+            }
             else
             {
                 Helpers.Log("DataHub timed out, command not send.", Helpers.logMsgType.WARNING);
-                m_commandBufferWritten.Dequeue();
                 return new List<byte[]>();
             }
         }
