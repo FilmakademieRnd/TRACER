@@ -81,6 +81,8 @@ namespace tracer
         {
             base.Cleanup(sender, e);
             core.timeEvent -= consumeMessages;
+            m_sceneManager.sceneReady -= connectAndStart;
+            manager.settings.ipAddress.hasChanged -= reconnect;
         }
 
         //!
@@ -101,12 +103,13 @@ namespace tracer
 
             m_sceneManager = core.getManager<SceneManager>();
             m_sceneManager.sceneReady += connectAndStart;
+            manager.settings.ipAddress.hasChanged += reconnect;
         }
 
         //!
-        //! Function that connects the scene object change events for parameter queuing.
+        //! Function that connects the reciver to the DataHub and starts the receive loop.
         //!
-        //! @param sender The emitting scene object.
+        //! @param sender The scene manager.
         //! @param e The pssed event arguments.
         //!
         private void connectAndStart(object sender, EventArgs e)
@@ -114,6 +117,17 @@ namespace tracer
             startUpdateReceiver(manager.settings.ipAddress.value, "5556");
 
             core.timeEvent += consumeMessages;
+        }
+
+        //!
+        //! Function that reconnects the reciver to the DataHub and restarts the receive loop.
+        //!
+        //! @param sender The network manager.
+        //! @param e The pssed ip address.
+        //!
+        private void reconnect(object sender, string ip)
+        {
+            startUpdateReceiver(ip, "5556");
         }
 
         //!

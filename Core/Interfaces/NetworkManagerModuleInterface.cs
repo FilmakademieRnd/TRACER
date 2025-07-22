@@ -193,7 +193,7 @@ namespace tracer
 
             if (m_transceiverThread != null)
             {
-                //await System.Threading.Tasks.Task.Delay(200);
+                await Task.Delay(200);
                 m_transceiverThread.Abort();
             }
 

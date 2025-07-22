@@ -199,17 +199,6 @@ namespace tracer
                             new byte[] { (byte)NetworkManagerModule.DataHubMessageType.IP, ipb[0], ipb[1], ipb[2], ipb[3] },
                             2f);
 
-                        //for (int i = 0; i < 10; i++)
-                        //{
-                        //    List<byte[]> responsesT = await SendServerCommand(new byte[] {
-                        //            (byte)NetworkManagerModule.DataHubMessageType.IP,
-                        //            000,
-                        //            111,
-                        //            222,
-                        //            (byte)i }, 2);
-                        //    Helpers.Log(responsesT[1][0].ToString());
-                        //}
-
                         //fallback if no correct response or 255(ip aready taken)
                         if (responses.Count > 0 && responses[1][0] != 255)
                         {
@@ -247,7 +236,7 @@ namespace tracer
             {
                 try
                 {
-                    NetMQConfig.Cleanup(true);
+                    NetMQConfig.Cleanup(false);
                 }
                 catch { }
                 finally

@@ -82,19 +82,28 @@ namespace tracer
             SceneManager sceneManager = core.getManager<SceneManager>();
             UIManager uiManager = core.getManager<UIManager>();
 
-            if (sceneManager != null && uiManager != null)
+            core.timeEvent -= sendParameterMessages;
+
+            manager.settings.ipAddress.hasChanged -= reconnect;
+            manager.sceneObjectAdded -= AddSceneObject;
+            manager.sceneObjectRemoved -= RemoveSceneObject;
+
+            if (sceneManager != null)
             {
                 sceneManager.sceneReady -= connectAndStart;
+                sceneManager.sceneObjectLocked -= lockSceneObject;
+                sceneManager.sceneObjectUnlocked -= unlockSceneObject;
+            }
+            if (uiManager != null)
+            {
                 uiManager.selectionAdded -= lockSceneObject;
                 uiManager.selectionRemoved -= unlockSceneObject;
             }
 
-            foreach (SceneObject sceneObject in sceneManager.getAllSceneObjects())
+                foreach (SceneObject sceneObject in sceneManager.getAllSceneObjects())
             {
                 sceneObject.hasChanged -= queueModifiedParameter;
             }
-
-            core.timeEvent -= sendParameterMessages;
         }
 
         //!
@@ -111,6 +120,7 @@ namespace tracer
 
             SceneManager sceneManager = core.getManager<SceneManager>();
             sceneManager.sceneReady += connectAndStart;
+            manager.settings.ipAddress.hasChanged += reconnect;
         }
 
         //!
@@ -145,6 +155,17 @@ namespace tracer
             manager.sceneObjectRemoved += RemoveSceneObject;
 
             core.timeEvent += sendParameterMessages;
+        }
+
+        //!
+        //! Function that reconnects the reciver to the DataHub and restarts the receive loop.
+        //!
+        //! @param sender The network manager.
+        //! @param e The pssed ip address.
+        //!
+        private void reconnect(object sender, string ip)
+        {
+            startUpdateSender(ip, "5557");
         }
 
         //!
