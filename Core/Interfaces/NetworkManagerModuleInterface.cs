@@ -59,7 +59,7 @@ namespace tracer
         //!
         public enum DataHubMessageType
         {
-            CONNECTIONSTATUS, IP, PING,
+            CONNECTIONSTATUS, ID, PING,
             SENDSCENE, REQUESTSCENE, SCENERECEIVED, FILEINFO,
             UNKNOWN = 255
         }
@@ -70,7 +70,7 @@ namespace tracer
         protected readonly object m_lock = new object();
 
         //!
-        //! IP address of the network interface to be used.
+        //! ID address of the network interface to be used.
         //!
         protected string m_ip;
 
@@ -154,7 +154,7 @@ namespace tracer
         //!
         //! Function to start a new thread.
         //!
-        //! @param ip IP address of the network interface.
+        //! @param ip ID address of the network interface.
         //! @param port Port number to be used.
         //!
         protected virtual async void start(string ip, string port)

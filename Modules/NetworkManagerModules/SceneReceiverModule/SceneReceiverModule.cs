@@ -98,7 +98,7 @@ namespace tracer
                          .Add(new ListParameter(parameterList1, "Device"))
                      .End()
                      .Begin(MenuItem.IType.HSPLIT)
-                         .Add("IP Address")
+                         .Add("ID Address")
                          .Add(manager.settings.ipAddress)
                      .End()
                      .Begin(MenuItem.IType.HSPLIT)
@@ -114,7 +114,7 @@ namespace tracer
             // add elements to start menu;
             uiManager.startMenu
                 .Begin(MenuItem.IType.HSPLIT)
-                    .Add("IP Address")
+                    .Add("ID Address")
                     .Add(manager.settings.ipAddress)
                 .End()
                 .Begin(MenuItem.IType.HSPLIT)
@@ -145,7 +145,7 @@ namespace tracer
         //! Because of Unity's single threded design we have to 
         //! split the work within a coroutine.
         //!
-        //! @param ip IP address of the network interface.
+        //! @param ip ID address of the network interface.
         //! @param port Port number to be used.
         //!
         protected void start(string ip, string port, bool emitSceneReady)
@@ -239,7 +239,7 @@ namespace tracer
 
         //! 
         //! Function that triggers the scene receiving process.
-        //! @param ip The IP address to the server.
+        //! @param ip The ID address to the server.
         //! @param port The port the server uses to send out the scene data.
         //! 
         public void receiveScene(string ip, string port, bool emitSceneReady)

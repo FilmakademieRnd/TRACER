@@ -33,6 +33,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using NetMQ;
@@ -184,36 +185,44 @@ namespace tracer
             {
                 m_cID = 254;
                 //reads the network name of the device
-                var hostName = Dns.GetHostName();
-                var host = Dns.GetHostEntry(hostName);
+                //var hostName = Dns.GetHostName();
+                //var host = Dns.GetHostEntry(hostName);
 
-                //Take last ip adress of local network (which is local wlan ip address)
-                foreach (var ip in host.AddressList)
+                foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
-                    byte[] ipb = ip.GetAddressBytes();
-
-                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    if ((ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet) && ni.OperationalStatus == OperationalStatus.Up)
                     {
-                        Helpers.Log(ip.ToString());
-                        List<byte[]> responses = await SendServerCommand(
-                            new byte[] { (byte)NetworkManagerModule.DataHubMessageType.IP, ipb[0], ipb[1], ipb[2], ipb[3] },
-                            2f);
-
-                        //fallback if no correct response or 255(ip aready taken)
-                        if (responses.Count > 0 && responses[1][0] != 255)
+                        UnityEngine.Debug.Log(ni.OperationalStatus.ToString());
+                        //Take last ip adress of local network (which is local wlan ip address)
+                        foreach (var uni in ni.GetIPProperties().UnicastAddresses)
                         {
-                            m_cID = responses[1][0];
-                            Helpers.Log("Got ID from DataHub. ID is: " + m_cID, Helpers.logMsgType.NONE);
-                            break;
+                            IPAddress ipAddress = uni.Address;
+
+                            if (ipAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                            {
+                                byte[] mac = ni.GetPhysicalAddress().GetAddressBytes();
+                                Helpers.Log("Requesting ID for IP: "+ ipAddress.ToString() + " at MAC: " + ni.GetPhysicalAddress().ToString());
+                                List<byte[]> responses = await SendServerCommand(
+                                    new byte[] { (byte)NetworkManagerModule.DataHubMessageType.ID, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] },
+                                    2f);
+
+                                //fallback if no correct response or 255(ip aready taken)
+                                if (responses.Count > 0 && responses[1][0] != 255)
+                                {
+                                    m_cID = responses[1][0];
+                                    Helpers.Log("Got ID from DataHub. cID is: " + m_cID, Helpers.logMsgType.NONE);
+                                    core.StartSync();
+                                    return;
+                                }
+                            }
                         }
                     }
                 }
-
             }
             Helpers.Log("Set cID to: " + m_cID);
             core.StartSync();
         }
-        
+
 
         //! 
         //! Cleanup function called before Unity destroys the TRACER _core.
@@ -267,7 +276,7 @@ namespace tracer
         }
 
         //!
-        //! The ID if the client (based on the last digit of IP address)
+        //! The ID if the client (based on the last digit of ID address)
         //!
         private byte m_cID = 254;
         public byte cID

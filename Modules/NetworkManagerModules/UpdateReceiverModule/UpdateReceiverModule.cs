@@ -393,7 +393,7 @@ namespace tracer
 
         //!
         //! Function to start the scene sender module.
-        //! @param ip The IP address to be used from the sender.
+        //! @param ip The ID address to be used from the sender.
         //! @param port The port number to be used from the sender.
         //!
         void startUpdateReceiver(string ip, string port)

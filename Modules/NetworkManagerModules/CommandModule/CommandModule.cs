@@ -119,7 +119,6 @@ namespace tracer
         {
             lock (m_lock)
             {
-                Helpers.Log("queue command");
                 m_commandRequest = new byte[2 + command.Length];
                 // header
                 m_commandRequest[0] = manager.cID;
