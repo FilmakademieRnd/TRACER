@@ -286,9 +286,9 @@ namespace tracer
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
-        protected override void Cleanup(object sender, EventArgs e)
+        public override void Dispose()
         {
-            base.Cleanup(sender, e);
+            base.Dispose();
 
             manager.UI2DCreated -= On2DUIReady;
         }

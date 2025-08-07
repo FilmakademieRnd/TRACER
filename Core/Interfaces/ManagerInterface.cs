@@ -78,11 +78,6 @@ namespace tracer
         public event EventHandler startEvent;
 
         //!
-        //! Event invoked when an TRACER _core OnDestroy() callback is triggered.
-        //!
-        public event EventHandler cleanupEvent;
-
-        //!
         //! Constructor
         //! @param  moduleType The type of modules to be loaded by this manager.
         //! @param tracerCore A reference to the TRACER _core.
@@ -95,7 +90,6 @@ namespace tracer
 
             m_core.awakeEvent += Init;
             m_core.startEvent += Start;
-            m_core.destroyEvent += Cleanup;
 
             foreach (Type t in modules)
             {
@@ -144,12 +138,15 @@ namespace tracer
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
-        protected virtual void Cleanup(object sender, EventArgs e) 
+        public virtual void Cleanup() 
         {
-            cleanupEvent?.Invoke(this, e);
+            foreach (Module module in m_modules.Values)
+                module.Dispose();
+
+            m_modules.Clear();
+
             m_core.awakeEvent -= Init;
             m_core.startEvent -= Start;
-            m_core.destroyEvent -= Cleanup;
         }
 
         //!

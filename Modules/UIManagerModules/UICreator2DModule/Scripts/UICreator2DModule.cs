@@ -120,9 +120,9 @@ namespace tracer
         //!
         //! Cleanup
         //!
-        protected override void Cleanup(object sender, EventArgs e)
+        public override void Dispose()
         {
-            base.Cleanup(sender, e);
+            base.Dispose();
             undoButton.onClick.RemoveAllListeners();
             redoButton.onClick.RemoveAllListeners();
             resetButton.onClick.RemoveAllListeners();

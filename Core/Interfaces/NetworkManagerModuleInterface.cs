@@ -90,11 +90,6 @@ namespace tracer
         protected TaskCompletionSource<bool> m_thredEnded;
 
         //!
-        //! Action emitted when worker thread has been disposed
-        //!
-        protected Action m_disposed;
-
-        //!
         //! The Thread used for receiving or sending messages.
         //!
         private Thread m_transceiverThread;
@@ -128,9 +123,6 @@ namespace tracer
         {
             m_mre = new ManualResetEvent(false);
             m_thredEnded = new TaskCompletionSource<bool>();
-
-            manager.cleanupEvent += stopThread;
-            m_disposed += this.manager.NetMQCleanup;
         }
 
         //!
@@ -139,14 +131,13 @@ namespace tracer
         public override void Dispose() 
         {
             base.Dispose();
-            manager.cleanupEvent -= stopThread;
-            //m_disposed -= manager.NetMQCleanup;
+            stopThread();
         }
 
         //!
         //! Function to stop all tranceiver threads (called when TRACER _core will be destroyed).
         //!
-        private void stopThread(object sender, EventArgs e)
+        private void stopThread()
         {
             stop();
         }
@@ -157,10 +148,10 @@ namespace tracer
         //! @param ip ID address of the network interface.
         //! @param port Port number to be used.
         //!
-        protected virtual async void start(string ip, string port)
+        protected virtual void start(string ip, string port)
         {
             if (m_isRunning)
-               await stop();
+               stop();
 
             m_ip = ip;
             m_port = port;
@@ -174,30 +165,29 @@ namespace tracer
         //!
         //! Stop the tranceiver.
         //!
-        public async Task<bool> stop()
+        public void stop()
         {
             m_isRunning = false;
             m_mre.Set();
             
-            bool retValue = await m_thredEnded.Task;
-
             if (m_socket != null)
             {
+                while (m_thredEnded.Task.Result != true)
+                    Thread.Yield();
+
                 //m_socket.Disconnect("tcp://" + m_ip + ":" + m_port);
                 m_socket.Dispose();
                 m_socket.Close();
                 Helpers.Log(this.name + " disposed.");
                 m_socket = null;
-                m_disposed?.Invoke();
             }
 
             if (m_transceiverThread != null)
             {
-                await Task.Delay(200);
                 m_transceiverThread.Abort();
+                m_transceiverThread.Join();
+                NetworkManager.threadCount--;
             }
-
-            return retValue;
         }
     }
 }

@@ -77,9 +77,9 @@ namespace tracer
         //!
         //! Cleaning up event registrations. 
         //!
-        protected override void Cleanup(object sender, EventArgs e)
+        public override void Dispose()
         {
-            base.Cleanup(sender, e);
+            base.Dispose();
             core.timeEvent -= consumeMessages;
             m_sceneManager.sceneReady -= connectAndStart;
             manager.settings.ipAddress.hasChanged -= reconnect;

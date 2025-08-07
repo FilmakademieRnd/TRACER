@@ -276,8 +276,8 @@ namespace tracer
                 CamModule.uiCameraOperation -= SetCameraManipulator;
             }
 
-            this.doneEditing -= manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
-            this.doneEditing -= core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
+            //this.doneEditing -= manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
+            //this.doneEditing -= core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
         }
 
         //!

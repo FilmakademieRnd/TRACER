@@ -65,11 +65,6 @@ namespace tracer
         public int pingRTT = 0;
 
         //!
-        //! number of disposed network worker threads
-        //!
-        private int m_disposeCount = 0;
-
-        //!
         //! Event that is invoket to send an server command.
         //!
         public event EventHandler<byte[]> sendServerCommand;
@@ -193,7 +188,6 @@ namespace tracer
                     if ((ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet) && ni.OperationalStatus == OperationalStatus.Up)
                     {
                         UnityEngine.Debug.Log(ni.OperationalStatus.ToString());
-                        //Take last ip adress of local network (which is local wlan ip address)
                         foreach (var uni in ni.GetIPProperties().UnicastAddresses)
                         {
                             IPAddress ipAddress = uni.Address;
@@ -230,9 +224,10 @@ namespace tracer
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
-        protected override void Cleanup(object sender, EventArgs e)
+        public override void Cleanup()
         {
-            base.Cleanup(sender, e);
+            base.Cleanup();
+            NetMQCleanup();
         }
 
         //!
@@ -240,8 +235,7 @@ namespace tracer
         //!
         public void NetMQCleanup()
         {
-            m_disposeCount++;
-            if (m_disposeCount == threadCount)
+            if (threadCount == 0)
             {
                 try
                 {
@@ -253,6 +247,7 @@ namespace tracer
                     Helpers.Log("netMQ cleaned up.");
                 }
             }
+            else Helpers.Log("netMQ cleanup error! Thread count is: " + threadCount, Helpers.logMsgType.ERROR);
         }
 
         //!

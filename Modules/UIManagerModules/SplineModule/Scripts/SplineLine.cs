@@ -129,9 +129,9 @@ public class SplineLine : UIManagerModule
     //! 
     //! Function called before Unity destroys the TRACER _core.
     //! 
-    protected override void Cleanup(object sender, EventArgs e)
+    public override void Dispose()
     {
-        base.Cleanup(sender, e);
+        base.Dispose();
         _mUIManager.selectionChanged -= selection;
         _mUIManager.UI2DCreated -= grabUI2D;
     }

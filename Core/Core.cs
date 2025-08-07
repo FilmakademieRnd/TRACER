@@ -143,10 +143,6 @@ namespace tracer
         //!
         public event EventHandler startEvent;
         //!
-        //! Event invoked when an Unity OnDestroy() callback is triggered.
-        //!
-        public event EventHandler destroyEvent;
-        //!
         //! Event invoked when Tracer's global timer ticks.
         //!
         public event EventHandler timeEvent;
@@ -241,7 +237,11 @@ namespace tracer
         private void OnDestroy()
         {
             SaveSettings();
-            destroyEvent?.Invoke(this, new EventArgs());
+
+            foreach (Manager manager in m_managerList.Values)
+                manager.Cleanup();
+
+            m_managerList.Clear();
         }
 
         //!

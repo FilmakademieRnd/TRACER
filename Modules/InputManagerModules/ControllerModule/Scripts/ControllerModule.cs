@@ -276,9 +276,9 @@ namespace tracer
         //!
         //! Cleanup method for the controller.
         //!
-        protected override void Cleanup(object sender, EventArgs e)
+        public override void Dispose()
         {
-            base.Cleanup(sender, e);
+            base.Dispose();
 
             // Unsubscribe from controller button events.
             manager.buttonNorth -= PressNorth;

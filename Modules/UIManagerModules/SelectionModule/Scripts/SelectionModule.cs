@@ -152,9 +152,9 @@ namespace tracer
         //! Callback from TRACER _core when Unity calls OnDestroy.
         //! Used to cleanup resources used by the PixelSelector module.
         //!
-        protected override void Cleanup(object sender, EventArgs e)
+        public override void Dispose()
         {
-            base.Cleanup(sender, e);
+            base.Dispose();
 
             core.updateEvent -= renderUpdate;
             m_sceneManager.sceneReady -= modifyMaterials;

@@ -79,14 +79,12 @@ namespace tracer
 
             m_manager.initEvent += Init;
             m_manager.startEvent += Start;
-            m_manager.cleanupEvent += Cleanup;
         }
 
         public virtual void Dispose()
         {
             m_manager.initEvent -= Init;
             m_manager.startEvent -= Start;
-            m_manager.cleanupEvent -= Cleanup;
         }
 
         //!
@@ -109,15 +107,5 @@ namespace tracer
         //! @param e Arguments for these event. 
         //! 
         protected virtual void Start(object sender, EventArgs e) { }
-        //! 
-        //! Virtual function called before Unity destroys the TRACER _core.
-        //! 
-        //! @param sender A reference to the TRACER _core.
-        //! @param e Arguments for these event. 
-        //! 
-        protected virtual void Cleanup(object sender, EventArgs e)
-        {
-            Dispose();
-        }
     }
 }
