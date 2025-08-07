@@ -276,6 +276,8 @@ namespace tracer
                 CamModule.uiCameraOperation -= SetCameraManipulator;
             }
 
+            // [REVIEW]
+            // Direct access to a module should be prevented!
             //this.doneEditing -= manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
             //this.doneEditing -= core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
         }

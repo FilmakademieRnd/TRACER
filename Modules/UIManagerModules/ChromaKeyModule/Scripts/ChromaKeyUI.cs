@@ -195,7 +195,7 @@ namespace tracer
         //! @param sender callback sender
         //! @param e event reference
         //!
-        protected override void Cleanup(object sender, EventArgs e)
+        public override void Dispose()
         {
             // Unsubscribe from input manager events
             _mInputManager.cameraControlChanged -= UpdateChromaKeyButton;

@@ -306,11 +306,14 @@ namespace tracer
             _uiManager.colorSelectGameObject -= GetColorSelect;
 
             // Unsubscribe from the ControllerdoneEditing event.
-            ControllerdoneEditing -= _sceneManager.getModule<UndoRedoModule>().addHistoryStep;
+
+            // [REVIEW]
+            // Direct access to a module should be prevented!
+            //ControllerdoneEditing -= _sceneManager.getModule<UndoRedoModule>().addHistoryStep;
         }
 
         #region StateMachineLogic
-        
+
         //!
         //! Controller modes enumeration.
         //!

@@ -187,7 +187,6 @@ namespace tracer
                 {
                     if ((ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet) && ni.OperationalStatus == OperationalStatus.Up)
                     {
-                        UnityEngine.Debug.Log(ni.OperationalStatus.ToString());
                         foreach (var uni in ni.GetIPProperties().UnicastAddresses)
                         {
                             IPAddress ipAddress = uni.Address;
