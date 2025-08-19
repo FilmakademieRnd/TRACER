@@ -89,13 +89,17 @@ namespace tracer
         }
 
         //!
-        //! Event that is invoked when the dialos progress changed.
+        //! Event that is invoked when the dialog progress changed.
         //!
         public event EventHandler<int> progressChanged;
         //!
-        //! Event that is invoked when the dialos caption changed.
+        //! Event that is invoked when the dialog caption changed.
         //!
         public event EventHandler<string> captionChanged;
+        //!
+        //! Event that is invoked when the dialog will be destroied  
+        //!
+        public Action destroyEvent;
 
         //!
         //! Constructor of the dialog class.
@@ -130,6 +134,14 @@ namespace tracer
         //!
         public Dialog (DTypes type = DTypes.BAR, UIManager.Roles role = UIManager.Roles.EXPERT) : this("", type, role)
         {
+        }
+
+        //!
+        //! Function calles, when the "close dialog" button has been pressed.
+        //!
+        public void Destroy()
+        {
+            destroyEvent?.Invoke();
         }
 
     }

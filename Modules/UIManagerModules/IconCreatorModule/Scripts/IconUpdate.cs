@@ -28,6 +28,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 03.03.2022
 
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace tracer
 {
@@ -57,7 +58,9 @@ namespace tracer
         void Start()
         {
             Core core = GameObject.Find("TRACER").GetComponent<Core>();
-            m_iconScale = Vector3.one * core.getManager<UIManager>().settings.uiScale.value;
+            UIManager uiManager = core.getManager<UIManager>();
+            uiManager.settings.uiScale.hasChanged += UpdateUIScale;
+            m_iconScale = Vector3.one * uiManager.settings.uiScale.value;
             transform.right = Camera.main.transform.right;
         }
 
@@ -79,6 +82,14 @@ namespace tracer
         }
         private void HideLock(){
             if(m_lockImage) m_lockImage.SetActive(false);
+        }
+
+        //!
+        //! Function coupled to user UI scale changes to update the icon scale
+        //!
+        private void UpdateUIScale(object sender, float e)
+        {
+            m_iconScale = Vector3.one * e;
         }
 
         //!

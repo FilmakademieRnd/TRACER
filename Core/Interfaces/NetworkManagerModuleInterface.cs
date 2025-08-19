@@ -70,7 +70,7 @@ namespace tracer
         protected readonly object m_lock = new object();
 
         //!
-        //! ID address of the network interface to be used.
+        //! IP address of the network interface to be used.
         //!
         protected string m_ip;
 
@@ -92,7 +92,7 @@ namespace tracer
         //!
         //! The Thread used for receiving or sending messages.
         //!
-        private Thread m_transceiverThread;
+        protected Thread m_transceiverThread;
         
         //!
         //! Function, listening for messages and adds them to m_messageQueue (executed in separate thread).
@@ -145,7 +145,7 @@ namespace tracer
         //!
         //! Function to start a new thread.
         //!
-        //! @param ip ID address of the network interface.
+        //! @param ip IP address of the network interface.
         //! @param port Port number to be used.
         //!
         protected virtual void start(string ip, string port)

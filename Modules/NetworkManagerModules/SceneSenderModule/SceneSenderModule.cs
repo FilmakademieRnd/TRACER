@@ -66,8 +66,10 @@ namespace tracer
         //!
         public SceneSenderModule(string name, Manager manager) : base(name, manager)
         {
-            //if (!core.isServer)
-              //  load = false;
+#if !UNITY_EDITOR
+            if (!core.isServer)
+                load = false;
+#endif
         }
 
         //! 
@@ -83,7 +85,7 @@ namespace tracer
             m_menu = new MenuTree()
                .Begin(MenuItem.IType.VSPLIT)
                     .Begin(MenuItem.IType.HSPLIT)
-                        .Add("ID Address")
+                        .Add("IP Address")
                         .Add(manager.settings.ipAddress)
                     .End()
                     .Begin(MenuItem.IType.HSPLIT)
@@ -184,7 +186,7 @@ namespace tracer
 
         //!
         //! Function to start the scene sender module.
-        //! @param ip The ID address to be used from the sender.
+        //! @param ip The IP address to be used from the sender.
         //! @param port The port number to be used from the sender.
         //!
         public void sendScene(string ip, string port)

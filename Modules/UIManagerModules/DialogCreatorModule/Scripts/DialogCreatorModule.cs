@@ -169,9 +169,11 @@ namespace tracer
             m_captionText = null;
 
             if (m_oldDialog != null)
+            {
+                m_oldDialog.Destroy();
                 m_oldDialog.progressChanged -= changeDialogProgress;
-            if (m_oldDialog != null)
                 m_oldDialog.captionChanged -= changeDialogCaption;
+            }
          
             UnityEngine.Object.DestroyImmediate(m_canvas);
         }

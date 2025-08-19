@@ -213,7 +213,8 @@ namespace tracer
                 }
             }
             Helpers.Log("Set cID to: " + m_cID);
-            core.StartSync();
+            
+            core!?.StartSync();
         }
 
 
@@ -270,7 +271,7 @@ namespace tracer
         }
 
         //!
-        //! The ID if the client (based on the last digit of ID address)
+        //! The ID if the client (based on the last digit of IP address)
         //!
         private byte m_cID = 254;
         public byte cID

@@ -203,6 +203,9 @@ namespace tracer
             };
 
             settings.roles = new ListParameter(roleList, "Roles");
+            
+            // set default role to 3 "DOP"
+            settings.roles.setValue(3);
         }
 
         //! 
@@ -446,7 +449,7 @@ namespace tracer
         //!
         private void CreateSettingsMenu()
         {
-            MenuTree settingsMenu = new MenuTree(new List<Roles> {Roles.EXPERT});
+            MenuTree settingsMenu = new MenuTree(new List<Roles> {Roles.VIEWER});
             settingsMenu.caption = "Settings";
             settingsMenu.setIcon("Images/button_gear");
             settingsMenu.scrollable = true;

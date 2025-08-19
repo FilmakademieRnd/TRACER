@@ -33,6 +33,7 @@ using System;
 using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
+using UnityEngine;
 
 namespace tracer
 {
@@ -50,6 +51,11 @@ namespace tracer
         //! The menu for the network configuration.
         //!
         private MenuTree m_menu;
+
+        //!
+        //! The scene receive progress.
+        //!
+        private int m_loadProgress = 0;
 
         //!
         //! Constructor
@@ -165,17 +171,21 @@ namespace tracer
         private IEnumerator startReceive(bool emitSceneReady)
         {
             Dialog statusDialog = new Dialog("Receive Scene", "", Dialog.DTypes.BAR);
+            statusDialog.destroyEvent = stop;
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.showDialog(statusDialog);
 
-            Thread receiverThread = new Thread(run);
-            receiverThread.Start();
+            ThreadStart transeiver = new ThreadStart(run);
+            m_transceiverThread = new Thread(transeiver);
+            m_transceiverThread.Start();
 
-            while (receiverThread.IsAlive)
+            while (m_transceiverThread.IsAlive)
             {
-                yield return null;
-                statusDialog.progress += 3;
+                statusDialog.progress = m_loadProgress;
+                yield return new WaitForSeconds(0.5f);
             }
+
+            m_transceiverThread = null;
 
             SceneManager sceneManager = core.getManager<SceneManager>();
             // emit sceneReceived signal to trigger scene cration in the sceneCreator module
@@ -202,6 +212,9 @@ namespace tracer
             Helpers.Log("Scene receiver started: " + "tcp://" + m_ip + ":" + m_port);
             SceneManager.SceneDataHandler sceneDataHandler = sceneManager.sceneDataHandler;
 
+            // because no loop we set m_threadEnded already at the beginning
+            m_thredEnded.TrySetResult(true);
+
             try
             {
                 foreach (string request in m_requests)
@@ -211,24 +224,31 @@ namespace tracer
                     {
                         case "header":
                             sceneDataHandler.headerByteData = sceneReceiver.ReceiveFrameBytes();
+                            m_loadProgress += 10;
                             break;
                         case "nodes":
                             sceneDataHandler.nodesByteData = sceneReceiver.ReceiveFrameBytes();
+                            m_loadProgress += 20;
                             break;
                         case "parameterobjects":
                             sceneDataHandler.parameterObjectsByteData = sceneReceiver.ReceiveFrameBytes();
+                            m_loadProgress += 10;
                             break;
                         case "objects":
                             sceneDataHandler.objectsByteData = sceneReceiver.ReceiveFrameBytes();
+                            m_loadProgress += 20;
                             break;
                         case "characters":
                             sceneDataHandler.characterByteData = sceneReceiver.ReceiveFrameBytes();
+                            m_loadProgress += 10;
                             break;
                         case "textures":
                             sceneDataHandler.texturesByteData = sceneReceiver.ReceiveFrameBytes();
+                            m_loadProgress += 20;
                             break;
                         case "materials":
                             sceneDataHandler.materialsByteData = sceneReceiver.ReceiveFrameBytes();
+                            m_loadProgress += 10;
                             break;
                     }
                 }
