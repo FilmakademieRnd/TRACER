@@ -99,6 +99,10 @@ namespace tracer
         //!
         public bool _isAnimated { get; protected set; } = false;
         //!
+        //! Role of a Parameter, determines it's visibility in the UI.
+        //!
+        public UIManager.Roles _role { get; protected set; } = UIManager.Roles.VIEWER;
+        //!
         //! Getter for parameters C# type.
         //!
         public Type cType
@@ -171,10 +175,8 @@ namespace tracer
         //! @param v new value to be set. Value will be casted automatically
         //!
         public abstract void copyValue(AbstractParameter v);
-
         public abstract int dataSize();
         public abstract int defaultDataSize();
-
         public abstract void OverrideParameterID(short objectId);
     }
 
@@ -241,13 +243,14 @@ namespace tracer
         //! @param name The parameters _parent ParameterObject.
         //! @param name Flag that determines whether a Parameter will be distributed.
         //!
-        public Parameter(T value, string name, ParameterObject parent = null, bool distribute = true)
+        public Parameter(T value, string name, ParameterObject parent = null, bool distribute = true, UIManager.Roles role = UIManager.Roles.VIEWER)
         {
             _value = value;
             _name = name;
             _parent = parent;
             _type = toTracerType(typeof(T));
             _distribute = distribute;
+            _role = role;
             _initialValue = value;
             _nextIdx = 0;
             _prevIdx = 0;
@@ -312,6 +315,7 @@ namespace tracer
             _initialValue = p._initialValue;
             _nextIdx = p._nextIdx;
             _prevIdx = p._prevIdx;
+            _role = p._role;
 
             hasChanged = p.hasChanged;
         }
@@ -369,6 +373,16 @@ namespace tracer
                 hasChanged?.Invoke(this, _value);
             }
             clearKeys();
+        }
+
+        //!
+        //! Sets the role of a parameter.
+        //!
+        //! @param role The new role the parameter will be set to. 
+        //!
+        public void setRole(UIManager.Roles role)
+        {
+            _role = role;
         }
 
         /////////////////////////////////////////////////////////////

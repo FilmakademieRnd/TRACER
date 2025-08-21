@@ -32,6 +32,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Collections;
 
 namespace tracer
 {
@@ -51,26 +52,6 @@ namespace tracer
         //!
         private int m_cameraIndex = 0;
         //!
-        //! The initial position of the selected object.
-        //!
-        private Vector3 m_oldPosition = Vector3.zero;
-        //!
-        //! The initial rotation of the selected object.
-        //!
-        private Quaternion m_oldRotation = Quaternion.identity;
-        //!
-        //! The initial rotation of the main camera.
-        //!
-        private Quaternion m_oldCamRotation = Quaternion.identity;
-        //!
-        //! The inverse initial posiotion of the main camara.
-        //!
-        private Quaternion m_inverseOldCamRotation = Quaternion.identity;
-        //!
-        //! The initial vector between the main camera and the selected object.
-        //!
-        private Vector3 m_positionOffset = Vector3.zero;
-        //!
         //! correct way to "lock" the selected object to its local position to the MainCamera
         //!
         private Vector3 m_localPositionWouldBe;
@@ -78,16 +59,10 @@ namespace tracer
         //! correct way to "lock" the selected object to its local rotation to the MainCamera
         //!
         private Quaternion m_localRotationWouldBe;
-
         //!
         //! The UI button for logging the camera to an object.
         //!
         private MenuButton m_cameraSelectButton;
-
-        public MenuButton cameraSelectButton()
-        {
-            return m_cameraSelectButton;
-        }
         //!
         //! The currently selected object.
         //!
@@ -124,17 +99,21 @@ namespace tracer
         //! A copy of the last selected camera.
         //!
         private SceneObjectCamera m_oldSOCamera = null;
-
         //!
         //! safe frame button
         //!
         MenuButton m_safeFrameButton = null;
-
+        
         private MenuButton nextCameraButton;
+        
         //!
         //! Event emitted when camera operations are in action
         //!
         public event EventHandler<bool> uiCameraOperation;
+        //!
+        //! The coroutine handling the safe frame update.
+        //!
+        private Coroutine m_safeFrameUpdateCoroutine;
 
         //!
         //! Constructor
@@ -160,20 +139,17 @@ namespace tracer
             m_inputManager = core.getManager<InputManager>();
 
             m_safeFramePrefab = Resources.Load("Prefabs/SafeFrame") as GameObject;
-            m_safeFrameButton = new MenuButton("", showSafeFrame, new List<UIManager.Roles>() { UIManager.Roles.DOP });
-            m_safeFrameButton.setIcon("Images/button_safeFrames");
 
-            nextCameraButton = new MenuButton("", selectNextCamera, new List<UIManager.Roles>() { UIManager.Roles.DOP });
+            nextCameraButton = new MenuButton("", showNextCamera, new List<UIManager.Roles>() { UIManager.Roles.DOP });
             nextCameraButton.setIcon("Images/button_camera");
             nextCameraButton.isToggle = true;
 
-            m_uiManager.addButton(m_safeFrameButton);
             m_uiManager.addButton(nextCameraButton);
 
             m_sceneManager.sceneReady += initCameraOnce;
             m_uiManager.selectionChanged += selection;
 
-            m_inputManager.cameraControlChanged += updateSafeFrame;
+            m_inputManager.cameraControlChanged += updateSafeFrameButtons;
             m_inputManager.cameraControlChanged += updateSelectCamera;
         }
 
@@ -189,7 +165,7 @@ namespace tracer
 
             m_sceneManager.sceneReady -= initCameraOnce;
             m_uiManager.selectionChanged -= selection;
-            m_inputManager.cameraControlChanged -= updateSafeFrame;
+            m_inputManager.cameraControlChanged -= updateSafeFrameButtons;
             m_inputManager.cameraControlChanged -= updateSelectCamera;
         }
 
@@ -201,25 +177,27 @@ namespace tracer
         //!
         private void selection(object sender, List<SceneObject> sceneObjects)
         {
-            //TODO do not reset and redo if the same object has been selected!
-            // if(m_selectedObject != null && sceneObjects.Count > 0 && m_selectedObject == sceneObjects[0])
-            //     return;
-
             if (m_cameraSelectButton != null){
                 m_uiManager.removeButton(m_cameraSelectButton);
                 m_cameraSelectButton = null;
             }
 
+            if (m_safeFrameButton != null)
+            {
+                m_uiManager.removeButton(m_safeFrameButton);
+                m_safeFrameButton = null;
+            }
+
             if (sceneObjects.Count > 0)
             {
-                m_cameraIndex = -1;
                 m_selectedObject = sceneObjects[0];
 
                 Type selectionType = m_selectedObject.GetType();
                 if (selectionType == typeof(SceneObjectCamera))
-                   m_cameraIndex = m_sceneManager.sceneCameraList.FindIndex(x => x.Equals((SceneObjectCamera)m_selectedObject));
-                
-                
+                {
+                    m_cameraIndex = m_sceneManager.sceneCameraList.FindIndex(x => x.Equals((SceneObjectCamera)m_selectedObject));
+                }
+
                 if (selectionType == typeof(SceneObjectCamera) ||
                     selectionType == typeof(SceneObjectDirectionalLight) ||
                     selectionType == typeof(SceneObjectSpotLight))
@@ -233,6 +211,7 @@ namespace tracer
                     m_cameraSelectButton.setIcon("Images/button_lockToCamera");
                 }
                 m_uiManager.addButton(m_cameraSelectButton);
+
             }
             else
             {
@@ -243,7 +222,6 @@ namespace tracer
                     uiCameraOperation?.Invoke(this, true); //always true: since we clicked nowhere, we want to hide the gizmo!
                 }
                 m_selectedObject = null;
-
             }
         }
 
@@ -259,33 +237,40 @@ namespace tracer
             if (m_selectedObject == null)
                 return;
             
-            
-            if (IsCamLocked()){     //UNLOCK AND REVERT
+            if (IsCamLocked())
+            {     //UNLOCK AND REVERT
                 UnlockCam();
                 ResetRatio();
-            }else{                  //LOCK
+                hideSafeFrame();
+            }
+            else
+            {
+                //LOCK
+
+                m_safeFrameButton = new MenuButton("", toggleSafeFrame, new List<UIManager.Roles>() { UIManager.Roles.DOP });
+                m_safeFrameButton.setIcon("Images/button_safeFrames");
+                m_uiManager.addButton(m_safeFrameButton);
+
                 //Debug.Log("LOOK THROUGH "+m_selectedObject.name);
                 Type selectionType = m_selectedObject.GetType();
-                if(selectionType == typeof(SceneObjectCamera)){
+
+                if (selectionType == typeof(SceneObjectCamera))
+                {
                     copyCamera();
-                }else if(selectionType == typeof(SceneObjectDirectionalLight) || (selectionType == typeof(SceneObjectSpotLight))){
+                }
+                else if (selectionType == typeof(SceneObjectDirectionalLight) || (selectionType == typeof(SceneObjectSpotLight))){
                     
                 }
 
                 Camera.main.cullingMask &= ~(1 << 11);
                 Camera.main.transform.position = m_selectedObject.transform.position;
                 Camera.main.transform.rotation = m_selectedObject.transform.rotation;
+                
                 if (m_selectedObject.transform.parent.name != "Scene")
                 {
                     Camera.main.transform.position = m_selectedObject.transform.parent.TransformPoint(m_selectedObject.transform.localPosition);
                     Camera.main.transform.rotation = m_selectedObject.transform.parent.rotation * m_selectedObject.transform.localRotation;
                 }
-                m_oldPosition = Vector3.zero;
-                m_oldRotation = Quaternion.identity;
-                m_inverseOldCamRotation = Quaternion.identity;
-
-                m_positionOffset = Vector3.zero;
-                m_oldRotation = Quaternion.identity;
 
                 InputManager inputManager = core.getManager<InputManager>();
                 if (inputManager.cameraControl == InputManager.CameraControl.ATTITUDE)
@@ -305,8 +290,8 @@ namespace tracer
             switch(m_lockType){
                 case CameraLockageType.lookThrough:
                     core.updateEvent -= updateLookThrough;
-                    if (m_oldSOCamera)
-                        m_oldSOCamera.hasChanged -= updateCamera;
+                    if (m_safeFrameUpdateCoroutine != null)
+                        core.StopCoroutine(m_safeFrameUpdateCoroutine);
                     break;
                 case CameraLockageType.lockObjectToCam:
                     core.updateEvent -= updateLockToCamera;
@@ -351,7 +336,7 @@ namespace tracer
         //!
         //! Toggles the safe frame overlay.
         //!
-        private void showSafeFrame()
+        private void toggleSafeFrame()
         {
 
             if (m_safeFrame == null)
@@ -362,33 +347,57 @@ namespace tracer
                 scaler.scaleFactor = Screen.dpi * 0.04f * Mathf.Min(Mathf.Max(manager.settings.uiScale.value, 0.4f), 3f) * physicalDeviceScale;
                 m_infoText = m_safeFrame.transform.FindDeepChild("InfoText").GetComponent<TextMeshProUGUI>();
                 m_scaler = m_safeFrame.transform.Find("scaler");
-                if (m_oldSOCamera)
-                    updateCamera(m_oldSOCamera, null);
+                if (IsCamLocked())
+                    m_safeFrameUpdateCoroutine = core.StartCoroutine(UpdateSafeFrameRoutine());
             }
             else
             {
+                if (m_safeFrameUpdateCoroutine != null)
+                    core.StopCoroutine(m_safeFrameUpdateCoroutine);
                 GameObject.DestroyImmediate(m_safeFrame);
                 m_safeFrame = null;
             }
         }
 
         //!
+        //! Hedes the safe frame overlay and the corresponding button.
+        //!
+        private void hideSafeFrame()
+        {
+            if (m_safeFrameUpdateCoroutine != null)
+                core.StopCoroutine(m_safeFrameUpdateCoroutine);
+            m_safeFrameUpdateCoroutine = null;
+
+            GameObject.DestroyImmediate(m_safeFrame);
+            m_safeFrame = null;
+
+            if (m_safeFrameButton != null)
+                manager.removeButton(m_safeFrameButton);
+            m_safeFrameButton = null;
+        }
+
+        private IEnumerator UpdateSafeFrameRoutine()
+        {
+            while (true)
+            {
+                updateSafeFrame(m_selectedObject, null);
+                yield return new WaitForSeconds(1);
+            }
+        }
+
+        //!
         //! update safeFrame
         //!
-        private void updateSafeFrame(object sender, InputManager.CameraControl c)
+        private void updateSafeFrameButtons(object sender, InputManager.CameraControl c)
         {
             if (c == InputManager.CameraControl.AR)
             {
-                m_safeFrameButton.showHighlighted(false);
-                GameObject.DestroyImmediate(m_safeFrame);
-                m_safeFrame = null;
-                core.getManager<UIManager>().removeButton(m_safeFrameButton);
-
+                hideSafeFrame();
             }
             else
             {
-                if(!core.getManager<UIManager>().getButtons().Contains(m_safeFrameButton))
-                    core.getManager<UIManager>().addButton(m_safeFrameButton);
+                if(!manager.getButtons().Contains(m_safeFrameButton))
+                    manager.addButton(m_safeFrameButton);
             }
         }
         
@@ -400,30 +409,37 @@ namespace tracer
             if (c == InputManager.CameraControl.AR)
             {
                 nextCameraButton.showHighlighted(false);
-                core.getManager<UIManager>().removeButton(nextCameraButton);
+                manager.removeButton(nextCameraButton);
 
             }
             else
             {
-                if(!core.getManager<UIManager>().getButtons().Contains(nextCameraButton))
-                    core.getManager<UIManager>().addButton(nextCameraButton);
+                if(!manager.getButtons().Contains(nextCameraButton))
+                    manager.addButton(nextCameraButton);
             }
         }
 
         //!
         //! Function for updating the aspect ratio of the safe frame based on the currently selected camera.
         //!
-        private void updateCamera(object sender, AbstractParameter parameter)
+        private void updateSafeFrame(SceneObject so, AbstractParameter parameter)
         {
             Camera cameraMain = Camera.main;
-            SceneObjectCamera soCamera = (SceneObjectCamera) sender;
+            SceneObjectCamera soCamera = null;
 
-            cameraMain.fieldOfView = soCamera.fov.value;
-            cameraMain.sensorSize = soCamera.sensorSize.value;
+            if (so != null &&
+                so.GetType() == typeof(SceneObjectCamera)) {
+                soCamera = (SceneObjectCamera)so;
+                cameraMain.fieldOfView = soCamera.fov.value;
+                cameraMain.sensorSize = soCamera.sensorSize.value;
+            }
 
             if (m_safeFrame)
             {
-                string camInfo = String.Format("{0}mm | f/{1} | {2}:{3}mm | {4:0.00} fps", cameraMain.focalLength, soCamera.aperture.value, cameraMain.sensorSize.x, cameraMain.sensorSize.y, 1.0f / Time.deltaTime);
+                string camInfo = "";
+                if (soCamera != null)
+                    camInfo = String.Format("{0:0.00}mm | f/{1:0.00} | {2:0.00}:{3:0.00}mm | {4:0.00} fps", cameraMain.focalLength, soCamera.aperture.value, cameraMain.sensorSize.x, cameraMain.sensorSize.y, 1.0f / Time.deltaTime);
+
                 float newAspect = cameraMain.sensorSize.x / cameraMain.sensorSize.y;
 
                 if (newAspect < cameraMain.aspect)
@@ -438,9 +454,10 @@ namespace tracer
         //!
         //! The function that cycles through the available cameras in scene and set the camera main transform to these camera transform. 
         //!
-        private void selectNextCamera()
+        private void showNextCamera()
         {
-            m_uiManager.clearSelectedObject();
+            hideSafeFrame();
+
             m_cameraIndex++;
 
             if (IsCamLocked())
@@ -469,15 +486,15 @@ namespace tracer
             if (m_sceneManager.sceneCameraList.Count <= 0 || m_cameraIndex >= m_sceneManager.sceneCameraList.Count)
                 return;
         
-            if (m_oldSOCamera)
-                m_oldSOCamera.hasChanged -= updateCamera;
+            //if (m_oldSOCamera)
+              //  m_oldSOCamera.hasChanged -= updateSafeFrameButtons;
             
             Camera mainCamera = Camera.main;
             int targetDisplay = mainCamera.targetDisplay;
             float aspect = mainCamera.aspect;
             SceneObjectCamera soCamera = m_sceneManager.sceneCameraList[m_cameraIndex];
             Camera newCamera = soCamera.GetComponent<Camera>();
-            soCamera.hasChanged += updateCamera;
+            //soCamera.hasChanged += updateSafeFrameButtons;
             Debug.Log(soCamera.name + " Camera linked.");
             m_oldSOCamera = soCamera;
             mainCamera.enabled = false;
@@ -486,7 +503,7 @@ namespace tracer
             mainCamera.aspect = aspect;
             mainCamera.enabled = true;
 
-            updateCamera(soCamera, null);
+            //updateSafeFrame(soCamera, null);
 
             // announce the UI operation to the input manager
             m_inputManager.updateCameraCommand();
@@ -508,7 +525,7 @@ namespace tracer
             mainCamera.aspect = aspect;
             mainCamera.enabled = true;
 
-            updateCamera(soCamera, null);
+            //updateSafeFrame(soCamera, null);
         }
 
         //!
@@ -541,8 +558,10 @@ namespace tracer
                         newPosition = camTransform.position;
                         newRotation = camTransform.rotation;
                     }
-                    m_selectedObject.position.setValue(newPosition);
-                    m_selectedObject.rotation.setValue(newRotation);
+                    if (m_selectedObject.position.value != newPosition)
+                        m_selectedObject.position.setValue(newPosition);
+                    if (m_selectedObject.rotation.value != newRotation)
+                        m_selectedObject.rotation.setValue(newRotation);
                     break;
                 case InputManager.CameraControl.NONE:
                     //do the same here right now, because the behaviour seems to be set to None from time to time (specifically AR mode did not work well anymore)
@@ -558,8 +577,10 @@ namespace tracer
                         newPosition = camTransform.position;
                         newRotation = camTransform.rotation;
                     }
-                    m_selectedObject.position.setValue(newPosition);
-                    m_selectedObject.rotation.setValue(newRotation);
+                    if (m_selectedObject.position.value != newPosition)
+                        m_selectedObject.position.setValue(newPosition);
+                    if (m_selectedObject.rotation.value != newRotation)
+                        m_selectedObject.rotation.setValue(newRotation);
                     break;
                 default:
                     break;

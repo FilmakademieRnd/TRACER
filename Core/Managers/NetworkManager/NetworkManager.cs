@@ -214,7 +214,9 @@ namespace tracer
             }
             Helpers.Log("Set cID to: " + m_cID);
             
-            core!?.StartSync();
+            if (core != null)
+                core.StartSync();
+
         }
 
 

@@ -668,7 +668,7 @@ namespace tracer
                     lightComponent.shadowNormalBias = 1f;
                     lightComponent.range = nodeLight.range * manager.settings.sceneScale;
 
-                    Debug.Log("Create Light: " + nodeLight.name + " of type: " + nodeLight.lightType.ToString() + " Intensity: " + nodeLight.intensity + " Pos: " + pos);
+                    // Debug.Log("Create Light: " + nodeLight.name + " of type: " + nodeLight.lightType.ToString() + " Intensity: " + nodeLight.intensity + " Pos: " + pos);
 
                     // Add light specific settings
                     if (nodeLight.lightType == LightType.Directional)
@@ -681,13 +681,15 @@ namespace tracer
                     }
                     else if (nodeLight.lightType == LightType.Area)
                     {
-                        // TODO: use are lights when supported in unity
                         lightComponent.spotAngle = 170;
                         lightComponent.range *= 4;
                     }
+                    else if (nodeLight.lightType == LightType.Point)
+                    {
+                    }
                     else
                     {
-                        Debug.Log("Unknown Light Type in NodeBuilderBasic::CreateLight");
+                        Debug.Log("Unknown Light Type " + nodeLight.lightType.ToString() + " in NodeBuilderBasic::CreateLight");
                     }
 
                     if (nodeLight.editable)

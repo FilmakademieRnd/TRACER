@@ -37,6 +37,10 @@ using TMPro;
 public class NumberInputFieldUpdate : MonoBehaviour, IPointerDownHandler, IPointerClickHandler, IDragHandler, IBeginDragHandler, IEndDragHandler
 {
     //!
+    //! Flag that detiermines if the input fields number can be nagative.
+    //!
+    public bool m_unsigned = true;
+    //!
     //! Variable defining the number of screen sections for value scaling.
     //!
     private static readonly int m_sections = 3;
@@ -121,6 +125,12 @@ public class NumberInputFieldUpdate : MonoBehaviour, IPointerDownHandler, IPoint
             scale = 0.01f / Mathf.Abs(scale);
         else if (scale == 0)
             scale += 0.01f;
-        m_inputField.text = (m_startVal + (eventData.position.x - m_startPos.x) * scale * (1f+m_magnitude)).ToString();
+        float newValue = m_startVal + (eventData.position.x - m_startPos.x) * scale * (1f + m_magnitude);
+        
+        if (newValue < 0)
+            if (m_unsigned)
+                newValue = 0;
+        
+        m_inputField.text = (newValue).ToString("#.00");
     }
 }
