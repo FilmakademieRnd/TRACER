@@ -28,12 +28,14 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 11.03.2022
 
-using System.Collections.Generic;
-using UnityEngine;
-using System.Threading;
-using System;
 using NetMQ;
 using NetMQ.Sockets;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using UnityEditor.VersionControl;
+using UnityEngine;
 
 namespace tracer
 {
@@ -66,10 +68,7 @@ namespace tracer
         //!
         public SceneSenderModule(string name, Manager manager) : base(name, manager)
         {
-#if !UNITY_EDITOR
-            if (!core.isServer)
-                load = false;
-#endif
+            //...
         }
 
         //! 
@@ -80,38 +79,10 @@ namespace tracer
         //! 
         protected override void Init(object sender, EventArgs e)
         {
-            Parameter<Action> button = new Parameter<Action>(Connect, "Start");
-
-            m_menu = new MenuTree()
-               .Begin(MenuItem.IType.VSPLIT)
-                    .Begin(MenuItem.IType.HSPLIT)
-                        .Add("IP Address")
-                        .Add(manager.settings.ipAddress)
-                    .End()
-                    .Begin(MenuItem.IType.HSPLIT)
-                        .Add(button)
-                    .End()
-              .End();
-
-            m_menu.caption = "Network Settings";
-            m_menu.iconResourceLocation = "Images/button_network";
-            core.getManager<UIManager>().addMenu(m_menu);
-
+            // place menu here!
+            
             m_sceneManager = core.getManager<SceneManager>();
-
             manager.requestSceneSend += SendScene;
-            manager.stopSceneSend += StopSendScene;
-        }
-
-        //! 
-        //! Function called when an Unity Start() m_callback is triggered
-        //! 
-        //! @param sender A reference to the TRACER _core.
-        //! @param e Arguments for these event. 
-        //! 
-        protected override void Start(object sender, EventArgs e)
-        {
-            //_core.getManager<UIManager>().showMenu(m_menu);
         }
 
         //!
@@ -122,60 +93,45 @@ namespace tracer
             sendScene(manager.settings.ipAddress.value, "5555");
         }
 
-        private void StopSendScene(object sender, EventArgs e)
-        {
-            stop();
-            //m_isRunning = false;
-        }
-
         //!
-        //! Action called from the start Button, initializing the scene sender.
-        //!
-        private void Connect()
-        {
-            Helpers.Log(manager.settings.ipAddress.value);
-
-            core.getManager<UIManager>().hideMenu();
-
-            m_sceneManager.emitParseScene(true);
-
-            sendScene(manager.settings.ipAddress.value, "5555");
-        }
-
-        //!
-        //! Function, sending messages containing the scene data as reponces to the requested package (executed in separate thread).
+        //! Function, sending sendMessages containing the scene data as reponces to the requested package (executed in separate thread).
         //!
         protected override void run()
         {
             m_isRunning = true;
             AsyncIO.ForceDotNet.Force();
-            var dataSender = new ResponseSocket();
-            m_socket = dataSender;
+            var sceneSender = new RequestSocket();
+            m_socket = sceneSender;
 
-            dataSender.Bind("tcp://" + m_ip + ":" + m_port);
-            Debug.Log("Enter while.. ");
+            sceneSender.Connect("tcp://" + m_ip + ":" + m_port);
+            Debug.Log("Scene sender started: " + "tcp://" + m_ip + ":" + m_port);
 
-            string message;
+            NetMQMessage sendMessages = new NetMQMessage(2);
+            string received = "0";
 
-            while (m_isRunning)
+            foreach (KeyValuePair<string, byte[]> package in m_responses)
             {
-                dataSender.TryReceiveFrameString(out message);       // TryReceiveFrameString returns null if no message has been received!
-                if (message != null)
-                {
-                    try
-                    {
-                        if (m_responses.ContainsKey(message))
-                        {
-                            dataSender.SendFrame(m_responses[message]);
-                            Helpers.Log(message + " send bytes: " + m_responses[message].Length);
-                        }
-                        else
-                            dataSender.SendFrame(new byte[0]);
-                    }
-                    catch { }
+                sendMessages.Append(package.Key);
+                sendMessages.Append(package.Value);
 
+                sceneSender.SendMultipartMessage(sendMessages);
+                Helpers.Log(package.Key + " send bytes: " + package.Value.Length);
+
+                if (sceneSender.TryReceiveFrameString(TimeSpan.FromSeconds(10), out received))
+                {
+                    if (received == "1")
+                        Debug.Log(package.Key + " stored on server: " + m_ip);
+                    else
+                        Debug.Log(package.Key + " not accepted by server: " + m_ip);
                 }
-                Thread.Sleep(100);
+                else
+                {
+                    Debug.Log("Timeout, server: " + m_ip + " not responding!");
+                    break;
+                }
+                
+                sendMessages.Clear();
+                received = "0";
             }
 
             m_responses.Clear();
@@ -195,6 +151,7 @@ namespace tracer
             SceneManager.SceneDataHandler dataHandler = m_sceneManager.sceneDataHandler;
 
             m_responses.Add("header", dataHandler.headerByteDataRef);
+            m_responses.Add("thumbnail", dataHandler.thumbnailByteDataRef);
             m_responses.Add("nodes", dataHandler.nodesByteDataRef);
             m_responses.Add("parameterobjects", dataHandler.parameterObjectsByteDataRef);
             m_responses.Add("objects", dataHandler.objectsByteDataRef);

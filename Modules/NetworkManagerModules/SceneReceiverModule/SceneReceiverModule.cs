@@ -113,7 +113,7 @@ namespace tracer
                 .End();
 
             m_menu.iconResourceLocation = "Images/button_network";
-            m_menu.caption = "Network Settings";
+            m_menu.caption = "Client Network Settings";
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.addMenu(m_menu);
 
@@ -134,7 +134,8 @@ namespace tracer
 
         private void Connect(object sender, EventArgs e)
         {
-            receiveScene(manager.settings.ipAddress.value, "5555", false);
+            //receiveScene(manager.settings.ipAddress.value, "5555", false);
+            Connect();
         }
 
         private void Connect()
@@ -159,8 +160,6 @@ namespace tracer
             m_ip = ip;
             m_port = port;
 
-            NetworkManager.threadCount++;
-
             core.StartCoroutine(startReceive(emitSceneReady));
         }
 
@@ -178,6 +177,7 @@ namespace tracer
             ThreadStart transeiver = new ThreadStart(run);
             m_transceiverThread = new Thread(transeiver);
             m_transceiverThread.Start();
+            NetworkManager.threadCount++;
 
             while (m_transceiverThread.IsAlive)
             {
@@ -186,6 +186,8 @@ namespace tracer
             }
 
             m_transceiverThread = null;
+            NetworkManager.threadCount--;
+            stop();
 
             SceneManager sceneManager = core.getManager<SceneManager>();
             // emit sceneReceived signal to trigger scene cration in the sceneCreator module
@@ -253,7 +255,7 @@ namespace tracer
                     }
                 }
             }
-            catch (Exception e) { Helpers.Log("SceneSender " + e.ToString(), Helpers.logMsgType.WARNING); }
+            catch (Exception e) { Helpers.Log("SceneReceiver " + e.ToString(), Helpers.logMsgType.WARNING); }
         }
 
 

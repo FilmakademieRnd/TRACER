@@ -28,10 +28,11 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 23.02.2021
 
-using System.Runtime.CompilerServices;
-using System.Collections.Generic;
-using UnityEngine;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace tracer
 {
@@ -372,6 +373,42 @@ namespace tracer
         internal void UnlockSceneObject(SceneObject sceneObject)
         {
             sceneObjectUnlocked.Invoke(this, sceneObject);
+        }
+
+        //!
+        //! Function that creates a screensupt based on the viw of the main camera.
+        //!
+        //! @param size The size for heigt and width in pixels for the screenshot.
+        //! @return The JPG encoded screenshot as a byte array.
+        //!
+        public byte[] MakeScreenshotJPG(int size)
+        {
+            // get active camera
+            Camera cam = Camera.main;
+
+            // calculate the corresponding height based on the target size and the cameras aspect
+            int height = Mathf.FloorToInt(size / cam.aspect);
+
+            // create a squared size texture we can use to handle the data
+            // and a temporary render texture with correct aspect to render the scene to
+            Texture2D tex = new Texture2D(size, size);
+            RenderTexture rt = RenderTexture.GetTemporary(size, height, 24);
+
+            // fill texture with black pixels
+            tex.SetPixels(Enumerable.Repeat(Color.black, size * size).ToArray());
+
+            // render scene into the render target
+            cam.targetTexture = rt;
+            cam.Render();
+            cam.targetTexture = null;
+
+            // copy the rendered pixels to a texture (from GPU to CPU) and cleanup
+            RenderTexture.active = rt;
+            tex.ReadPixels(new Rect(0, 0, size, height), 0, size / 2 - height / 2);
+            RenderTexture.active = null;
+            RenderTexture.ReleaseTemporary(rt);
+
+            return tex.EncodeToJPG(95);
         }
     }
 }

@@ -125,7 +125,7 @@ namespace tracer
             if (!m_showIcons)
                 return;
 
-            SceneManager sceneManager = ((SceneManager)sender);
+            SceneManager sceneManager = core.getManager<SceneManager>();
 
             foreach (SceneObject sceneObject in sceneManager.getAllSceneObjects())
             {
@@ -136,6 +136,7 @@ namespace tracer
                     case SceneObjectLight:
                         if (manager.activeRole == UIManager.Roles.EXPERT ||
                             manager.activeRole == UIManager.Roles.LIGHTING ||
+                            manager.activeRole == UIManager.Roles.DOP ||
                             manager.activeRole == UIManager.Roles.SET)
                         {
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);

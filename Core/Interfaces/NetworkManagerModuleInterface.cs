@@ -60,7 +60,7 @@ namespace tracer
         public enum DataHubMessageType
         {
             CONNECTIONSTATUS, ID, PING,
-            SENDSCENE, REQUESTSCENE, SCENERECEIVED, FILEINFO,
+            SENDSCENE, REQUESTSCENE, FILEINFO,
             UNKNOWN = 255
         }
 

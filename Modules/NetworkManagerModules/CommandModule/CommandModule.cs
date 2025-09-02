@@ -203,7 +203,6 @@ namespace tracer
         {
             lock (m_lock)
             {
-                    Helpers.Log("decode reply");
                     manager.m_commandBufferWritten.TrySetResult(responses.ConvertAll(x => x.ToArray()));
             }
 

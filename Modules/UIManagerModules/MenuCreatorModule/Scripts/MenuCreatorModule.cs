@@ -270,7 +270,17 @@ namespace tracer
                                 textComponent.font = manager.uiAppearanceSettings.defaultFont;
                                 textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
                                 Image imgButton = button.GetComponent<Image>();
-                                imgButton.color = manager.uiAppearanceSettings.colors.ButtonBG;
+                                if (item.iconData != null)
+                                {
+                                    Texture2D tex = new Texture2D(2,2);
+                                    ImageConversion.LoadImage(tex, item.iconData);
+                                    imgButton.sprite = Sprite.Create(tex, new Rect(0.0f, 0.0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                                    imgButton.color = Color.white;
+                                    RectTransform buttonTransform = button.GetComponent<RectTransform>();
+                                    buttonTransform.sizeDelta = new Vector2(buttonTransform.rect.height, buttonTransform.rect.height);
+                                }
+                                else
+                                    imgButton.color = manager.uiAppearanceSettings.colors.ButtonBG;
                             }
                             break;
                         case AbstractParameter.ParameterType.BOOL:

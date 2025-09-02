@@ -200,9 +200,9 @@ namespace tracer
                                     2f);
 
                                 //fallback if no correct response or 255(ip aready taken)
-                                if (responses.Count > 0 && responses[1][0] != 255)
+                                if (responses.Count > 0 && responses[0][0] != 255)
                                 {
-                                    m_cID = responses[1][0];
+                                    m_cID = responses[0][0];
                                     Helpers.Log("Got ID from DataHub. cID is: " + m_cID, Helpers.logMsgType.NONE);
                                     core.StartSync();
                                     return;
@@ -322,7 +322,8 @@ namespace tracer
 
             if (t.GetType() == typeof(Task<List<byte[]>>))
             {
-                return m_commandBufferWritten.Task.Result;
+                List<byte[]> result = m_commandBufferWritten.Task.Result;
+                return result.GetRange(1, result.Count-1);
             }
             else
             {
@@ -345,14 +346,6 @@ namespace tracer
         public void RequestSceneSend()
         {
             requestSceneSend?.Invoke(this, EventArgs.Empty);
-        }
-
-        //!
-        //! Function to stop all local scene sender. 
-        //!
-        public void StopSceneSend()
-        {
-            stopSceneSend?.Invoke(this, EventArgs.Empty);
         }
 
         //!

@@ -292,10 +292,6 @@ namespace tracer
                     if (cID != manager.cID)
                         manager.ClientConnectionUpdate(status, cID, isServer);
                     break;
-                case DataHubMessageType.SCENERECEIVED:
-                    if (message[4] == manager.cID)
-                        manager.StopSceneSend();
-                    break;
             }
         }
 

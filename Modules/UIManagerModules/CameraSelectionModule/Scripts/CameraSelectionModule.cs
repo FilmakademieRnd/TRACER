@@ -246,7 +246,6 @@ namespace tracer
             else
             {
                 //LOCK
-
                 m_safeFrameButton = new MenuButton("", toggleSafeFrame, new List<UIManager.Roles>() { UIManager.Roles.DOP });
                 m_safeFrameButton.setIcon("Images/button_safeFrames");
                 m_uiManager.addButton(m_safeFrameButton);
@@ -438,7 +437,10 @@ namespace tracer
             {
                 string camInfo = "";
                 if (soCamera != null)
-                    camInfo = String.Format("{0:0.00}mm | f/{1:0.00} | {2:0.00}:{3:0.00}mm | {4:0.00} fps", cameraMain.focalLength, soCamera.aperture.value, cameraMain.sensorSize.x, cameraMain.sensorSize.y, 1.0f / Time.deltaTime);
+                {
+                    float focalLength = soCamera.sensorSize.value.y / (2.0f * Mathf.Tan(Mathf.Deg2Rad * soCamera.fov.value * 0.5f));
+                    camInfo = String.Format("{0:0.00}mm | f/{1:0.00} | {2:0.00}:{3:0.00}mm | {4:0.00} fps", focalLength, soCamera.aperture.value, cameraMain.sensorSize.x, cameraMain.sensorSize.y, 1.0f / Time.deltaTime);
+                }
 
                 float newAspect = cameraMain.sensorSize.x / cameraMain.sensorSize.y;
 

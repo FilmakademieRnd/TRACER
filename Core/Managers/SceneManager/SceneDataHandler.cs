@@ -49,6 +49,7 @@ namespace tracer
             public class SceneData
             {
                 public TracerHeader header;
+                public byte[] thubnail;
                 public List<SceneNode> nodeList;
                 public List<ObjectPackage> objectList;
                 public List<CharacterPackage> characterList;
@@ -59,6 +60,7 @@ namespace tracer
                 public SceneData()
                 {
                     header = new TracerHeader();
+                    thubnail = new byte[0];
                     nodeList = new List<SceneNode>();
                     objectList = new List<ObjectPackage>();
                     characterList = new List<CharacterPackage>();
@@ -93,7 +95,7 @@ namespace tracer
             //!
             public static readonly int size_float = sizeof(float);
             //!
-            //! The list containing the serialised header.
+            //! The array containing the serialised header.
             //!
             private byte[] m_headerByteData;
             //!
@@ -114,6 +116,29 @@ namespace tracer
             {
                 set { m_headerByteData = value; }
                 get { return m_headerByteData; }
+            }
+            //!
+            //! The array containing the serialised scene thumbnail.
+            //!
+            private byte[] m_thumbnailByteData;
+            //!
+            //! Getter function returning a reference to the byte array  
+            //! containing the serialised scene thumbnail.
+            //!
+            //! @return A reference to the serialised scene thumbnail data.
+            //!
+            public ref byte[] thumbnailByteDataRef
+            {
+                get { return ref m_thumbnailByteData; }
+            }
+            //!
+            //! Setter function for setting a the byte array,
+            //! containing the serialised scene thumbnail data.
+            //!
+            public byte[] thumbnailByteData
+            {
+                set { m_thumbnailByteData = value; }
+                get { return m_thumbnailByteData; }
             }
             //!
             //! The list containing the serialised nodes.
@@ -266,6 +291,7 @@ namespace tracer
             public void clearSceneByteData()
             {
                 m_headerByteData = new byte[0];
+                m_thumbnailByteData = new byte[0];
                 m_nodesByteData = new byte[0];
                 m_objectsByteData = new byte[0];
                 m_characterByteData = new byte[0];
@@ -330,6 +356,8 @@ namespace tracer
             {
                 // create byte arrays and clear buffers
                 m_headerByteData = StructureToByteArray(sceneData.header);
+                
+                m_thumbnailByteData = sceneData.thubnail;
 
                 getNodesByteArray(ref sceneData.nodeList);
                 sceneData.nodeList.Clear();

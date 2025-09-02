@@ -104,6 +104,8 @@ namespace tracer
 
             sceneData.header.frameRate = (byte) core.settings.framerate;
 
+            sceneData.thubnail = manager.MakeScreenshotJPG(256);
+
             List<GameObject> gameObjects = new List<GameObject>();
             recursiveGameObjectIdExtract(scene, ref gameObjects, getLowLayer, getHighLayer, getMixedLayer);
 

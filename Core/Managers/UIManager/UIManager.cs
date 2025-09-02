@@ -449,7 +449,7 @@ namespace tracer
         //!
         private void CreateSettingsMenu()
         {
-            MenuTree settingsMenu = new MenuTree(new List<Roles> {Roles.VIEWER});
+            MenuTree settingsMenu = new MenuTree(new List<Roles> {Roles.VIEWER, Roles.DOP, Roles.LIGHTING, Roles.SET});
             settingsMenu.caption = "Settings";
             settingsMenu.setIcon("Images/button_gear");
             settingsMenu.scrollable = true;

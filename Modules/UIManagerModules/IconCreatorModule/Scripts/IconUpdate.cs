@@ -40,7 +40,9 @@ namespace tracer
         //!
         //! The calculated Depth between main camera and gizmo from last frame call.
         //!
-        private Vector3 m_iconScale;
+        private Vector3 m_iconScale = Vector3.one;
+
+        private SpriteRenderer m_renderer;
 
         //!
         //! A reference to the _parent Scene Object.
@@ -62,6 +64,7 @@ namespace tracer
             uiManager.settings.uiScale.hasChanged += UpdateUIScale;
             m_iconScale = Vector3.one * uiManager.settings.uiScale.value;
             transform.right = Camera.main.transform.right;
+            m_renderer = GetComponent<SpriteRenderer>();
         }
 
         public void CreateLockIcon(){
@@ -95,27 +98,27 @@ namespace tracer
         //!
         //! Update is called once per frame
         //!
-        void Update()
+        void LateUpdate()
         {
-            Transform camera = Camera.main.transform;
-            float depth = Vector3.Dot(camera.position - transform.position, camera.forward);
+            if (m_renderer.isVisible)
+            {
+                Transform camera = Camera.main.transform;
+                float depth = Vector3.Dot(camera.position - transform.position, camera.forward);
 
-            transform.position = m_parentObject.transform.position;
-            transform.rotation = camera.rotation;
-            transform.localScale = m_iconScale * Mathf.Abs(depth * 0.1f);
-            
-            if(!m_lockImage)
-                return;
+                transform.position = m_parentObject.transform.position;
+                transform.rotation = camera.rotation;
+                transform.localScale = m_iconScale * Mathf.Abs(depth * 0.1f);
 
-            //TODO: only necessary to check, if icon is visible by any camera!
-            if(m_parentObject._lock){
-                if(!m_lockImage.activeSelf){
-                    ShowLock();
-                }
-            }else{
-                if(m_lockImage.activeSelf){
-                    HideLock();
-                }
+                if (!m_lockImage)
+                    return;
+
+                //TODO: only necessary to check, if icon is visible by any camera!
+                if (m_parentObject._lock)
+                    if (!m_lockImage.activeSelf)
+                        ShowLock();
+                else
+                    if (m_lockImage.activeSelf)
+                        HideLock();
             }
         }
     }

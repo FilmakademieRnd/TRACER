@@ -224,6 +224,7 @@ namespace tracer
                     break;
                 case SceneObjectLight:
                     if (manager.activeRole == UIManager.Roles.EXPERT ||
+                        manager.activeRole == UIManager.Roles.DOP ||
                         manager.activeRole == UIManager.Roles.LIGHTING ||
                         manager.activeRole == UIManager.Roles.SET)
                         manager.addSelectedObject(clickedSceneObject);
@@ -375,7 +376,8 @@ namespace tracer
         //!
         private void renderUpdate(object sender, EventArgs e)
         {
-            if (m_isRenderActive){
+            if (m_isRenderActive)
+            {
                 //Debug.Log("renderUpdate called "+Time.time);
                 //Debug.Log("<color=green>ACTIVE renderUpdate called</color>");
                 Camera camera = Camera.main;

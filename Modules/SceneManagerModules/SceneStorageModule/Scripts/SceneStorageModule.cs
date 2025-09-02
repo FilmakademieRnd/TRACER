@@ -80,9 +80,9 @@ namespace tracer
                    .End()
                    .Begin(MenuItem.IType.HSPLIT)
                        .Add(loadDemoButton)
-                       .Add(saveDatahubButton)
-                       .Add(loadDatahubButton)
-                       .Add(infoDatahubButton)
+                       //.Add(saveDatahubButton)
+                       //.Add(loadDatahubButton)
+                       //.Add(infoDatahubButton)
                    .End()
              .End();
 
@@ -127,8 +127,29 @@ namespace tracer
         {
             NetworkManager networkManager = core.getManager<NetworkManager>();
             List<byte[]> responses = await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.FILEINFO });
-            foreach (byte[] response in responses)
-                Helpers.Log(Encoding.UTF8.GetString(response));
+
+            MenuTree serverSceneMenu = new MenuTree();
+            serverSceneMenu.Begin(MenuItem.IType.VSPLIT);
+
+            for (int i = 0; i < responses.Count - 1; i += 2)
+            {
+                serverSceneMenu.Begin(MenuItem.IType.HSPLIT);
+
+                string response = Encoding.UTF8.GetString(responses[i]);
+                serverSceneMenu.Add(new Parameter<Action>(DataHubLoadScene, response, null, false), responses[i+1]);
+                Helpers.Log(response);
+
+                serverSceneMenu.End();
+            }
+
+            serverSceneMenu.End();
+
+            serverSceneMenu.caption = "Scenes on Server";
+            //serverSceneMenu.iconResourceLocation = "Images/button_save";
+            UIManager uiManager = core.getManager<UIManager>();
+            uiManager.addMenu(serverSceneMenu);
+
+            uiManager.showMenu(serverSceneMenu);
         }
 
         //!
@@ -150,12 +171,9 @@ namespace tracer
 
             NetworkManager networkManager = core.getManager<NetworkManager>();
             
-            networkManager.RequestSceneSend();
             await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.REQUESTSCENE });
-
-            //await System.Threading.Tasks.Task.Delay(10000); // can be deleted!!!
-
-            networkManager.StopSceneSend();
+            
+            networkManager.RequestSceneSend();
         }
 
         //!
@@ -165,10 +183,20 @@ namespace tracer
         {
             NetworkManager networkManager = core.getManager<NetworkManager>();
 
-            await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.SENDSCENE });
+            await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.SENDSCENE, 1 });
             networkManager.RequestSceneReceive();
         }
 
+        //!
+        //! Function to request a scene send and store from DataHub.
+        //!
+        private async void DataHubLoadScene(int e)
+        {
+            NetworkManager networkManager = core.getManager<NetworkManager>();
+
+            await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.SENDSCENE, (byte) e });
+            networkManager.RequestSceneReceive();
+        }
 
         //!
         //! Function that determines the current scene filepath and calls the load function.
@@ -193,6 +221,8 @@ namespace tracer
 
                 if (manager.sceneDataHandler.headerByteDataRef != null)
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".header"), manager.sceneDataHandler.headerByteDataRef);
+                if (manager.sceneDataHandler.thumbnailByteDataRef != null)
+                    File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".jpg"), manager.sceneDataHandler.thumbnailByteDataRef);
                 if (manager.sceneDataHandler.nodesByteDataRef != null)
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".nodes"), manager.sceneDataHandler.nodesByteDataRef);
                 if (manager.sceneDataHandler.objectsByteDataRef != null)
@@ -209,7 +239,7 @@ namespace tracer
                 manager.sceneDataHandler.clearSceneByteData();
             }
 
-            File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".jpg"), MakeScreenshotJPG(256));
+            //File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".jpg"), MakeScreenshotJPG(256));
         }
 
         //!
@@ -385,43 +415,6 @@ namespace tracer
             manager.emitSceneNew(true);
             UImanager.showDialog(null);
         }
-
-        //!
-        //! Function that creates a screensupt based on the viw of the main camera.
-        //!
-        //! @param size The size for heigt and width in pixels for the screenshot.
-        //! @return The JPG encoded screenshot as a byte array.
-        //!
-        private byte[] MakeScreenshotJPG(int size)
-        {
-            // get active camera
-            Camera cam = Camera.main;
-
-            // calculate the corresponding height based on the target size and the cameras aspect
-            int height = Mathf.FloorToInt(size / cam.aspect);
-            
-            // create a squared size texture we can use to handle the data
-            // and a temporary render texture with correct aspect to render the scene to
-            Texture2D tex = new Texture2D(size, size);
-            RenderTexture rt = RenderTexture.GetTemporary(size, height, 24);
-
-            // fill texture with black pixels
-            tex.SetPixels(Enumerable.Repeat(Color.black, size * size).ToArray());
-
-            // render scene into the render target
-            cam.targetTexture = rt;
-            cam.Render();
-            cam.targetTexture = null;
-
-            // copy the rendered pixels to a texture (from GPU to CPU) and cleanup
-            RenderTexture.active = rt;
-            tex.ReadPixels(new Rect(0, 0, size, height), 0, size / 2 - height / 2);
-            RenderTexture.active = null;
-            RenderTexture.ReleaseTemporary(rt);
-
-            return tex.EncodeToJPG(95);
-        }
-
     }
 
 }

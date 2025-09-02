@@ -83,9 +83,9 @@ namespace tracer
         //! 
         //! @param param The parameter stored in the menue item.
         //! 
-        public MenuTree Begin(AbstractParameter param)
+        public MenuTree Begin(AbstractParameter param, byte[] iconData)
         {
-            return Begin(MenuItem.IType.PARAMETER, param);
+            return Begin(MenuItem.IType.PARAMETER, param, iconData);
         }
 
         //!
@@ -94,17 +94,17 @@ namespace tracer
         //! @param type The type of the new item.
         //! @param param The parameter stored in the menue item.
         //! 
-        private MenuTree Begin(MenuItem.IType type, AbstractParameter param = null)
+        private MenuTree Begin(MenuItem.IType type, AbstractParameter param = null, byte[] iconData = null)
         {
             if (m_stack.Count == 0)
             {
-                MenuItem item = new MenuItem(type, param, null);
+                MenuItem item = new MenuItem(type, param, null, iconData);
                 Items.Add(item);
                 m_stack.Push(item);
             }
             else
             {
-                MenuItem item = m_stack.Peek().Add(type, param);
+                MenuItem item = m_stack.Peek().Add(type, param, iconData );
                 m_stack.Push(item);
             }
 
@@ -143,9 +143,9 @@ namespace tracer
         //! 
         //! @param param The parameter stored in the menue item.
         //! 
-        public MenuTree Add(AbstractParameter param)
+        public MenuTree Add(AbstractParameter param, byte[] iconData = null)
         {
-            return Add(MenuItem.IType.PARAMETER, param);
+            return Add(MenuItem.IType.PARAMETER, param, iconData);
         }
 
         //!
@@ -154,9 +154,9 @@ namespace tracer
         //! @param type The type of the new item.
         //! @param param The parameter stored in the menue item.
         //! 
-        private MenuTree Add(MenuItem.IType type, AbstractParameter param = null)
+        private MenuTree Add(MenuItem.IType type, AbstractParameter param = null, byte[] iconData = null)
         {
-            m_stack.Peek().Add(type, param);
+            m_stack.Peek().Add(type, param, iconData);
             return this;
         }
 
@@ -199,17 +199,30 @@ namespace tracer
         //!
         public List<MenuItem> Children { get; }
         //!
+        //! The optional icon for an menu item.
+        //!
+        protected byte[] m_iconData = null;
+        //!
+        //! The optional icon for an menu item.
+        //!
+        public byte[] iconData
+        {
+            set => m_iconData = value;
+            get => m_iconData;
+        }
+        //!
         //! The constructor of the menuItem
         //!
         //! @param type The type of the menuItem.
         //! @param param The parameterm the menuItem is associated with.
         //! @param parant The _parent of the menuItem.
         //!
-        public MenuItem(IType type, AbstractParameter param, MenuItem parent)
+        public MenuItem(IType type, AbstractParameter param, MenuItem parent, byte[] iconData)
         {
             Type = type;
             Parameter = param;
             Parent = parent;
+            m_iconData = iconData;
             Children = new List<MenuItem>();
         }
         //!
@@ -218,9 +231,9 @@ namespace tracer
         //! @param type The type of the new item.
         //! @param param The parameter stored in the menue item.
         //! 
-        public MenuItem Add(IType type, AbstractParameter param)
+        public MenuItem Add(IType type, AbstractParameter param, byte[] iconData)
         {
-            MenuItem item = new MenuItem(type, param, this);
+            MenuItem item = new MenuItem(type, param, this, iconData);
             Children.Add(item);
             return item;
         }

@@ -102,17 +102,16 @@ namespace tracer
             {
                 fov = new Parameter<float>(_camera.fieldOfView, "fov", this);
                 fov.hasChanged += updateFov;
-                aspect = new Parameter<float>(_camera.aspect, "aspectRatio", this);
-                aspect.hasChanged += updateAspect;
-                near = new Parameter<float>(_camera.nearClipPlane, "nearClipPlane", this);
+                aspect = new Parameter<float>(_camera.aspect, "aspectRatio", this, true, UIManager.Roles.EXPERT);
+                near = new Parameter<float>(_camera.nearClipPlane, "nearClipPlane", this, true, UIManager.Roles.EXPERT);
                 near.hasChanged += updateNearClipPlane;
-                far = new Parameter<float>(_camera.farClipPlane, "farClipPlane", this);
+                far = new Parameter<float>(_camera.farClipPlane, "farClipPlane", this, true, UIManager.Roles.EXPERT);
                 far.hasChanged += updateFarClipPlane;
-                focDist = new Parameter<float>(1f, "focalDistance", this);
+                focDist = new Parameter<float>(1f, "focalDistance", this, true, UIManager.Roles.EXPERT);
                 focDist.hasChanged += updateFocalDistance;
-                aperture = new Parameter<float>(2.8f, "aperture", this);
+                aperture = new Parameter<float>(2.8f, "aperture", this, true, UIManager.Roles.EXPERT);
                 aperture.hasChanged += updateAperture;
-                sensorSize = new Parameter<Vector2>(_camera.sensorSize, "sensorSize", this);
+                sensorSize = new Parameter<Vector2>(_camera.sensorSize, "sensorSize", this, true, UIManager.Roles.EXPERT);
                 sensorSize.hasChanged += updateSensorSize;
             }
             else
@@ -151,6 +150,7 @@ namespace tracer
         private void updateFov(object sender, float a)
         {
             _camera.fieldOfView = a;
+            _camera.focalLength = sensorSize.value.y / (2.0f * Mathf.Tan(Mathf.Deg2Rad * a * 0.5f));
             emitHasChanged((AbstractParameter)sender);
         }
 

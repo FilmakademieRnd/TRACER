@@ -189,65 +189,68 @@ namespace tracer
 
             for (int i = 0; i < lengthToShow; i++)
             {
-                switch (mainSelection.parameterList[i].name)
+                if (mainSelection.parameterList[i]._role >= manager.activeRole)
                 {
-                    //translation
-                    case "position":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_translate"));
-                        break;
-                    //rotation
-                    case "rotation":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_rotate"));
-                        break;
-                    //scale
-                    case "scale":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_scale"));
-                        break;
-                    case "intensity":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_intensity"));
-                        break;
-                    case "color":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_color"));
-                        break;
-                    case "range":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_range"));
-                        break;
-                    case "aperture":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_aperture"));
-                        break;
-                    case "aspectRatio":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_aspect"));
-                        break;
-                    case "radius":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_radius"));
-                        break;
-                    case "fov":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_fov"));
-                        break;
-                    case "farClipPlane":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_farClipPlane_text"));
-                        break;
-                    case "nearClipPlane":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_nearClipPlane_text"));
-                        break;
-                    case "focalDistance":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_focalDistance"));
-                        break;
-                    case "sensorSize":
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_sensorSize_text"));
-                        break;
-                    case "pathPositions":   //was a button like TRS before:
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
-                        break;
-                    case "pathRotations":   //was a button like TRS before: 
-                        snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
-                        break;
-                    case "animHostGen":     //RPC we use to trigger the character animation for a given path (both above) in AnimHost
-                        //not visualized at all (beware that they still increase to index of these snap elements)
-                        break;
-                    default:                        
-                        snapSelect.addElement(mainSelection.parameterList[i].name);
-                        break;
+                    switch (mainSelection.parameterList[i].name)
+                    {
+                        //translation
+                        case "position":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_translate"));
+                            break;
+                        //rotation
+                        case "rotation":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_rotate"));
+                            break;
+                        //scale
+                        case "scale":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_scale"));
+                            break;
+                        case "intensity":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_intensity"));
+                            break;
+                        case "color":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_color"));
+                            break;
+                        case "range":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_range"));
+                            break;
+                        case "aperture":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_aperture"));
+                            break;
+                        case "aspectRatio":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_aspect"));
+                            break;
+                        case "radius":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_radius"));
+                            break;
+                        case "fov":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_fov"));
+                            break;
+                        case "farClipPlane":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_farClipPlane_text"));
+                            break;
+                        case "nearClipPlane":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_nearClipPlane_text"));
+                            break;
+                        case "focalDistance":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_focalDistance"));
+                            break;
+                        case "sensorSize":
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_sensorSize_text"));
+                            break;
+                        case "pathPositions":   //was a button like TRS before:
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathPos"));
+                            break;
+                        case "pathRotations":   //was a button like TRS before: 
+                            snapSelect.addElement(Resources.Load<Sprite>("Images/button_pathRot"));
+                            break;
+                        case "animHostGen":     //RPC we use to trigger the character animation for a given path (both above) in AnimHost
+                                                //not visualized at all (beware that they still increase to index of these snap elements)
+                            break;
+                        default:
+                            snapSelect.addElement(mainSelection.parameterList[i].name);
+                            break;
+                    }
                 }
             }
             snapSelect.parameterChanged += createAdditionalManipulator;
