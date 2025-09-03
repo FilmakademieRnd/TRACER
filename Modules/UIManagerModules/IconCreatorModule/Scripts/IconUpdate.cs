@@ -98,7 +98,7 @@ namespace tracer
         //!
         //! Update is called once per frame
         //!
-        void LateUpdate()
+        void Update()
         {
             if (m_renderer.isVisible)
             {
@@ -114,11 +114,15 @@ namespace tracer
 
                 //TODO: only necessary to check, if icon is visible by any camera!
                 if (m_parentObject._lock)
+                {
                     if (!m_lockImage.activeSelf)
                         ShowLock();
+                }
                 else
+                {
                     if (m_lockImage.activeSelf)
                         HideLock();
+                }
             }
         }
     }
