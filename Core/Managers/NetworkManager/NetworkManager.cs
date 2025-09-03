@@ -28,15 +28,17 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 13.10.2021
 
+using NetMQ;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using NetMQ;
 using UnityEngine;
 
 namespace tracer
@@ -52,6 +54,7 @@ namespace tracer
             [ShowInMenu]
             // to store a parameters value into the settings files.
             public Parameter<string> ipAddress;
+            public Parameter<string> vID;
         }
 
         //!
@@ -140,6 +143,7 @@ namespace tracer
         {
             m_commandBufferWritten = new TaskCompletionSource<List<byte[]>>();
             settings.ipAddress = new Parameter<string>("127.0.0.1", "ipAddress");
+            settings.vID = new Parameter<string>("000000", "vID");
         }
 
         //! 
@@ -163,6 +167,34 @@ namespace tracer
             determineClientID(o, ip);
         }
 
+        private byte[] createVID()
+        {
+            int size = settings.vID.value.Length;
+            byte[] data = new byte[size];
+            
+            if (settings.vID.value == "000000")
+            {
+                string newVID = "";
+
+                for (int i = 0; i < size; i++)
+                {
+                    data[i] = (byte) UnityEngine.Random.Range(0, 255);
+                    newVID += (char) data[i];
+                }
+                
+                settings.vID.value = newVID;
+            }
+            else
+            {
+                for (int i = 0; i < size; i++)
+                {
+                    data[i] = (byte) settings.vID.value[i];
+                }
+            }
+            
+            return data;
+        }
+
         private async void determineClientID(object o, string startIP)
         {
             // initialize the server list with the given server ID
@@ -176,6 +208,7 @@ namespace tracer
                 // prevent equal cIDs if server and client running on the same machine
                 m_cID = (byte)UnityEngine.Random.Range(2, 250);
             }
+
             else
             {
                 m_cID = 254;
@@ -193,8 +226,13 @@ namespace tracer
 
                             if (ipAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                             {
+#if UNITY_IOS || UNITY_ANDROID
+                                byte[] mac = createVID();
+                                Helpers.Log("Requesting ID for IP: " + ipAddress.ToString() + " at MAC: " + BitConverter.ToString(mac));
+#else
                                 byte[] mac = ni.GetPhysicalAddress().GetAddressBytes();
                                 Helpers.Log("Requesting ID for IP: "+ ipAddress.ToString() + " at MAC: " + ni.GetPhysicalAddress().ToString());
+#endif
                                 List<byte[]> responses = await SendServerCommand(
                                     new byte[] { (byte)NetworkManagerModule.DataHubMessageType.ID, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] },
                                     2f);
@@ -203,7 +241,7 @@ namespace tracer
                                 if (responses.Count > 0 && responses[0][0] != 255)
                                 {
                                     m_cID = responses[0][0];
-                                    Helpers.Log("Got ID from DataHub. cID is: " + m_cID, Helpers.logMsgType.NONE);
+                                    Helpers.Log("Got ID from DataHub. vID is: " + m_cID, Helpers.logMsgType.NONE);
                                     core.StartSync();
                                     return;
                                 }
@@ -212,7 +250,7 @@ namespace tracer
                     }
                 }
             }
-            Helpers.Log("Set cID to: " + m_cID);
+            Helpers.Log("Set vID to: " + m_cID);
             
             if (core != null)
                 core.StartSync();
