@@ -169,10 +169,10 @@ namespace tracer
 
         private byte[] createVID()
         {
-            int size = settings.vID.value.Length;
+            int size = 6;
             byte[] data = new byte[size];
             
-            if (settings.vID.value == "000000")
+            if (settings.vID.value == "000000" || settings.vID.value == "")
             {
                 string newVID = "";
 
