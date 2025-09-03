@@ -364,15 +364,22 @@ namespace tracer
         private void hideSafeFrame()
         {
             if (m_safeFrameUpdateCoroutine != null)
+            {
                 core.StopCoroutine(m_safeFrameUpdateCoroutine);
-            m_safeFrameUpdateCoroutine = null;
+                m_safeFrameUpdateCoroutine = null;
+            }
 
-            GameObject.DestroyImmediate(m_safeFrame);
-            m_safeFrame = null;
+            if (m_safeFrame != null)
+            {
+                GameObject.DestroyImmediate(m_safeFrame);
+                m_safeFrame = null;
+            }
 
             if (m_safeFrameButton != null)
+            {
                 manager.removeButton(m_safeFrameButton);
-            m_safeFrameButton = null;
+                m_safeFrameButton = null;
+            }
         }
 
         private IEnumerator UpdateSafeFrameRoutine()
@@ -393,13 +400,8 @@ namespace tracer
             {
                 hideSafeFrame();
             }
-            else
-            {
-                if(!manager.getButtons().Contains(m_safeFrameButton))
-                    manager.addButton(m_safeFrameButton);
-            }
         }
-        
+
         //!
         //! update selectCamera
         //!
