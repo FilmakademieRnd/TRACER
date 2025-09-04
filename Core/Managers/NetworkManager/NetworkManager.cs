@@ -216,6 +216,22 @@ namespace tracer
                 //var hostName = Dns.GetHostName();
                 //var host = Dns.GetHostEntry(hostName);
 
+#if UNITY_IOS || UNITY_ANDROID
+                byte[] mac = createVID();
+                Helpers.Log("Requesting ID for MAC: " + BitConverter.ToString(mac));
+
+                List<byte[]> responses = await SendServerCommand(
+                                   new byte[] { (byte)NetworkManagerModule.DataHubMessageType.ID, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] },
+                                   2f);
+                
+                //fallback if no correct response or 255(ip aready taken)
+                if (responses.Count > 0 && responses[0][0] != 255)
+                {
+                    m_cID = responses[0][0];
+                    Helpers.Log("Got ID from DataHub. vID is: " + m_cID, Helpers.logMsgType.NONE);
+                }
+#else
+
                 foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if ((ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet) && ni.OperationalStatus == OperationalStatus.Up)
@@ -226,13 +242,8 @@ namespace tracer
 
                             if (ipAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                             {
-#if UNITY_IOS || UNITY_ANDROID
-                                byte[] mac = createVID();
-                                Helpers.Log("Requesting ID for IP: " + ipAddress.ToString() + " at MAC: " + BitConverter.ToString(mac));
-#else
                                 byte[] mac = ni.GetPhysicalAddress().GetAddressBytes();
                                 Helpers.Log("Requesting ID for IP: "+ ipAddress.ToString() + " at MAC: " + ni.GetPhysicalAddress().ToString());
-#endif
                                 List<byte[]> responses = await SendServerCommand(
                                     new byte[] { (byte)NetworkManagerModule.DataHubMessageType.ID, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] },
                                     2f);
@@ -249,6 +260,7 @@ namespace tracer
                         }
                     }
                 }
+#endif
             }
             Helpers.Log("Set vID to: " + m_cID);
             
