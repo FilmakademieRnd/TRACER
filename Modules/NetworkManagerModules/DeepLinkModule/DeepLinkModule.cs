@@ -45,13 +45,14 @@ namespace tracer
             core.updateEvent += UpdateEvent;
         }
 
-        private void UpdateEvent(object sendre, EventArgs e)
+        private void UpdateEvent(object sender, EventArgs e)
         {
-            if (!string.IsNullOrEmpty(Application.absoluteURL))
+            string url = Application.absoluteURL;
+            if (!string.IsNullOrEmpty(url))
             {
-                if (Application.absoluteURL.Contains("?"))
+                if (url.Contains("?"))
                 {
-                    string ip = Application.absoluteURL.Split('?')[1];
+                    string ip = url.Split('?')[1];
                     if (CheckIP(ip))
                     {
                         manager.ConnectUsingQrCode(ip);
@@ -59,12 +60,15 @@ namespace tracer
                     }
                 }
 
-                if (Application.absoluteURL.Contains("#"))
+                if (url.Contains("#"))
                 {
-                    string loadScene = Application.absoluteURL.Split('#')[1];
+                    string[] parameters = url.Split('#')[1].Split('+');
+                    string loadScene = parameters[0];
+                    if (parameters.Length == 2)
+                        manager.settings.ipAddress.value = parameters[1];
 
-                        core.getManager<SceneManager>().InvokeQrLoadEvent(loadScene);
-                        core.updateEvent -= UpdateEvent;
+                    core.getManager<SceneManager>().InvokeQrLoadEvent(loadScene);
+                    core.updateEvent -= UpdateEvent;
                 }
             }
         }
