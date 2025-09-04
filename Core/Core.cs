@@ -164,12 +164,12 @@ namespace tracer
         void Awake()
         {
             // enable/disable logging
-/*#if UNITY_EDITOR
+#if UNITY_EDITOR
             UnityEngine.Debug.unityLogger.logEnabled = true;
 #else
             Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
             UnityEngine.Debug.unityLogger.logEnabled = false;
-#endif*/
+#endif
 
             if (!string.IsNullOrEmpty(Application.absoluteURL))
             {
