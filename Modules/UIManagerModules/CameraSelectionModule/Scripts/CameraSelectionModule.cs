@@ -423,7 +423,7 @@ namespace tracer
         //!
         //! Function for updating the aspect ratio of the safe frame based on the currently selected camera.
         //!
-        private void updateSafeFrame(SceneObject so, AbstractParameter parameter)
+        private void updateSafeFrame(object so, AbstractParameter parameter)
         {
             Camera cameraMain = Camera.main;
             SceneObjectCamera soCamera = null;
@@ -490,15 +490,15 @@ namespace tracer
             if (m_sceneManager.sceneCameraList.Count <= 0 || m_cameraIndex >= m_sceneManager.sceneCameraList.Count)
                 return;
         
-            //if (m_oldSOCamera)
-              //  m_oldSOCamera.hasChanged -= updateSafeFrameButtons;
+            if (m_oldSOCamera)
+                m_oldSOCamera.hasChanged -= updateSafeFrame;
             
             Camera mainCamera = Camera.main;
             int targetDisplay = mainCamera.targetDisplay;
             float aspect = mainCamera.aspect;
             SceneObjectCamera soCamera = m_sceneManager.sceneCameraList[m_cameraIndex];
             Camera newCamera = soCamera.GetComponent<Camera>();
-            //soCamera.hasChanged += updateSafeFrameButtons;
+            soCamera.hasChanged += updateSafeFrame;
             Debug.Log(soCamera.name + " Camera linked.");
             m_oldSOCamera = soCamera;
             mainCamera.enabled = false;
