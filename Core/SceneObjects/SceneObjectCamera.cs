@@ -111,7 +111,7 @@ namespace tracer
                 focDist.hasChanged += updateFocalDistance;
                 aperture = new Parameter<float>(2.8f, "aperture", this, true, UIManager.Roles.EXPERT);
                 aperture.hasChanged += updateAperture;
-                sensorSize = new Parameter<Vector2>(_camera.sensorSize, "sensorSize", this, true, UIManager.Roles.EXPERT);
+                sensorSize = new Parameter<Vector2>(_camera.sensorSize, "sensorSize", this);
                 sensorSize.hasChanged += updateSensorSize;
             }
             else
