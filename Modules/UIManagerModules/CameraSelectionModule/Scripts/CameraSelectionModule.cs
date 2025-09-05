@@ -78,7 +78,7 @@ namespace tracer
         //!
         //! Reference to UIManager
         //!
-        UIManager m_uiManager;
+        private UIManager m_uiManager;
         //!
         //! The preloaded prafab of the safe frame overlay game object.
         //!
@@ -100,12 +100,13 @@ namespace tracer
         //!
         private SceneObjectCamera m_oldSOCamera = null;
         //!
-        //! safe frame button
+        //! Safe frame button
         //!
-        MenuButton m_safeFrameButton = null;
-        
-        private MenuButton nextCameraButton;
-        
+        private MenuButton m_safeFrameButton = null;
+        //!
+        //! Next Camera button
+        //!
+        private MenuButton m_nextCameraButton;
         //!
         //! Event emitted when camera operations are in action
         //!
@@ -140,11 +141,11 @@ namespace tracer
 
             m_safeFramePrefab = Resources.Load("Prefabs/SafeFrame") as GameObject;
 
-            nextCameraButton = new MenuButton("", showNextCamera, new List<UIManager.Roles>() { UIManager.Roles.DOP });
-            nextCameraButton.setIcon("Images/button_camera");
-            nextCameraButton.isToggle = true;
+            m_nextCameraButton = new MenuButton("", showNextCamera, new List<UIManager.Roles>() { UIManager.Roles.DOP });
+            m_nextCameraButton.setIcon("Images/button_camera");
+            m_nextCameraButton.isToggle = true;
 
-            m_uiManager.addButton(nextCameraButton);
+            m_uiManager.addButton(m_nextCameraButton);
 
             m_sceneManager.sceneReady += initCameraOnce;
             m_uiManager.selectionChanged += selection;
@@ -409,14 +410,14 @@ namespace tracer
         {
             if (c == InputManager.CameraControl.AR)
             {
-                nextCameraButton.showHighlighted(false);
-                manager.removeButton(nextCameraButton);
+                m_nextCameraButton.showHighlighted(false);
+                manager.removeButton(m_nextCameraButton);
 
             }
             else
             {
-                if(!manager.getButtons().Contains(nextCameraButton))
-                    manager.addButton(nextCameraButton);
+                if(!manager.getButtons().Contains(m_nextCameraButton))
+                    manager.addButton(m_nextCameraButton);
             }
         }
 
@@ -477,6 +478,10 @@ namespace tracer
 
             // copy properties to main camera and set it use display 1 (0)
             copyCamera();
+
+            // deselect everything and selct camamera scene object
+            manager.clearSelectedObject();
+            manager.addSelectedObject(m_sceneManager.sceneCameraList[m_cameraIndex]);
 
             InputManager inputManager = core.getManager<InputManager>();
             if (inputManager.cameraControl == InputManager.CameraControl.ATTITUDE)

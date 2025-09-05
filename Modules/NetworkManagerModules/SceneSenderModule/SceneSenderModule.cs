@@ -116,7 +116,7 @@ namespace tracer
                 sceneSender.SendMultipartMessage(sendMessages);
                 Helpers.Log(package.Key + " send bytes: " + package.Value.Length);
 
-                if (sceneSender.TryReceiveFrameString(TimeSpan.FromSeconds(10), out received))
+                if (sceneSender.TryReceiveFrameString(TimeSpan.FromSeconds(20), out received))
                 {
                     if (received == "1")
                         Debug.Log(package.Key + " stored on server: " + m_ip);

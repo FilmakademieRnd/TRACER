@@ -80,9 +80,9 @@ namespace tracer
                    .End()
                    .Begin(MenuItem.IType.HSPLIT)
                        .Add(loadDemoButton)
-                       //.Add(saveDatahubButton)
-                       //.Add(loadDatahubButton)
-                       //.Add(infoDatahubButton)
+                       .Add(saveDatahubButton)
+                       .Add(loadDatahubButton)
+                       .Add(infoDatahubButton)
                    .End()
              .End();
 

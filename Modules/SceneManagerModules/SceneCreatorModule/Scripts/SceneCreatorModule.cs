@@ -88,8 +88,6 @@ namespace tracer
             base.Dispose();
 
             NetworkManager networkManager = core.getManager<NetworkManager>();
-            SceneReceiverModule sceneReceiverModule = networkManager.getModule<SceneReceiverModule>();
-            SceneStorageModule sceneStorageModule = manager.getModule<SceneStorageModule>();
            
             manager.sceneNew -= CreateScene;
         }
@@ -100,8 +98,6 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             NetworkManager networkManager = core.getManager<NetworkManager>();
-            SceneReceiverModule sceneReceiverModule = networkManager.getModule<SceneReceiverModule>();
-            SceneStorageModule sceneStorageModule = manager.getModule<SceneStorageModule>();
 
             manager.sceneNew += CreateScene;
         }
