@@ -88,11 +88,6 @@ namespace tracer
         public event EventHandler<EventArgs> requestSceneSend;
 
         //!
-        //! Event that is invoket to stop a scene server.
-        //!
-        public event EventHandler<EventArgs> stopSceneSend;
-
-        //!
         //! Event that is invoket when a client has left the network session.
         //!
         public event EventHandler<byte> clientLost;
