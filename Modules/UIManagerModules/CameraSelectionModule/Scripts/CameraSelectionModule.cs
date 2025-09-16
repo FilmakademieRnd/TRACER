@@ -28,11 +28,11 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 27.04.2022
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
-using System.Collections;
 
 namespace tracer
 {
@@ -90,7 +90,15 @@ namespace tracer
         //!
         //! The scaler of the safe frame.
         //!
-        private Transform m_scaler = null;
+        //private Transform m_scaler = null;
+        //!
+        //! The rect transform of the safe frame's parent.
+        //!
+        private RectTransform m_sfParentTransform = null;
+        //!
+        //! The rect transform of the safe frame.
+        //!
+        private RectTransform m_sfTransform = null;        
         //!
         //! The text of the safe frame.
         //!
@@ -102,7 +110,7 @@ namespace tracer
         //!
         //! Safe frame button
         //!
-        private MenuButton m_safeFrameButton = null;
+        //private MenuButton m_safeFrameButton = null;
         //!
         //! Next Camera button
         //!
@@ -150,7 +158,7 @@ namespace tracer
             m_sceneManager.sceneReady += initCameraOnce;
             m_uiManager.selectionChanged += selection;
 
-            m_inputManager.cameraControlChanged += updateSafeFrameButtons;
+            m_inputManager.cameraControlChanged += cameraControlChanged;
             m_inputManager.cameraControlChanged += updateSelectCamera;
         }
 
@@ -166,7 +174,7 @@ namespace tracer
 
             m_sceneManager.sceneReady -= initCameraOnce;
             m_uiManager.selectionChanged -= selection;
-            m_inputManager.cameraControlChanged -= updateSafeFrameButtons;
+            m_inputManager.cameraControlChanged -= cameraControlChanged;
             m_inputManager.cameraControlChanged -= updateSelectCamera;
         }
 
@@ -183,11 +191,11 @@ namespace tracer
                 m_cameraSelectButton = null;
             }
 
-            if (m_safeFrameButton != null)
-            {
-                m_uiManager.removeButton(m_safeFrameButton);
-                m_safeFrameButton = null;
-            }
+            //if (m_safeFrameButton != null)
+            //{
+            //    m_uiManager.removeButton(m_safeFrameButton);
+            //    m_safeFrameButton = null;
+            //}
 
             if (sceneObjects.Count > 0)
             {
@@ -247,9 +255,9 @@ namespace tracer
             else
             {
                 //LOCK
-                m_safeFrameButton = new MenuButton("", toggleSafeFrame, new List<UIManager.Roles>() { UIManager.Roles.DOP });
-                m_safeFrameButton.setIcon("Images/button_safeFrames");
-                m_uiManager.addButton(m_safeFrameButton);
+                //m_safeFrameButton = new MenuButton("", toggleSafeFrame, new List<UIManager.Roles>() { UIManager.Roles.DOP });
+                //m_safeFrameButton.setIcon("Images/button_safeFrames");
+                //m_uiManager.addButton(m_safeFrameButton);
 
                 //Debug.Log("LOOK THROUGH "+m_selectedObject.name);
                 Type selectionType = m_selectedObject.GetType();
@@ -278,6 +286,8 @@ namespace tracer
 
                 core.updateEvent += updateLookThrough;
                 m_lockType = CameraLockageType.lookThrough;
+
+                toggleSafeFrame();
             }
 
             uiCameraOperation?.Invoke(this, IsCamLocked());
@@ -316,7 +326,8 @@ namespace tracer
         {
             if (!m_selectedObject)
                 return;
-            
+
+
             if (IsCamLocked()){    //UNLOCK
                 UnlockCam();
             }else{
@@ -346,9 +357,13 @@ namespace tracer
                 float physicalDeviceScale = Mathf.Sqrt(Screen.width * Screen.width + Screen.height * Screen.height) / Screen.dpi / 12f;
                 scaler.scaleFactor = Screen.dpi * 0.04f * Mathf.Min(Mathf.Max(manager.settings.uiScale.value, 0.4f), 3f) * physicalDeviceScale;
                 m_infoText = m_safeFrame.transform.FindDeepChild("InfoText").GetComponent<TextMeshProUGUI>();
-                m_scaler = m_safeFrame.transform.Find("scaler");
+                m_sfParentTransform = m_safeFrame.transform.GetComponent<RectTransform>(); ;
+                m_sfTransform = m_safeFrame.transform.Find("scaler").GetComponent<RectTransform>();
+
                 if (IsCamLocked())
+                {
                     m_safeFrameUpdateCoroutine = core.StartCoroutine(UpdateSafeFrameRoutine());
+                }
             }
             else
             {
@@ -376,15 +391,16 @@ namespace tracer
                 m_safeFrame = null;
             }
 
-            if (m_safeFrameButton != null)
-            {
-                manager.removeButton(m_safeFrameButton);
-                m_safeFrameButton = null;
-            }
+            //if (m_safeFrameButton != null)
+            //{
+            //    manager.removeButton(m_safeFrameButton);
+            //    m_safeFrameButton = null;
+            //}
         }
 
         private IEnumerator UpdateSafeFrameRoutine()
         {
+            yield return new WaitForEndOfFrame();             // give the canvas time to init
             while (true)
             {
                 updateSafeFrame(m_selectedObject, null);
@@ -395,7 +411,7 @@ namespace tracer
         //!
         //! update safeFrame
         //!
-        private void updateSafeFrameButtons(object sender, InputManager.CameraControl c)
+        private void cameraControlChanged(object sender, InputManager.CameraControl c)
         {
             if (c == InputManager.CameraControl.AR)
             {
@@ -446,11 +462,20 @@ namespace tracer
                 }
 
                 float newAspect = cameraMain.sensorSize.x / cameraMain.sensorSize.y;
-
+                float scale = 0.5f * m_sfParentTransform.rect.width * (1.0f - (1f / cameraMain.aspect * (cameraMain.sensorSize.x / cameraMain.sensorSize.y)));
+                
                 if (newAspect < cameraMain.aspect)
-                    m_scaler.localScale = new Vector3(1f / cameraMain.aspect * (cameraMain.sensorSize.x / cameraMain.sensorSize.y), 1f, 1f);
+                {
+                    //m_scaler.localScale = new Vector3(1f / cameraMain.aspect * (cameraMain.sensorSize.x / cameraMain.sensorSize.y), 1f, 1f);
+                    m_sfTransform.offsetMin = new Vector2(scale, m_sfTransform.offsetMin.y);
+                    m_sfTransform.offsetMax = new Vector2(-scale, m_sfTransform.offsetMax.y);
+                }
                 else
-                    m_scaler.localScale = new Vector3(1f, cameraMain.aspect / (cameraMain.sensorSize.x / cameraMain.sensorSize.y), 1f);
+                {
+                    //m_scaler.localScale = new Vector3(1f, cameraMain.aspect / (cameraMain.sensorSize.x / cameraMain.sensorSize.y), 1f);
+                    m_sfTransform.offsetMin = new Vector2(m_sfTransform.offsetMin.x, -scale);
+                    m_sfTransform.offsetMax = new Vector2(m_sfTransform.offsetMax.x, scale);
+                }
 
                 m_infoText.text = camInfo;
             }
@@ -504,15 +529,12 @@ namespace tracer
             SceneObjectCamera soCamera = m_sceneManager.sceneCameraList[m_cameraIndex];
             Camera newCamera = soCamera.GetComponent<Camera>();
             soCamera.hasChanged += updateSafeFrame;
-            Debug.Log(soCamera.name + " Camera linked.");
             m_oldSOCamera = soCamera;
             mainCamera.enabled = false;
             mainCamera.CopyFrom(newCamera);
             mainCamera.targetDisplay = targetDisplay;
             mainCamera.aspect = aspect;
             mainCamera.enabled = true;
-
-            //updateSafeFrame(soCamera, null);
 
             // announce the UI operation to the input manager
             m_inputManager.updateCameraCommand();
@@ -533,8 +555,6 @@ namespace tracer
             mainCamera.CopyFrom(soCamera.GetComponent<Camera>());
             mainCamera.aspect = aspect;
             mainCamera.enabled = true;
-
-            //updateSafeFrame(soCamera, null);
         }
 
         //!
@@ -576,20 +596,18 @@ namespace tracer
                     //do the same here right now, because the behaviour seems to be set to None from time to time (specifically AR mode did not work well anymore)
                     //newPosition = camTransform.position - objTransform.parent.position;
                     //newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
-                    if (objTransform.parent.name != "Scene")
-                    {
-                        newPosition = objTransform.parent.InverseTransformPoint(camTransform.position);
-                        newRotation = Quaternion.Inverse(objTransform.parent.rotation) * camTransform.rotation;
-                    }
-                    else
-                    {
-                        newPosition = camTransform.position;
-                        newRotation = camTransform.rotation;
-                    }
-                    if (m_selectedObject.position.value != newPosition)
-                        m_selectedObject.position.setValue(newPosition);
-                    if (m_selectedObject.rotation.value != newRotation)
-                        m_selectedObject.rotation.setValue(newRotation);
+                    //if (objTransform.parent.name != "Scene")
+                    //{
+                    //    newPosition = camTransform.parent.InverseTransformPoint(objTransform.position);
+                    //    newRotation = Quaternion.Inverse(camTransform.parent.rotation) * objTransform.rotation;
+                    //}
+                    //else
+                    //{
+                        newPosition = m_selectedObject.transform.position;
+                        newRotation = m_selectedObject.transform.rotation;
+                    //}
+                    camTransform.position = newPosition;
+                    camTransform.rotation = newRotation;
                     break;
                 default:
                     break;

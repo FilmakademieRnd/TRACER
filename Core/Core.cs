@@ -35,6 +35,7 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 using System.Diagnostics;
 using static tracer.AbstractParameter;
+using System.Linq;
 
 namespace tracer
 {
@@ -106,7 +107,11 @@ namespace tracer
         {
             get => m_timesteps;
         }
-
+        private static Parameter<string> s_logParameter;
+        public Parameter<string> logParameter
+        {
+            get => s_logParameter;
+        }
         public string deepLink;
         //!
         //! The global dictionary of parameter objects.
@@ -171,6 +176,9 @@ namespace tracer
             UnityEngine.Debug.unityLogger.logEnabled = false;
 #endif
 
+            Application.logMessageReceived += updateLog;
+            s_logParameter = new Parameter<string>("", "logParameter");
+
             if (!string.IsNullOrEmpty(Application.absoluteURL))
             {
                 deepLink = Application.absoluteURL;
@@ -207,6 +215,15 @@ namespace tracer
 
             awakeEvent?.Invoke(this, new EventArgs());
             lateAwakeEvent?.Invoke(this, new EventArgs());
+        }
+
+        void updateLog(string logString, string stackTrace, LogType type)
+        {
+            // clear log if more then 20 lines
+            if ( s_logParameter.value.Count(c => c.Equals('\n')) > 20 )
+                s_logParameter.value = logString;
+            else
+                s_logParameter.value += '\n' + logString;
         }
 
         //!
@@ -359,7 +376,7 @@ namespace tracer
                 Helpers.Log("Parameter object List in scene ID: " + sceneID.ToString() + " already contains the Parameter Object.", Helpers.logMsgType.WARNING);
         }
 
-        internal void removeParameterObject(ParameterObject parameterObject)
+        public void removeParameterObject(ParameterObject parameterObject)
         {
             byte sceneID = parameterObject._sceneID;
             short poID = parameterObject._id;

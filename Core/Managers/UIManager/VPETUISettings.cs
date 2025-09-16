@@ -33,6 +33,7 @@ namespace tracer
     {
         public TMP_FontAsset defaultFont;
         public int defaultFontSize;
+        public int smallFontSize;
         public Colors colors;
     }
     [System.Serializable]

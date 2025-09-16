@@ -141,5 +141,9 @@ namespace tracer
 
             _core.addParameterObject(this);
         }
+        public List<AbstractParameter> getParametersByRole(UIManager.Roles role)
+        {
+            return parameterList.FindAll(p => p._role >= role);
+        }
     }
 }

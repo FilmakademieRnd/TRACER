@@ -41,9 +41,14 @@ namespace tracer
         //! @param name The parameters _parent ParameterObject.
         //! @param name Flag that determines whether a Parameter will be distributed.
         //!
-        public ListParameter(List<AbstractParameter> parameterList, string name, ParameterObject parent = null, bool distribute = true) : base(0, name, parent, distribute)
+        public ListParameter(List<AbstractParameter> parameterList, string name, ParameterObject parent = null, bool distribute = true, UIManager.Roles role = UIManager.Roles.VIEWER) : base(0, name, parent, distribute, role)
         {
             _parameterList = parameterList;
+            _type = ParameterType.LIST;
+        }
+
+        public ListParameter(string name, ParameterObject parent = null, bool distribute = true, UIManager.Roles role = UIManager.Roles.VIEWER) : base(0, name, parent, distribute, role)
+        {
             _type = ParameterType.LIST;
         }
 
@@ -57,7 +62,7 @@ namespace tracer
         //!
         //! The ListParameters parameter list.
         //!
-        private List<AbstractParameter> _parameterList;
+        protected List<AbstractParameter> _parameterList;
 
         //!
         //! Getter and setter for the parameter list.
@@ -119,6 +124,17 @@ namespace tracer
         public void select(int idx)
         {
             setValue(idx);
+        }
+    }
+    public class ListParameter<T> : ListParameter
+    {
+        public ListParameter(List<Parameter<T>> parameterList, string name, ParameterObject parent = null, bool distribute = true, UIManager.Roles role = UIManager.Roles.VIEWER) : base(name, parent, distribute, role)
+        {
+            _parameterList.AddRange(parameterList);
+        }
+        public T getValue()
+        {
+            return (T)(object)parameterList[value];
         }
     }
 }

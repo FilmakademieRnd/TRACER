@@ -309,7 +309,9 @@ namespace tracer
                 //currentAddSelector.SetActive(false);
             }
 
-            AbstractParameter abstractParam = mainSelection.parameterList[index];
+            // [!!! SEIM was here !!!]
+            //AbstractParameter abstractParam = mainSelection.parameterList[index];
+            AbstractParameter abstractParam = mainSelection.getParametersByRole(manager.activeRole)[index];
             AbstractParameter.ParameterType type = abstractParam.tracerType;
 
             switch (type)

@@ -46,7 +46,7 @@ namespace tracer
         public MenuCreatorModule(string name, Manager manager) : base(name, manager)
         {
         }
-
+        private DynamicParameterObject m_dynPo = null;
         //!
         //! A reference to the previous created menu, null at the beginning.
         //!
@@ -71,6 +71,10 @@ namespace tracer
         //! Prefab for the Unity text object, used as UI element for an string (read only) parameter.
         //!
         private GameObject m_text;
+        //!
+        //! Prefab for the Unity text object, used as UI element for a textbox (read only).
+        //!
+        private GameObject m_textBox;
         //!
         //! Prefab for the Unity input field object, used as UI element for an string parameter.
         //!
@@ -106,6 +110,7 @@ namespace tracer
             m_button = Resources.Load("Prefabs/MenuButton") as GameObject;
             m_toggle = Resources.Load("Prefabs/MenuToggle") as GameObject;
             m_text = Resources.Load("Prefabs/MenuText") as GameObject;
+            m_textBox = Resources.Load("Prefabs/MenuTextBox") as GameObject;
             m_inputField = Resources.Load("Prefabs/MenuInputField") as GameObject;
             m_numberInputField = Resources.Load("Prefabs/MenuNumberInputField") as GameObject;
             m_dropdown = Resources.Load("Prefabs/MenuDropdown") as GameObject;
@@ -152,6 +157,7 @@ namespace tracer
                 menuCanvas.GetComponent<Canvas>().sortingOrder = 15;
                 m_uiElements.Add(menuCanvas);
                 GameObject rootPanel = menuCanvas.transform.Find("Panel").gameObject;
+                m_dynPo = DynamicParameterObject.Attach(rootPanel);
                 //Image imageComponent = menuCanvas.GetComponentInChildren<Image>();
                 Image imageComponent = menuCanvas.transform.Find("Panel_Menu").GetComponent<Image>();
                 imageComponent.color = manager.uiAppearanceSettings.colors.MenuTitleBG;
@@ -249,6 +255,17 @@ namespace tracer
                         textComponent.fontStyle = FontStyles.Bold;
                         textComponent.alignment = TextAlignmentOptions.Midline;
                         textComponent.enableWordWrapping = true;
+                    }
+                    break;
+                case MenuItem.IType.TEXTBOX:
+                    {
+                        newObjects.Add(GameObject.Instantiate(m_textBox, parentObject.transform));
+                        TextMeshProUGUI textComponent = newObjects[0].GetComponentInChildren<TextMeshProUGUI>();
+                        textComponent.text = ((Parameter<string>)item.Parameter).value;
+                        //textComponent.color = manager.uiAppearanceSettings.colors.ElementSelection_Highlight;
+                        textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                        textComponent.fontSize = manager.uiAppearanceSettings.smallFontSize;
+                        textComponent.fontStyle = FontStyles.Normal;
                     }
                     break;
                 case MenuItem.IType.PARAMETER:
@@ -548,7 +565,6 @@ namespace tracer
                     break;
             }
 
-
             if (item.Parameter != null)
             {
                 ParameterObject parameterObject = item.Parameter._parent;
@@ -560,6 +576,11 @@ namespace tracer
                         m_parameterObjects.Add(parameterObject);
                         m_parameterMapping.Add(item.Parameter, newObjects);
                     }
+                }
+                else
+                {
+                    m_dynPo.AddParameter(item.Parameter);
+                    m_parameterMapping.Add(item.Parameter, newObjects);
                 }
             }
 
@@ -666,8 +687,16 @@ namespace tracer
                         break;
                     case AbstractParameter.ParameterType.STRING:
                         {
-                            TMP_InputField inputField = gameObjects[0].GetComponent<TMP_InputField>();
-                            inputField.text = ((Parameter<string>)parameter).value;
+                            TextMeshProUGUI textComponent = gameObjects[0].GetComponentInChildren<TextMeshProUGUI>();
+                            if (textComponent)
+                            {
+                                textComponent.text = ((Parameter<string>) parameter).value;
+                            }
+                            else
+                            {
+                                TMP_InputField inputField = gameObjects[0].GetComponent<TMP_InputField>();
+                                inputField.text = ((Parameter<string>)parameter).value;
+                            }
                         }
                         break;
                     case AbstractParameter.ParameterType.LIST:
@@ -699,13 +728,19 @@ namespace tracer
                 parameterObject.hasChanged -= updateItem;
 
             m_parameterObjects.Clear();
-
             m_parameterMapping.Clear();
 
             foreach (GameObject uiElement in m_uiElements)
                 UnityEngine.Object.DestroyImmediate(uiElement);
             
             m_uiElements.Clear();
+
+            if (m_dynPo != null)
+            {
+                core.removeParameterObject(m_dynPo);
+                UnityEngine.Object.DestroyImmediate(m_dynPo);
+                m_dynPo = null;
+            }
         }
     }
 }

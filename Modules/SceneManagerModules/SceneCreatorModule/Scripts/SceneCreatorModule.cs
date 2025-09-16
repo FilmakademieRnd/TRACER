@@ -318,8 +318,6 @@ namespace tracer
             uiManager.addMenu(customMenu);
         }
 
-        private void test() { }
-
         //!
         //! Function that creates the textures in the Unity scene.
         //!

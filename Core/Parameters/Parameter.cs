@@ -77,11 +77,11 @@ namespace tracer
         //!
         //! A reference to the parameters _parent object.
         //!
-        public ParameterObject _parent { get; protected set; }
+        public ParameterObject _parent { get; internal set; }
         //!
         //! The unique _id of this parameter.
         //!
-        public short _id { get; protected set; }
+        public short _id { get; internal set; }
         //!
         //! Flag that determines whether a Parameter will be distributed.
         //!

@@ -471,6 +471,13 @@ namespace tracer
                     createMenuTreefromSettings(manager.GetType().ToString().Split('.')[1], ref settingsMenu, manager._settings);
                 }
             }
+            
+            settingsMenu = settingsMenu.Add(MenuItem.IType.SPACE);
+            settingsMenu.Add("Log", true);
+            settingsMenu = settingsMenu.Add(MenuItem.IType.SPACE);
+            settingsMenu.Begin(MenuItem.IType.HSPLIT);
+            settingsMenu.Add(MenuItem.IType.TEXTBOX, core.logParameter);
+            settingsMenu.End();
 
             // load about menu prefab and add about button
             m_aboutMenu = Resources.Load("AboutMenu/AboutMenu") as GameObject;
@@ -479,6 +486,7 @@ namespace tracer
             settingsMenu.Begin(MenuItem.IType.HSPLIT)
                 .Add(aboutButton);
             settingsMenu.End();
+
 
             settingsMenu.End();  // <<< end VSPLIT
 

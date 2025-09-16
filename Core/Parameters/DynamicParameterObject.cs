@@ -53,6 +53,15 @@ public class DynamicParameterObject : ParameterObject
         return obj;
     }
 
+    public void AddParameter(AbstractParameter parameter, bool subscribe = false)
+    {
+        parameter._id = (short) parameterList.Count;
+        parameterList.Add(parameter);
+
+        if (subscribe) 
+            SubscribeToParameterChange(parameter);
+    }
+
     //!
     //! Function to subscribe to the HasChanged Parameter Event
     ///

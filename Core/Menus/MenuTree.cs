@@ -138,6 +138,7 @@ namespace tracer
             else
                 return Add(MenuItem.IType.TEXT, new Parameter<string>(text, "InfoText" + Items.Count.ToString()));
         }
+
         //!
         //! Adds a new parameter item into the current branch.
         //! 
@@ -154,7 +155,7 @@ namespace tracer
         //! @param type The type of the new item.
         //! @param param The parameter stored in the menue item.
         //! 
-        private MenuTree Add(MenuItem.IType type, AbstractParameter param = null, byte[] iconData = null)
+        public MenuTree Add(MenuItem.IType type, AbstractParameter param = null, byte[] iconData = null)
         {
             m_stack.Peek().Add(type, param, iconData);
             return this;
@@ -180,7 +181,7 @@ namespace tracer
         //!
         public enum IType
         {
-            HSPLIT, VSPLIT, SPACE, TEXT, TEXTSECTION, PARAMETER
+            HSPLIT, VSPLIT, SPACE, TEXT, TEXTSECTION, TEXTBOX, PARAMETER
         }
         //!
         //! The type of the menu item.

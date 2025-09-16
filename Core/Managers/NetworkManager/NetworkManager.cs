@@ -354,7 +354,7 @@ namespace tracer
         //! 
         //! @param command The command as a byte array to be send to DataHub.
         //! @return 
-        public async Task<List<byte[]>> SendServerCommand(byte[] command, float timeout = 5)
+        public async Task<List<byte[]>> SendServerCommand(byte[] command, float timeout = 3)
         {
             // enqueue new TCS to for handling message response tasks
             m_commandBufferWritten = new TaskCompletionSource<List<byte[]>>(TaskContinuationOptions.RunContinuationsAsynchronously);

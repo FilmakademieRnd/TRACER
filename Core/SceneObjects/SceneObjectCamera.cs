@@ -29,6 +29,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 01.03.2022
 
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace tracer
 {
@@ -73,6 +74,11 @@ namespace tracer
         public Parameter<Vector2> sensorSize;
 
         //!
+        //! aperture
+        //!
+        public ListParameter sensorSizePresets;
+
+        //!
         //! reference to camera component
         //!
         private Camera _camera;
@@ -113,6 +119,14 @@ namespace tracer
                 aperture.hasChanged += updateAperture;
                 sensorSize = new Parameter<Vector2>(_camera.sensorSize, "sensorSize", this);
                 sensorSize.hasChanged += updateSensorSize;
+
+                List<AbstractParameter> sensorList = new List<AbstractParameter> { 
+                    new Parameter<Vector2>(new Vector2(1, 1), "Alexa", this, true, UIManager.Roles.EXPERT), 
+                    new Parameter<Vector2>(new Vector2(2, 2), "Venice", this, true, UIManager.Roles.EXPERT), 
+                    new Parameter<Vector2>(new Vector2(3, 3), "BlackMagic", this, true, UIManager.Roles.EXPERT) };
+
+                sensorSizePresets = new ListParameter(sensorList, "SensorSizes", this, true, UIManager.Roles.EXPERT);
+                sensorSizePresets.hasChanged += updateSensorSizeSelection;
             }
             else
                 Helpers.Log("no camera component found!");
@@ -217,6 +231,13 @@ namespace tracer
         private void updateSensorSize(object sender, Vector2 a)
         {
             _camera.sensorSize = a;
+            emitHasChanged((AbstractParameter)sender);
+        }
+
+        private void updateSensorSizeSelection(object sender, int s)
+        {
+            sensorSizePresets.select(s);
+            sensorSize.value = ((Parameter<Vector2>)sensorSizePresets.parameterList[s]).value;
             emitHasChanged((AbstractParameter)sender);
         }
 
