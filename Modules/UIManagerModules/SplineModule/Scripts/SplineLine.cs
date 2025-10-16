@@ -201,7 +201,7 @@ public class SplineLine : UIManagerModule
     {
         if (_splineGameObject!= null)
         {
-            Object.DestroyImmediate(_splineGameObject);
+            Object.Destroy(_splineGameObject);
         }
     }
 

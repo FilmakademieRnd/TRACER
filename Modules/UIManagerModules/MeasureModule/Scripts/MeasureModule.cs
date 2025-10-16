@@ -669,7 +669,7 @@ namespace tracer{
             //Duplicate current selected waypoint
             GameObject newWaypoint = GameObject.Instantiate(sceneObjectToPlace.gameObject);
             //remove old sceneobject comp
-            Component.DestroyImmediate(newWaypoint.GetComponent<SceneObject>());
+            Component.Destroy(newWaypoint.GetComponent<SceneObject>());
             core.getManager<SceneManager>().simpleSceneObjectList.Add((SceneObject)SceneObjectMeasurement.Attach(newWaypoint));
             newWaypoint.transform.parent = sceneObjectToPlace.transform.parent;
             //insert after selected waypoint

@@ -226,30 +226,38 @@ namespace tracer
                     {
                         case "header":
                             sceneDataHandler.headerByteData = sceneReceiver.ReceiveFrameBytes();
+                            Debug.Log(request + " received with " + sceneDataHandler.headerByteData.Length + " bytes.");
                             m_loadProgress += 10;
                             break;
                         case "nodes":
                             sceneDataHandler.nodesByteData = sceneReceiver.ReceiveFrameBytes();
+                            Debug.Log(request + " received with " + sceneDataHandler.nodesByteDataRef.Length + " bytes.");
                             m_loadProgress += 20;
                             break;
                         case "parameterobjects":
                             sceneDataHandler.parameterObjectsByteData = sceneReceiver.ReceiveFrameBytes();
+                            Debug.Log(request + " received with " + sceneDataHandler.parameterObjectsByteDataRef.Length + " bytes.");
                             m_loadProgress += 10;
                             break;
                         case "objects":
                             sceneDataHandler.objectsByteData = sceneReceiver.ReceiveFrameBytes();
+                            Debug.Log(request + " received with " + sceneDataHandler.objectsByteDataRef.Length + " bytes.");
                             m_loadProgress += 20;
                             break;
                         case "characters":
                             sceneDataHandler.characterByteData = sceneReceiver.ReceiveFrameBytes();
+                            Debug.Log(request + " received with " + sceneDataHandler.characterByteDataRef.Length + " bytes.");
                             m_loadProgress += 10;
                             break;
                         case "textures":
                             sceneDataHandler.texturesByteData = sceneReceiver.ReceiveFrameBytes();
+                            Debug.Log(request + " received with " + sceneDataHandler.texturesByteDataRef.Length + " bytes.");
                             m_loadProgress += 20;
                             break;
                         case "materials":
                             sceneDataHandler.materialsByteData = sceneReceiver.ReceiveFrameBytes();
+                            Debug.Log(request + " received with " + sceneDataHandler.materialsByteDataRef.Length + " bytes.");
+
                             m_loadProgress += 10;
                             break;
                     }

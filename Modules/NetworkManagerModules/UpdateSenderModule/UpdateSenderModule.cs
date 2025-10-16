@@ -408,9 +408,10 @@ namespace tracer
             Span<byte> msgSpan = new Span<byte>(message);
 
             // header
-            msgSpan[0] = manager.cID;                       // ClientID
-            msgSpan[1] = core.time;                         // Time
-            msgSpan[2] = (byte)MessageType.PARAMETERUPDATE; // MessageType
+                                                            // name, (size in bytes)
+            msgSpan[0] = manager.cID;                       // ClientID (1)
+            msgSpan[1] = core.time;                         // Time (1)
+            msgSpan[2] = (byte)MessageType.PARAMETERUPDATE; // MessageType (1)
 
             //list of parameters
             int start = 3;
@@ -420,13 +421,12 @@ namespace tracer
                 int length = 10 + parameter.dataSize();
                 Span<byte> newSpan = msgSpan.Slice(start, length);
 
-
-                newSpan[0] = parameter._parent._sceneID;                                // SceneID
-                BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id); // SceneObjectID
-                BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);         // ParameterID
-                newSpan[5] = (byte)parameter.tracerType;                                // ParameterType
-                BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);        // Parameter message length
-                parameter.Serialize(newSpan.Slice(10));                                 // Parameter data
+                newSpan[0] = parameter._parent._sceneID;                                // SceneID, (1)
+                BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id); // SceneObjectID (2)
+                BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);         // ParameterID (2)
+                newSpan[5] = (byte)parameter.tracerType;                                // ParameterType (1)
+                BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);        // Parameter message length (4)
+                parameter.Serialize(newSpan.Slice(10));                                 // Parameter data (parameter._datasize)
 
                 start += length;
             }

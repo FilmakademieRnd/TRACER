@@ -192,7 +192,7 @@ namespace tracer
                     sceneObject.getParameter<Color>("color").hasChanged -= updateIconColor;
                 }
                 
-                UnityEngine.Object.DestroyImmediate(sceneObject._icon);
+                UnityEngine.Object.Destroy(sceneObject._icon);
             }
         }
     }

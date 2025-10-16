@@ -62,7 +62,7 @@ public class SceneRaycastHelper{
             if(debug)
                 Debug.Log("<color=red>NO HIT</color>");
             foreach(SphereCollider c in tmpColliders)
-                Component.DestroyImmediate(c);
+                Component.Destroy(c);
             return false;
         }
 
@@ -80,7 +80,7 @@ public class SceneRaycastHelper{
         
         //remove all tmp sphere collider
         foreach(SphereCollider c in tmpColliders)
-            Component.DestroyImmediate(c);
+            Component.Destroy(c);
 
         //another raycast, place object on point
         if(Physics.Raycast(ray, out finalHit, 100, layerMaskNoUI)){

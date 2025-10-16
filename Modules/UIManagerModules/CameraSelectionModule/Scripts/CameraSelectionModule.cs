@@ -369,7 +369,7 @@ namespace tracer
             {
                 if (m_safeFrameUpdateCoroutine != null)
                     core.StopCoroutine(m_safeFrameUpdateCoroutine);
-                GameObject.DestroyImmediate(m_safeFrame);
+                GameObject.Destroy(m_safeFrame);
                 m_safeFrame = null;
             }
         }
@@ -387,7 +387,7 @@ namespace tracer
 
             if (m_safeFrame != null)
             {
-                GameObject.DestroyImmediate(m_safeFrame);
+                GameObject.Destroy(m_safeFrame);
                 m_safeFrame = null;
             }
 

@@ -52,7 +52,7 @@ namespace tracer
         //!
         //! The unique ID of this parameter object.
         //!
-        public byte _sceneID { get; protected set; } = 254;
+        public byte _sceneID { get; protected set; } = 255;
         //!
         //! The name of this parameter object.
         //!
@@ -75,7 +75,7 @@ namespace tracer
         //!
         //! List storing all parameters of this SceneObject.
         //!
-        private List<AbstractParameter> _parameterList;
+        protected List<AbstractParameter> _parameterList;
         //!
         //! Getter for parameter list
         //!
@@ -110,7 +110,7 @@ namespace tracer
         //! @param gameObject The gameObject the new ParameterObject will be attached to.
         //! @sceneID The scene ID for the new ParameterObject.
         //!
-        public static ParameterObject Attach(GameObject gameObject, byte sceneID = 254)
+        public static ParameterObject Attach(GameObject gameObject, byte sceneID = 255)
         {
             ParameterObject obj = gameObject.AddComponent<ParameterObject>();
             obj.Init(sceneID);
@@ -134,9 +134,10 @@ namespace tracer
             if (_core == null)
                 _core = GameObject.FindObjectOfType<Core>();
 
-            _sceneID = 254;
+            _sceneID = 255;
 
             _id = s_id++;
+            Debug.Log("Create parameter object " + name + " ID:" + _id + " SID:" + _sceneID);
             _parameterList = new List<AbstractParameter>();
 
             _core.addParameterObject(this);

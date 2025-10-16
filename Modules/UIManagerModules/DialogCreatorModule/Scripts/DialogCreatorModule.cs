@@ -175,7 +175,7 @@ namespace tracer
                 m_oldDialog.captionChanged -= changeDialogCaption;
             }
          
-            UnityEngine.Object.DestroyImmediate(m_canvas);
+            UnityEngine.Object.Destroy(m_canvas);
         }
     }
 }

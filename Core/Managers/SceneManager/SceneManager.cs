@@ -97,7 +97,27 @@ namespace tracer
             }
             return returnvalue;
         }
-        
+
+        //!
+        //! Function that returns a list containing all objects of a specific scene.
+        //!
+        //! @param The scne ID to define the scene to gather all scene objects from.
+        //!
+        //! @return The list containing all scene objects.
+        //!
+        public List<SceneObject> getAllSceneObjectsFromScene(byte sceneID)
+        {
+            List<SceneObject> returnvalue = new List<SceneObject>();
+
+            foreach (ParameterObject parameterObject in core.parameterObjectList[sceneID].Values)
+            {
+                SceneObject sceneObject = parameterObject as SceneObject;
+                if (sceneObject)
+                    returnvalue.Add((SceneObject)parameterObject);
+            }
+            return returnvalue;
+        }
+
         //!
         //! Function that returns a list containing all Dynamic Parameter Objects.
         //!
@@ -338,19 +358,46 @@ namespace tracer
             // remove all Unity GameObjects
             if (m_scnRoot != null)
             {
-                foreach (Transform child in m_scnRoot.transform)
-                {
-                    GameObject.DestroyImmediate(child.gameObject);
-                }
+                for (int i=0; i<m_scnRoot.transform.childCount; i++)
+                    GameObject.Destroy(m_scnRoot.transform.GetChild(i).gameObject);
             }
 
             // remove all Tracer SceneObjects
-            foreach (SceneObject sceneObject in getAllSceneObjects())
+            List<SceneObject> sceneObjectList = getAllSceneObjects();
+            foreach (SceneObject sceneObject in sceneObjectList)
                 core.removeParameterObject(sceneObject);
 
             m_sceneCameraList.Clear();
             m_sceneLightList.Clear();
             m_simpleSceneObjectList.Clear();
+
+            sceneReset?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void ResetScene(byte sceneID)
+        {
+            // remove all Unity GameObjects
+            if (m_scnRoot != null)
+            {
+                for (int i = 0; i < m_scnRoot.transform.childCount; i++)
+                    GameObject.Destroy(m_scnRoot.transform.GetChild(i).gameObject);
+            }
+
+            // remove all Tracer SceneObjects
+            List<SceneObject> sceneObjectList = getAllSceneObjectsFromScene(sceneID);
+            foreach (SceneObject sceneObject in sceneObjectList)
+            {
+                GameObject go = sceneObject.gameObject;
+                core.removeParameterObject(sceneObject);
+                m_simpleSceneObjectList.Remove(sceneObject);
+                if (sceneObject.GetType() == typeof(SceneObjectCamera))
+                    m_sceneCameraList.Remove((SceneObjectCamera) sceneObject);
+                else if (sceneObject.GetType() == typeof(SceneObjectLight))
+                    m_sceneLightList.Remove((SceneObjectLight) sceneObject);
+                if (go != null)
+                    GameObject.Destroy(go);
+                
+            }
 
             sceneReset?.Invoke(this, EventArgs.Empty);
         }

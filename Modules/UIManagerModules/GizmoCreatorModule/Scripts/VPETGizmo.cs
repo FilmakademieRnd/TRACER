@@ -82,8 +82,8 @@ namespace tracer
         public void dispose()
         {
             foreach (GameObject gizmoElement in m_GizmoElements)
-                Object.DestroyImmediate(gizmoElement);
-            Object.DestroyImmediate(m_root);
+                Object.Destroy(gizmoElement);
+            Object.Destroy(m_root);
             m_GizmoElements.Clear();
         }
 

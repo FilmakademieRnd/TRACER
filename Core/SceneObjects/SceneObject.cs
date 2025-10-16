@@ -28,6 +28,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 01.03.2022
 
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
@@ -40,6 +41,10 @@ namespace tracer
     [DisallowMultipleComponent]
     public class SceneObject : ParameterObject
     {
+        //!
+        //! The global _id counter for generating unique parameterObject IDs.
+        //!
+        private static short s_oid = 1;
         //!
         //! Is the sceneObject locked?
         //!
@@ -115,7 +120,18 @@ namespace tracer
         //!
         public override void Awake()
         {
-            base.Awake();
+            //base.Awake();
+
+            if (_core == null)
+                _core = GameObject.FindObjectOfType<Core>();
+
+            _sceneID = 255;
+
+            _id = s_oid++;
+            Debug.Log("Create parameter object " + name + " ID:" + _id + " SID:" + _sceneID);
+            _parameterList = new List<AbstractParameter>();
+
+            _core.addParameterObject(this);
 
             m_uiManager = _core.getManager<UIManager>();
 

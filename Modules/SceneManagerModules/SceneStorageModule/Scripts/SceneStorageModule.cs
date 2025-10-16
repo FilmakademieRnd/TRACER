@@ -131,12 +131,15 @@ namespace tracer
             MenuTree serverSceneMenu = new MenuTree();
             serverSceneMenu.Begin(MenuItem.IType.VSPLIT);
 
+            int infoNBR = 0;
             for (int i = 0; i < responses.Count - 1; i += 2)
             {
                 serverSceneMenu.Begin(MenuItem.IType.HSPLIT);
 
                 string response = Encoding.UTF8.GetString(responses[i]);
-                serverSceneMenu.Add(new Parameter<Action>(DataHubLoadScene, response, null, false), responses[i+1]);
+                RPCParameter<int> selectInfoParameter = new RPCParameter<int>(infoNBR++, response, null, false);
+                selectInfoParameter.setCall(DataHubLoadScene);
+                serverSceneMenu.Add(selectInfoParameter, responses[i+1]);
                 Helpers.Log(response);
 
                 serverSceneMenu.End();
@@ -183,7 +186,7 @@ namespace tracer
         {
             NetworkManager networkManager = core.getManager<NetworkManager>();
 
-            await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.SENDSCENE, 1 });
+            await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.SENDSCENE, 0 });
             networkManager.RequestSceneReceive();
         }
 

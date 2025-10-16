@@ -47,6 +47,7 @@ namespace tracer
 
         private void UpdateEvent(object sender, EventArgs e)
         {
+            //string url = "vpetapp://Scene#https://dl.animationsinstitut.de/DigitalLocations/Babelsberg_v1+193.196.129.50";
             string url = Application.absoluteURL;
             if (!string.IsNullOrEmpty(url))
             {

@@ -694,7 +694,7 @@ namespace tracer
             }
             else
             {
-                Object.DestroyImmediate(_controllerCanvas);
+                Object.Destroy(_controllerCanvas);
                 _isCrosshairOn = false;
             }
         }
@@ -706,7 +706,7 @@ namespace tracer
         {
             if (_isCrosshairOn)
             {
-                Object.DestroyImmediate(_controllerCanvas);
+                Object.Destroy(_controllerCanvas);
                 _isCrosshairOn = false;
             }
         }
@@ -875,7 +875,7 @@ namespace tracer
 
                 if (_controllerCanvas)
                 {
-                    Object.DestroyImmediate(_controllerCanvas);
+                    Object.Destroy(_controllerCanvas);
                 }
                 GetCurrentSelector();
             }

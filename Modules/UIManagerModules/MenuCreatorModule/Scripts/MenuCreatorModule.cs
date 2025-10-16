@@ -64,6 +64,10 @@ namespace tracer
         //!
         private GameObject m_button;
         //!
+        //! Prefab for the Unity button object, used as UI element for an action parameter.
+        //!
+        private GameObject m_buttonList;
+        //!
         //! Prefab for the Unity toggle object, used as UI element for an bool parameter.
         //!
         private GameObject m_toggle;
@@ -108,6 +112,7 @@ namespace tracer
             m_canvas = Resources.Load("Prefabs/MenuCanvas") as GameObject;
             m_panel = Resources.Load("Prefabs/MenuPanel") as GameObject;
             m_button = Resources.Load("Prefabs/MenuButton") as GameObject;
+            m_buttonList = Resources.Load("Prefabs/MenuButtonList") as GameObject;
             m_toggle = Resources.Load("Prefabs/MenuToggle") as GameObject;
             m_text = Resources.Load("Prefabs/MenuText") as GameObject;
             m_textBox = Resources.Load("Prefabs/MenuTextBox") as GameObject;
@@ -274,30 +279,19 @@ namespace tracer
                         case AbstractParameter.ParameterType.ACTION:
                             {
                                 newObjects.Add(GameObject.Instantiate(m_button, parentObject.transform));
-                                Button button = newObjects[0].GetComponent<Button>();
+                                Button button = newObjects[0].GetComponentInChildren<Button>();
                                 ColorBlock buttonColors = button.colors;
                                 buttonColors.pressedColor = manager.uiAppearanceSettings.colors.ElementSelection_Highlight;
                                 button.colors = buttonColors;
                                 Action parameterAction = ((Parameter<Action>)item.Parameter).value;
                                 button.onClick.AddListener(() => parameterAction());
                                 button.onClick.AddListener(delegate { ((Parameter<Action>)item.Parameter).InvokeHasChanged(); });
+                                button.GetComponent<Image>().color = manager.uiAppearanceSettings.colors.ButtonBG;
                                 TextMeshProUGUI textComponent = newObjects[0].GetComponentInChildren<TextMeshProUGUI>();
                                 textComponent.text = item.Parameter.name;
                                 textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
                                 textComponent.font = manager.uiAppearanceSettings.defaultFont;
                                 textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
-                                Image imgButton = button.GetComponent<Image>();
-                                if (item.iconData != null)
-                                {
-                                    Texture2D tex = new Texture2D(2,2);
-                                    ImageConversion.LoadImage(tex, item.iconData);
-                                    imgButton.sprite = Sprite.Create(tex, new Rect(0.0f, 0.0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-                                    imgButton.color = Color.white;
-                                    RectTransform buttonTransform = button.GetComponent<RectTransform>();
-                                    buttonTransform.sizeDelta = new Vector2(buttonTransform.rect.height, buttonTransform.rect.height);
-                                }
-                                else
-                                    imgButton.color = manager.uiAppearanceSettings.colors.ButtonBG;
                             }
                             break;
                         case AbstractParameter.ParameterType.BOOL:
@@ -321,16 +315,48 @@ namespace tracer
                             break;
                         case AbstractParameter.ParameterType.INT:
                             {
-                                newObjects.Add(GameObject.Instantiate(m_numberInputField, parentObject.transform));
-                                TMP_InputField numberInputField = newObjects[0].GetComponent<TMP_InputField>();
-                                numberInputField.text = ((Parameter<int>)item.Parameter).value.ToString();
-                                numberInputField.onEndEdit.AddListener(delegate { ((Parameter<int>)item.Parameter).setValue(Mathf.RoundToInt(float.Parse(numberInputField.text))); numberInputField.text = ((Parameter<int>)item.Parameter).value.ToString(); });
-                                Image imgButton = numberInputField.GetComponent<Image>();
-                                imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
-                                numberInputField.textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
-                                numberInputField.textComponent.font = manager.uiAppearanceSettings.defaultFont;
-                                numberInputField.textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
-                                numberInputField.caretPosition = numberInputField.text.Length;
+                                if (item.Parameter.GetType() == typeof(RPCParameter<int>))
+                                {
+                                    newObjects.Add(GameObject.Instantiate(m_buttonList, parentObject.transform));
+                                    Button button = newObjects[0].GetComponentInChildren<Button>();
+                                    ColorBlock buttonColors = button.colors;
+                                    buttonColors.pressedColor = manager.uiAppearanceSettings.colors.ElementSelection_Highlight;
+                                    button.colors = buttonColors;
+                                    RPCParameter<int> buttonParameter = (RPCParameter<int>)item.Parameter;
+                                    button.onClick.AddListener(() => buttonParameter.getCall()(buttonParameter.value));
+                                    button.onClick.AddListener(delegate { buttonParameter.InvokeHasChanged(); });
+                                    TextMeshProUGUI textComponent = newObjects[0].GetComponentInChildren<TextMeshProUGUI>();
+                                    textComponent.text = item.Parameter.name;
+                                    textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                                    textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                                    textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                    HorizontalLayoutGroup hlGroup = parentObject.transform.GetComponent<HorizontalLayoutGroup>();
+                                    hlGroup.childForceExpandWidth = true;
+                                    hlGroup.childControlWidth = true;
+
+                                    if (item.iconData != null)
+                                    {
+                                        Image imgButton = button.transform.GetChild(0).GetComponent<Image>();
+                                        Texture2D tex = new Texture2D(2, 2);
+                                        ImageConversion.LoadImage(tex, item.iconData);
+                                        imgButton.sprite = Sprite.Create(tex, new Rect(0.0f, 0.0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                                        RectTransform buttonTransform = button.GetComponent<RectTransform>();
+                                        buttonTransform.sizeDelta = new Vector2(buttonTransform.rect.height, buttonTransform.rect.height);
+                                    }
+                                }
+                                else
+                                {
+                                    newObjects.Add(GameObject.Instantiate(m_numberInputField, parentObject.transform));
+                                    TMP_InputField numberInputField = newObjects[0].GetComponent<TMP_InputField>();
+                                    numberInputField.text = ((Parameter<int>)item.Parameter).value.ToString();
+                                    numberInputField.onEndEdit.AddListener(delegate { ((Parameter<int>)item.Parameter).setValue(Mathf.RoundToInt(float.Parse(numberInputField.text))); numberInputField.text = ((Parameter<int>)item.Parameter).value.ToString(); });
+                                    Image imgButton = numberInputField.GetComponent<Image>();
+                                    imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
+                                    numberInputField.textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                                    numberInputField.textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                                    numberInputField.textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                    numberInputField.caretPosition = numberInputField.text.Length;
+                                }
                             }
                             break;
                         case AbstractParameter.ParameterType.FLOAT:
@@ -730,17 +756,14 @@ namespace tracer
             m_parameterObjects.Clear();
             m_parameterMapping.Clear();
 
+            if (m_dynPo != null)
+                core.removeParameterObject(m_dynPo);
+         
             foreach (GameObject uiElement in m_uiElements)
-                UnityEngine.Object.DestroyImmediate(uiElement);
+                UnityEngine.Object.Destroy(uiElement);
             
             m_uiElements.Clear();
 
-            if (m_dynPo != null)
-            {
-                core.removeParameterObject(m_dynPo);
-                UnityEngine.Object.DestroyImmediate(m_dynPo);
-                m_dynPo = null;
-            }
         }
     }
 }

@@ -51,6 +51,16 @@ namespace tracer
         }
 
         //!
+        //! Function to return the action to be executed.
+        //! 
+        //! @return action The action to be executed.
+        //!
+        public Action<T> getCall()
+        {
+            return m_action;
+        }
+
+        //!
         //! Function for deserializing parameter _data.
         //! 
         //! @param _data The byte _data to be deserialized and copyed to the parameters value.

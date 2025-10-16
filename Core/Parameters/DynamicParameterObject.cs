@@ -62,6 +62,14 @@ public class DynamicParameterObject : ParameterObject
             SubscribeToParameterChange(parameter);
     }
 
+    public void RemoveParameters()
+    {
+        foreach (AbstractParameter parameter in parameterList)
+            UnsubscribeFromParameterChange(parameter);
+
+        parameterList.Clear();
+    }
+
     //!
     //! Function to subscribe to the HasChanged Parameter Event
     ///
@@ -79,8 +87,26 @@ public class DynamicParameterObject : ParameterObject
             eventType.AddEventHandler(parameter, handler);
         }
     }
-    
-    
+
+    //!
+    //! Function to unsubscribe to the HasChanged Parameter Event
+    ///
+    /// @param parameter The parameter whose HasChanged event will be unsubscribed
+    ///
+    public void UnsubscribeFromParameterChange(AbstractParameter parameter)
+    {
+        var parameterType = parameter.GetType();
+        var eventType = parameterType.GetEvent("hasChanged");
+
+        if (eventType != null && parameterType.GetGenericArguments().Length > 0)
+        {
+            var handlerType = eventType.EventHandlerType;
+            var handler = CreateHandler(parameter, handlerType);
+            eventType.RemoveEventHandler(parameter, handler);
+        }
+    }
+
+
     ///
     /// Creates a delegate for handling the HasChanged event
     ///

@@ -266,8 +266,8 @@ namespace tracer
         //!
         private void clearUI()
         {
-            GameObject.DestroyImmediate(currentManipulator);
-            GameObject.DestroyImmediate(currentAddSelector);
+            GameObject.Destroy(currentManipulator);
+            GameObject.Destroy(currentAddSelector);
             if(manipulatorPanel)
                 manipulatorPanel.gameObject.SetActive(true);
             if (undoRedoPanel)
@@ -275,7 +275,7 @@ namespace tracer
 
             foreach (var manipSelec in instancedManipulatorSelectors)
             {
-                GameObject.DestroyImmediate(manipSelec);
+                GameObject.Destroy(manipSelec);
             }
             instancedManipulatorSelectors.Clear();
         }
