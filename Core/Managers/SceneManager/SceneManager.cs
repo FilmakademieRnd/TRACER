@@ -374,6 +374,11 @@ namespace tracer
             sceneReset?.Invoke(this, EventArgs.Empty);
         }
 
+        //!
+        //! Function that deletes all Unity scene content and clears the TRACER scene object of a specific scene ID.
+        //!
+        //! @param sceneID The scene ID  from which the objects will be deleted.
+        //!
         public void ResetScene(byte sceneID)
         {
             // remove all Unity GameObjects

@@ -126,13 +126,14 @@ namespace tracer
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => ref _name;
         }
+        //!
+        //! Function to initialize animation funcctionality of a parameter.
+        //!
         public abstract void InitAnimation();
-
         //!
         //! abstract reset function for the abstract parameter
         //!
         public abstract void reset();
-
         //!
         //! Fuction that determines a parameters C# type from a TRACER type.
         //!
@@ -175,9 +176,18 @@ namespace tracer
         //! @param v new value to be set. Value will be casted automatically
         //!
         public abstract void copyValue(AbstractParameter v);
+        //!
+        //! Abstract definition of function used to calculate a parameter's data size.
+        //!
+        //! @return The size of the data stored in a parameter in byte.
+        //!
         public abstract int dataSize();
+        //!
+        //! Abstract definition of function used get the parameter's default data size.
+        //!
+        //! @return The default size of the data stored in a parameter in byte.
+        //!
         public abstract int defaultDataSize();
-        public abstract void OverrideParameterID(short objectId);
     }
 
     [Serializable]
@@ -202,7 +212,7 @@ namespace tracer
         //!
         protected short _dataSize = -1;
         //!
-        //! Getter for the size of the serialized sourceSpan of the parameter.
+        //! Getter for the size of the serialized sourceSpan of the parameter in byte.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int dataSize()
@@ -213,6 +223,9 @@ namespace tracer
 
             return defaultDataSize();
         }
+        //!
+        //! Getter for the default size of the serialized sourceSpan of the parameter in byte.
+        //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int defaultDataSize()
         {
@@ -223,10 +236,6 @@ namespace tracer
                 default:
                     return _dataSize;
             }
-        }
-        public override void OverrideParameterID(short paraID)
-        {
-            _id = paraID;
         }
 
         //!

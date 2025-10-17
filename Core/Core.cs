@@ -33,8 +33,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using System.Diagnostics;
-using static tracer.AbstractParameter;
 using System.Linq;
 
 namespace tracer

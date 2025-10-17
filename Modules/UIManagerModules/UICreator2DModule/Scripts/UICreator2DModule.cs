@@ -43,24 +43,18 @@ namespace tracer
     //!
     public class UICreator2DModule : UIManagerModule
     {
-        //Currently displayed manipulator (can be null if none is displayed)
-        GameObject currentManipulator;
+        //!
+        //! Currently displayed manipulator (can be null if none is displayed).
+        //!
+        public GameObject currentManipulator { get; private set; }
 
-        public GameObject GetManipulator()
-        {
-            return currentManipulator;
-        }
-
-        //Currently displayed AddSelector (can be null if none is displayed)
-        GameObject currentAddSelector;
-        
-        public GameObject currentAddSelectorGetter
-        {
-            get => currentAddSelector;
-        }
+        //!
+        //! Currently displayed AddSelector (can be null if none is displayed)
+        //!
+        private GameObject currentAddSelector;
 
         //Button for additional parameters, hidden if currentAddSelector is active
-        GameObject currentAddButton;
+        private GameObject currentAddButton;
 
         //List of selection Buttons for Manipulators
         private List<GameObject> instancedManipulatorSelectors = new List<GameObject>();
@@ -70,19 +64,29 @@ namespace tracer
         //!
         public event EventHandler<int> parameterChanged;
 
-        //public event EventHandler<ColorSelect> colorSelectActive; 
-
+        //!
+        //! The transform of the 2D UI.
+        //!
         private Transform UI2D;
-
-        public Transform UI2DCanvas
-        {
-            get => UI2D;
-        }
-        
+        //!
+        //! The transform of the manipulator panel.
+        //!
         private Transform manipulatorPanel;
+        //!
+        //! The transform of the undo/redo panel.
+        //!
         private Transform undoRedoPanel;
+        //!
+        //! The undo button.
+        //!
         private Button undoButton;
+        //!
+        //! The redo button.
+        //!
         private Button redoButton;
+        //!
+        //! The reset button.
+        //!
         private Button resetButton;
 
         public bool blocksRaycasts = true;
@@ -309,7 +313,7 @@ namespace tracer
                 //currentAddSelector.SetActive(false);
             }
 
-            // [!!! SEIM was here !!!]
+            // [REVIEW SEIM was here]
             //AbstractParameter abstractParam = mainSelection.parameterList[index];
             AbstractParameter abstractParam = mainSelection.getParametersByRole(manager.activeRole)[index];
             AbstractParameter.ParameterType type = abstractParam.tracerType;

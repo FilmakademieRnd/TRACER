@@ -31,15 +31,7 @@ if not go to https://opensource.org/licenses/MIT
 using NetMQ;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing;
-using System.Linq;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using UnityEngine;
 
 namespace tracer
 {
@@ -156,12 +148,21 @@ namespace tracer
             startCommantServer(this, "");
         }
 
+        //!
+        //! Function that re-/starts the CommandServer and triggers the client ID negotiation.
+        //!
+        //! @param o The calling object.
+        //! @param ip The IP the client shall use to look for a DataHub.
+        //!
         private void startCommantServer(object o, string ip)
         {
             requestCommandServer?.Invoke(this, EventArgs.Empty);
             determineClientID(o, ip);
         }
 
+        //!
+        //! Function for creating a new pleudo random MAC address.
+        //!
         private byte[] createVID()
         {
             int size = 6;
@@ -190,6 +191,14 @@ namespace tracer
             return data;
         }
 
+        //!
+        //! Function for negotiating the clients ID with the DataHub.
+        //! If no DataHub can be found, the default ID 254 will be used.
+        //! If core.useRandomCID is true a random ID (2-250) will be generated.
+        //!
+        //! @param o The calling object.
+        //! @param ip The IP the client shall use to look for a DataHub.
+        //!
         private async void determineClientID(object o, string startIP)
         {
             // initialize the server list with the given server ID

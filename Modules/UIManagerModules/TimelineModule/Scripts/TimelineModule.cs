@@ -708,8 +708,8 @@ namespace tracer
             //TODO: somehow get currentManipulator from UICreator2DModule
             //is this ugly?
             UICreator2DModule ui2DModule = manager.getModule<UICreator2DModule>();
-            if(ui2DModule != null && ui2DModule.GetManipulator()){
-                m_manipulator = ui2DModule.GetManipulator().GetComponent<Manipulator>();
+            if(ui2DModule != null && ui2DModule.currentManipulator){
+                m_manipulator = ui2DModule.currentManipulator.GetComponent<Manipulator>();
                 if(m_manipulator)
                     m_manipulator.doneEditing += OnManipulatorEditEnded;
             }

@@ -73,15 +73,12 @@ namespace tracer
         }
 
         //!
-        //! Function to call the action associated with the Parameter. 
+        //! Function to call the action associated with the Parameter remotely and locally (optional). 
         //!
-        public void Call(T value)
-        {
-            _value = value;
-            InvokeHasChanged();
-        }
-
-        public void Call(T value, bool local)
+        //! @parame value a parameter for the action.
+        //! @local Flag for also calling the action locally. 
+        //!
+        public void Call(T value, bool local = false)
         {
             _value = value;
             if (local)
@@ -113,12 +110,9 @@ namespace tracer
 
         //!
         //! Function to call the action associated with the Parameter. 
+        //! @local Flag for also calling the action locally. 
         //!
-        public void Call()
-        {
-            InvokeHasChanged();
-        }
-        public void Call(bool local)
+        public void Call(bool local = false)
         {
             _value = value;
             if (local)

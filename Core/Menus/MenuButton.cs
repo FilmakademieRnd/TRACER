@@ -76,7 +76,7 @@ namespace tracer
             set => m_action = value;
         }
         //!
-        //! The name and caption of a MenuButton.
+        //! The caption of a MenuButton.
         //!
         private string m_caption;
         public string caption
@@ -84,7 +84,9 @@ namespace tracer
             set => m_caption = value;
             get => m_caption;
         }
-        
+        //!
+        //! The name of a MenuButton.
+        //!
         public string name { get; }
         
         //!

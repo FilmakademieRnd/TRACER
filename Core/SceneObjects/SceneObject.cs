@@ -52,10 +52,22 @@ namespace tracer
             get => IsLocked();
             set => SetLocked(value);
         }
-        
+        //!
+        //! Flag determine if a scene object is locked.
+        //!
         private bool m_lock = false;
+        //!
+        //! Function that returns the lock status of the scene object.
+        //!
+        //! @return The lock status of the scene object.
+        //!
         protected virtual bool IsLocked(){ return m_lock;}
-        protected virtual void SetLocked(bool v){ m_lock = v;}
+        //!
+        //! Function that sets the lock status of the scene object.
+        //!
+        //! @param l The new lock status of the scene object.
+        //!
+        protected virtual void SetLocked(bool l){ m_lock = l;}
         //!
         //! Previous lock state for highlighting the sceneObject.
         //!
@@ -139,6 +151,9 @@ namespace tracer
             InitParameter();      
         }
 
+        //!
+        //! Function that initializes the parameters of a scene object.
+        //!
         protected virtual void InitParameter(){
             position = new Parameter<Vector3>(transform.localPosition, "position", this);
             position.hasChanged += updatePosition;

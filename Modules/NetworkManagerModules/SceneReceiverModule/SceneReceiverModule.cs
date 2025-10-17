@@ -278,6 +278,11 @@ namespace tracer
             start(ip, port, emitSceneReady);
         }
 
+        //!
+        //! Function used to trigger a scene receiving via QR code.
+        //! @param o A reference to the scene manager.
+        //! @param ip The ID address to the server.
+        //! 
         public void ReceiveSceneUsingQr(object o, string ip)
         {
             core.getManager<UIManager>().hideMenu();

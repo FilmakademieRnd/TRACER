@@ -31,7 +31,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -100,7 +99,13 @@ namespace tracer
             //uiManager.showMenu(m_menu);
         }
 
-        private void QrSceneLoad(object sender,string sceneName)
+        //!
+        //! Function used to load a scene based on a QR code scann. 
+        //!
+        //! @param sender A reference to the scene manager.
+        //! @param sceneName The name of the scene to be loaded (only used to determine the demo scene).
+        //!
+        private void QrSceneLoad(object sender, string sceneName)
         {
             if (sceneName.Equals("Demo"))
             {

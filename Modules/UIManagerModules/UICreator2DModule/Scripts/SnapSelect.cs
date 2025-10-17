@@ -27,7 +27,6 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 02.02.2022
 
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.EventSystems;
 using UnityEngine;
@@ -50,9 +49,9 @@ namespace tracer
         //!
         private List<SnapSelectElement> _elements;
 
-        public List<SnapSelectElement> elements
+        public ref List<SnapSelectElement> elements
         {
-            get => _elements;
+            get => ref _elements;
         }
 
         //!

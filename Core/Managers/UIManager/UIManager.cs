@@ -72,6 +72,9 @@ namespace tracer
         {
             EXPERT, LIGHTING, SET, DOP, VIEWER
         }
+        //!
+        //! The global user role.
+        //!
         public Roles activeRole
         {
             get => (Roles)settings.roles.value;
@@ -84,6 +87,9 @@ namespace tracer
         //! The list containing currently selected scene objects.
         //!
         private List<SceneObject> m_selectedObjects;
+        //!
+        //! List containing all currently selected objects.
+        //!
         public List<SceneObject> SelectedObjects
         {
             get { return m_selectedObjects; }
@@ -166,12 +172,15 @@ namespace tracer
         //! activating/deactivating 2D UI interaction
         //!
         bool _ui2Dinteractable;
+        private MenuTree m_startMenu;
+        //!
+        //! A reference to the start menu.
+        //!
+        public ref MenuTree startMenu
+        { get => ref m_startMenu; }
         //!
         //! Getter and setter for activating/deactivating 2D UI interaction
         //!
-        private MenuTree m_startMenu;
-        public ref MenuTree startMenu
-        { get => ref m_startMenu; }
         public bool ui2Dinteractable
         {
             get { return _ui2Dinteractable; }
@@ -471,13 +480,17 @@ namespace tracer
                     createMenuTreefromSettings(manager.GetType().ToString().Split('.')[1], ref settingsMenu, manager._settings);
                 }
             }
-            
-            settingsMenu = settingsMenu.Add(MenuItem.IType.SPACE);
-            settingsMenu.Add("Log", true);
-            settingsMenu = settingsMenu.Add(MenuItem.IType.SPACE);
-            settingsMenu.Begin(MenuItem.IType.HSPLIT);
-            settingsMenu.Add(MenuItem.IType.TEXTBOX, core.logParameter);
-            settingsMenu.End();
+
+            // add text box for logging console to settings panel
+            if (Debug.unityLogger.logEnabled)
+            {
+                settingsMenu = settingsMenu.Add(MenuItem.IType.SPACE);
+                settingsMenu.Add("Log", true);
+                settingsMenu = settingsMenu.Add(MenuItem.IType.SPACE);
+                settingsMenu.Begin(MenuItem.IType.HSPLIT);
+                settingsMenu.Add(MenuItem.IType.TEXTBOX, core.logParameter);
+                settingsMenu.End();
+            }
 
             // load about menu prefab and add about button
             m_aboutMenu = Resources.Load("AboutMenu/AboutMenu") as GameObject;
@@ -656,6 +669,9 @@ namespace tracer
             selectionChanged?.Invoke(this, m_selectedObjects);
         }
 
+        //!
+        //! Function that emits the event that the 2D UI has been created.
+        //!
         public void emitUI2DCreated(UIBehaviour ui)
         {
             UI2DCreated?.Invoke(this, ui);
@@ -668,6 +684,7 @@ namespace tracer
         {
             _ui2Dinteractable = e;
         }
+
         //!
         //! Function that invokes all events listening for changes via the 3d manipulation (e.g. Timeline if Keyframe is selected)
         //!
