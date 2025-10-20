@@ -140,7 +140,6 @@ namespace tracer
             _sceneID = 255;
 
             _id = s_oid++;
-            Debug.Log("Create parameter object " + name + " ID:" + _id + " SID:" + _sceneID);
             _parameterList = new List<AbstractParameter>();
 
             _core.addParameterObject(this);
