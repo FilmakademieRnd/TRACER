@@ -221,6 +221,18 @@ namespace tracer
                             m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<AbstractParameter>>(sceneObject, updateScaleCamera));
                             break;
                         }
+                    //[SEIM test for schematic view]
+                    //case SceneObject:
+                    //    {
+                    //        gizmo = new VPETGizmo(sceneObject.name + "_Gizmo", sceneObject.transform);
+                    //        gizmo.addElement(ref m_rectPos, Color.yellow, true).localPosition = new Vector3(0, 0, 0);
+
+                    //        sceneObject._gizmo = gizmo.root;
+                    //        //updateScaleCamera(sceneObject, null);
+                    //        //sceneObject.hasChanged += updateScaleCamera;
+                    //        //m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<AbstractParameter>>(sceneObject, updateScaleCamera));
+                    //        break;
+                    //    }
                 }
                 if (gizmo != null)
                 {

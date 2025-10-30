@@ -42,6 +42,11 @@ namespace tracer
         //! field of view (horizonal value from Katana)
         //!
         public Parameter<float> fov;
+        
+        //!
+        //! sensor size presets
+        //!
+        public ListParameter focalLengthPresets;
 
         //!
         //! aspect ratio
@@ -69,12 +74,12 @@ namespace tracer
         public Parameter<float> aperture;
 
         //!
-        //! aperture
+        //! sensorSize
         //!
         public Parameter<Vector2> sensorSize;
 
         //!
-        //! aperture
+        //! sensor size presets
         //!
         public ListParameter sensorSizePresets;
 
@@ -121,12 +126,22 @@ namespace tracer
                 sensorSize.hasChanged += updateSensorSize;
 
                 List<AbstractParameter> sensorList = new List<AbstractParameter> { 
-                    new Parameter<Vector2>(new Vector2(1, 1), "Alexa", this, true, UIManager.Roles.EXPERT), 
-                    new Parameter<Vector2>(new Vector2(2, 2), "Venice", this, true, UIManager.Roles.EXPERT), 
-                    new Parameter<Vector2>(new Vector2(3, 3), "BlackMagic", this, true, UIManager.Roles.EXPERT) };
+                    new Parameter<Vector2>(new Vector2(36.7f, 25.54f), "Alexa LF"), 
+                    new Parameter<Vector2>(new Vector2(36.2f, 24.1f), "Venice"), 
+                    new Parameter<Vector2>(new Vector2(13.056f, 7.344f), "Ursa") };
 
                 sensorSizePresets = new ListParameter(sensorList, "SensorSizes", this, true, UIManager.Roles.EXPERT);
                 sensorSizePresets.hasChanged += updateSensorSizeSelection;
+
+                List<AbstractParameter> lensList = new List<AbstractParameter> {
+                    new Parameter<float>(105f, "105mm"),
+                    new Parameter<float>(85f, "85mm"),
+                    new Parameter<float>(50f, "50mm"),
+                    new Parameter<float>(24f, "24mm"),
+                    new Parameter<float>(18f, "18mm") };
+
+                focalLengthPresets = new ListParameter(lensList, "FocalLengths", this, true, UIManager.Roles.EXPERT);
+                focalLengthPresets.hasChanged += updateFocalLengthSelection;
             }
             else
                 Helpers.Log("no camera component found!");
@@ -145,6 +160,7 @@ namespace tracer
             focDist.hasChanged -= updateFocalDistance;
             aperture.hasChanged -= updateAperture;
             sensorSize.hasChanged -= updateSensorSize;
+            sensorSizePresets.hasChanged -= updateSensorSizeSelection;
         }
 
         // Update is called once per frame
@@ -236,11 +252,17 @@ namespace tracer
 
         private void updateSensorSizeSelection(object sender, int s)
         {
-            sensorSizePresets.select(s);
             sensorSize.value = ((Parameter<Vector2>)sensorSizePresets.parameterList[s]).value;
+            fov.value = Camera.FocalLengthToFieldOfView(_camera.focalLength, sensorSize.value.y);
             emitHasChanged((AbstractParameter)sender);
         }
-
+        
+        private void updateFocalLengthSelection(object sender, int s)
+        {
+            float fl = ((Parameter<float>)focalLengthPresets.parameterList[s]).value;
+            fov.value = Camera.FocalLengthToFieldOfView(fl, sensorSize.value.y);
+            emitHasChanged((AbstractParameter)sender);
+        }
 
         //!
         //! updates the Unity camera component specific parameters and informs all connected TRACER parameters about the change

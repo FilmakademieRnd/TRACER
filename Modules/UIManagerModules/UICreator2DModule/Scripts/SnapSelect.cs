@@ -174,11 +174,6 @@ namespace tracer
         //! Is the menu fixed or dragable
         //!
         private bool _dragable = true;
-        public bool dragable
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _dragable;
-        }
 
         //!
         //! Reference to main SnapSelect UI Panel

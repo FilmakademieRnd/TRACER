@@ -169,6 +169,12 @@ namespace tracer
                             break;
                     }
                     break;
+                case AbstractParameter.ParameterType.LIST:
+                    ListParameter paramList = (ListParameter) abstractParam;
+                    _snapSelect.setSensitivity(100f);
+                    foreach (AbstractParameter param in paramList.parameterList)
+                        _snapSelect.addElement(param.name);
+                    break;
                 default:
                     Helpers.Log("Parameter Type cannot be edited with Spinner.");
                     break;
@@ -244,6 +250,8 @@ namespace tracer
         private void changeAxis(object sender, int index)
         {
             _currentAxis = index;
+            if (abstractParam.tracerType == AbstractParameter.ParameterType.LIST)
+                ((ListParameter)abstractParam).select(index);
         }
     }
 }

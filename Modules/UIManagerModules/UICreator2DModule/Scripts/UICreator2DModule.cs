@@ -320,6 +320,7 @@ namespace tracer
 
             switch (type)
             {
+                case AbstractParameter.ParameterType.LIST:
                 case AbstractParameter.ParameterType.FLOAT:
                 case AbstractParameter.ParameterType.VECTOR2:
                 case AbstractParameter.ParameterType.VECTOR3:
@@ -356,6 +357,9 @@ namespace tracer
                         manipButton.Init(abstractParam, manager);
                     }
                     break;
+                //case AbstractParameter.ParameterType.LIST:
+                        // add list selection here!
+                  //      break;
                 case AbstractParameter.ParameterType.ACTION:
                 case AbstractParameter.ParameterType.INT:
                 case AbstractParameter.ParameterType.STRING:
