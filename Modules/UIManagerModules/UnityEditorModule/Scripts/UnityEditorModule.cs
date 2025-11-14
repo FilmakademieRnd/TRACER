@@ -81,14 +81,14 @@ namespace tracer
 
                 if (sceneObj != null)
                 {
-                    manager.clearSelectedObject();
+                    manager.clearSelectedObjects();
 
                     Helpers.Log("selecting: " + sceneObj.ToString());
                     manager.addSelectedObject(sceneObj);
                 }
             }
             else
-                manager.clearSelectedObject();
+                manager.clearSelectedObjects();
         }
     }
 }

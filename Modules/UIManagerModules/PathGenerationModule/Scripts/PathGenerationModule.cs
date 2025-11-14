@@ -533,14 +533,14 @@ namespace tracer{
             //TODO enable overlay that indicates what to do (frame + text AND "abort"/"finish") (enable overlay for as long as user press another of our button)
 
             //hide gizmo and TRS ui --> we simulate this by de-selecting!
-            manager.clearSelectedObject();
+            manager.clearSelectedObjects();
             
             //add event to input manager
             core.getManager<InputManager>().inputPressEnd += OnPointerDown_GeneratePath; //needed UI, because of inputBlockingCanvas
         }
 
         private void OnClick_SendPathToAnimHost(){
-            manager.clearSelectedObject();
+            manager.clearSelectedObjects();
             sceneCharacterForPath.animHostGen.setValue(Mathf.Clamp(animHostAnimationTypeToSend, 1, 3));  //0 stop, 1 stream, 2 stream loop, 3 block
             //trigger function where we wait for the character to become unlocked (after locking) - to know if the animation has finished
             core.StartCoroutine(WaitForAnimHostToFinish());
@@ -579,7 +579,7 @@ namespace tracer{
             core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
 
             //re-enable gizmos by simulate a "reselection"
-            //manager.clearSelectedObject();
+            //manager.clearSelectedObjects();
             manager.addSelectedObject(sceneCharacterForPath);
 
             //show correct buttons
@@ -686,7 +686,7 @@ namespace tracer{
                 yield return null;
             }
             if(sceneCharacterForPath){
-                manager.clearSelectedObject();
+                manager.clearSelectedObjects();
                 manager.addSelectedObject(sceneCharacterForPath);
             }
         }

@@ -192,7 +192,7 @@ namespace tracer{
                     sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
                 //check if measurement object was selected and undo if so
                 if(manager.isThisOurSelectedObject(sceneObjectToPlace)){
-                    manager.clearSelectedObject();
+                    manager.clearSelectedObjects();
                 }
             }
             Debug.Log("<color=orange>ToggleMeasureUI: "+isActive+"</color>");
@@ -599,7 +599,7 @@ namespace tracer{
             sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = Color.green;
 
             //hide gizmo and TRS ui --> we simulate this by de-selecting!
-            manager.clearSelectedObject();
+            manager.clearSelectedObjects();
             //add event to input manager
             core.getManager<InputManager>().inputPressEnd += OnPointerDown_Place; //needed UI, because of inputBlockingCanvas
             //use the below for testing ongoing alignment
@@ -621,7 +621,7 @@ namespace tracer{
             core.getManager<InputManager>().inputPressEnd -= OnPointerDown_Place;
 
             //re-enable gizmos by simulate a "reselection"
-            manager.clearSelectedObject();
+            manager.clearSelectedObjects();
             manager.addSelectedObject(sceneObjectToPlace);
 
             //show correct buttons
@@ -650,7 +650,7 @@ namespace tracer{
                 if(uiDistanceText)
                     uiDistanceText.text = "";
             }
-            manager.clearSelectedObject();
+            manager.clearSelectedObjects();
         }
         private void OnClick_StartCreation_Line(){
             CreateMeasurePoolAtRuntime(GameObject.Instantiate(Resources.Load(LOCATION_LINEPOOL_PREFAB) as GameObject).GetComponent<MeasurePool>());
@@ -705,7 +705,7 @@ namespace tracer{
             //Destroying SceneObjects currently not supported. Implement as well as adding!
             GameObject.Destroy(sceneObjectToPlace.gameObject);
 
-            manager.clearSelectedObject();
+            manager.clearSelectedObjects();
             manager.addSelectedObject(newWaypointToSelect.GetComponent<SceneObject>());
         }
 
