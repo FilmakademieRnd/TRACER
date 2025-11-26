@@ -237,9 +237,11 @@ namespace tracer
                             snapSelect.addElement(Resources.Load<Sprite>("Images/button_nearClipPlane_text"));
                             break;
                         case "focalDistance":
+                        case "FocalLengths":
                             snapSelect.addElement(Resources.Load<Sprite>("Images/button_focalDistance"));
                             break;
                         case "sensorSize":
+                        case "SensorSizes":
                             snapSelect.addElement(Resources.Load<Sprite>("Images/button_sensorSize_text"));
                             break;
                         case "pathPositions":   //was a button like TRS before:
@@ -321,6 +323,18 @@ namespace tracer
             switch (type)
             {
                 case AbstractParameter.ParameterType.LIST:
+                    GameObject listSelectorPrefab = Resources.Load<GameObject>("Prefabs/PRE_UI_ListSelector");
+                    currentManipulator = SceneObject.Instantiate(listSelectorPrefab, manipulatorPanel);
+                    Manipulator manipListSelector = currentManipulator.GetComponent<Manipulator>();
+                    if (manipListSelector){
+                        manipListSelector.Init(abstractParam, manager);
+                        //SceneObjectMeasurement is only locally, so we dont add these listener
+                        if(mainSelection.GetType() != typeof(SceneObjectMeasurement)){
+                            manipListSelector.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
+                            manipListSelector.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
+                        }
+                    }
+                    break;
                 case AbstractParameter.ParameterType.FLOAT:
                 case AbstractParameter.ParameterType.VECTOR2:
                 case AbstractParameter.ParameterType.VECTOR3:
@@ -357,9 +371,6 @@ namespace tracer
                         manipButton.Init(abstractParam, manager);
                     }
                     break;
-                //case AbstractParameter.ParameterType.LIST:
-                        // add list selection here!
-                  //      break;
                 case AbstractParameter.ParameterType.ACTION:
                 case AbstractParameter.ParameterType.INT:
                 case AbstractParameter.ParameterType.STRING:

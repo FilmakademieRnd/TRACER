@@ -409,7 +409,7 @@ namespace tracer
                     idx++;
                 }
 
-                // shader/material properties 
+                // shader/material properties
                 int propertyCount = material.shader.GetPropertyCount();
                 matPack.shaderPropertyIds = new int[propertyCount];
                 matPack.shaderPropertyTypes = new int[propertyCount];
@@ -469,14 +469,20 @@ namespace tracer
                             break;
                         // Texture (handled separately)
                         case 4:
-                            Texture2D texture = (Texture2D)material.GetTexture(shaderPropertyId);
-                            if (texture)
+                            Texture baseTex = material.GetTexture(shaderPropertyId);
+
+                            Texture2D texture = baseTex as Texture2D;
+                            if (texture != null)
                             {
                                 matPack.textureIds[texIdx] = processTexture(texture, ref sceneData.textureList);
                                 matPack.textureOffsets[texIdx * 2] = material.GetTextureOffset(shaderPropertyId).x;
                                 matPack.textureOffsets[texIdx * 2 + 1] = material.GetTextureOffset(shaderPropertyId).y;
                                 matPack.textureScales[texIdx * 2] = material.GetTextureScale(shaderPropertyId).x;
                                 matPack.textureScales[texIdx * 2 + 1] = material.GetTextureScale(shaderPropertyId).y;
+                            }
+                            else if (baseTex != null)
+                            {
+                                Helpers.Log($"Texture '{baseTex.name}' is not Texture2D, it's {baseTex.GetType().Name}", Helpers.logMsgType.ERROR);
                             }
                             shaderData = new byte[0];
                             texIdx++;
@@ -615,8 +621,17 @@ namespace tracer
             texPack.height = texture.height;
             texPack.format = texture.format;
 
-            texPack.colorMapData = texture.GetRawTextureData();
-            texPack.colorMapDataSize = texPack.colorMapData.Length;
+            try
+            {
+                texPack.colorMapData = texture.GetRawTextureData();
+                texPack.colorMapDataSize = texPack.colorMapData.Length;
+            }
+            catch (System.Exception e)
+            {
+                Helpers.Log($"Failed to get texture data: {e.Message}", Helpers.logMsgType.ERROR);
+                texPack.colorMapData = new byte[0];
+                texPack.colorMapDataSize = 0;
+            }
 
             texPack.texture = texture;
 

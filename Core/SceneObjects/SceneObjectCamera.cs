@@ -1,4 +1,4 @@
-﻿/*
+/*
 -----------------------------------------------------------------------------------
 TRACER FOUNDATION -
 Toolset for Realtime Animation, Collaboration & Extended Reality
@@ -111,7 +111,7 @@ namespace tracer
 
             if (_camera)
             {
-                fov = new Parameter<float>(_camera.fieldOfView, "fov", this);
+                fov = new Parameter<float>(_camera.fieldOfView, "fov", this, true, UIManager.Roles.EXPERT);
                 fov.hasChanged += updateFov;
                 aspect = new Parameter<float>(_camera.aspect, "aspectRatio", this, true, UIManager.Roles.EXPERT);
                 near = new Parameter<float>(_camera.nearClipPlane, "nearClipPlane", this, true, UIManager.Roles.EXPERT);
@@ -122,7 +122,7 @@ namespace tracer
                 focDist.hasChanged += updateFocalDistance;
                 aperture = new Parameter<float>(2.8f, "aperture", this, true, UIManager.Roles.EXPERT);
                 aperture.hasChanged += updateAperture;
-                sensorSize = new Parameter<Vector2>(_camera.sensorSize, "sensorSize", this);
+                sensorSize = new Parameter<Vector2>(_camera.sensorSize, "sensorSize", this, true, UIManager.Roles.EXPERT);
                 sensorSize.hasChanged += updateSensorSize;
 
                 List<AbstractParameter> sensorList = new List<AbstractParameter> { 
@@ -130,7 +130,7 @@ namespace tracer
                     new Parameter<Vector2>(new Vector2(36.2f, 24.1f), "Venice"), 
                     new Parameter<Vector2>(new Vector2(13.056f, 7.344f), "Ursa") };
 
-                sensorSizePresets = new ListParameter(sensorList, "SensorSizes", this, true, UIManager.Roles.EXPERT);
+                sensorSizePresets = new ListParameter(sensorList, "SensorSizes", this, true, UIManager.Roles.DOP);
                 sensorSizePresets.hasChanged += updateSensorSizeSelection;
 
                 List<AbstractParameter> lensList = new List<AbstractParameter> {
@@ -140,7 +140,7 @@ namespace tracer
                     new Parameter<float>(24f, "24mm"),
                     new Parameter<float>(18f, "18mm") };
 
-                focalLengthPresets = new ListParameter(lensList, "FocalLengths", this, true, UIManager.Roles.EXPERT);
+                focalLengthPresets = new ListParameter(lensList, "FocalLengths", this, true, UIManager.Roles.DOP);
                 focalLengthPresets.hasChanged += updateFocalLengthSelection;
             }
             else

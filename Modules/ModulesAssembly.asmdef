@@ -6,7 +6,8 @@
         "HelperAssembly",
         "Unity.TextMeshPro",
         "Unity.Splines",
-        "Unity.Mathematics"
+        "Unity.Mathematics",
+        "glTFast"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
