@@ -505,7 +505,7 @@ namespace tracer
             copyCamera();
 
             // deselect everything and selct camamera scene object
-            manager.clearSelectedObject();
+            manager.clearSelectedObjects();
             manager.addSelectedObject(m_sceneManager.sceneCameraList[m_cameraIndex]);
 
             InputManager inputManager = core.getManager<InputManager>();

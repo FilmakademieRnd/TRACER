@@ -349,7 +349,7 @@ namespace tracer
         {
             buttonsUpdated?.Invoke(this, EventArgs.Empty);
             menusUpdated?.Invoke(this, EventArgs.Empty);
-            clearSelectedObject();
+            clearSelectedObjects();
             Helpers.Log("Role changed to " + (Roles) r);
         }
 
@@ -658,7 +658,7 @@ namespace tracer
         //!
         //! Function that clears the selected objects list.
         //!
-        public void clearSelectedObject()
+        public void clearSelectedObjects()
         {
             foreach (SceneObject sceneObject in m_selectedObjects){
                 // dont invoke network related calls (that one is for highlights as well)

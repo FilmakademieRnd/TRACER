@@ -30,10 +30,11 @@ if not go to https://opensource.org/licenses/MIT
 
 using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Runtime.CompilerServices;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static UnityEditor.PlayerSettings;
 
 namespace tracer
 {
@@ -80,10 +81,6 @@ namespace tracer
         //!
         private InputManager m_inputManager;
         //!
-        //! The async redner request.
-        //!
-        //private AsyncGPUReadbackRequest request;
-        //!
         //! Re-used property block used to set selectable _id.
         //!
         private MaterialPropertyBlock m_properties;
@@ -98,7 +95,7 @@ namespace tracer
         //!
         //! Divides the screen resolution for the selection.
         //!
-        private int scaleDivisor = 4;
+        private readonly float scaleDivisor = 0.25f;
         //!
         //! Flag to wait for execution to finish
         //!
@@ -188,7 +185,8 @@ namespace tracer
                 return;
 
             SceneObject obj = GetSelectableAtCollider(point);
-            if (!obj){
+            if (!obj)
+            {
                 m_isRenderActive = true;
                 // give the system some time to render the object _id's
                 while(m_isRenderActive || m_gpuReadbackRequested)
@@ -197,19 +195,22 @@ namespace tracer
                 obj = GetSelectableAtPixel(point);
             }
 
-            if (obj){                
+            if (obj)
+            {                
                 CheckDoubleClick(obj);
 
                 if(manager.isThisOurSelectedObject(obj)){
                     m_isRenderActive = false;
                     return;
                 }else{
-                    manager.clearSelectedObject();
+                    manager.clearSelectedObjects();
                 }
 
                 AddSelectionByRole(obj);
-            }else{
-                manager.clearSelectedObject();
+            }
+            else
+            {
+                manager.clearSelectedObjects();
             }
         }
         //!
@@ -259,7 +260,7 @@ namespace tracer
         public void SetSelectedObjectViaScript(SceneObject obj){
             if(!obj || manager.isThisOurSelectedObject(obj))
                 return;
-            manager.clearSelectedObject();
+            manager.clearSelectedObjects();
             switch (obj){
                 case SceneObjectCamera:
                     if (manager.activeRole == UIManager.Roles.EXPERT ||
@@ -288,25 +289,61 @@ namespace tracer
         public SceneObject GetSelectableAtPixel(Vector2 screenPosition)
         {
             if (!cpuData.IsCreated){
-                //Debug.Log("<color=red>GetSelectableAtPixel cpuData.IsCreated = false!</color>");
                 return null;
             }
 
-            int scaledX = (int)screenPosition.x / scaleDivisor;
-            int scaledY = (int)screenPosition.y / scaleDivisor;
+            int scaledX = (int) (screenPosition.x * scaleDivisor);
+            int scaledY = (int) (screenPosition.y * scaleDivisor);
             int pos = scaledX + dataWidth * scaledY;
             
             if (cpuData.Length < pos || pos < 0){
-                //Debug.Log("<color=red>GetSelectableAtPixel pos wrong ("+cpuData.Length+" /"+pos+") </color>");
                 return null;
             }
             
             byte sceneID = 0;
             short soID = 0;
             DecodeId(cpuData[pos], ref sceneID, ref soID);
-            //Debug.Log("<color=yellow>DecodeId sceneID = "+sceneID+", soID = "+soID+"</color>");
 
             return m_sceneManager.getSceneObject(sceneID, soID);
+        }
+
+        //!
+        //! Retrieve the selectable present at the current location in camera screenspace, if any.
+        //! 
+        //! @param screenPosition The position to get the selectable at.
+        //! @return The selectable at the specified screen position or null if there is none.
+        //!
+        public List<SceneObject> GetSelectableInRect(RectInt screenRect)
+        {
+            if (!cpuData.IsCreated)
+                return null;
+
+            int xMin = (int) (screenRect.xMin * scaleDivisor);
+            int xMax = (int) (screenRect.xMax * scaleDivisor);
+            int yMin = (int) (screenRect.yMin * scaleDivisor);
+            int yMax = (int) (screenRect.yMax * scaleDivisor);
+            int dw = dataWidth;
+            List<Color32> ids = new List<Color32>(5);
+
+            for (int x = xMin; x < xMax; x++)
+                for (int y = yMin; y < xMax; y++)
+                {
+                    Color32 cData = cpuData[x + dw * y];
+                    if (cData.b != 0 || cData.a != 0)
+                        if (!ids.Contains(cData))
+                            ids.Add(cData);
+                }
+            
+            byte sceneID = 0;
+            short soID = 0;
+            List<SceneObject> sceneObjects = new List<SceneObject>(ids.Count);
+            foreach (Color32 c in ids)
+            {
+                DecodeId(c, ref sceneID, ref soID);
+                sceneObjects.Add(m_sceneManager.getSceneObject(sceneID, soID));
+            }
+
+            return sceneObjects;
         }
 
         //!
@@ -332,14 +369,43 @@ namespace tracer
                 if (!sceneObject)
                     sceneObject = gameObject.GetComponent<SceneObject>();
 
-                //changed by Thomas: Try to get SceneObject in any parent
-                if(!sceneObject){
+                if (!sceneObject)
                     sceneObject = gameObject.GetComponentInParent<SceneObject>();
-                    //Debug.Log("<color=orange>Found GetComponentInParent ? "+(sceneObject != null)+"</color>");
-                }
-                //if (!sceneObject && gameObject.transform.parent)
-                    //sceneObject = gameObject.transform.parent.GetComponent<SceneObject>();
+            }
 
+            return sceneObject;
+        }
+
+        //!
+        //! Retrieve the selectable present at the current location by tracing a ray into the scene and looking for colliders.
+        //! 
+        //! @param screenPosition The position to get the selectable at.
+        //! @param layerMask The object layers to be considered for the ray intersection.
+        //! @return The selectable at the traced collider or null if there is none.
+        //!
+        public SceneObject GetSelectableAtCollider(Rect screenRectangle)
+        {
+            RaycastHit hit;
+            SceneObject sceneObject = null;
+            Camera camera = Camera.main;
+
+            //float pixelsToWorld = camera.orthographicSize / (screenHeight / 2f);   //<-- maybe this is nessesarry?  [SEIM]
+            Vector3 center = camera.ScreenToWorldPoint(screenRectangle.center);
+            Vector3 foreward = camera.transform.forward;
+
+            if (Physics.BoxCast(center, screenRectangle.size *0.5f, foreward, out hit, Quaternion.LookRotation(foreward), Mathf.Infinity))
+            {
+                GameObject gameObject = hit.collider.gameObject;
+                IconUpdate iconUpdate = gameObject.GetComponent<IconUpdate>();
+                // check if an icon has been hit
+                if (iconUpdate)
+                    sceneObject = iconUpdate.m_parentObject;
+
+                if (!sceneObject)
+                    sceneObject = gameObject.GetComponent<SceneObject>();
+
+                if (!sceneObject)
+                    sceneObject = gameObject.GetComponentInParent<SceneObject>();
             }
 
             return sceneObject;
@@ -383,8 +449,8 @@ namespace tracer
                 Camera camera = Camera.main;
 
                 // If camera size changed (e.g. window resize) adjust sizes of selection textures.
-                int currentWidth = camera.pixelWidth / scaleDivisor;
-                int currentHeight = camera.pixelHeight / scaleDivisor;
+                int currentWidth = (int) (camera.pixelWidth * scaleDivisor);
+                int currentHeight = (int) (camera.pixelHeight * scaleDivisor);
                 if (gpuTexture == null || dataWidth != currentWidth || dataHeight != currentHeight)
                 {
                     if (gpuTexture != null) gpuTexture.Release();
@@ -514,6 +580,7 @@ namespace tracer
         //! @param _id The selectable _id to be encoded.
         //! @return The color representing the encoded _id.
         //!
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void EncodeId(out Color32 color, byte sceneID, short soID)
         {
             color = new Color32(
@@ -529,7 +596,8 @@ namespace tracer
         //! @param color The color to decode into a selectable _id.
         //! @return The decoded selectable _id.
         //!
-        private void DecodeId(Color32 color, ref byte sceneID, ref short soID)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void DecodeId(Color32 color, ref byte sceneID, ref short soID) 
         {
             sceneID = color.g;
             soID = (short) (

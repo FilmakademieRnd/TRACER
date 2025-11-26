@@ -212,10 +212,10 @@ namespace tracer{
                     _snapSelect.elements[^1].gameObject.GetComponent<UnityEngine.UI.Image>().enabled = false;
 
                     //Deselect!(?)
-                    _manager.clearSelectedObject();
+                    _manager.clearSelectedObjects();
 
                     //DESELECT, SO WE ARE NOT LOCKED
-                    //_manager.clearSelectedObject();
+                    //_manager.clearSelectedObjects();
 
                     break;
             }

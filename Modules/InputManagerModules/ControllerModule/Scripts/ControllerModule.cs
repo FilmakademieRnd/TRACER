@@ -717,7 +717,7 @@ namespace tracer
         private void SelectSceneObjectWithRaycastAndButton()
         {
             OffCrosshair();
-            _uiManager.clearSelectedObject();
+            _uiManager.clearSelectedObjects();
             manager.ControllerSelect(new Vector2(Screen.width / 2, Screen.height / 2));
         }
         
@@ -763,7 +763,7 @@ namespace tracer
             switch (_currentState)
             {
                 case ControllerModes.MAIN_VIEW_MODE:
-                    _uiManager.clearSelectedObject();
+                    _uiManager.clearSelectedObjects();
                     break;
 
                 case ControllerModes.OBJECT_MODE:
@@ -823,7 +823,7 @@ namespace tracer
         private void SelectById(SceneObject obj)
         {
             OffCrosshair();
-            _uiManager.clearSelectedObject();
+            _uiManager.clearSelectedObjects();
 
             switch (obj)
             {
