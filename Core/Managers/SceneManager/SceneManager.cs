@@ -99,6 +99,27 @@ namespace tracer
         }
 
         //!
+        //! Function that returns a list containing all scene objects.
+        //!
+        //! @return The list containing all scene objects.
+        //!
+        public List<T> getAllSceneObjects<T>() where T : SceneObject 
+        {
+            List<T> returnvalue = new List<T>();
+
+            foreach (Dictionary<short, ParameterObject> dict in core.parameterObjectList.Values)
+            {
+                foreach (ParameterObject parameterObject in dict.Values)
+                {
+                    T sceneObject = parameterObject as T;
+                    if (sceneObject)
+                        returnvalue.Add((T)parameterObject);
+                }
+            }
+            return returnvalue;
+        }
+
+        //!
         //! Function that returns a list containing all objects of a specific scene.
         //!
         //! @param The scne ID to define the scene to gather all scene objects from.

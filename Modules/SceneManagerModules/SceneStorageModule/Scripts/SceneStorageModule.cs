@@ -241,8 +241,9 @@ namespace tracer
             List<byte[]> responses = await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.FILEINFO });
 
             MenuTree serverSceneMenu = new MenuTree();
+            
             serverSceneMenu.Begin(MenuItem.IType.VSPLIT);
-
+            
             int infoNBR = 0;
             for (int i = 0; i < responses.Count - 1; i += 2)
             {
@@ -262,8 +263,7 @@ namespace tracer
             serverSceneMenu.caption = "Scenes on Server";
             //serverSceneMenu.iconResourceLocation = "Images/button_save";
             UIManager uiManager = core.getManager<UIManager>();
-            uiManager.addMenu(serverSceneMenu);
-
+            
             uiManager.showMenu(serverSceneMenu);
         }
 

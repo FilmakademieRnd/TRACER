@@ -431,6 +431,7 @@ namespace tracer
             SceneManager sceneManager = _manager.core.getManager<SceneManager>();
             if (sceneManager == null) return;
 
+            // List<SceneObjectCamera> cameras = sceneManager.getAllSceneObjects<SceneObjectCamera>();     // line below depricated, use this line instead
             List<SceneObjectCamera> cameras = sceneManager.sceneCameraList;
             if (cameras == null || cameras.Count == 0) return;
 

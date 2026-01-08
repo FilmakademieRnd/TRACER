@@ -821,7 +821,7 @@ namespace tracer
         {
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
-                Helpers.Log("glTF Loader: File not found: " + filePath, Helpers.logMsgType.ERROR);
+                Helpers.Log("glTF Loader: File not found: " + filePath, Helpers.logMsgType.WARNING);
                 return false;
             }
 

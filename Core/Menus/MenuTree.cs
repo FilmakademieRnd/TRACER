@@ -58,6 +58,12 @@ namespace tracer
         public MenuTree() : base("", null, null) { }
         public MenuTree(List<UIManager.Roles> roles) : base("", null, roles) { }
 
+        public void Clear()
+        {
+            m_stack.Clear();
+            Items.Clear();
+        }
+
         //!
         //! Adds a new string item as branch into the menu tree.
         //! 
