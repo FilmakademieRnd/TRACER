@@ -1,5 +1,5 @@
 # Philosophy 
-
+/.doc/img/FA_AI_Logo.png
 The idea behind TRACER is to create an open, extensible interface that is independent of applications and programming languages, in order to transfer data sets and edit them in real time both within and between applications.
 The transfer to or from any number of other instances should be possible.For historical reasons, the focus has been and continues to be on 3D applications, which is why the existing implementations are most advanced in this area. Currently, there are implementations for Blender, Unreal, Katana, and Unity. The last one is by far the most comprehensive and also the reference implementation.
 
