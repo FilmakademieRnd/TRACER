@@ -31,6 +31,8 @@ if not go to https://opensource.org/licenses/MIT
 using NetMQ;
 using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
 namespace tracer
