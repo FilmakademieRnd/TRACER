@@ -6,11 +6,11 @@ The transfer to or from any number of other instances should be possible.For his
 
 # DataHub
 
-The DataHub is a part of the TRACER network infrastructure, but a separate application that acts as a message distributor between clients, but also functions as a “cloud”-like server that provides or stores scenes. It also keeps track of all registered clients, assigns them a unique ID, and notifies other clients as soon as their connection status changes. A client can communicate directly with the DataHub via the Command Message Protocol to, for example, start a scene distribution process or negotiate a new ID. The Datahub has a modular architecture, it consists of a fixed core and plugins that implement the individual functions. [0MQ](https://zeromq.org/) is used here for network communication. 
+The [DataHub](https://github.com/FilmakademieRnd/DataHub) is a part of the TRACER network infrastructure, but a separate application that acts as a message distributor between clients, but also functions as a “cloud”-like server that provides or stores scenes. It also keeps track of all registered clients, assigns them a unique ID, and notifies other clients as soon as their connection status changes. A client can communicate directly with the DataHub via the Command Message Protocol to, for example, start a scene distribution process or negotiate a new ID. The DataHub has a modular architecture, it consists of a fixed core and plugins that implement the individual functions. [0MQ](https://zeromq.org/) is used here for network communication. 
 
 ## Ports and Sockets
 
-TRACER uses [0MQ](https://zeromq.org/) (ZeroMQ) for network communication. Depending on the use case, different patterns are employed. These are provided in 0MQ via various socket types. The Request and Reply pattern is used for sending and receiving scenes, as well as for the Command Manager. Updates are sent and received via Publisher/Subscriber sockets, which run through an external server (DataHub) to distribute messages to any number of clients. Each client registers with its Publisher (UpdateSender) at the DataHub, and similarly, the client’s Subscriber (UpdateReceiver) registers with its corresponding Subscriber at the DataHub. A distinction is also made between whether TCP/IP sockets or WebSockets are used. TCP/IP is used for communication from an application, while WebSockets must be used for a web app or browser implementation. Accordingly, the ports used differ as listed below. 
+TRACER uses [0MQ](https://zeromq.org/) (ZeroMQ) for network communication. Depending on the use case, different patterns are employed. These are provided in 0MQ via various socket types. [The Request and Reply pattern](https://zguide.zeromq.org/docs/chapter3/) is used for sending and receiving scenes, as well as for the Command Manager. Updates are sent and received via Publisher/Subscriber sockets, which run through an external server (DataHub) to distribute messages to any number of clients. Each client registers with its Publisher [(UpdateSender)](https://github.com/FilmakademieRnd/TRACER/blob/master/Modules/NetworkManagerModules/UpdateSenderModule/UpdateSenderModule.cs) at the DataHub, and similarly, the client’s Subscriber [(UpdateReceiver)](https://github.com/FilmakademieRnd/TRACER/blob/master/Modules/NetworkManagerModules/UpdateReceiverModule/UpdateReceiverModule.cs) registers with its corresponding Subscriber at the DataHub. A distinction is also made between whether TCP/IP sockets or WebSockets are used. TCP/IP is used for communication from an application, while WebSockets must be used for a web app or browser implementation. Accordingly, the ports used differ as listed below. 
 
 ### TCP/IP
 
@@ -28,8 +28,8 @@ TRACER uses [0MQ](https://zeromq.org/) (ZeroMQ) for network communication. Depen
 
 # TRACER Implementation
 
-TRACER has a modular structure but is initialized from a central core. All included functionality is categorized by managers. The implementation of the functionalities is carried out by modules associated with these managers.In other words, apart from core and management functionality, everything else is implemented via modules. TRACER, with its core, managers, and their modules, “lives” independently or within a host application such as Unreal, Blender, Maya, Unity, etc. 
-Modules should be interchangeable at any time and therefore must not have any direct dependencies on each other. Communication between modules and the system takes place via subscription to events; communication between modules is only permitted via managers. 
+TRACER has a modular structure but is initialized from a central [Core](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Core.cs). All included functionality is categorized by managers. The implementation of the functionalities is carried out by modules associated with these managers.In other words, apart from core and management functionality, everything else is implemented via modules. TRACER, with its core, managers, and their modules, “lives” independently or within a host application such as Unreal, Blender, Maya, Unity, etc. 
+**Modules should be interchangeable at any time and therefore must not have any direct dependencies on each other. Communication between modules and the system takes place via subscription to events; communication between modules is only permitted via managers.** 
 
 ## Core
 
@@ -40,11 +40,11 @@ It initializes managers, update events, and global settings. It is also the elem
 
 Managers categorize the various functionalities, thereby creating the basic structure for TRACER. They also manage the respective modules and enable communication between them .Every manager has a Settings class as a member. The values of a parameter defined within this Settings class are automatically saved when the host application is closed and reloaded the next time it starts.  
 The existing Categories can be expanded depending on the required functionality. Currently, the following categories exist:\
-**Input**: Summarizes user-generated physical data that flows into a client. E.g., tracking, touch, controller, etc.\
-**Animation**: Animation of parameters, keys, timeline.\
-**Network**: Data exchange via network, synchronization of a scene, but also individual parameters and server commands.\
-**Scene**: Defines and manages a scene structure. Scenes can be classic 3D scenes with scene graphs, geometry, materials, etc., but also menu and logic functionalities and their interaction with the host engine (see ParameterObject!).\
-**UI**: Creates and manages user interfaces and their interaction with the system.
+[**Input**](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Managers/InputManager/InputManager.cs): Summarizes user-generated physical data that flows into a client. E.g., tracking, touch, controller, etc.\
+[**Animation**](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Managers/AnimationManager/AnimationManager.cs): Animation of parameters, keys, timeline.\
+[**Network**](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Managers/NetworkManager/NetworkManager.cs): Data exchange via network, synchronization of a scene, but also individual parameters and server commands.\
+[**Scene**](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Managers/SceneManager/SceneManager.cs): Defines and manages a scene structure. Scenes can be classic 3D scenes with scene graphs, geometry, materials, etc., but also menu and logic functionalities and their interaction with the host engine (see ParameterObject!).\
+[**UI**](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Managers/UIManager/UIManager.cs): Creates and manages user interfaces and their interaction with the system.
 
 ## Modules
 
@@ -56,10 +56,11 @@ Independent instances of a module class that must be assigned to a single manage
 Parameters provide typed container classes that encapsulate any data type. They enable data exchange with event signaling within TRACER. They also implement the serialization and deserialization of their data. 
 
 ## Parameter Object
-Concept for structuring parameters and connect TRACER with arbitrary Host Applications. It combines parameters and makes them available for more complex logic, which is to be implemented within the ParameterObject. It also establishes the connection to the host application and ensures that values and parameters of the host application are tracked and modified if necessary. This is achieved through inheritance or component patterns (depending on the host application).
+Concept for structuring parameters and connect TRACER with arbitrary Host Applications. It combines parameters and makes them available for more complex logic, which is to be implemented within the [ParameterObject](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Parameters/ParameterObject.cs). It also establishes the connection to the host application and ensures that values and parameters of the host application are tracked and modified if necessary. This is achieved through inheritance or component patterns (depending on the host application).
 When creating an instance (inheritance) or adding to a host application object (component), the newly created parameter object is automatically added to a database, which is accessible at any time via the SceneManager. Each newly created parameter object is assigned a unique ID, which allows it to be identified at any time. 
-A module must also implement monitoring of its parameters so that it sends out an event as soon as one of its own parameters changes. This enables parameters to be monitored. This concept was introduced in order to bundle chaotic parameter changes in an object-oriented manner, thereby making them clearer and more efficient. 
+A Parameter Object must also implement monitoring of its parameters so that it sends out an event as soon as one of its own parameters changes. This enables parameters to be monitored. This concept was introduced in order to bundle chaotic parameter changes in an object-oriented manner, thereby making them clearer and more efficient. 
 —> Used, for example, to update TRACER Client internal components, network communication, and trigger system events.
+The [SceneObject](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/SceneObjects/SceneObject.cs) is a specialization of the ParameterObject. It implements additional functionality for 3D objects, such as position, rotation, and scaling. Other specializations exist to represent, for example, cameras, light sources, or skinned geometries.
 
 ## Parameter Update Message
 <img src="/.doc/img/UpdateMessage+Key.png" height="250">
@@ -67,7 +68,7 @@ A module must also implement monitoring of its parameters so that it sends out a
 These messages are used to transfer parameter updates via 0MQ over network. Messages are sent at most once per engine update tick. However, any number of parameter updates can be included in such a message. A message consists of a header and a list of all parameter updates within the last engine tick. 
 
 ### Message Header
-**ClienID \<byte\>**: The unique ID of the local Tracer instance, given by the DataHub. Fallback: if no DataHub is reachable, the last Tuple of the lacal IP is used.
+**ClienID \<byte\>**: The unique ID of the local Tracer instance, given by the DataHub. Fallback: if no DataHub is reachable, the last Tuple of the local IP is used.
 
 **Time \<byte\>**: The current time in frames (only for sync). Will be increased depending on the framerate within engines update intervall and reseted if counter exceeds 255, but also needs to be a multiple of the current local framerate.  
 
@@ -88,7 +89,7 @@ enum MessageType : byte{
 ### Parameter Update
 **SceneID \<byte\>**: ID determine to which scene (or server) a SceneObject belongs. 255 is the default scene ID. ParameterObjects or SceneObjects only existing locally are assigned the scene ID 255. Objects that are created locally during runtime and are intended to interact with the network will have the local client ID as their SceneID. Objects received via network will get the sender ID as SceneID.
 
-**SceneObjectID \<short\>**: Unique ID to identify a SceneObject in a scene. This ID will be created automaticly when a SceneObject is created or attached to a GameObject.
+**SceneObjectID \<short\>**: Unique ID to identify a SceneObject in a scene. This ID will be created automaticly when a SceneObject is created or attached to a host application specific object like a light, camera, or mesh.
 
 **ParameterID \<short\>**: Unique ID to identify a parameter within it‘s SceneObject. This ID will be created automaticly when a parameter is added to a SceneObject. Parameters living outside a SceneObject or ParameterObject will not be tracked by the system and therefore cannot trigger any event.
 
@@ -127,11 +128,11 @@ enum KeyType : byte{
  2 BEZIER }
 ```
 
-**KeyTime \<float\>**: The time value of a key.
+**KeyTime \<float\>**: The time value of a key in seconds.
 
-**KeyTangentTime1 \<float\>**: The left tangent time value of a key.
+**KeyTangentTime1 \<float\>**: The left tangent time value of a key in seconds.
 
-K**eyTangentTime2 \<float\>**: The right tangent time value of a key.
+K**eyTangentTime2 \<float\>**: The right tangent time value of a key in seconds.
 
 **KeyValue \<T\>**: A value with the same type of the key‘s parent parameter value as a byte stream.
 
@@ -140,12 +141,12 @@ K**eyTangentTime2 \<float\>**: The right tangent time value of a key.
 **KeyTangentValue2 \<T\>**: The right tangent value, with the same type of the key‘s parent parameter value as a byte stream.
 
 ## Command Message
-Command messages are implemented via a separate, independent message port and are used to communicate with the DataHub. The messages are modeled similar to an RPC with parameter return and can be generated asynchronously by the user via the network manager. When a command message is sent, the sender waits for a response from the DataHub for a predetermined period of time. If this time limit is exceeded, the request is discarded. 
+Command messages are implemented via a separate, independent message port and are used exclusively to communicate with the DataHub. The messages are modeled similar to an RPC with parameter return and can be generated asynchronously by the user via the network manager. When a command message is sent, the sender waits for a response from the DataHub for a predetermined period of time. If this time limit is exceeded, the request is discarded. 
 CommandMessages are currently used to **measure the quality of the network connection** to the DataHub, to **obtain a unique ID**, to **trigger the sending and receiving of scenes** to and from the DataHub, and to **retrieve information about the scenes** available on the DataHub.
 
 <img src="/.doc/img/CommandMessage.png" height="150">
 
-**ClienID \<byte\>**: The unique ID of the local Tracer instance, given by the DataHub. Fallback: if no DataHub is reachable, the last Tuple of the lacal IP is used.
+**ClienID \<byte\>**: The unique ID of the local Tracer instance, given by the DataHub. Fallback: if no DataHub is reachable, the last Tuple of the local IP is used.
 
 **Time \<byte\>**: The current time in frames (only for sync). Will be increased depending on the framerate within engines update intervall and reseted if counter exceeds 255, but also needs to be a multiple of the current local framerate.
 
@@ -164,7 +165,7 @@ enum DataHubMessageType
 
 ## Scene Description
 
-The TRACER scene description is a proprietary binary format that allows storing 3D scenes and general parameter structures. It is divided into packages that categorize the scene by **header** with scene specific information, **scene graph** with object types, **geometry**, **characters**, **materials**, **textures**, and generalized **parameter objects**. Based on this structure, 3D data is created, stored, and transmitted. By dividing the data into packages, it is relatively easy to version a scene, by saving versions of the scene graph (NodePackage). 
+The [TRACER scene description](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Managers/SceneManager/SceneDataDefinition.cs) is a proprietary binary format that allows storing 3D scenes and general parameter structures. It is divided into packages that categorize the scene by **header** with scene specific information, **scene graph** containing an object hierarchy and their properties, **geometry**, **characters**, **materials**, **textures**, and generalized **parameter objects**. Based on this structure, 3D data is created, stored, and transmitted. By dividing the data into packages, it is relatively easy to version a scene, by saving versions of the scene graph (NodePackage). 
 
 ### Header
 Package containing global scene settings.
@@ -179,7 +180,7 @@ Package containing global scene settings.
 
 ### Node Package 
 
-The Node Package defines the scne graph of a scene. It contains the tree structure as well as the types, properties, and references of the respective nodes. While the properties and references are fields of the nodes, the types and extensions are realized through inheritance.  
+The Node Package defines the scene graph of a scene. It contains the tree structure as well as the types, properties, and references of the respective nodes. While the properties and references are fields of the nodes, the types and extensions are realized through inheritance.  
 
 <img src="/.doc/img/SceneNodes.png" width="350">
 
@@ -195,9 +196,9 @@ The Node Package defines the scne graph of a scene. It contains the tree structu
 
 **name <byte[64]>**: Name of the node.
 
-**geoID \<int\>**: ID for referencing the associated geometry data.
+**geoID \<int\>**: ID for referencing the associated geometry data stored in object package.
 
-**materialID \<int\>**: The ID for referencing the associated material data.
+**materialID \<int\>**: The ID for referencing the associated material data stored in material package.
 
 **color \<float4\>**: The color if the node has no material assigned.
 
@@ -229,13 +230,13 @@ An object package contains all geometry data for an object. This data is referen
 
 **bWSize \<int\>**: The number of blend weights and bone indices in one object package.
 
-**mesh <Mesh (Unity type)>**: Optional, a mesh stord in the Unity format. Can be empty.
+**mesh <Mesh (Unity type)>**: Optional, a mesh stored in the Unity format. Can be empty.
 
 **vertices <float[]>**: An array of float storing the vertex positions as x,y,z coordinates in local space.
 
 **indices <int[]>**: An array of int storing the indices.
 
-**normals <float[]>**: An array of float storing the normals as x,y,z in local sapce.
+**normals <float[]>**: An array of float storing the normals as x,y,z in local space.
 
 **uvs <float[]>**: An array of float storing the UVs as x,y coordinates.
 
@@ -245,7 +246,7 @@ An object package contains all geometry data for an object. This data is referen
 
 ### Character Package
 
-A Character Package contains all ata to create a sceleton and bind it‘s corresponding scene node, including the referenced geomety to it.
+A Character Package contains all ata data to create a skeleton skeleton and bind it‘s corresponding scene node, including the referenced geomety geometry to it.
 
 <img src="/.doc/img/CharacterPkg.png" height="150">
 
@@ -253,11 +254,11 @@ A Character Package contains all ata to create a sceleton and bind it‘s corres
 
 **sSize \<int\>**: The size of the skeleton array.
 
-**characterRootId \<int\>**: The object ID of the root of the character in the scenegraph.
+**characterRootId \<int\>**: The object ID of the root of the character in the scene graph.
 
 **boneMapping <int[]>**: The array of IDs for referencing the associated bone objects.
 
-**skeletonMapping <int[]>**: The array of IDs for referencing the sceleton objects.
+**skeletonMapping <int[]>**: The array of IDs for referencing the skeleton objects.
 
 **bonePosition <float[]>**: The array of bone positions for this character as vec3[].
 
@@ -274,13 +275,13 @@ An texture package contains all data to create a texture. This data is reference
 
 **colorMapDataSize \<int\>**: The size of the texture raw data in bytes.
 
-**width \<int\>**: The width of the texture in pexels.
+**width \<int\>**: The width of the texture in pixels.
 
 **height \<int\>**: The height of the texture in pixels.
 
 **format \<byte\>**: Enumeration storing the textures format (0-59).
 
-**texture <Texture (Unity type)>**: Optional, a texture stord in the Unity format. Can be empty.
+**texture <Texture (Unity type)>**: Optional, a texture stored in the Unity format. Can be empty.
 
 **colorMapData <byte[]>**: The array of bytes storing the raw texture data.
 
@@ -353,7 +354,7 @@ A material package contains all the data needed to create a referenceable materi
 
 shaderProperties <byte[]>: The properties respective value as a byte stream.
 
-### Parameter Package
+### ParameterObject Package
 
 The ParameterObjectPackage allows to generate parameters and their parent ParameterObjects at runtime, as well as save and load them in scenes.
 
@@ -372,7 +373,7 @@ The ParameterObjectPackage allows to generate parameters and their parent Parame
 
 ## Menu System
 
-TRACER also provides a “mini-markup language” for creating menu structures. The MenuTree class implements a tree structure and functions that allow nested tree structures—including layout and simple GUI elements—to be organized into menus directly within the source code. TRACER parameters can also be used directly by automatically linking to appropriate GUI elements based on their type. Using Unity as the Host Application, the code block below will be used to generate the menu shown in the image. The Parameter with the type Action links to a defined function called every time the Button will be clicked. A corresponding text box is generated for the manager's string parameter. All elements are listed in the specified hierarchy, sorted visually in horizontal and vertical alignment groups.  
+TRACER also provides a “mini-markup language” for creating menu structures. The [MenuTree class](https://github.com/FilmakademieRnd/TRACER/blob/master/Core/Menus/MenuTree.cs) implements a tree structure and functions that allow nested tree structures—including layout and simple GUI elements—to be organized into menus directly within the source code. TRACER parameters can also be used directly by automatically linking to appropriate GUI elements based on their type. Using Unity as the Host Application, the code block below will be used to generate the menu shown in the image. The Parameter with the type Action links to a defined function called every time the Button will be clicked. A corresponding text box is generated for the manager's string parameter. All elements are listed in the specified hierarchy, sorted visually in horizontal and vertical alignment groups.  
 
 <img src="/.doc/img/Menu.png" height="250">
 
