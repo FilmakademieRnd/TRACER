@@ -159,7 +159,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""OrbitClick"",
                     ""type"": ""Button"",
                     ""id"": ""a950519f-0476-42db-83cd-857c420abf2e"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -168,7 +168,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""DragClick"",
                     ""type"": ""Button"",
                     ""id"": ""d0d60628-4b7a-45b7-9566-8f68e73cc8fb"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -307,6 +307,15 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""OnPrimaryPointerDown"",
+                    ""type"": ""Button"",
+                    ""id"": ""9354ff82-3767-4fbd-9a6d-3ced7d5cd2a3"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -771,6 +780,28 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""action"": ""DragClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""88894768-8e31-479b-8aa8-83738edbb292"",
+                    ""path"": ""<Mouse>/leftButton"",
+                    ""interactions"": ""Tap"",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnPrimaryPointerDown"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7f71ec5d-25d4-43cd-b714-615048531da8"",
+                    ""path"": ""<Touchscreen>/primaryTouch/tap"",
+                    ""interactions"": ""Tap"",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnPrimaryPointerDown"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -803,6 +834,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_Controller_Right_Shoulder = m_VPETMap.FindAction("Controller_Right_Shoulder", throwIfNotFound: true);
         m_VPETMap_Controller_Left_Stick = m_VPETMap.FindAction("Controller_Left_Stick", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
+        m_VPETMap_OnPrimaryPointerDown = m_VPETMap.FindAction("OnPrimaryPointerDown", throwIfNotFound: true);
     }
 
     ~@Inputs()
@@ -907,6 +939,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_Controller_Right_Shoulder;
     private readonly InputAction m_VPETMap_Controller_Left_Stick;
     private readonly InputAction m_VPETMap_Controller_Right_Stick;
+    private readonly InputAction m_VPETMap_OnPrimaryPointerDown;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
     /// </summary>
@@ -1015,6 +1048,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @Controller_Right_Stick => m_Wrapper.m_VPETMap_Controller_Right_Stick;
         /// <summary>
+        /// Provides access to the underlying input action "VPETMap/OnPrimaryPointerDown".
+        /// </summary>
+        public InputAction @OnPrimaryPointerDown => m_Wrapper.m_VPETMap_OnPrimaryPointerDown;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_VPETMap; }
@@ -1112,6 +1149,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right_Stick.started += instance.OnController_Right_Stick;
             @Controller_Right_Stick.performed += instance.OnController_Right_Stick;
             @Controller_Right_Stick.canceled += instance.OnController_Right_Stick;
+            @OnPrimaryPointerDown.started += instance.OnOnPrimaryPointerDown;
+            @OnPrimaryPointerDown.performed += instance.OnOnPrimaryPointerDown;
+            @OnPrimaryPointerDown.canceled += instance.OnOnPrimaryPointerDown;
         }
 
         /// <summary>
@@ -1195,6 +1235,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right_Stick.started -= instance.OnController_Right_Stick;
             @Controller_Right_Stick.performed -= instance.OnController_Right_Stick;
             @Controller_Right_Stick.canceled -= instance.OnController_Right_Stick;
+            @OnPrimaryPointerDown.started -= instance.OnOnPrimaryPointerDown;
+            @OnPrimaryPointerDown.performed -= instance.OnOnPrimaryPointerDown;
+            @OnPrimaryPointerDown.canceled -= instance.OnOnPrimaryPointerDown;
         }
 
         /// <summary>
@@ -1403,5 +1446,12 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_Right_Stick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "OnPrimaryPointerDown" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnOnPrimaryPointerDown(InputAction.CallbackContext context);
     }
 }

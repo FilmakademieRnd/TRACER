@@ -66,7 +66,8 @@ namespace tracer
         
         public event EventHandler<Vector2> tappedEvent;
 
-        //!
+
+        //! 
         //! Press start event, i.e. the begin of a click.
         //!
         //public event EventHandler<Vector2> inputPressTapp;
@@ -318,11 +319,79 @@ namespace tracer
         //! the position buffer for a two finger camera manipulation
         //!
         private SeparateBufferClass m_posBuffer;
+
         //!
         //! the distance (zoom) buffer for a two finger camera manipulation
         //!
         private SeparateBufferClass m_distBuffer;
 
+        #region NewInteraction
+
+        //they will be invoked by e.g. ProcessMainTriggerDown (which will be called from the SubModules - beware to only call once per frame, it may be possible to have touch, mouse and button simultan?)
+        public event EventHandler<Vector2> onMainTrigger, onMainTriggerDouble, onMainTriggerDrag;   //also for second and third; and add an arbitrary onPinch?
+
+        //!
+        //! Constructor initializing member variables.
+        //!
+        public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore){
+            // Enable input
+            m_inputs = new Inputs();    //TODO: remove, since it's Unity specific!
+            m_inputs.VPETMap.Enable();
+
+            m_inputs.VPETMap.Position.performed += ProcessPositionInput;
+
+            //is mapped to primary touch and left mouse click as tap interaction (below 0.2s, no hold)
+            //this "subscription" should be performed by an e.g. MouseInputModule, TouchInputModule.
+            //And they would execute an ProcessMainTriggerDown which leads to event invocation
+            m_inputs.VPETMap.OnPrimaryPointerDown.performed += ProcessMainTriggerDown;
+
+            m_posBuffer = new SeparateBufferClass();
+            m_distBuffer = new SeparateBufferClass();
+            
+            m_raycastList = new List<RaycastResult>(5);
+        }
+
+        private void ProcessPositionInput(InputAction.CallbackContext obj){ 
+            // Get the position
+            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            m_posBuffer.SetBufferOnce(pos);
+            // Update buffer
+            m_posBuffer.OverrideBuffer(pos);
+        }
+
+        //!
+        //! Input press start function, for monitoring the start of touch/click interaction and 
+        //! decide whether we hit something (must not trigger on HOLD)
+        //!
+        private void ProcessMainTriggerDown(InputAction.CallbackContext c){
+            
+            Debug.Log("<color=yellow>MAIN TRIGGER DOWN</color>");
+
+            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            
+            Ray debugRay = Camera.main.ScreenPointToRay(point);
+            Debug.DrawRay(debugRay.origin, debugRay.direction*100, Color.yellow, 2f);
+
+            if(TappedUI(point)){
+                Debug.Log("HIT 2D UI");
+                m_inputLayerType = InputLayerType.UI;
+                inputPressStartedUI?.Invoke(this, point);
+            }else if(Tapped3DUI(point)){
+                Debug.Log("HIT 3D UI");
+                m_inputLayerType = InputLayerType.WORLD;
+                inputPressStarted?.Invoke(this, point);
+            }else{
+                Debug.Log("hit nothing");
+                m_inputLayerType = InputLayerType.SCREEN;
+                inputPressStarted?.Invoke(this, point);
+            }
+
+        }
+
+
+        #endregion
+
+        /*
         //!
         //! Constructor initializing member variables.
         //!
@@ -349,7 +418,6 @@ namespace tracer
 
             // Dedicated bindings for monitoring touch and drag interactions
             m_inputs.VPETMap.Click.started += ctx => PressStarted(ctx);
-            //m_inputs.VPETMap.Click.performed += ctx => PressPerformed(ctx);
             m_inputs.VPETMap.Click.canceled += ctx => PressEnd(ctx);
             
             
@@ -370,8 +438,8 @@ namespace tracer
             m_inputs.VPETMap.Controller_Left_Stick.canceled += ctx => LeftStick(ctx);
             m_inputs.VPETMap.Controller_Right_Stick.performed += ctx => RightStick(ctx);
             m_inputs.VPETMap.Controller_Right_Stick.canceled += ctx => RightStick(ctx);
-            m_inputs.VPETMap.Controller_Left_Stick.canceled += ctx => StickCanceld(ctx);;
-            m_inputs.VPETMap.Controller_Right_Stick.canceled += ctx => StickCanceld(ctx);;
+            m_inputs.VPETMap.Controller_Left_Stick.canceled += ctx => StickCanceld(ctx);
+            m_inputs.VPETMap.Controller_Right_Stick.canceled += ctx => StickCanceld(ctx);
 
             
             // Keep track of cursor/touch move
@@ -408,11 +476,13 @@ namespace tracer
             m_inputs.VPETMap.MiddleClick.canceled += MiddleClick_ended;
             
 #endif
+
             m_posBuffer = new SeparateBufferClass();
             m_distBuffer = new SeparateBufferClass();
             
             m_raycastList = new List<RaycastResult>(5);
         }
+        */
 
         #region Controller Button Events Invoke
         private void LeftShoulderButtonPressed(InputAction.CallbackContext ctx)
@@ -525,13 +595,13 @@ namespace tracer
         //!
         //! Function to handle mouse movement for camera operation (editor only)
         //!
-        private void Position_performed(InputAction.CallbackContext obj)
-        {
-            if (orbitClick)
-            {
-                Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+        private void Position_performed(InputAction.CallbackContext obj){
+            
+            // Grab the position
+            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            m_posBuffer.SetBufferOnce(pos);
 
-                m_posBuffer.SetBufferOnce(pos);
+            if (orbitClick){
 
                 Vector2 bufferedValueDifference = pos - m_posBuffer.GetBufferValue();
 
@@ -545,13 +615,10 @@ namespace tracer
 
                 //HACK TO update gizmo size!
                 fingerGestureEvent?.Invoke(this, true);
-            }
-            else if (dragClick)
-            {
-                // Grab the position
-                Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
 
-                m_posBuffer.SetBufferOnce(pos);
+            }else if (dragClick){
+                
+                // Invoke event
 
                 // Invoke event
                 threeDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
@@ -688,7 +755,10 @@ namespace tracer
         {
             base.Cleanup();
 
-            m_inputs.VPETMap.Tap.performed -= TapFunction;
+            m_inputs.VPETMap.Position.performed -= ProcessPositionInput;
+            m_inputs.VPETMap.OnPrimaryPointerDown.performed -= ProcessMainTriggerDown;
+
+ /*         m_inputs.VPETMap.Tap.performed -= TapFunction;
 
             m_inputs.VPETMap.Click.started -= PressStarted;
             //m_inputs.VPETMap.Click.performed -= PressPerformed;
@@ -724,8 +794,9 @@ namespace tracer
             
             m_inputs.VPETMap.Controller_Left_Stick.canceled -= StickCanceld;
             m_inputs.VPETMap.Controller_Right_Stick.canceled -= StickCanceld;
-            
+*/        
 
+/*
 #if UNITY_EDITOR
             // Editor-only mouse camera manipulation
             m_inputs.VPETMap.OrbitClick.performed -= OrbitClick_performed;
@@ -741,6 +812,7 @@ namespace tracer
             m_inputs.VPETMap.MiddleClick.performed -= MiddleClick_performed;
             m_inputs.VPETMap.MiddleClick.canceled -= MiddleClick_ended;
 #endif
+*/
         }
 
         public void enableAttitudeSensor()

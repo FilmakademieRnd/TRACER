@@ -1,4 +1,5 @@
 {
+    "version": 1,
     "name": "Inputs",
     "maps": [
         {
@@ -72,7 +73,7 @@
                     "name": "OrbitClick",
                     "type": "Button",
                     "id": "a950519f-0476-42db-83cd-857c420abf2e",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -81,7 +82,7 @@
                     "name": "DragClick",
                     "type": "Button",
                     "id": "d0d60628-4b7a-45b7-9566-8f68e73cc8fb",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -220,6 +221,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "OnPrimaryPointerDown",
+                    "type": "Button",
+                    "id": "9354ff82-3767-4fbd-9a6d-3ced7d5cd2a3",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -682,6 +692,28 @@
                     "processors": "",
                     "groups": "",
                     "action": "DragClick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "88894768-8e31-479b-8aa8-83738edbb292",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "Tap",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnPrimaryPointerDown",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7f71ec5d-25d4-43cd-b714-615048531da8",
+                    "path": "<Touchscreen>/primaryTouch/tap",
+                    "interactions": "Tap",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnPrimaryPointerDown",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
