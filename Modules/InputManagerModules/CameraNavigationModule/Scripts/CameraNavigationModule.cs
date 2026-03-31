@@ -162,7 +162,7 @@ namespace tracer
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged += SelectionUpdate;
             // Subscribe to focus event
-            uiManager.selectionFocus += FocusOnSelection;
+            uiManager.selectionFocus += FocusOnSelection;   //change behaviour? subscribe to double click
 
             // Subscribe to camera change
             manager.updateCameraUICommand += CameraUpdated;
