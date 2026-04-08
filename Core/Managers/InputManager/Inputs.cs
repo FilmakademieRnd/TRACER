@@ -309,7 +309,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": true
                 },
                 {
-                    ""name"": ""OnPrimaryPointerDown"",
+                    ""name"": ""OnPrimaryInputClick"",
                     ""type"": ""Button"",
                     ""id"": ""9354ff82-3767-4fbd-9a6d-3ced7d5cd2a3"",
                     ""expectedControlType"": """",
@@ -788,7 +788,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""interactions"": ""Tap"",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""OnPrimaryPointerDown"",
+                    ""action"": ""OnPrimaryInputClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -799,7 +799,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""interactions"": ""Tap"",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""OnPrimaryPointerDown"",
+                    ""action"": ""OnPrimaryInputClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -834,7 +834,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_Controller_Right_Shoulder = m_VPETMap.FindAction("Controller_Right_Shoulder", throwIfNotFound: true);
         m_VPETMap_Controller_Left_Stick = m_VPETMap.FindAction("Controller_Left_Stick", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
-        m_VPETMap_OnPrimaryPointerDown = m_VPETMap.FindAction("OnPrimaryPointerDown", throwIfNotFound: true);
+        m_VPETMap_OnPrimaryInputClick = m_VPETMap.FindAction("OnPrimaryInputClick", throwIfNotFound: true);
     }
 
     ~@Inputs()
@@ -939,7 +939,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_Controller_Right_Shoulder;
     private readonly InputAction m_VPETMap_Controller_Left_Stick;
     private readonly InputAction m_VPETMap_Controller_Right_Stick;
-    private readonly InputAction m_VPETMap_OnPrimaryPointerDown;
+    private readonly InputAction m_VPETMap_OnPrimaryInputClick;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
     /// </summary>
@@ -1048,9 +1048,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @Controller_Right_Stick => m_Wrapper.m_VPETMap_Controller_Right_Stick;
         /// <summary>
-        /// Provides access to the underlying input action "VPETMap/OnPrimaryPointerDown".
+        /// Provides access to the underlying input action "VPETMap/OnPrimaryInputClick".
         /// </summary>
-        public InputAction @OnPrimaryPointerDown => m_Wrapper.m_VPETMap_OnPrimaryPointerDown;
+        public InputAction @OnPrimaryInputClick => m_Wrapper.m_VPETMap_OnPrimaryInputClick;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1149,9 +1149,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right_Stick.started += instance.OnController_Right_Stick;
             @Controller_Right_Stick.performed += instance.OnController_Right_Stick;
             @Controller_Right_Stick.canceled += instance.OnController_Right_Stick;
-            @OnPrimaryPointerDown.started += instance.OnOnPrimaryPointerDown;
-            @OnPrimaryPointerDown.performed += instance.OnOnPrimaryPointerDown;
-            @OnPrimaryPointerDown.canceled += instance.OnOnPrimaryPointerDown;
+            @OnPrimaryInputClick.started += instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputClick.performed += instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputClick.canceled += instance.OnOnPrimaryInputClick;
         }
 
         /// <summary>
@@ -1235,9 +1235,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right_Stick.started -= instance.OnController_Right_Stick;
             @Controller_Right_Stick.performed -= instance.OnController_Right_Stick;
             @Controller_Right_Stick.canceled -= instance.OnController_Right_Stick;
-            @OnPrimaryPointerDown.started -= instance.OnOnPrimaryPointerDown;
-            @OnPrimaryPointerDown.performed -= instance.OnOnPrimaryPointerDown;
-            @OnPrimaryPointerDown.canceled -= instance.OnOnPrimaryPointerDown;
+            @OnPrimaryInputClick.started -= instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputClick.performed -= instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputClick.canceled -= instance.OnOnPrimaryInputClick;
         }
 
         /// <summary>
@@ -1447,11 +1447,11 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_Right_Stick(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "OnPrimaryPointerDown" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "OnPrimaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnOnPrimaryPointerDown(InputAction.CallbackContext context);
+        void OnOnPrimaryInputClick(InputAction.CallbackContext context);
     }
 }

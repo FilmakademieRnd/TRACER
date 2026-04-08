@@ -325,39 +325,176 @@ namespace tracer
         //!
         private SeparateBufferClass m_distBuffer;
 
+
         #region NewInteraction
 
-        //they will be invoked by e.g. ProcessMainTriggerDown (which will be called from the SubModules - beware to only call once per frame, it may be possible to have touch, mouse and button simultan?)
-        public event EventHandler<Vector2> onMainTrigger, onMainTriggerDouble, onMainTriggerDrag;   //also for second and third; and add an arbitrary onPinch?
+        public enum LayerToOperate{
+            ui2d = 10,
+            ui3d = 20,
+            selectable = 30,
+            world = 40
+        }
+        private LayerToOperate layerToOperate = LayerToOperate.world;
+
+        public class InputEventHandlerArgs: EventArgs{
+            public SceneObject obj { get; set; }    //sceneobject that was hit/we use (may be zero and gathered within subscribed function)
+            public Vector3 pos { get; set; }        //screen position or world
+            public Vector3 delta { get; set; }      //can be used as delta or additional pos if necessary
+            public InputEventHandlerArgs(SceneObject _obj, Vector3 _pos, Vector3 _delta){
+                obj = _obj; pos = _pos; delta = _delta;
+            }
+        }
+
+        //these will be invoked by e.g. ProcessMainTriggerDown (which will be called from the SubModules - beware to only call once per frame, it may be possible to have touch, mouse and button simultan?)
+
+        public event EventHandler<InputEventHandlerArgs> onPrimaryInteract2dUI, onPrimaryInteract3dUI, onPrimaryInteractSelectable, onPrimaryInteractWorld;
+        public event EventHandler<InputEventHandlerArgs> onPrimaryDrag2dUI, onPrimaryDrag3dUI, onPrimaryDragSelectable, onPrimaryDragWorld;
+
+        //!
+        //! simply set the layer we operate at, used in every Process.. function
+        //! @param lay: layer we are on, 2dUI, 3dUI, Selectable, World
+        //! 
+        public void SetLayerToOperate(LayerToOperate lay){
+            layerToOperate = lay;
+            //may be locked?
+        }
+
+        //!
+        //! @param pos: world or screen pos
+        //! @param hitObj: the object we hit (if applicable)
+        //!
+        public void ProcessPrimaryInteract(Vector3 pos, SceneObject hitObj){
+            //use downwards if eventhandler is empty?
+            switch (layerToOperate){
+                case LayerToOperate.ui2d:
+                    //ignore if in unity, buttons will execute stuff
+                    //or utilize, e.g. for color picker
+                    onPrimaryInteract2dUI?.Invoke(this, new InputEventHandlerArgs(hitObj, pos, Vector3.zero));
+                    return;
+                case LayerToOperate.ui3d:
+                    //do something on the 3d ui, may select (if 3d icon), may cycle through sth (pos, rot, scale, etc ...)
+                    onPrimaryInteract3dUI?.Invoke(this, new InputEventHandlerArgs(hitObj, pos, Vector3.zero));
+                    return;
+                case LayerToOperate.selectable:
+                    //e.g. select object
+                    onPrimaryInteractSelectable?.Invoke(this, new InputEventHandlerArgs(hitObj, pos, Vector3.zero));
+                    return;
+                case LayerToOperate.world:
+                    //e.g. clicked nowhere or at point in space (most likely hitObj is null)
+                    onPrimaryInteractWorld?.Invoke(this, new InputEventHandlerArgs(hitObj, pos, Vector3.zero));
+                    return;
+            }
+        }
+
+        //!
+        //! @param pos: world or screen pos
+        //! @param delta: world or screen delta (most likely only v2)
+        //! @param hitObj: the object we hit earlier (if applicable), 
+        //!     used here, because we checked it for layerToOperate earlier and we do not need to gather it again
+        //!
+        public void ProcessPrimaryDrag(Vector3 pos, Vector3 delta, SceneObject usedObj){
+            switch (layerToOperate){
+                case LayerToOperate.ui2d:
+                    //ignore if in unity, buttons will execute stuff
+                    //or utilize, e.g. for color picker
+                    onPrimaryDrag2dUI?.Invoke(this, new InputEventHandlerArgs(usedObj, pos, delta));
+                    return;
+                case LayerToOperate.ui3d:
+                    //e.g. move object by investigating which gizmo element was hit
+                    onPrimaryDrag3dUI?.Invoke(this, new InputEventHandlerArgs(usedObj, pos, delta));
+                    return;
+                case LayerToOperate.selectable:
+                    //e.g. move object
+                    onPrimaryDragSelectable?.Invoke(this, new InputEventHandlerArgs(usedObj, pos, delta));
+                    return;
+                case LayerToOperate.world:
+                    //e.g. look around, usedObj will most likely be zero
+                    onPrimaryDragWorld?.Invoke(this, new InputEventHandlerArgs(usedObj, pos, delta));
+                    return;
+            }
+        }
+
+        /*************************************************************************************
+        *                              FUNCTION WORDING
+        *   Process..       - receives these specific function calls and do internal checks
+        *   On..            - after checking for specific outcomes, raise these events
+        *
+        *   ..Primary..     - lmb, 1 finger
+        *   ..Secondary..   - rmb, 2 fingers
+        *   ..Tertiary..    - mmb, 3 fingers
+        *
+        *   ..Drag..        - down + move
+        *   ..Hold..        - down + stationary (within limits)
+        *   ..Interact..    - click, tap, controller-button-press
+        *
+        *   ..2dUI          - outcome was in 2D UI (e.g. Unity Canvas UI Button)
+        *   ..3dUI          - outcome was in 3D UI (e.g. our own 3D Gizmo implementation)
+        *   ..Selectable    - outcome was potential world (3d or 2d) selectable object
+        *   ..World         - outcome was something else, e.g. a static wall
+        *       //these come from modules, so we do not need to call unity functions here
+        *
+        *   #Examples
+        *       - ProcessPrimaryInteract-> OnPrimaryInteractSelectable      -> select object (lmb click,1f tap,controller a press)
+        *       - ProcessSecondaryDrag  -> OnSecondaryDrag2dUI              -> skim timeline (2f is right, mouse will be rmb than?)
+        *                               -> OnSecondaryDrag3dUI||Selectable  -> rotate object (2f, rmb)
+        *       - ProcessPrimaryDrag    -> OnPrimaryDragSelectable          -> obj != null, obj == selectedObj, move object (1f, lmb) (otherwise OnPrimaryDragWorld)
+        *       - ProcessPrimaryDrag    -> OnPrimaryDrag3dUI                -> manipulate object depending on gizmo (1f, lmb)
+        *       - ProcessTertiaryDrag   -> OnTertiaryDrag3dUI||Selectable   -> none? (3f, mmb) 
+        *                                   //should the above outcome exist? e.g. never 3dui/selectable 
+        *                                   //instead always mapped to world (screen) and utilize viewport navigation?
+        *       - ProcessPrimaryDrag    -> OnPrimaryModifiedDragWorld       -> move selected object (modifier + 1f/lmb/left thumbstick)
+        *                                   //Modif will never executes 2dUI/3dUI/Selectable
+        *       - ProcessSecondaryDrag  -> OnSecondaryModifiedDragWorld     -> rotate selected object (modifier + 2f/rmb/right thumbstick)
+        *       - ProcessTertiaryDrag   -> OnTertiaryModifiedDragWorld      -> scale selected object (modifier + 3f/mmb/lr trigger(?))
+        *                                   //Modif is keyboard button, ui button (touch) or controller
+        *
+        *   #Specifics
+        *       - ProcessZoom           -> OnZoom2dUI                       -> zooms in/out on timeline (scrollwheel, 2f, controller button + thumbstick)
+        *                                   //pnr cancels 1f, should both fingers be on 2dUI?
+        *                                   //will prevent ProcessSecondaryDrag to be called (when touch is used)
+        *                                   //cannot be differentiated within ProcessSecondaryDrag! (because of rmb)
+        *       - ProcessZoom           -> OnZoom3dUI||Selectable           -> if object already selected, scale it (scrollwheel, 2f) [if not, OnZoomWorld]
+        *       - ProcessRoll           -> OnRollWorld                      -> roll viewport (2f gesture, modifier + mouse)
+        *       - ProcessRoll           -> OnRoll3dUI||Selectable           -> if object already selected, rotate object (2f gesture) [if not, OnRollWorld]
+        *       - ProcessFocus          -> OnFocusObject                    -> focus current view/cam view on object (double click/tap, button/key press)
+        *  
+        *   #Open Questions
+        *       [d]oing implementation for Desktop/Web and see whats working and what not
+        *           ? not sure if InputManager should diff between e.g. touch and mouse for e.g. OnPrimaryModifiedDragWorld
+        *           to do something like orbit rotate for mouse, but object move on touch (strg <> 1f button hold)
+        *       ? do all "process" within module (check if 2f is modif + move <> instead pinch for example)
+        *       ? should ..Modified.. be additional functions or always #specifics that are executed?
+        *       ? do we need 'endEvents' e.g. when moving an object? because if we are (too) fast OnPrimaryDrag3dUI will become OnPrimaryDragWorld...
+        *           ? may we only check for the layer "at the start" and do not change it any further
+        *       ? do we need a "InputEnded" function? or "SpecificsEnd"?
+        *
+        *
+        *   #Decisions
+        *       ## event-naming and style
+        *       - OnSecondaryDrag2dUI/3dUI/Selectable/World events im IM haben (etwas unübersichtlich)
+        *       - Alternativ: OnSecondaryDrag(enum, ... ), aber dann würde alle Logik in den Modulen stattfinden müssen
+        *
+        *   #Further Info
+        *       - 2dUI events could be used by every button instead using unitys button function
+        *           that way, they would check (object == us)
+        *
+        *   #Ideas
+        *       - press space to toggle selectable objects in sight (&& range!), do so via controller as well
+        *       - cycle through gizmo type if it is clicked/tapped
+        *
+        *
+        **************************************************************************************/
+
 
         //!
         //! Constructor initializing member variables.
         //!
         public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore){
-            // Enable input
-            m_inputs = new Inputs();    //TODO: remove, since it's Unity specific!
-            m_inputs.VPETMap.Enable();
-
-            m_inputs.VPETMap.Position.performed += ProcessPositionInput;
-
-            //is mapped to primary touch and left mouse click as tap interaction (below 0.2s, no hold)
-            //this "subscription" should be performed by an e.g. MouseInputModule, TouchInputModule.
-            //And they would execute an ProcessMainTriggerDown which leads to event invocation
-            m_inputs.VPETMap.OnPrimaryPointerDown.performed += ProcessMainTriggerDown;
-
-            m_posBuffer = new SeparateBufferClass();
             m_distBuffer = new SeparateBufferClass();
-            
             m_raycastList = new List<RaycastResult>(5);
         }
 
-        private void ProcessPositionInput(InputAction.CallbackContext obj){ 
-            // Get the position
-            Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            m_posBuffer.SetBufferOnce(pos);
-            // Update buffer
-            m_posBuffer.OverrideBuffer(pos);
-        }
+
 
         //!
         //! Input press start function, for monitoring the start of touch/click interaction and 
@@ -754,9 +891,6 @@ namespace tracer
         public override void Cleanup()
         {
             base.Cleanup();
-
-            m_inputs.VPETMap.Position.performed -= ProcessPositionInput;
-            m_inputs.VPETMap.OnPrimaryPointerDown.performed -= ProcessMainTriggerDown;
 
  /*         m_inputs.VPETMap.Tap.performed -= TapFunction;
 
