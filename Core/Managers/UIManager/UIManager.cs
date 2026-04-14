@@ -191,6 +191,32 @@ namespace tracer
         //!
         public event EventHandler<AbstractParameter> m_manipulation3dDoneEvent;
 
+
+        #region Selectable SceneObject via Pixel Data    
+        // without ANY unity dependencie
+        // The Interface that any data provider must follow
+        public interface ISelectableSceneObjectProvider{
+            SceneObject GetSelectableViaScreenPosition(int x, int y);
+        }
+
+        //!
+        //! The currently active provider (can be null)
+        //!
+        private ISelectableSceneObjectProvider _dataProvider;
+
+        public void RegisterProvider(ISelectableSceneObjectProvider provider){ _dataProvider = provider; }
+        public void UnregisterProvider(){ _dataProvider = null; }
+
+        // Other pure C# managers or modules can call this!
+        public SceneObject GetSelectableAtPixel(int x, int y){
+            if (_dataProvider == null)
+                return null; // If the Unity module is missing, fail gracefully.
+
+            return _dataProvider.GetSelectableViaScreenPosition(x, y);
+        }
+        
+        #endregion
+
         //!
         //! Constructor initializing member variables.
         //!

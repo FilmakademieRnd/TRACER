@@ -21,57 +21,29 @@ if not go to https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------------
 */
 
-//! @file "PexelSelectorModule.cs"
-//! @brief implementation of the TRACER SelectionModule, a pixel precise selection method.
+//! @file "SelectionModule.cs"
+//! @brief implementation of the TRACER SelectionModule, for 3D selectable SceneObjects
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
-//! @version 0
-//! @date 23.11.2021
+//! @author Thomas Krüger
+//! @version 1
+//! @date 14.04.2026
+//! @changed outsourced color-array id calculation into IDExtractorModule
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
-using static UnityEditor.PlayerSettings;
 
-namespace tracer
-{
+namespace tracer{
     //!
     //! Module to be used per camera that provide selection from main camera.
     //! There can be multiple instances of this class, providing local camera space selection.
     //!
-    public class SelectionModule : UIManagerModule
-    {
-        //!
-        //! Name of the shader tag for the selection shader.
-        //!
-        private const string SelectableType = "SelectableType";
-        //!
-        //! Value od the shader tag for the selection shader.
-        //!
-        public const string Selectable = "Selectable";
-        //!
-        //! Name of the shader property holding the selectable _id.
-        //!
-        private const string m_SelectableIdPropertyName = "_SelectableId";
-        //!
-        //! The shater to be used for object ID rendering.
-        //!
-        private Shader objectIdShader;
-        //!
-        //! The render texture for the selection.
-        //!
-        private RenderTexture gpuTexture;
-        //!
-        //! The color/ID data to be stored in the CPU texture.
-        //!
-        private NativeArray<Color32> cpuData;
-        //!
-        //! Tracked materials with selectable tag.
-        //!
-        private readonly Dictionary<Material, Material> m_materials;
+    public class SelectionModule : UIManagerModule{
         //!
         //! A reference to the TRACER scene manager.
         //!
@@ -80,46 +52,13 @@ namespace tracer
         //! A reference to the TRACER input manager.
         //!
         private InputManager m_inputManager;
-        //!
-        //! Re-used property block used to set selectable _id.
-        //!
-        private MaterialPropertyBlock m_properties;
-        //!
-        //! Cached shader property _id of selectable _id.
-        //!
-        private int m_selectableIdPropertyId;
-        //!
-        //! Scaled width and height of render texture.
-        //!
-        private int dataWidth, dataHeight;
-        //!
-        //! Divides the screen resolution for the selection.
-        //!
-        private readonly float scaleDivisor = 0.25f;
-        //!
-        //! Flag to wait for execution to finish
-        //!
-        private bool m_gpuReadbackRequested = false;
-        //!
-        //! Flag to determine if touch is active.
-        //!
-        private bool m_isRenderActive = false;
-
-        public bool isRenderActive
-        {
-            set => m_isRenderActive = value;
-        }
-
+        
         //!
         //! Constructor
         //! @param name Name of this module
         //! @param _core Reference to the TRACER _core
         //!
-        public SelectionModule(string name, Manager manager) : base(name, manager)
-        {
-            objectIdShader = Resources.Load<Shader>("Shader/SelectableId");
-            m_materials = new Dictionary<Material, Material>();
-            m_selectableIdPropertyId = Shader.PropertyToID(m_SelectableIdPropertyName);
+        public SelectionModule(string name, Manager manager) : base(name, manager){
         }
 
         //! 
@@ -128,20 +67,13 @@ namespace tracer
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
         //! 
-        protected override void Init(object sender, EventArgs e)
-        {
-            //DEBUGGING
-            //Debug.unityLogger.logEnabled = false;
-
-            core.updateEvent += renderUpdate;
-           
+        protected override void Init(object sender, EventArgs e){
             m_sceneManager = core.getManager<SceneManager>();
             m_inputManager = core.getManager<InputManager>();
             
-            m_sceneManager.sceneReady += modifyMaterials;
-
             // hookup to input events
-            m_inputManager.objectSelectionEvent += SelectFunction;
+            m_inputManager.onPrimaryInteractSelectable += SelectFunction;
+            m_inputManager.onPrimaryInteract3dUI += SelectFunction;
             
         }
 
@@ -149,25 +81,11 @@ namespace tracer
         //! Callback from TRACER _core when Unity calls OnDestroy.
         //! Used to cleanup resources used by the PixelSelector module.
         //!
-        public override void Dispose()
-        {
+        public override void Dispose(){
             base.Dispose();
 
-            core.updateEvent -= renderUpdate;
-            m_sceneManager.sceneReady -= modifyMaterials;
-            m_inputManager.objectSelectionEvent -= SelectFunction;
-
-            dataWidth = 0;
-            dataHeight = 0;
-
-            if (gpuTexture != null)
-                gpuTexture.Release();
-
-            if (cpuData.IsCreated)
-                cpuData.Dispose();
-
-            //m_hasAsyncRequest = false;
-            //request = default(AsyncGPUReadbackRequest);
+            m_inputManager.onPrimaryInteractSelectable  -= SelectFunction;
+            m_inputManager.onPrimaryInteract3dUI        -= SelectFunction;
         }
 
         //!
@@ -177,42 +95,24 @@ namespace tracer
         //! @param sender The input manager.
         //! @param e The screen coorinates from the input event.
         //!
-        private async void SelectFunction(object sender, Vector2 point){
+        private void SelectFunction(object sender, InputManager.InputEventHandlerArgs args){
 
-            //if already waiting for a previous select function to be resolved, abort
-            //very unlikely, but if the system has low fps due something and we'Re spamming clicks, it may be possible
-            if(m_isRenderActive || m_gpuReadbackRequested)
-                return;
+            if (args.obj){
+                //TODO: move into FocusObjectModule (which only listens to DoubleClick)
+                //CheckDoubleClick(args.obj);
 
-            SceneObject obj = GetSelectableAtCollider(point);
-            if (!obj)
-            {
-                m_isRenderActive = true;
-                // give the system some time to render the object _id's
-                while(m_isRenderActive || m_gpuReadbackRequested)
-                    await System.Threading.Tasks.Task.Delay(50);
-
-                obj = GetSelectableAtPixel(point);
-            }
-
-            if (obj)
-            {                
-                CheckDoubleClick(obj);
-
-                if(manager.isThisOurSelectedObject(obj)){
-                    m_isRenderActive = false;
+                if(manager.isThisOurSelectedObject(args.obj)){
                     return;
                 }else{
                     manager.clearSelectedObjects();
                 }
 
-                AddSelectionByRole(obj);
-            }
-            else
-            {
+                AddSelectionByRole(args.obj);
+            }else{
                 manager.clearSelectedObjects();
             }
         }
+        
         //!
         //! Function to add the found selected object to the manager, depending by our Role
         //!
@@ -239,8 +139,9 @@ namespace tracer
         }
         //!
         //! Function to check for a double-click/tap to focus on an object
+        //! TODO: move into FocusObjectModule (which only listens to DoubleClick)
         //!
-        private void CheckDoubleClick(SceneObject obj){
+        /*private void CheckDoubleClick(SceneObject obj){
             if(!obj){
                 manager.setLastClickedObject(null);
                 return;
@@ -253,7 +154,8 @@ namespace tracer
                 }
             }
             manager.setLastClickedObject(obj);
-        }
+        }*/
+
         //!
         //! Function to simulate Select
         //!
@@ -280,330 +182,27 @@ namespace tracer
                     break;
             }
         }
+        
         //!
-        //! Retrieve the selectable present at the current location in camera screenspace, if any.
+        //! Retrieve the selectables present at the current location in camera screenspace, if any.
         //! 
         //! @param screenPosition The position to get the selectable at.
-        //! @return The selectable at the specified screen position or null if there is none.
+        //! @return The selectables at the specified screen position or null if there is none.
         //!
-        public SceneObject GetSelectableAtPixel(Vector2 screenPosition)
-        {
-            if (!cpuData.IsCreated){
-                return null;
-            }
+        public List<SceneObject> GetSelectableInRect(RectInt screenRect){
+            int xMin = screenRect.xMin;
+            int xMax = screenRect.xMax;
+            int yMin = screenRect.yMin;
+            int yMax = screenRect.yMax;
 
-            int scaledX = (int) (screenPosition.x * scaleDivisor);
-            int scaledY = (int) (screenPosition.y * scaleDivisor);
-            int pos = scaledX + dataWidth * scaledY;
+            HashSet<SceneObject> sceneObjects = new HashSet<SceneObject>();
+            for (int x = xMin; x < xMax; x++){
+                for (int y = yMin; y < yMax; y++){
+                    sceneObjects.Add(manager.GetSelectableAtPixel(x, y));
+                }
+            }
             
-            if (cpuData.Length < pos || pos < 0){
-                return null;
-            }
-            
-            byte sceneID = 0;
-            short soID = 0;
-            DecodeId(cpuData[pos], ref sceneID, ref soID);
-
-            return m_sceneManager.getSceneObject(sceneID, soID);
-        }
-
-        //!
-        //! Retrieve the selectable present at the current location in camera screenspace, if any.
-        //! 
-        //! @param screenPosition The position to get the selectable at.
-        //! @return The selectable at the specified screen position or null if there is none.
-        //!
-        public List<SceneObject> GetSelectableInRect(RectInt screenRect)
-        {
-            if (!cpuData.IsCreated)
-                return null;
-
-            int xMin = (int) (screenRect.xMin * scaleDivisor);
-            int xMax = (int) (screenRect.xMax * scaleDivisor);
-            int yMin = (int) (screenRect.yMin * scaleDivisor);
-            int yMax = (int) (screenRect.yMax * scaleDivisor);
-            int dw = dataWidth;
-            List<Color32> ids = new List<Color32>(5);
-
-            for (int x = xMin; x < xMax; x++)
-                for (int y = yMin; y < xMax; y++)
-                {
-                    Color32 cData = cpuData[x + dw * y];
-                    if (cData.b != 0 || cData.a != 0)
-                        if (!ids.Contains(cData))
-                            ids.Add(cData);
-                }
-            
-            byte sceneID = 0;
-            short soID = 0;
-            List<SceneObject> sceneObjects = new List<SceneObject>(ids.Count);
-            foreach (Color32 c in ids)
-            {
-                DecodeId(c, ref sceneID, ref soID);
-                sceneObjects.Add(m_sceneManager.getSceneObject(sceneID, soID));
-            }
-
-            return sceneObjects;
-        }
-
-        //!
-        //! Retrieve the selectable present at the current location by tracing a ray into the scene and looking for colliders.
-        //! 
-        //! @param screenPosition The position to get the selectable at.
-        //! @param layerMask The object layers to be considered for the ray intersection.
-        //! @return The selectable at the traced collider or null if there is none.
-        //!
-        public SceneObject GetSelectableAtCollider(Vector2 screenPosition)
-        {
-            RaycastHit hit;
-            SceneObject sceneObject = null;
-
-            if (Physics.Raycast(Camera.main.ScreenPointToRay(screenPosition), out hit, Mathf.Infinity))
-            {
-                GameObject gameObject = hit.collider.gameObject;
-                IconUpdate iconUpdate = gameObject.GetComponent<IconUpdate>();
-                // check if an icon has been hit
-                if (iconUpdate)
-                    sceneObject = iconUpdate.m_parentObject;
-
-                if (!sceneObject)
-                    sceneObject = gameObject.GetComponent<SceneObject>();
-
-                if (!sceneObject)
-                    sceneObject = gameObject.GetComponentInParent<SceneObject>();
-            }
-
-            return sceneObject;
-        }
-
-        //!
-        //! Retrieve the selectable present at the current location by tracing a ray into the scene and looking for colliders.
-        //! 
-        //! @param screenPosition The position to get the selectable at.
-        //! @param layerMask The object layers to be considered for the ray intersection.
-        //! @return The selectable at the traced collider or null if there is none.
-        //!
-        public SceneObject GetSelectableAtCollider(Rect screenRectangle)
-        {
-            RaycastHit hit;
-            SceneObject sceneObject = null;
-            Camera camera = Camera.main;
-
-            //float pixelsToWorld = camera.orthographicSize / (screenHeight / 2f);   //<-- maybe this is nessesarry?  [SEIM]
-            Vector3 center = camera.ScreenToWorldPoint(screenRectangle.center);
-            Vector3 foreward = camera.transform.forward;
-
-            if (Physics.BoxCast(center, screenRectangle.size *0.5f, foreward, out hit, Quaternion.LookRotation(foreward), Mathf.Infinity))
-            {
-                GameObject gameObject = hit.collider.gameObject;
-                IconUpdate iconUpdate = gameObject.GetComponent<IconUpdate>();
-                // check if an icon has been hit
-                if (iconUpdate)
-                    sceneObject = iconUpdate.m_parentObject;
-
-                if (!sceneObject)
-                    sceneObject = gameObject.GetComponent<SceneObject>();
-
-                if (!sceneObject)
-                    sceneObject = gameObject.GetComponentInParent<SceneObject>();
-            }
-
-            return sceneObject;
-        }
-
-        //! 
-        //! Gets a cached adjusted material or creates a new one based on the specified material.
-        //! Selectable materials are identical to the specified material except that they have the
-        //! SelectableType tag set so they are rendered in the replacement pass used to render
-        //! selectable ids.
-        //! 
-        //! Note that all adjusted materials are destroyed when the selection manager is destroyed!
-        //! 
-        //! @param material The material to be changed for selection rendering.
-        //! @return An adjusted m_instance of the specified material with the selectable tag set.
-        //!
-        private Material GetSelectableMaterial(Material material)
-        {
-            Material selectableMaterial;
-            if (!m_materials.TryGetValue(material, out selectableMaterial))
-            {
-                selectableMaterial = UnityEngine.Object.Instantiate(material);
-                selectableMaterial.SetOverrideTag(SelectableType, Selectable);
-                m_materials.Add(material, selectableMaterial);
-            }
-
-            return selectableMaterial;
-        }
-
-        //!
-        //! Callback from TRACER _core when Unity calls it's render update.
-        //! Used setup render texture, render the object ID pass and copy
-        //! it asyncron into a Color32 array. 
-        //!
-        private void renderUpdate(object sender, EventArgs e)
-        {
-            if (m_isRenderActive)
-            {
-                //Debug.Log("renderUpdate called "+Time.time);
-                //Debug.Log("<color=green>ACTIVE renderUpdate called</color>");
-                Camera camera = Camera.main;
-
-                // If camera size changed (e.g. window resize) adjust sizes of selection textures.
-                int currentWidth = (int) (camera.pixelWidth * scaleDivisor);
-                int currentHeight = (int) (camera.pixelHeight * scaleDivisor);
-                if (gpuTexture == null || dataWidth != currentWidth || dataHeight != currentHeight)
-                {
-                    if (gpuTexture != null) gpuTexture.Release();
-                    if (cpuData.IsCreated) cpuData.Dispose();
-
-                    dataWidth = currentWidth;
-                    dataHeight = currentHeight;
-
-                    int depthBits = camera.depthTextureMode == DepthTextureMode.None ? 16 : 0;
-                    gpuTexture = new RenderTexture(dataWidth, dataHeight, depthBits, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
-                    gpuTexture.filterMode = FilterMode.Point;
-                    cpuData = new NativeArray<Color32>(dataWidth * dataHeight, Allocator.Persistent);
-                }
-
-                RenderTexture oldRenderTexture = camera.targetTexture;
-                CameraClearFlags oldClearFlags = camera.clearFlags;
-                Color oldBackgroundColor = camera.backgroundColor;
-                RenderingPath oldRenderingPath = camera.renderingPath;
-                bool oldAllowMsaa = camera.allowMSAA;
-
-                camera.targetTexture = gpuTexture; // Render into render texture.
-                camera.clearFlags = CameraClearFlags.SolidColor; // Make sure non-rendered pixels have _id zero.
-                camera.backgroundColor = Color.clear;
-                camera.renderingPath = RenderingPath.Forward; // No gbuffer required.
-                camera.allowMSAA = false; // Avoid interpolated colors.
-
-                camera.RenderWithShader(objectIdShader, SelectableType);
-
-                camera.targetTexture = oldRenderTexture;
-                camera.clearFlags = oldClearFlags;
-                camera.backgroundColor = oldBackgroundColor;
-                camera.renderingPath = oldRenderingPath;
-                camera.allowMSAA = oldAllowMsaa;
-
-                m_isRenderActive = false;
-                m_gpuReadbackRequested = true;
-                
-                //see https://dev.to/alpenglow/unity-fast-pixel-reading-part-2-asyncgpureadback-4kgn for example implementation
-                AsyncGPUReadback.Request(gpuTexture, 0, OnCompleteAsyncGPUReadback);
-            }
-        }
-
-        private void OnCompleteAsyncGPUReadback(AsyncGPUReadbackRequest request){
-            m_gpuReadbackRequested = false;
-            if (!request.done){
-                Debug.Log("<color=yellow>request not done</color>");
-                return;
-            }
-
-            if (request.hasError){
-                Debug.Log("<color=red>request.hasError</color>");
-                return;
-            }
-                
-            //Debug.Log("<color=green>request.done</color>");
-            request.GetData<Color32>().CopyTo(cpuData);
-        }
-
-        //!
-        //! Function that creates a new property block for all renderable
-        //! objects in the scene to set the object ID as a shader parameter.
-        //! This function is called after the scene has been loaded.
-        //!
-        private void modifyMaterials(object sender, EventArgs e)
-        {
-            foreach (Renderer renderer in m_sceneManager.scnRoot.GetComponentsInChildren<Renderer>())
-            {
-                if (m_properties == null)
-                    m_properties = new MaterialPropertyBlock();
-
-                SceneObject sceneObject = renderer.gameObject.GetComponent<SceneObject>();
-
-                if ((sceneObject is SceneObjectCamera) || (sceneObject is SceneObjectLight))
-                    continue;
-
-                int soID = 0;
-                int sceneID = 0;
-                if (sceneObject)
-                {
-                    soID = sceneObject._id;  
-                    sceneID = sceneObject._sceneID;
-                }
-                else
-                {
-                    Transform t = renderer.transform;
-                    Transform root = core.getManager<SceneManager>().scnRoot.transform;
-
-                    while (t.parent != root)
-                    {
-                        if (t.parent.tag == "editable")
-                        {
-                            SceneObject so = t.parent.GetComponent<SceneObject>();
-                            if (so)
-                            {
-                                soID = so._id;  
-                                sceneID = so._sceneID;
-                            }
-                            break;
-                        }
-                        else
-                        {
-                            t = t.parent;
-                        }
-                    }
-                }
-
-                Color32 packedId;
-                EncodeId(out packedId, (byte) sceneID, (short) soID);
-
-                m_properties.Clear();
-
-                // Keep existing changed properties.
-                if (renderer.HasPropertyBlock())
-                    renderer.GetPropertyBlock(m_properties);
-
-                m_properties.SetColor(m_selectableIdPropertyId, packedId);
-
-                renderer.SetPropertyBlock(m_properties);
-
-                renderer.sharedMaterial = GetSelectableMaterial(renderer.sharedMaterial);
-            }
-        }
-
-        //! 
-        //! Encodes a selectable _id into a color.
-        //! 
-        //! @param _id The selectable _id to be encoded.
-        //! @return The color representing the encoded _id.
-        //!
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void EncodeId(out Color32 color, byte sceneID, short soID)
-        {
-            color = new Color32(
-                0,
-                sceneID,
-                (byte)(soID >> (8)),
-                (byte)(soID >> (0)) );
-        }
-
-        //! 
-        //! Decodes a color into a selectable _id.
-        //! 
-        //! @param color The color to decode into a selectable _id.
-        //! @return The decoded selectable _id.
-        //!
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void DecodeId(Color32 color, ref byte sceneID, ref short soID) 
-        {
-            sceneID = color.g;
-            soID = (short) (
-                (color.b << (8)) | 
-                (color.a << (0)) );
+            return sceneObjects.ToList();
         }
     }
-
 }

@@ -334,7 +334,7 @@ namespace tracer
             selectable = 30,
             world = 40
         }
-        private LayerToOperate layerToOperate = LayerToOperate.world;
+        public LayerToOperate layerToOperate { get; private set; } = LayerToOperate.world;
 
         public class InputEventHandlerArgs: EventArgs{
             public SceneObject obj { get; set; }    //sceneobject that was hit/we use (may be zero and gathered within subscribed function)
@@ -346,7 +346,7 @@ namespace tracer
         }
 
         //these will be invoked by e.g. ProcessMainTriggerDown (which will be called from the SubModules - beware to only call once per frame, it may be possible to have touch, mouse and button simultan?)
-
+        public event EventHandler<InputEventHandlerArgs> onAnyInputDetection;
         public event EventHandler<InputEventHandlerArgs> onPrimaryInteract2dUI, onPrimaryInteract3dUI, onPrimaryInteractSelectable, onPrimaryInteractWorld;
         public event EventHandler<InputEventHandlerArgs> onPrimaryDrag2dUI, onPrimaryDrag3dUI, onPrimaryDragSelectable, onPrimaryDragWorld;
 
@@ -355,8 +355,16 @@ namespace tracer
         //! @param lay: layer we are on, 2dUI, 3dUI, Selectable, World
         //! 
         public void SetLayerToOperate(LayerToOperate lay){
+            //maybe can be locked!
             layerToOperate = lay;
-            //may be locked?
+        }
+        //!
+        //! will be triggered on any button down, mouse down, key down event
+        //! (pendant in old unity: Input.anyKeyDown)
+        //! @param pos: world or screen pos
+        //!
+        public void ProcessInputDetected(Vector3 pos) {
+            onAnyInputDetection?.Invoke(this, new InputEventHandlerArgs(null, pos, Vector3.zero));
         }
 
         //!

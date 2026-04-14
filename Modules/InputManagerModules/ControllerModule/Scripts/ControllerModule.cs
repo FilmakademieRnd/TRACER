@@ -724,20 +724,18 @@ namespace tracer
         //!
         //! This method adjusts the color and scale of the crosshair based on raycasting and the object hit.
         //!
-        private void CrosshairChangeColor()
-        {
+        private void CrosshairChangeColor(){
+            //TODO: change and utilize the selection via our current events (and the already done raycast etc)
             _ray = _camera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-            _selectionModule.isRenderActive = true;
 
-            if (Physics.Raycast(_ray, out _hit))
-            {
+            if (Physics.Raycast(_ray, out _hit)){
                 if (_hit.transform.gameObject.GetComponent<SceneObject>() || _hit.transform.gameObject.GetComponent<IconUpdate>())
                 {
                     _crossHairImg.color = _uiManager.uiAppearanceSettings.colors.ElementSelection_Highlight;
                     _crossHairImg.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
                 }
             }
-            else if (_selectionModule.GetSelectableAtPixel(new Vector2(Screen.width / 2, Screen.height / 2)))
+            else if (_uiManager.GetSelectableAtPixel(Screen.width / 2, Screen.height / 2))
             {
                 _crossHairImg.color = _uiManager.uiAppearanceSettings.colors.ElementSelection_Highlight;
                 _crossHairImg.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
