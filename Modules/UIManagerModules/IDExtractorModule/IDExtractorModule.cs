@@ -1,6 +1,34 @@
+/*
+-----------------------------------------------------------------------------------
+TRACER FOUNDATION -
+Toolset for Realtime Animation, Collaboration & Extended Reality
+
+Copyright (c) 2024 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Labs
+https://research.animationsinstitut.de/tracer 
+https://github.com/FilmakademieRnd/TRACER
+
+TRACER FOUNDATION is a development by Filmakademie Baden-Wuerttemberg,
+Animationsinstitut R&D Labs in the scope of the EU funded project
+MAX-R (101070072) and funding on the own behalf of Filmakademie Baden-Wuerttemberg.
+Former EU projects Dreamspace (610005) and SAUCE (780470) have inspired the
+TRACER FOUNDATION development.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the MIT License for more details.
+You should have received a copy of the MIT License along with this program;
+if not go to https://opensource.org/licenses/MIT
+-----------------------------------------------------------------------------------
+*/
+
+//! @file "IDExtractorModule.cs"
+//! @brief implementation of TRACER ID Extraction module for selecting objects via rtx color
+//! @author Thomas Krüger
+//! @version 0
+//! @date 15.04.2026
+
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -10,9 +38,9 @@ namespace tracer{
     public class IDExtractorModule : UIManagerModule, UIManager.ISelectableSceneObjectProvider {
 
         #region Interface Implementation
-        //if we every want to utilize the "get selectable via pixel id" we have come with this solution
-        //to implement a function in the UIManager without ANY unity dependency and
-        //without to do the RenderUpdate step in different functions!
+        //! if we every want to utilize the "get selectable via pixel id" we have come with this solution
+        //! to implement a function in the UIManager without ANY unity dependency and
+        //! without to do the RenderUpdate step in different functions!
         public SceneObject GetSelectableViaScreenPosition(int x, int y){
             int scaledX = Mathf.Clamp((int)(x * scaleDivisor), 0, dataWidth - 1);
             int scaledY = Mathf.Clamp((int)(y * scaleDivisor), 0, dataHeight - 1);
@@ -29,7 +57,31 @@ namespace tracer{
                 (unityColor.b << (8)) | 
                 (unityColor.a << (0)) );
 
+            //Debug.Log("UIManager <i>IDExtractorModule</i> sceneID:<b>"+sceneID+"</b> and soID:<b>"+soID+"</b>");
             return m_sceneManager.getSceneObject(sceneID, soID);
+        }
+
+        //! 
+        //! same as above, but we also could select non-scene-objects (that have a renderer!)
+        //!
+        public object GetWorldObjectViaScreenPosition(int x, int y){
+            int scaledX = Mathf.Clamp((int)(x * scaleDivisor), 0, dataWidth - 1);
+            int scaledY = Mathf.Clamp((int)(y * scaleDivisor), 0, dataHeight - 1);
+            int index = scaledY * dataWidth + scaledX;
+
+            if (!cpuData.IsCreated){
+                return null;
+            }
+
+            //DECODE Color32 to sceneID and sceneObjectID
+            Color32 unityColor = cpuData[index];
+            byte sceneID = unityColor.g;            //sceneID should be -1 or something?
+            short soID = (short) (
+                (unityColor.b << (8)) | 
+                (unityColor.a << (0)) );
+
+            //Debug.Log("UIManager <i>IDExtractorModule</i> sceneID:<b>"+sceneID+"</b> and soID:<b>"+soID+"</b>");
+            return m_sceneManager.GetNonSceneObject(soID);
         }
         #endregion
 
@@ -159,9 +211,11 @@ namespace tracer{
         //! @return An adjusted m_instance of the specified material with the selectable tag set.
         //!
         private Material GetSelectableMaterial(Material material){
-            Material selectableMaterial;
-            if (!m_materials.TryGetValue(material, out selectableMaterial)){
+            if (!m_materials.TryGetValue(material, out Material selectableMaterial)) {
                 selectableMaterial = UnityEngine.Object.Instantiate(material);
+                #if UNITY_EDITOR
+                selectableMaterial.name += "_ModifiedForIDE";
+                #endif
                 selectableMaterial.SetOverrideTag(SelectableTypeName, SelectableShaderTagValue);
                 m_materials.Add(material, selectableMaterial);
             }
@@ -178,6 +232,8 @@ namespace tracer{
             MaterialPropertyBlock m_properties = new MaterialPropertyBlock(); //Re-used property block used to set selectable _id.
             Transform root = m_sceneManager.scnRoot.transform;
 
+            int sceneObjectMatsChanged = 0;
+            int nonSceneObjectMatsChanged = 0;
             foreach (Renderer renderer in m_sceneManager.scnRoot.GetComponentsInChildren<Renderer>()){
                 SceneObject sceneObject = renderer.gameObject.GetComponent<SceneObject>();
                 short soID = 0;
@@ -192,16 +248,23 @@ namespace tracer{
                     
                     while (t.parent != root){
                         if (t.parent.CompareTag("editable")){
-                            SceneObject so = t.parent.GetComponent<SceneObject>();
-                            if (so){
-                                soID = so._id;  
-                                sceneID = so._sceneID;
+                            sceneObject = t.parent.GetComponent<SceneObject>();
+                            if (sceneObject){
+                                soID = sceneObject._id;  
+                                sceneID = sceneObject._sceneID;
+                                break;  //break was outside of this!
                             }
-                            break;  //shouldn't this be within the 'if' above?
                         }else{
                             t = t.parent;
                         }
                     }
+                }
+
+                // use different scene id thingy for renderer-only objects (generic save as object + soID) in seperate manager
+                if (!sceneObject) {
+                    sceneID = 10;   //be careful! [REVIEW] 
+                    soID = m_sceneManager.AddNonSceneObject((object)renderer.gameObject);
+                    nonSceneObjectMatsChanged++;
                 }
 
                 //ENCODE sceneID and sceneObjectID into a unity-color
@@ -221,7 +284,9 @@ namespace tracer{
                 m_properties.SetColor(m_selectableIdPropertyId, packedId);
                 renderer.SetPropertyBlock(m_properties);
                 renderer.sharedMaterial = GetSelectableMaterial(renderer.sharedMaterial);
+                sceneObjectMatsChanged++;
             }
+            Debug.Log("<color=green>IDExtractorModule modified <b>"+sceneObjectMatsChanged+"</b> sceneObject materials and <b>"+nonSceneObjectMatsChanged+"</b> non-so materials</color>");
         }
         #endregion
 
@@ -276,6 +341,7 @@ namespace tracer{
             m_gpuReadbackRequested = true;
             
             // Request readback - see https://dev.to/alpenglow/unity-fast-pixel-reading-part-2-asyncgpureadback-4kgn for example implementation
+            //Debug.Log("<color=blue>AsyncGPURequest started <b>"+Time.time.ToString("F2")+"</b> </color>");
             AsyncGPUReadback.Request(gpuTexture, 0, TextureFormat.RGBA32, OnCompleteAsyncGPUReadback);
         }
 
@@ -309,8 +375,12 @@ namespace tracer{
             }
 
             if (request.done && cpuData.IsCreated){ // Ensure array wasn't disposed during resize
+                //Debug.Log("<color=green>AsyncGPURequest finished <b>"+Time.time.ToString("F2")+"</b> </color>");
                 request.GetData<Color32>().CopyTo(cpuData);
-            }
+            } 
+            // else {
+            //     Debug.Log("<color=yellow>AsyncGPURequest ended <b>"+Time.time.ToString("F2")+"</b> </color>");
+            // }
 
             // Now that we have the data, we allow the Update loop to trigger the next render
             m_gpuReadbackRequested = false; 

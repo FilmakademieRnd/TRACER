@@ -315,10 +315,11 @@ namespace tracer
 
             // create scene _parent if not there
             scnRoot = GameObject.Find("Scene");
-            if (scnRoot == null)
-            {
+            if (scnRoot == null){
                 scnRoot = new GameObject("VPETScene");
             }
+
+            nonSceneObjects = new Dictionary<short, object>();
         }
 
         public void emitParseScene(bool emitSceneReady)
@@ -483,5 +484,27 @@ namespace tracer
 
             return tex.EncodeToJPG(95);
         }
+
+        #region Non SceneObjects
+        //!
+        //! all non scene-objects
+        //! (unity implementation will store all object that have a renderer attached for quering via IDExtractorModule)
+        //!
+        private Dictionary<short, object> nonSceneObjects;
+
+        public short AddNonSceneObject(object obj) {
+            short count = (short)nonSceneObjects.Count;
+            nonSceneObjects.Add(count, obj);
+            return count;
+        }
+
+        public object GetNonSceneObject(short nsoID) {
+            if (nonSceneObjects.TryGetValue(nsoID, out object nsobj))
+                return nsobj;
+            else
+                return null;
+        }
+
+        #endregion
     }
 }

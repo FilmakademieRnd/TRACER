@@ -77,6 +77,8 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             m_sceneObjects = new List<SceneObject>();
+            // [REVIEWV]
+            // should become SphereCollider and put onto other layer than default ?!
             m_Icon = Resources.Load("Prefabs/Icon") as GameObject;
             m_lightSprite = Resources.Load<Sprite>("Images/LightIcon");
             m_cameraSprite = Resources.Load<Sprite>("Images/CameraIcon");

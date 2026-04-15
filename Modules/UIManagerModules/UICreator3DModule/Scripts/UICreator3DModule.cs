@@ -698,7 +698,7 @@ namespace tracer
         {
 
             // Log
-            //Debug.Log("Selection changed");
+            Debug.Log("<i>UICreator3DModule.SelectionUpdate()</i> "+sceneObjects.Count);
 
             if (sceneObjects.Count > 0)
             {
@@ -1046,11 +1046,9 @@ namespace tracer
         //!
         //! Set transform gizmo to translate mode
         //!
-        public void SetModeT()
-        {
-            //Debug.Log("T mode");
-            if (selObj != null)
-            {
+        public void SetModeT(){
+            Debug.Log("T mode");
+            if (selObj != null){
                 HideAxes();
                 ShowAxis(manipT);
                 TransformAxisMulti(manipT);

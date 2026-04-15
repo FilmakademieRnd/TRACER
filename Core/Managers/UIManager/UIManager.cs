@@ -197,6 +197,7 @@ namespace tracer
         // The Interface that any data provider must follow
         public interface ISelectableSceneObjectProvider{
             SceneObject GetSelectableViaScreenPosition(int x, int y);
+            object GetWorldObjectViaScreenPosition(int x, int y);
         }
 
         //!
@@ -211,10 +212,14 @@ namespace tracer
         public SceneObject GetSelectableAtPixel(int x, int y){
             if (_dataProvider == null)
                 return null; // If the Unity module is missing, fail gracefully.
-
             return _dataProvider.GetSelectableViaScreenPosition(x, y);
         }
         
+        public object GetWorldObjectAtPixel(int x, int y){
+            if (_dataProvider == null)
+                return null; // If the Unity module is missing, fail gracefully.
+            return _dataProvider.GetWorldObjectViaScreenPosition(x, y);
+        }
         #endregion
 
         //!

@@ -42,18 +42,6 @@ namespace tracer{
 
         public const float MAX_DOUBLECLICK_GAP = 0.25f;
 
-        //!
-        //! Enumeration describing possible input hits.
-        //!
-        public enum InputLayerType{
-            NONE = 10,      //we hit absolutely nothing
-            UI2D = 20,      //we hit any 2d ui from a canvas
-            UI3D = 30,      //we hit a selectable objects 3d ui, e.g. a world-gizmo
-            COL3D = 33,     //we hit a selectable 3d world-object's collider (unity collider)
-            PIX3D = 36,     //we hit a selectable 3d world-object's pixel
-            SCREEN = 40     //touch/click behaviour for user-camera (rotating, moving)
-        }
-
         #region VARIABLES
         //!
         //! The generated Unity input class defining all available user inputs.
@@ -80,10 +68,16 @@ namespace tracer{
         //!
         private InputManager.LayerToOperate primaryInputLayerHit = InputManager.LayerToOperate.world;
         
+        // [REVIEW] create a class for hit object and hit pos ?
+
         //!
         //! the object we hit in our last layer-to-operate evaluation (do not execute multiple times)
         //!
-        private GameObject m_gameObjectWeHit, m_uiObjectWeHit;
+        private GameObject m_uiGameObjectWeHit, m_gameObjectWeHit, m_worldGameObjectWeHit;
+        //!
+        //! the world position were a hit occured
+        //!
+        private Vector3 m_worldHitPos;
         //!
         //! We create a custom action entirely in code, no Asset required, checking for ANY input
         //!
@@ -92,6 +86,10 @@ namespace tracer{
         //! reference to tthe UIManager
         //!
         private UIManager uiManager;
+        //!
+        //! a reference to the mainCam to not search by tag via Camera.main
+        //!
+        private Camera mainCam;
 
         #endregion
 
@@ -118,6 +116,7 @@ namespace tracer{
         protected override void Init(object sender, EventArgs e){
             
             uiManager = core.getManager<UIManager>();
+            mainCam = Camera.main;
 
             //enable input
             m_inputs = new Inputs();
@@ -212,10 +211,32 @@ namespace tracer{
 
             SetLastClickTime();
             
+            switch (manager.layerToOperate){
+                case InputManager.LayerToOperate.ui2d:
+                    manager.ProcessPrimaryInteract(m_pos, m_uiGameObjectWeHit);
+                    break;
+                case InputManager.LayerToOperate.ui3d:
+                    manager.ProcessPrimaryInteract(m_pos, m_gameObjectWeHit);
+                    break;
+                case InputManager.LayerToOperate.selectable:
+                    manager.ProcessPrimaryInteract(m_pos, m_gameObjectWeHit);
+                    //if we store hitWorldObject and selectableObject seperate within InputEventHandlerArgs
+                    //we could use the below function in seperate module and addlistener to InputManager events!
+                    if (RayMeshUtility.GetHitPointPrecise(mainCam.ScreenPointToRay(m_pos), m_worldGameObjectWeHit, RayMeshUtility.Accuracy.NearestVertex, out m_worldHitPos)){
+                        UnityHitVisualizerHelper.Spawn(m_worldHitPos, Color.green, 0.15f);
+                    }
+                    break;
+                case InputManager.LayerToOperate.world:
+                    manager.ProcessPrimaryInteract(m_pos, m_worldGameObjectWeHit);
+                    if (RayMeshUtility.GetHitPointPrecise(mainCam.ScreenPointToRay(m_pos), m_worldGameObjectWeHit, RayMeshUtility.Accuracy.ExactMesh, out m_worldHitPos)){
+                        UnityHitVisualizerHelper.Spawn(m_worldHitPos, Color.green, 0.15f);
+                    }
+                    break;
+            }
 
             //--- DEBUG
             Debug.Log("<color=yellow>primary input click</color>");
-            Ray debugRay = Camera.main.ScreenPointToRay(m_pos);
+            Ray debugRay = mainCam.ScreenPointToRay(m_pos);
             Debug.DrawRay(debugRay.origin, debugRay.direction*100, Color.yellow, 2f);
             //---------- END DEBUG
         }
@@ -233,7 +254,7 @@ namespace tracer{
             
             //--- DEBUG
             Debug.Log("<color=yellow>primary input double-click</color>");
-            Ray debugRay = Camera.main.ScreenPointToRay(m_pos);
+            Ray debugRay = mainCam.ScreenPointToRay(m_pos);
             Debug.DrawRay(debugRay.origin, debugRay.direction*100, Color.yellow, 2f);
             //---------- END DEBUG
 
@@ -248,6 +269,7 @@ namespace tracer{
         //! @param pos position we should use to check, mostly the input, maybe a mid-point
         //!
         private void SetLayerToOperate(Vector2 pos){
+
             if(Is2dUiElement(pos)){
                 manager.SetLayerToOperate(InputManager.LayerToOperate.ui2d);
             }else if(Is3dUiElement(pos)){
@@ -255,28 +277,26 @@ namespace tracer{
             }else if (IsSelectable(pos) || IsSelectableAtPixel(pos)) {
                 manager.SetLayerToOperate(InputManager.LayerToOperate.selectable);
             }else{
-                
-
-                //TODO
-                // do we need to use the current SelectionModule functionality (SelectFunction")
-                // via collider and pixel for further tests? YES (take care to not call it excessively!)
-
                 manager.SetLayerToOperate(InputManager.LayerToOperate.world);
+                
+                object nonSceneObject = uiManager.GetWorldObjectAtPixel((int)pos.x, (int)pos.y);
+                if(nonSceneObject != null)
+                    m_worldGameObjectWeHit = nonSceneObject as GameObject;
             }
 
             switch (manager.layerToOperate){
                 case InputManager.LayerToOperate.ui2d:
                     //Since we use Unity's Canvas and UI-Elements for Events, we straight skip any input hitting any of these
-                    Debug.Log("<color=red>layer to operate set @2d ui</color>");
+                    Debug.Log("layer to operate set <color=grey>@2d ui</color>");
                     break;
                 case InputManager.LayerToOperate.ui3d:
-                    Debug.Log("<color=orange>layer to operate set @3d world ui</color>");
+                    Debug.Log("layer to operate set <color=grey>@3d world ui</color>");
                     break;
                 case InputManager.LayerToOperate.selectable:
-                    Debug.Log("<color=cyan>layer to operate set @world (hit nothing)</color>");
+                    Debug.Log("layer to operate set <color=grey>@selectable</color>");
                     break;
                 case InputManager.LayerToOperate.world:
-                    Debug.Log("<color=cyan>layer to operate set @world (hit nothing)</color>");
+                    Debug.Log("layer to operate set <color=grey>@world (hit nothing)</color>");
                     break;
             }
         }
@@ -292,19 +312,23 @@ namespace tracer{
             List<RaycastResult> m_raycastList = new List<RaycastResult>(5);
             EventSystem.current.RaycastAll(eventDataCurrentPosition, m_raycastList);
             if(m_raycastList.Count > 0) {
-                m_uiObjectWeHit = m_raycastList[0].gameObject;
+                m_uiGameObjectWeHit = m_raycastList[0].gameObject;
+                m_worldGameObjectWeHit = null;
                 return true;
             }
             return false;
         }
 
         //!
-        //! returns true if pos is over any 3D manipulator object (layerMask 5 for UI)
+        //! returns true if pos is over any 3D manipulator object (layerMask 0 for Default)
+        //! [REVIEW] should be seperate 3D-UI Layer
         //!
         private bool Is3dUiElement(Vector2 pos){
-            bool hitObject = Physics.Raycast(Camera.main.ScreenPointToRay(pos), out RaycastHit hitInfo, Mathf.Infinity, 1 << 5);
+            bool hitObject = Physics.Raycast(mainCam.ScreenPointToRay(pos), out RaycastHit hitInfo, Mathf.Infinity, 1 << 0);
             if (hitObject) {
                 m_gameObjectWeHit = hitInfo.transform.gameObject;
+                m_worldGameObjectWeHit = null;
+                m_worldHitPos = hitInfo.point;
                 return true;
             }
             return false;
@@ -312,25 +336,25 @@ namespace tracer{
 
         //!
         //! returns true if pos is over any 3d selectable object
+        //! [REVIEW] will never hit, since there are no colliders (despite 3d ui gizmos) in the scene!
         //!
         private bool IsSelectable(Vector2 pos){
             int layerMask = 1 << 5; //layer 5 (UI)
             layerMask = ~layerMask; //all but UI
 
-            if (Physics.Raycast(Camera.main.ScreenPointToRay(pos), out RaycastHit hit, Mathf.Infinity, layerMask)){
-                GameObject hitObject = hit.transform.gameObject;
-                SceneObject sceneObject = hitObject.GetComponent<SceneObject>();
+            if (Physics.Raycast(mainCam.ScreenPointToRay(pos), out RaycastHit hitInfo, Mathf.Infinity, layerMask)){
+                m_worldGameObjectWeHit = hitInfo.transform.gameObject;
+                SceneObject sceneObject = m_worldGameObjectWeHit.GetComponent<SceneObject>();
+                m_worldHitPos = hitInfo.point;
                 if (sceneObject) {
-                    m_gameObjectWeHit = hitObject;
+                    m_gameObjectWeHit = sceneObject.gameObject;
                     return true;
                 }
-                sceneObject = hitObject.GetComponentInParent<SceneObject>();
+                sceneObject = m_worldGameObjectWeHit.GetComponentInParent<SceneObject>();
                 if (sceneObject) {
-                    m_gameObjectWeHit = hitObject;
+                    m_gameObjectWeHit = sceneObject.gameObject;
                     return true;
                 }
-
-                //return IsSelectableAtPixel(pos);
             }
             return false;
         }
@@ -342,6 +366,7 @@ namespace tracer{
         private bool IsSelectableAtPixel(Vector2 pos) {
             SceneObject foundSO = uiManager.GetSelectableAtPixel((int)pos.x, (int)pos.y);
             if (foundSO) {
+                m_worldGameObjectWeHit = foundSO.gameObject;
                 m_gameObjectWeHit = foundSO.gameObject;
                 return true;
             }
@@ -376,22 +401,227 @@ namespace tracer{
         #endregion
 
         /*
-        #region MOUSE
+        # region MOUSE
 
-        #endregion
+        # endregion
 
-        #region KEYBOARD
+        # region KEYBOARD
 
-        #endregion
+        # endregion
 
-        #region TOUCH
+        # region TOUCH
 
-        #endregion
+        # endregion
 
-        #region CONTROLLER
+        # region CONTROLLER
 
-        #endregion
+        # endregion
         */
 
+    }
+}
+
+public static class RayMeshUtility{
+    public enum Accuracy{
+        BoundingBox,    // Fastest, least accurate
+        NearestVertex,  // Medium speed, snaps to points
+        ExactMesh       // Slowest, perfectly accurate
+    }
+
+    // A simple struct to sort our child meshes by how close their bounding box is
+    private struct HitCandidate : IComparable<HitCandidate>{
+        public MeshFilter filter;
+        public float boundsDistance;
+
+        public int CompareTo(HitCandidate other){
+            return boundsDistance.CompareTo(other.boundsDistance);
+        }
+    }
+    //!
+    //! APPROACH 1: MOST EFFICIENT (Fast Hierarchy)
+    //! Checks all children, sorts by closest bounding box, and stops at the FIRST valid mesh hit.
+    //! Fast, but might pick the wrong mesh if two objects' bounding boxes heavily intersect.
+    //!
+    public static bool GetHitPointFast(Ray worldRay, GameObject rootTarget, Accuracy accuracy, out Vector3 hitPoint){
+        hitPoint = Vector3.zero;
+        MeshRenderer[] renderers = rootTarget.GetComponentsInChildren<MeshRenderer>();
+        if (renderers.Length == 0) return false;
+
+        // 1. Bounding Box Pre-Pass
+        List<HitCandidate> candidates = new List<HitCandidate>();
+        for (int i = 0; i < renderers.Length; i++){
+            if (renderers[i].bounds.IntersectRay(worldRay, out float dist)){
+                MeshFilter filter = renderers[i].GetComponent<MeshFilter>();
+                if (filter != null && filter.sharedMesh != null){
+                    candidates.Add(new HitCandidate { filter = filter, boundsDistance = dist });
+                }
+            }
+        }
+
+        if (candidates.Count == 0) return false;
+
+        // 2. Sort by closest bounding box
+        candidates.Sort();
+
+        // 3. Check the meshes in order of closest bounding box. Stop at the first hit!
+        for (int i = 0; i < candidates.Count; i++){
+            if (CalculateHit(worldRay, candidates[i].filter, accuracy, out hitPoint)){
+                return true; // We found a hit, stop looking!
+            }
+        }
+        return false;
+    }
+
+    //!
+    //! APPROACH 2: MOST PRECISE (Absolute Hierarchy)
+    //! Checks all children whose bounding boxes are hit, calculates exact hits for ALL of them, 
+    //! and returns the absolute mathematically closest point.
+    //!
+    public static bool GetHitPointPrecise(Ray worldRay, GameObject rootTarget, Accuracy accuracy, out Vector3 hitPoint){
+        hitPoint = Vector3.zero;
+        if(!rootTarget) return false;
+        MeshRenderer[] renderers = rootTarget.GetComponentsInChildren<MeshRenderer>();
+        if (renderers.Length == 0) return false;
+
+        float absoluteClosestDistance = float.MaxValue;
+        bool foundAnyHit = false;
+
+        for (int i = 0; i < renderers.Length; i++){
+            // 1. Bounding Box Pre-Pass (Still crucial to skip meshes we completely miss)
+            if (renderers[i].bounds.IntersectRay(worldRay, out float _)){
+                MeshFilter filter = renderers[i].GetComponent<MeshFilter>();
+                if (filter != null && filter.sharedMesh != null){
+                    // 2. Calculate the exact hit for this specific child
+                    if (CalculateHit(worldRay, filter, accuracy, out Vector3 localHit)){
+                        float distToHit = Vector3.Distance(worldRay.origin, localHit);
+                        // 3. Keep track of the absolute closest point across all children
+                        if (distToHit < absoluteClosestDistance){
+                            absoluteClosestDistance = distToHit;
+                            hitPoint = localHit;
+                            foundAnyHit = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return foundAnyHit;
+    }
+
+    //!
+    //! Core calculation where we have hit in world
+    //!
+    private static bool CalculateHit(Ray worldRay, MeshFilter filter, Accuracy accuracy, out Vector3 hitPoint){
+        hitPoint = Vector3.zero;
+        Transform objTransform = filter.transform;
+
+        switch (accuracy){
+            case Accuracy.BoundingBox:
+                if (filter.GetComponent<Renderer>().bounds.IntersectRay(worldRay, out float dist)){
+                    hitPoint = worldRay.GetPoint(dist);
+                    return true;
+                }
+                return false;
+            case Accuracy.NearestVertex:
+                return GetNearestVertexHit(worldRay, objTransform, filter, out hitPoint);
+            case Accuracy.ExactMesh:
+                return GetExactTriangleHit(worldRay, objTransform, filter, out hitPoint);
+        }
+        return false;
+    }
+
+    private static bool GetNearestVertexHit(Ray worldRay, Transform objTransform, MeshFilter filter, out Vector3 hitPoint){
+        hitPoint = Vector3.zero;
+        if (filter == null || filter.sharedMesh == null) return false;
+
+        // Transform the ray into local space so we don't have to transform every vertex!
+        Ray localRay = new Ray(objTransform.InverseTransformPoint(worldRay.origin), objTransform.InverseTransformDirection(worldRay.direction));
+        
+        Vector3[] vertices = filter.sharedMesh.vertices;
+        float closestDistance = float.MaxValue;
+        Vector3 closestLocalVertex = Vector3.zero;
+        bool found = false;
+
+        for (int i = 0; i < vertices.Length; i++){
+            Vector3 v = vertices[i];
+            // Math magic: Distance from point to ray
+            Vector3 cross = Vector3.Cross(localRay.direction, v - localRay.origin);
+            float distToRay = cross.magnitude;
+
+            if (distToRay < closestDistance){
+                // Ensure the vertex is actually IN FRONT of the ray, not behind it
+                if (Vector3.Dot(localRay.direction, v - localRay.origin) > 0){
+                    closestDistance = distToRay;
+                    closestLocalVertex = v;
+                    found = true;
+                }
+            }
+        }
+
+        if (found){
+            // Convert back to world space
+            hitPoint = objTransform.TransformPoint(closestLocalVertex);
+            return true;
+        }
+        return false;
+    }
+
+    private static bool GetExactTriangleHit(Ray worldRay, Transform objTransform, MeshFilter filter, out Vector3 hitPoint){
+        hitPoint = Vector3.zero;
+        if (filter == null || filter.sharedMesh == null) return false;
+
+        Ray localRay = new Ray(objTransform.InverseTransformPoint(worldRay.origin), objTransform.InverseTransformDirection(worldRay.direction));
+        
+        Vector3[] vertices = filter.sharedMesh.vertices;
+        int[] triangles = filter.sharedMesh.triangles;
+
+        float closestHit = float.MaxValue;
+        bool found = false;
+
+        // Iterate through every triangle
+        for (int i = 0; i < triangles.Length; i += 3){
+            Vector3 v0 = vertices[triangles[i]];
+            Vector3 v1 = vertices[triangles[i + 1]];
+            Vector3 v2 = vertices[triangles[i + 2]];
+
+            if (IntersectTriangle(localRay, v0, v1, v2, out float t)){
+                if (t < closestHit){
+                    closestHit = t;
+                    found = true;
+                }
+            }
+        }
+
+        if (found){
+            hitPoint = objTransform.TransformPoint(localRay.GetPoint(closestHit));
+            return true;
+        }
+        return false;
+    }
+
+    // Standard Möller–Trumbore ray-triangle intersection
+    private static bool IntersectTriangle(Ray ray, Vector3 v0, Vector3 v1, Vector3 v2, out float t){
+        t = 0;
+        const float EPSILON = 0.0000001f;
+        Vector3 edge1 = v1 - v0;
+        Vector3 edge2 = v2 - v0;
+        Vector3 h = Vector3.Cross(ray.direction, edge2);
+        float a = Vector3.Dot(edge1, h);
+
+        if (a > -EPSILON && a < EPSILON) return false; // Ray is parallel to triangle
+
+        float f = 1.0f / a;
+        Vector3 s = ray.origin - v0;
+        float u = f * Vector3.Dot(s, h);
+
+        if (u < 0.0f || u > 1.0f) return false;
+
+        Vector3 q = Vector3.Cross(s, edge1);
+        float v = f * Vector3.Dot(ray.direction, q);
+
+        if (v < 0.0f || u + v > 1.0f) return false;
+
+        t = f * Vector3.Dot(edge2, q);
+        return t > EPSILON;
     }
 }

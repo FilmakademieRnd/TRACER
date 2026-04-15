@@ -72,8 +72,9 @@ namespace tracer{
             m_inputManager = core.getManager<InputManager>();
             
             // hookup to input events
+            m_inputManager.onPrimaryInteract3dUI += SelectViaIconFunction;
             m_inputManager.onPrimaryInteractSelectable += SelectFunction;
-            m_inputManager.onPrimaryInteract3dUI += SelectFunction;
+            m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
             
         }
 
@@ -84,33 +85,80 @@ namespace tracer{
         public override void Dispose(){
             base.Dispose();
 
+            m_inputManager.onPrimaryInteract3dUI        -= SelectViaIconFunction;
             m_inputManager.onPrimaryInteractSelectable  -= SelectFunction;
-            m_inputManager.onPrimaryInteract3dUI        -= SelectFunction;
+            m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
         }
 
         //!
-        //! Function to connect input managers input event for estimating a scene object at
-        //! a certain screen coortinate with UI managers scene object selection mechanism.
+        //! Function to connect input managers input event for selecting a sceneObject
         //!
         //! @param sender The input manager.
-        //! @param e The screen coorinates from the input event.
+        //! @param args The obj we hit, screen coorinates and input delta from the input event.
         //!
         private void SelectFunction(object sender, InputManager.InputEventHandlerArgs args){
-
-            if (args.obj){
+            SceneObject validCastedSceneObject = (args.obj as GameObject)?.GetComponent<SceneObject>();
+            if (validCastedSceneObject != null){
+                //Debug.Log("<color=green>validCastedSceneObject</color>");
                 //TODO: move into FocusObjectModule (which only listens to DoubleClick)
                 //CheckDoubleClick(args.obj);
 
-                if(manager.isThisOurSelectedObject(args.obj)){
+                if(manager.isThisOurSelectedObject(validCastedSceneObject)){
                     return;
                 }else{
                     manager.clearSelectedObjects();
                 }
 
-                AddSelectionByRole(args.obj);
+                AddSelectionByRole(validCastedSceneObject);
             }else{
+                //Debug.Log("<color=red>NO validCastedSceneObject</color>");
                 manager.clearSelectedObjects();
             }
+        }
+
+        //!
+        //! Function to connect input managers input event for selecting a sceneObject via an IconHit
+        //!
+        //! @param sender The input manager.
+        //! @param args The ui icon gameobject we hit, screen coorinates and input delta from the input event.
+        //!
+        private void SelectViaIconFunction(object sender, InputManager.InputEventHandlerArgs args){
+            IconUpdate validCastedIconUpdateObject = (args.obj as GameObject)?.GetComponent<IconUpdate>();
+            if (validCastedIconUpdateObject != null){
+                Debug.Log("<color=green>validCastedIconUpdateObject</color>");
+                //TODO: move into FocusObjectModule (which only listens to DoubleClick)
+                //CheckDoubleClick(args.obj);
+
+                if(manager.isThisOurSelectedObject(validCastedIconUpdateObject.m_parentObject)){
+                    return;
+                }else{
+                    manager.clearSelectedObjects();
+                }
+
+                AddSelectionByRole(validCastedIconUpdateObject.m_parentObject);
+            }else{
+                Debug.Log("<color=red>NO validCastedIconUpdateObject</color>");
+                manager.clearSelectedObjects();
+            }
+        }
+        //!
+        //! Function to connect input managers input event for de-selecting (hit nothing "selectable")
+        //!
+        //! @param sender The input manager.
+        //! @param args The gameobject we hit, screen coorinates and input delta from the input event.
+        //!
+        private void DeSelectFunction(object sender, InputManager.InputEventHandlerArgs args){
+            //nothing to do here, in other function this could help to 
+            //e.g. show a line where we point to, etc
+
+            GameObject validCastedGameObject = (args.obj as GameObject);
+            if (validCastedGameObject != null){
+                //show interaction "ghost" at target hit pos on gameobject (could blink) pos
+
+            }else{
+                //show interaction "ghost" at target pos?
+            }
+            manager.clearSelectedObjects();
         }
         
         //!

@@ -337,10 +337,13 @@ namespace tracer
         public LayerToOperate layerToOperate { get; private set; } = LayerToOperate.world;
 
         public class InputEventHandlerArgs: EventArgs{
-            public SceneObject obj { get; set; }    //sceneobject that was hit/we use (may be zero and gathered within subscribed function)
+            public object obj { get; set; }         //object (uiobject, gameobject) that was hit/we use (may be zero and gathered within subscribed function)
+            //public SceneObject sceneObject { get; set; }  //store it already here? what if we hit a 3d icon, but it has a reference to a sceneobject!
+            // [REVIEW][TODO]
+            // create own V3 format, to get rid of Unity dependency
             public Vector3 pos { get; set; }        //screen position or world
             public Vector3 delta { get; set; }      //can be used as delta or additional pos if necessary
-            public InputEventHandlerArgs(SceneObject _obj, Vector3 _pos, Vector3 _delta){
+            public InputEventHandlerArgs(object _obj, Vector3 _pos, Vector3 _delta){
                 obj = _obj; pos = _pos; delta = _delta;
             }
         }
@@ -371,7 +374,7 @@ namespace tracer
         //! @param pos: world or screen pos
         //! @param hitObj: the object we hit (if applicable)
         //!
-        public void ProcessPrimaryInteract(Vector3 pos, SceneObject hitObj){
+        public void ProcessPrimaryInteract(Vector3 pos, object hitObj){
             //use downwards if eventhandler is empty?
             switch (layerToOperate){
                 case LayerToOperate.ui2d:
@@ -380,7 +383,7 @@ namespace tracer
                     onPrimaryInteract2dUI?.Invoke(this, new InputEventHandlerArgs(hitObj, pos, Vector3.zero));
                     return;
                 case LayerToOperate.ui3d:
-                    //do something on the 3d ui, may select (if 3d icon), may cycle through sth (pos, rot, scale, etc ...)
+                    //do something on the 3d ui, may select (if 3d icon), may cycle through sth (pos, rot, scale, etc ...) if already selected
                     onPrimaryInteract3dUI?.Invoke(this, new InputEventHandlerArgs(hitObj, pos, Vector3.zero));
                     return;
                 case LayerToOperate.selectable:
@@ -400,7 +403,7 @@ namespace tracer
         //! @param hitObj: the object we hit earlier (if applicable), 
         //!     used here, because we checked it for layerToOperate earlier and we do not need to gather it again
         //!
-        public void ProcessPrimaryDrag(Vector3 pos, Vector3 delta, SceneObject usedObj){
+        public void ProcessPrimaryDrag(Vector3 pos, Vector3 delta, object usedObj){
             switch (layerToOperate){
                 case LayerToOperate.ui2d:
                     //ignore if in unity, buttons will execute stuff
