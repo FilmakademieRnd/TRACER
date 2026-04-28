@@ -96,7 +96,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Navigate"",
                     ""type"": ""Value"",
                     ""id"": ""b48a59d7-3b11-4d2b-afe3-1044fd9f54c6"",
-                    ""expectedControlType"": ""Vector2"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": true
@@ -316,6 +316,15 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""OnPrimaryInputDrag"",
+                    ""type"": ""Value"",
+                    ""id"": ""b3e7ccbb-ed2d-45b2-adf0-efa294a5b3cd"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -510,7 +519,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": """",
                     ""id"": ""164fd2fe-3e48-4e7d-bdb9-e8727926afb1"",
                     ""path"": ""<Mouse>/rightButton"",
-                    ""interactions"": """",
+                    ""interactions"": ""Hold"",
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""OrbitClick"",
@@ -802,6 +811,39 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""action"": ""OnPrimaryInputClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""eb8a6a41-0cd3-4fde-8a3b-fb26218fb120"",
+                    ""path"": ""<Keyboard>/space"",
+                    ""interactions"": ""Tap"",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnPrimaryInputClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""695ebaa8-ecb4-461d-a489-ae89c4034a69"",
+                    ""path"": ""<Mouse>/leftButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnPrimaryInputDrag"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""d89ee2c2-5023-4926-a3f9-015e8b031e63"",
+                    ""path"": ""<Touchscreen>/primaryTouch/tap"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnPrimaryInputDrag"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -835,6 +877,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_Controller_Left_Stick = m_VPETMap.FindAction("Controller_Left_Stick", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
         m_VPETMap_OnPrimaryInputClick = m_VPETMap.FindAction("OnPrimaryInputClick", throwIfNotFound: true);
+        m_VPETMap_OnPrimaryInputDrag = m_VPETMap.FindAction("OnPrimaryInputDrag", throwIfNotFound: true);
     }
 
     ~@Inputs()
@@ -940,6 +983,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_Controller_Left_Stick;
     private readonly InputAction m_VPETMap_Controller_Right_Stick;
     private readonly InputAction m_VPETMap_OnPrimaryInputClick;
+    private readonly InputAction m_VPETMap_OnPrimaryInputDrag;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
     /// </summary>
@@ -1052,6 +1096,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @OnPrimaryInputClick => m_Wrapper.m_VPETMap_OnPrimaryInputClick;
         /// <summary>
+        /// Provides access to the underlying input action "VPETMap/OnPrimaryInputDrag".
+        /// </summary>
+        public InputAction @OnPrimaryInputDrag => m_Wrapper.m_VPETMap_OnPrimaryInputDrag;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_VPETMap; }
@@ -1152,6 +1200,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @OnPrimaryInputClick.started += instance.OnOnPrimaryInputClick;
             @OnPrimaryInputClick.performed += instance.OnOnPrimaryInputClick;
             @OnPrimaryInputClick.canceled += instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputDrag.started += instance.OnOnPrimaryInputDrag;
+            @OnPrimaryInputDrag.performed += instance.OnOnPrimaryInputDrag;
+            @OnPrimaryInputDrag.canceled += instance.OnOnPrimaryInputDrag;
         }
 
         /// <summary>
@@ -1238,6 +1289,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @OnPrimaryInputClick.started -= instance.OnOnPrimaryInputClick;
             @OnPrimaryInputClick.performed -= instance.OnOnPrimaryInputClick;
             @OnPrimaryInputClick.canceled -= instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputDrag.started -= instance.OnOnPrimaryInputDrag;
+            @OnPrimaryInputDrag.performed -= instance.OnOnPrimaryInputDrag;
+            @OnPrimaryInputDrag.canceled -= instance.OnOnPrimaryInputDrag;
         }
 
         /// <summary>
@@ -1453,5 +1507,12 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnOnPrimaryInputClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "OnPrimaryInputDrag" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnOnPrimaryInputDrag(InputAction.CallbackContext context);
     }
 }

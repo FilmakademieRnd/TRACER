@@ -32,7 +32,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;  //one has to add this to "Assembly Definition Reference" in the "ModulesAssembly"
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.EnhancedTouch;  //one has to add this to "Assembly Definition Reference" in the "ModulesAssembly"
 
 namespace tracer{
     //!
@@ -52,6 +53,11 @@ namespace tracer{
         //! The latest main input position (primary touch, mouse pos)
         //!
         private Vector2 m_pos;
+
+        //!
+        //! The latest main input delta (primary touch, mouse pos)
+        //!
+        private Vector2 m_delta;
         
         //!
         //! the position buffer for further calculations (two finger camera manipulation e.g. zoom, ...)
@@ -66,7 +72,7 @@ namespace tracer{
         //!
         //! the layer we hit with our primary input, to determine a valid double click (hit the same layer)
         //!
-        private InputManager.LayerToOperate primaryInputLayerHit = InputManager.LayerToOperate.world;
+        private EvaluationHelper.OperationLayer primaryInputOP = EvaluationHelper.OperationLayer.OTHER;
         
         // [REVIEW] create a class for hit object and hit pos ?
 
@@ -115,6 +121,8 @@ namespace tracer{
         //! 
         protected override void Init(object sender, EventArgs e){
             
+            EvaluationHelper.Instance.Init(core);
+
             uiManager = core.getManager<UIManager>();
             mainCam = Camera.main;
 
@@ -124,7 +132,9 @@ namespace tracer{
 
             //add listener
             m_inputs.VPETMap.Position.performed             += ProcessPositionInput;
+            m_inputs.VPETMap.OnPrimaryInputClick.started    += ProcessPrimaryInputClickStarted;
             m_inputs.VPETMap.OnPrimaryInputClick.performed  += ProcessPrimaryInputClick;
+            //m_inputs.VPETMap.OnPrimaryInputDrag.performed                += ProcessDebugDrag;
             //trigger "any input detected"
             SetupAnyInputAction();
             anyInputAction.performed                        += ProcessAnyInput;
@@ -152,7 +162,9 @@ namespace tracer{
 
             // Unsubscribe
             m_inputs.VPETMap.Position.performed             -= ProcessPositionInput;
+            m_inputs.VPETMap.OnPrimaryInputClick.started    -= ProcessPrimaryInputClickStarted;
             m_inputs.VPETMap.OnPrimaryInputClick.performed  -= ProcessPrimaryInputClick;
+            //m_inputs.VPETMap.OnPrimaryInputDrag.performed                -= ProcessDebugDrag;
             //clean the unity any-input action
             // Always clean up dynamic actions to prevent memory leaks
             if (anyInputAction != null){
@@ -165,14 +177,16 @@ namespace tracer{
         #endregion
 
         #region GENERAL
+
         //!
         //! tracks the positions of our primary input (primary touch, mouse pos)
         //! and writes them into a buffer to allow further calculations (delta, speed, etc)
         //!
         private void ProcessPositionInput(InputAction.CallbackContext obj){ 
             // Get the position
-            m_pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            //necessary to set pos within the input module? -> NO ONLY WRAPPER
+            Vector2 newPos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            m_delta = newPos-m_pos;
+            m_pos = newPos;
 
             m_posBuffer.SetBufferOnce(m_pos);
             // Update buffer
@@ -183,7 +197,24 @@ namespace tracer{
         //! which is currently used to execute IDExtractorModule
         //!
         private void ProcessAnyInput(InputAction.CallbackContext obj) {
-            manager.ProcessInputDetected(m_pos);
+            //manager.ProcessInputDetected(m_pos);
+            InputManager.PointerData anyInputData = new() {
+                Level = InputManager.InputLevel.Primary,
+                State = InputManager.InputState.Ended,
+                Position = m_pos,
+                Delta = m_delta
+            };
+            manager.Publish(new InputManager.AnyInputEvent { Data = anyInputData });
+        }
+
+        private void ProcessPrimaryInputClickStarted(InputAction.CallbackContext c){
+
+            //DEBUG
+            Debug.Log("<color=yellow>Primary Input Click Started</color>");
+            //-----
+
+            //nothing to do here
+            //do not check layers here, because we may triggered the rtx this frame by ProcessAnyInput
         }
 
         //!
@@ -193,52 +224,67 @@ namespace tracer{
         //!
         private void ProcessPrimaryInputClick(InputAction.CallbackContext c){
 
+            //DEBUG
+            Debug.Log("<color=green>Primary Input Click Performed</color>");
+            //-----
+
+            //determine if we hit UI or OTHER
+            //this will also gets buffer
+            EvaluationHelper.OperationLayer op = EvaluationHelper.Instance.EvaluateOperationLayer(m_pos);
+
             //Do not execute if we processed _ANY_ other input (possible? one finger drag, quick pinch-zoom)
-            SetLayerToOperate(m_pos);
+            
 
-            //TODO: make this 'layerWeAre' globally available
-            //  then utilize within Dual/Triple Move (Drag/Pinch) Input
-            //layer may get overwritten from further input
-            //e.g. touch pinch may use 2d (timeline) or world (cam zoom) if we dont want objects to get scaled by this
-            //call and set on IM before anything else
-            //InputManager.InputLayerType layerWeAreAt = DetermineLayerWeHit();
-            //? maybe check all layer and send all information (2dui hit, 3dui hit, selectable hit)
-
-            if (WasDoubleClick()){
+            if (WasDoubleClick(op)){
                 ProcessDoubleClickInput(c);
                 return;
             }
 
-            SetLastClickTime();
+            SetLastClickTime(op);
+
+            InputManager.PointerData clickData = new() {
+                Level = InputManager.InputLevel.Primary,
+                State = InputManager.InputState.Ended,
+                Position = m_pos,
+                Delta = m_delta
+            };
+
             
-            switch (manager.layerToOperate){
-                case InputManager.LayerToOperate.ui2d:
-                    manager.ProcessPrimaryInteract(m_pos, m_uiGameObjectWeHit);
+            
+            switch (op){
+                case EvaluationHelper.OperationLayer.UI2D:
+                    manager.Publish(new InputManager.ClickUIEvent { Data = clickData });
                     break;
-                case InputManager.LayerToOperate.ui3d:
-                    manager.ProcessPrimaryInteract(m_pos, m_gameObjectWeHit);
-                    break;
-                case InputManager.LayerToOperate.selectable:
-                    manager.ProcessPrimaryInteract(m_pos, m_gameObjectWeHit);
-                    //if we store hitWorldObject and selectableObject seperate within InputEventHandlerArgs
-                    //we could use the below function in seperate module and addlistener to InputManager events!
-                    if (RayMeshUtility.GetHitPointPrecise(mainCam.ScreenPointToRay(m_pos), m_worldGameObjectWeHit, RayMeshUtility.Accuracy.NearestVertex, out m_worldHitPos)){
-                        UnityHitVisualizerHelper.Spawn(m_worldHitPos, Color.green, 0.15f);
-                    }
-                    break;
-                case InputManager.LayerToOperate.world:
-                    manager.ProcessPrimaryInteract(m_pos, m_worldGameObjectWeHit);
-                    if (RayMeshUtility.GetHitPointPrecise(mainCam.ScreenPointToRay(m_pos), m_worldGameObjectWeHit, RayMeshUtility.Accuracy.ExactMesh, out m_worldHitPos)){
-                        UnityHitVisualizerHelper.Spawn(m_worldHitPos, Color.green, 0.15f);
-                    }
+                case EvaluationHelper.OperationLayer.UI3D:
+                case EvaluationHelper.OperationLayer.SCENEOBJECT:
+                case EvaluationHelper.OperationLayer.OTHER:
+                    manager.Publish(new InputManager.ClickOtherEvent { Data = clickData });
+                    // if (RayMeshUtility.GetHitPointPrecise(mainCam.ScreenPointToRay(m_pos), m_worldGameObjectWeHit, RayMeshUtility.Accuracy.ExactMesh, out m_worldHitPos)){
+                    //     UnityHitVisualizerHelper.Spawn(m_worldHitPos, Color.green, 0.15f);
+                    // }
                     break;
             }
 
             //--- DEBUG
-            Debug.Log("<color=yellow>primary input click</color>");
-            Ray debugRay = mainCam.ScreenPointToRay(m_pos);
-            Debug.DrawRay(debugRay.origin, debugRay.direction*100, Color.yellow, 2f);
+            // Debug.Log("<color=yellow>primary input click</color>");
+            // Ray debugRay = mainCam.ScreenPointToRay(m_pos);
+            // Debug.DrawRay(debugRay.origin, debugRay.direction*100, Color.yellow, 2f);
             //---------- END DEBUG
+        }
+
+        private void ProcessDebugDrag(InputAction.CallbackContext c){
+            //DEBUG
+            Debug.Log("Drag >> Pressed this Frame "+(c.action.WasPressedThisFrame() ? "<color=green>true</color>" : "<color=red>false</color>"));
+            //-----
+
+            /*
+                gibt es so in Unity als Event nicht.
+                - entweder mit Vector2, dann wird es ongoing invoked + wir checken auf "hold"
+                - 
+
+                !! be careful with Press, Tap, Hold when to determine if it becomes a drag | when to trigger or start
+
+            */
         }
 
         //!
@@ -264,120 +310,12 @@ namespace tracer{
 
         #region HELPER
 
-        //!
-        //! use (input) position to check what layershould be used/would be hit
-        //! @param pos position we should use to check, mostly the input, maybe a mid-point
-        //!
-        private void SetLayerToOperate(Vector2 pos){
-
-            if(Is2dUiElement(pos)){
-                manager.SetLayerToOperate(InputManager.LayerToOperate.ui2d);
-            }else if(Is3dUiElement(pos)){
-                manager.SetLayerToOperate(InputManager.LayerToOperate.ui3d);
-            }else if (IsSelectable(pos) || IsSelectableAtPixel(pos)) {
-                manager.SetLayerToOperate(InputManager.LayerToOperate.selectable);
-            }else{
-                manager.SetLayerToOperate(InputManager.LayerToOperate.world);
-                
-                object nonSceneObject = uiManager.GetWorldObjectAtPixel((int)pos.x, (int)pos.y);
-                if(nonSceneObject != null)
-                    m_worldGameObjectWeHit = nonSceneObject as GameObject;
-            }
-
-            switch (manager.layerToOperate){
-                case InputManager.LayerToOperate.ui2d:
-                    //Since we use Unity's Canvas and UI-Elements for Events, we straight skip any input hitting any of these
-                    Debug.Log("layer to operate set <color=grey>@2d ui</color>");
-                    break;
-                case InputManager.LayerToOperate.ui3d:
-                    Debug.Log("layer to operate set <color=grey>@3d world ui</color>");
-                    break;
-                case InputManager.LayerToOperate.selectable:
-                    Debug.Log("layer to operate set <color=grey>@selectable</color>");
-                    break;
-                case InputManager.LayerToOperate.world:
-                    Debug.Log("layer to operate set <color=grey>@world (hit nothing)</color>");
-                    break;
-            }
-        }
-
-        //!
-        //! returns true if pos is over any UI element
-        //! (it goes over all raycaster in the scene - ideally that would be GraphicRaycaster from the 2D UI)
-        //!
-        //! @param pos position of the click/tap
-        //!
-        private bool Is2dUiElement(Vector2 pos){
-            PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current){ position = pos };
-            List<RaycastResult> m_raycastList = new List<RaycastResult>(5);
-            EventSystem.current.RaycastAll(eventDataCurrentPosition, m_raycastList);
-            if(m_raycastList.Count > 0) {
-                m_uiGameObjectWeHit = m_raycastList[0].gameObject;
-                m_worldGameObjectWeHit = null;
-                return true;
-            }
-            return false;
-        }
-
-        //!
-        //! returns true if pos is over any 3D manipulator object (layerMask 0 for Default)
-        //! [REVIEW] should be seperate 3D-UI Layer
-        //!
-        private bool Is3dUiElement(Vector2 pos){
-            bool hitObject = Physics.Raycast(mainCam.ScreenPointToRay(pos), out RaycastHit hitInfo, Mathf.Infinity, 1 << 0);
-            if (hitObject) {
-                m_gameObjectWeHit = hitInfo.transform.gameObject;
-                m_worldGameObjectWeHit = null;
-                m_worldHitPos = hitInfo.point;
-                return true;
-            }
-            return false;
-        }
-
-        //!
-        //! returns true if pos is over any 3d selectable object
-        //! [REVIEW] will never hit, since there are no colliders (despite 3d ui gizmos) in the scene!
-        //!
-        private bool IsSelectable(Vector2 pos){
-            int layerMask = 1 << 5; //layer 5 (UI)
-            layerMask = ~layerMask; //all but UI
-
-            if (Physics.Raycast(mainCam.ScreenPointToRay(pos), out RaycastHit hitInfo, Mathf.Infinity, layerMask)){
-                m_worldGameObjectWeHit = hitInfo.transform.gameObject;
-                SceneObject sceneObject = m_worldGameObjectWeHit.GetComponent<SceneObject>();
-                m_worldHitPos = hitInfo.point;
-                if (sceneObject) {
-                    m_gameObjectWeHit = sceneObject.gameObject;
-                    return true;
-                }
-                sceneObject = m_worldGameObjectWeHit.GetComponentInParent<SceneObject>();
-                if (sceneObject) {
-                    m_gameObjectWeHit = sceneObject.gameObject;
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        //!
-        //! returns true if pos is over any 3d selectable object 
-        //! (uses color array which gets created via rtx)
-        //!
-        private bool IsSelectableAtPixel(Vector2 pos) {
-            SceneObject foundSO = uiManager.GetSelectableAtPixel((int)pos.x, (int)pos.y);
-            if (foundSO) {
-                m_worldGameObjectWeHit = foundSO.gameObject;
-                m_gameObjectWeHit = foundSO.gameObject;
-                return true;
-            }
-            return false;
-        }
 
         //!
         //! sets current primary input click time and layer for further double-click checks
         //! TODO: remove layertype and put into other function!
-        private void SetLastClickTime(){
-            primaryInputLayerHit = manager.layerToOperate;
+        private void SetLastClickTime(EvaluationHelper.OperationLayer _op){
+            primaryInputOP = _op;
             m_lastClickTime = Time.time; 
         }
 
@@ -393,8 +331,8 @@ namespace tracer{
         //! make a double click check (time within gap, same layer as before)
         //! todo: we could also add a position-delta to check
         //!
-        private bool WasDoubleClick(){
-            if(primaryInputLayerHit != manager.layerToOperate)   //if layer is different, reset time - no double-click!
+        private bool WasDoubleClick(EvaluationHelper.OperationLayer _op){
+            if(primaryInputOP != _op)   //if layer is different, reset time - no double-click!
                 ResetLastClickTime();
             return Time.time - m_lastClickTime < MAX_DOUBLECLICK_GAP; 
         }

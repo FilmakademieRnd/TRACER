@@ -72,9 +72,11 @@ namespace tracer{
             m_inputManager = core.getManager<InputManager>();
             
             // hookup to input events
-            m_inputManager.onPrimaryInteract3dUI += SelectViaIconFunction;
-            m_inputManager.onPrimaryInteractSelectable += SelectFunction;
-            m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
+            // m_inputManager.onPrimaryInteract3dUI += SelectViaIconFunction;
+            // m_inputManager.onPrimaryInteractSelectable += SelectFunction;
+            // m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
+            m_inputManager.Subscribe<InputManager.ClickOtherEvent>(SelectFunction);
+            //add DoubleClick
             
         }
 
@@ -85,9 +87,10 @@ namespace tracer{
         public override void Dispose(){
             base.Dispose();
 
-            m_inputManager.onPrimaryInteract3dUI        -= SelectViaIconFunction;
-            m_inputManager.onPrimaryInteractSelectable  -= SelectFunction;
-            m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
+            // m_inputManager.onPrimaryInteract3dUI        -= SelectViaIconFunction;
+            // m_inputManager.onPrimaryInteractSelectable  -= SelectFunction;
+            // m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
+            m_inputManager.Unsubscribe<InputManager.ClickOtherEvent>(SelectFunction);
         }
 
         //!
@@ -96,21 +99,37 @@ namespace tracer{
         //! @param sender The input manager.
         //! @param args The obj we hit, screen coorinates and input delta from the input event.
         //!
-        private void SelectFunction(object sender, InputManager.InputEventHandlerArgs args){
-            SceneObject validCastedSceneObject = (args.obj as GameObject)?.GetComponent<SceneObject>();
-            if (validCastedSceneObject != null){
-                //Debug.Log("<color=green>validCastedSceneObject</color>");
-                //TODO: move into FocusObjectModule (which only listens to DoubleClick)
-                //CheckDoubleClick(args.obj);
+        private void SelectFunction(InputManager.ClickOtherEvent evt){
 
-                if(manager.isThisOurSelectedObject(validCastedSceneObject)){
+            if (evt.Data.Level != InputManager.InputLevel.Primary) return;
+
+            // Wir reagieren auf die Phase
+            switch (evt.Data.State){
+                case InputManager.InputState.Started:
+                case InputManager.InputState.Ongoing:
+                case InputManager.InputState.Canceled:
+                    //nothing to do
+                    break;
+                case InputManager.InputState.Ended:
+                    //check via evaluation helper what we hit
+                    //this should already be buffered at our pos!
+                    break;
+            }
+
+            SceneObject sceneObject = EvaluationHelper.Instance.EvaluateSceneObject(evt.Data.Position);
+            if (sceneObject != null){
+                //TODO check for Selection via Icon!
+                
+                if(manager.isThisOurSelectedObject(sceneObject)){
                     return;
                 }else{
                     manager.clearSelectedObjects();
                 }
 
-                AddSelectionByRole(validCastedSceneObject);
+                AddSelectionByRole(sceneObject);
             }else{
+                //TODO check for Selection via Icon!
+
                 //Debug.Log("<color=red>NO validCastedSceneObject</color>");
                 manager.clearSelectedObjects();
             }

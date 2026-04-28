@@ -326,7 +326,102 @@ namespace tracer
         private SeparateBufferClass m_distBuffer;
 
 
+        //***************************************************************************************
+        //***************************************************************************************
+        //***************************************************************************************
+        //***************************************************************************************
+
         #region NewInteraction
+
+        // **** PARAMETER DESIGN ****
+
+        // --- ENUMS ---
+        public enum InputLevel      { Primary, Secondary, Tertiary }
+        public enum InputState      { Started, Ongoing, Ended, Canceled }   //ended can be counted as an executed as well
+        //public enum InputDeviceType { Mouse, Touch, Controller, Keyboard, Special }
+
+        // --- EVENT PARAMTER-DATA ---
+        public struct PointerData{
+            public InputLevel Level;
+            public InputState State;
+            //public InputDeviceType Device;
+            public UnityEngine.Vector2 Position;    //has to be replaced by own v2 implementation
+            public UnityEngine.Vector2 Delta;       //has to be replaced by own v2 implementation
+        }
+
+        // --- INTERFACE ---
+        public interface IInputEvent { }
+
+        // --- EVENTS ---
+        public struct AnyInputEvent                          : IInputEvent { public PointerData Data; }
+
+        // Click, Tap, Button Press
+        public struct ClickUIEvent                          : IInputEvent { public PointerData Data; }
+        public struct ClickOtherEvent                       : IInputEvent { public PointerData Data; }
+
+        // Drags (mouse hold + move, 1 finger touch + move, controller button hold + move)
+        public struct DragUIEvent                           : IInputEvent { public PointerData Data; }
+        public struct DragOtherEvent                        : IInputEvent { public PointerData Data; }
+
+        // Holds (mouse long press - no move, touch long press - no move, button long press - no move )
+        public struct HoldUIEvent                           : IInputEvent { public PointerData Data; }
+        public struct HoldOtherEvent                        : IInputEvent { public PointerData Data; }
+
+        // DoubleClick, Double Tap, (no controller pendant)
+        public struct DoubleClickUIEvent                    : IInputEvent { public PointerData Data; }
+        public struct DoubleClickOtherEvent                 : IInputEvent { public PointerData Data; }
+
+        // Specifics - Pinch (determine that its no secondary drag or pinch!)
+        public struct PinchUIEvent                          : IInputEvent { public PointerData Data; }
+        public struct PinchOtherEvent                       : IInputEvent { public PointerData Data; }
+        
+        // Specifics - Scroll Wheel
+        public struct MouseScrollUIEvent                    : IInputEvent { public PointerData Data; }
+        public struct MouseScrollOtherEvent                 : IInputEvent { public PointerData Data; }
+        
+        // Specifics - Rotate (determine that its no secondary drag or pinch!)
+        public struct TouchRotateUIEvent                    : IInputEvent { public PointerData Data; }
+        public struct TouchRotateOtherEvent                 : IInputEvent { public PointerData Data; }
+
+        // Specifics - Thumbsticks (can we differentiate a thumbstick ui <> other ?)
+        public struct ThumbstickLeftUIEvent                 : IInputEvent { public PointerData Data; }
+        public struct ThumbstickLeftOtherEvent              : IInputEvent { public PointerData Data; }
+        //... other specifics (Gyro, Controller-Trigger, ...)
+
+
+        // **** EVENT HUB ****
+        // save abos sorted by event-type
+        private readonly Dictionary<Type, Delegate> _eventHub = new Dictionary<Type, Delegate>();
+
+        public void Subscribe<T>(Action<T> callback) where T : IInputEvent{
+            Type eventType = typeof(T);
+            
+            if (!_eventHub.ContainsKey(eventType)){
+                _eventHub[eventType] = null;
+            }
+
+            // add method from module to our dict of abos
+            _eventHub[eventType] = (Action<T>)_eventHub[eventType] + callback;
+        }
+
+        public void Unsubscribe<T>(Action<T> callback) where T : IInputEvent{
+            Type eventType = typeof(T);
+            if (_eventHub.ContainsKey(eventType)){
+                _eventHub[eventType] = (Action<T>)_eventHub[eventType] - callback;
+            }
+        }
+
+        // 3. a module (e.g. UnityInputModule) fires an event
+        public void Publish<T>(T eventData) where T : IInputEvent{
+            Type eventType = typeof(T);
+
+            if (_eventHub.TryGetValue(eventType, out var action) && action != null){
+                // invokes all subscribed methods and sends the eventData
+                ((Action<T>)action).Invoke(eventData);
+            }
+        }
+
+
 
         public enum LayerToOperate{
             ui2d = 10,
@@ -538,6 +633,12 @@ namespace tracer
 
 
         #endregion
+
+        //***************************************************************************************
+        //***************************************************************************************
+        //***************************************************************************************
+        //***************************************************************************************
+
 
         /*
         //!

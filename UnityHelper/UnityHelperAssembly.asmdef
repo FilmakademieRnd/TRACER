@@ -1,15 +1,8 @@
 {
-    "name": "ModulesAssembly",
+    "name": "UnityHelperAssembly",
     "rootNamespace": "",
     "references": [
-        "Core",
-        "HelperAssembly",
-        "UnityHelperAssembly",
-        "Unity.TextMeshPro",
-        "Unity.Splines",
-        "Unity.Mathematics",
-        "glTFast",
-        "Unity.InputSystem"
+        "GUID:3c8c80ae2ea220d4fb13c98317414fa5"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
