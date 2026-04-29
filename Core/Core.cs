@@ -206,6 +206,9 @@ namespace tracer
             AnimationManager animationManager = new AnimationManager(typeof(AnimationManagerModule), this);
             m_managerList.Add(typeof(AnimationManager), animationManager);
 
+            //Initialize the EvaluationHelper (Unity Specific!)
+            EvaluationHelper.Instance.Init(this);
+
             LoadSettings();
 
             settings.screenSize.x = Screen.currentResolution.width;

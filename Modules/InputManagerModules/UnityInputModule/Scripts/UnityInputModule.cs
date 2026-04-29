@@ -121,8 +121,6 @@ namespace tracer{
         //! 
         protected override void Init(object sender, EventArgs e){
             
-            EvaluationHelper.Instance.Init(core);
-
             uiManager = core.getManager<UIManager>();
             mainCam = Camera.main;
 
@@ -356,9 +354,37 @@ namespace tracer{
         # endregion
         */
 
+        #region CDH
+        //CLICK DFRAG HOLD Determination
+
+        [Header("Interaction Settings")]
+        // How many pixels must the pointer move before a click becomes a drag?
+        public float dragDistanceThreshold = 15f; 
+        // Maximum time (seconds) a pointer can be down to be considered a click.
+        public float maxClickDuration = 0.5f;
+
+        // An internal class/struct just for the Module to keep track of what's happening
+        public class InputTracker{
+            public bool IsDown;
+            public bool HasSurpassedDragThreshold;
+            public float TimePressed;
+            public Vector2 StartPosition;
+            public Vector2 LastFramePosition;
+        }
+
+        // Track states for 1-finger/Left-Click, 2-finger/Right-Click, etc.
+        private Dictionary<InputManager.InputLevel, InputTracker> _trackers = new Dictionary<InputManager.InputLevel, InputTracker>{
+            { InputManager.InputLevel.Primary,      new InputTracker() },
+            { InputManager.InputLevel.Secondary,    new InputTracker() },
+            { InputManager.InputLevel.Tertiary,     new InputTracker() }
+        };
+
+        #endregion
+
     }
 }
 
+#region RAY UTILITY
 public static class RayMeshUtility{
     public enum Accuracy{
         BoundingBox,    // Fastest, least accurate
@@ -563,3 +589,4 @@ public static class RayMeshUtility{
         return t > EPSILON;
     }
 }
+#endregion

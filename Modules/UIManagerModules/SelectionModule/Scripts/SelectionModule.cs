@@ -44,10 +44,7 @@ namespace tracer{
     //! There can be multiple instances of this class, providing local camera space selection.
     //!
     public class SelectionModule : UIManagerModule{
-        //!
-        //! A reference to the TRACER scene manager.
-        //!
-        private SceneManager m_sceneManager;
+
         //!
         //! A reference to the TRACER input manager.
         //!
@@ -68,7 +65,6 @@ namespace tracer{
         //! @param e Arguments for these event. 
         //! 
         protected override void Init(object sender, EventArgs e){
-            m_sceneManager = core.getManager<SceneManager>();
             m_inputManager = core.getManager<InputManager>();
             
             // hookup to input events
@@ -77,6 +73,7 @@ namespace tracer{
             // m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
             m_inputManager.Subscribe<InputManager.ClickOtherEvent>(SelectFunction);
             //add DoubleClick
+            //add drag in terms of drawing a rectangle for multi-selection with different function
             
         }
 
@@ -103,7 +100,7 @@ namespace tracer{
 
             if (evt.Data.Level != InputManager.InputLevel.Primary) return;
 
-            // Wir reagieren auf die Phase
+            // check phase
             switch (evt.Data.State){
                 case InputManager.InputState.Started:
                 case InputManager.InputState.Ongoing:
@@ -116,9 +113,9 @@ namespace tracer{
                     break;
             }
 
-            SceneObject sceneObject = EvaluationHelper.Instance.EvaluateSceneObject(evt.Data.Position);
+            SceneObject sceneObject = GetSceneObjectAtPosition(evt.Data.Position);
+
             if (sceneObject != null){
-                //TODO check for Selection via Icon!
                 
                 if(manager.isThisOurSelectedObject(sceneObject)){
                     return;
@@ -128,56 +125,23 @@ namespace tracer{
 
                 AddSelectionByRole(sceneObject);
             }else{
-                //TODO check for Selection via Icon!
-
-                //Debug.Log("<color=red>NO validCastedSceneObject</color>");
+                Debug.Log("<color=red>no valid SceneObject to select</color>");
                 manager.clearSelectedObjects();
             }
         }
 
-        //!
-        //! Function to connect input managers input event for selecting a sceneObject via an IconHit
-        //!
-        //! @param sender The input manager.
-        //! @param args The ui icon gameobject we hit, screen coorinates and input delta from the input event.
-        //!
-        private void SelectViaIconFunction(object sender, InputManager.InputEventHandlerArgs args){
-            IconUpdate validCastedIconUpdateObject = (args.obj as GameObject)?.GetComponent<IconUpdate>();
-            if (validCastedIconUpdateObject != null){
-                Debug.Log("<color=green>validCastedIconUpdateObject</color>");
-                //TODO: move into FocusObjectModule (which only listens to DoubleClick)
-                //CheckDoubleClick(args.obj);
+        private SceneObject GetSceneObjectAtPosition(Vector2 screenPos) {
+            //Check for IconUpdate
+            //[!REVISE]
+            GameObject hitObject = EvaluationHelper.Instance.EvaluateGameObject(screenPos);
 
-                if(manager.isThisOurSelectedObject(validCastedIconUpdateObject.m_parentObject)){
-                    return;
-                }else{
-                    manager.clearSelectedObjects();
-                }
-
-                AddSelectionByRole(validCastedIconUpdateObject.m_parentObject);
-            }else{
-                Debug.Log("<color=red>NO validCastedIconUpdateObject</color>");
-                manager.clearSelectedObjects();
+            if (hitObject) {
+                IconUpdate icon = hitObject.GetComponent<IconUpdate>();
+                if(icon && icon.m_parentObject)
+                    return icon.m_parentObject;
             }
-        }
-        //!
-        //! Function to connect input managers input event for de-selecting (hit nothing "selectable")
-        //!
-        //! @param sender The input manager.
-        //! @param args The gameobject we hit, screen coorinates and input delta from the input event.
-        //!
-        private void DeSelectFunction(object sender, InputManager.InputEventHandlerArgs args){
-            //nothing to do here, in other function this could help to 
-            //e.g. show a line where we point to, etc
 
-            GameObject validCastedGameObject = (args.obj as GameObject);
-            if (validCastedGameObject != null){
-                //show interaction "ghost" at target hit pos on gameobject (could blink) pos
-
-            }else{
-                //show interaction "ghost" at target pos?
-            }
-            manager.clearSelectedObjects();
+            return EvaluationHelper.Instance.EvaluateSceneObject(screenPos);
         }
         
         //!

@@ -94,10 +94,6 @@ namespace tracer{
         //! tracer core reference
         //!
         private Core core;
-        //!
-        //! A reference to the TRACER scene manager.
-        //!
-        private SceneManager m_sceneManager;
 
         //!
         //! Init our evaluation helper - via UnityInputModule
@@ -108,8 +104,7 @@ namespace tracer{
             mainCam = Camera.main;
             selectableLayer = LayerMask.GetMask(CullingLayerName);
 
-            m_sceneManager = core.getManager<SceneManager>();
-            m_sceneManager.sceneReady += OnSceneReady;
+            core.getManager<SceneManager>().sceneReady += OnSceneReady;
         }
 
         // gets called when sceneManager emits a sceneReady event
@@ -134,7 +129,7 @@ namespace tracer{
             if(core == null) //never initialized or it's a duplicate
                 return;
 
-            m_sceneManager.sceneReady -= OnSceneReady;
+            core.getManager<SceneManager>().sceneReady -= OnSceneReady;
 
             if(m_materials == null) //scene was never ready
                 return;
@@ -194,11 +189,11 @@ namespace tracer{
             m_selectableIdPropertyId = Shader.PropertyToID(SelectableIdPropertyName);
 
             MaterialPropertyBlock m_properties = new MaterialPropertyBlock(); //Re-used property block used to set selectable _id.
-            Transform root = m_sceneManager.scnRoot.transform;
+            Transform root = core.getManager<SceneManager>().scnRoot.transform;
 
             int sceneObjectMatsChanged = 0;
             int nonSceneObjectMatsChanged = 0;
-            foreach (Renderer renderer in m_sceneManager.scnRoot.GetComponentsInChildren<Renderer>()){
+            foreach (Renderer renderer in core.getManager<SceneManager>().scnRoot.GetComponentsInChildren<Renderer>()){
                 SceneObject sceneObject = renderer.gameObject.GetComponent<SceneObject>();
                 short soID = 0;
                 byte sceneID = 0;
@@ -451,6 +446,7 @@ namespace tracer{
         //! the object we hit in our last layer-to-operate evaluation (do not execute multiple times)
         //!
         private GameObject m_uiGameObjectWeHit, m_gameObjectWeHit, m_worldGameObjectWeHit;
+        private SceneObject m_sceneObjectWeHit;
         //!
         //! the world position were a hit occured
         //!
@@ -483,6 +479,17 @@ namespace tracer{
             
             //how to implement an iterative selection of SceneObjects when clicking repeatingly at the same pos/obj?
             //  -> maybe within another "EvaluateSceneObjectsIterative"
+
+            if (IsSceneObject(screenPos) || IsSceneObjectAtPixel(screenPos)) 
+                return m_sceneObjectWeHit;
+
+            return null;
+        }
+
+        // Evaluate and return a GameObject that was hit via a Physics Raycast
+        public GameObject EvaluateGameObject(Vector2 screenPos) {
+            if(Is3DUI(screenPos))
+                return m_gameObjectWeHit;
             return null;
         }
 
@@ -529,15 +536,15 @@ namespace tracer{
 
             if (Physics.Raycast(mainCam.ScreenPointToRay(pos), out RaycastHit hitInfo, Mathf.Infinity, layerMask)){
                 m_worldGameObjectWeHit = hitInfo.transform.gameObject;
-                SceneObject sceneObject = m_worldGameObjectWeHit.GetComponent<SceneObject>();
+                m_sceneObjectWeHit = m_worldGameObjectWeHit.GetComponent<SceneObject>();
                 m_worldHitPos = hitInfo.point;
-                if (sceneObject) {
-                    m_gameObjectWeHit = sceneObject.gameObject;
+                if (m_sceneObjectWeHit) {
+                    m_gameObjectWeHit = m_sceneObjectWeHit.gameObject;
                     return true;
                 }
-                sceneObject = m_worldGameObjectWeHit.GetComponentInParent<SceneObject>();
-                if (sceneObject) {
-                    m_gameObjectWeHit = sceneObject.gameObject;
+                m_sceneObjectWeHit = m_worldGameObjectWeHit.GetComponentInParent<SceneObject>();
+                if (m_sceneObjectWeHit) {
+                    m_gameObjectWeHit = m_sceneObjectWeHit.gameObject;
                     return true;
                 }
             }
@@ -560,7 +567,7 @@ namespace tracer{
                 (unityColor.b << (8)) | 
                 (unityColor.a << (0)) );
 
-            return m_sceneManager.getSceneObject(sceneID, soID);
+            return core.getManager<SceneManager>().getSceneObject(sceneID, soID);
         }
 
         //!
@@ -568,10 +575,10 @@ namespace tracer{
         //! (uses color array which gets created via rtx)
         //!
         private bool IsSceneObjectAtPixel(Vector2 pos) {
-            SceneObject foundSO = GetSceneObjectViaScreenPosition((int)pos.x, (int)pos.y);
-            if (foundSO) {
-                m_worldGameObjectWeHit = foundSO.gameObject;
-                m_gameObjectWeHit = foundSO.gameObject;
+            m_sceneObjectWeHit = GetSceneObjectViaScreenPosition((int)pos.x, (int)pos.y);
+            if (m_sceneObjectWeHit) {
+                m_worldGameObjectWeHit = m_sceneObjectWeHit.gameObject;
+                m_gameObjectWeHit = m_sceneObjectWeHit.gameObject;
                 return true;
             }
             return false;
