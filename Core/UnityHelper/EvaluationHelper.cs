@@ -455,6 +455,7 @@ namespace tracer{
         //!
         //! use (input) position to check what layershould be used/would be hit
         //! @param screen-pos position we should use to check
+        //! TODO: add buffer, add var to deny buffer
         //!
         public OperationLayer EvaluateOperationLayer(Vector2 screenPos){
             //if in buffer, return this

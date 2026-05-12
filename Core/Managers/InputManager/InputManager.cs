@@ -341,7 +341,7 @@ namespace tracer
         //public enum InputDeviceType { Mouse, Touch, Controller, Keyboard, Special }
 
         // --- EVENT PARAMTER-DATA ---
-        public struct PointerData{
+        public struct InputData{
             public InputLevel Level;
             public InputState State;
             //public InputDeviceType Device;
@@ -353,39 +353,39 @@ namespace tracer
         public interface IInputEvent { }
 
         // --- EVENTS ---
-        public struct AnyInputEvent                          : IInputEvent { public PointerData Data; }
+        public struct AnyInputEvent                         : IInputEvent { public InputData Data; }
 
         // Click, Tap, Button Press
-        public struct ClickUIEvent                          : IInputEvent { public PointerData Data; }
-        public struct ClickOtherEvent                       : IInputEvent { public PointerData Data; }
+        public struct ClickUIEvent                          : IInputEvent { public InputData Data; }
+        public struct ClickOtherEvent                       : IInputEvent { public InputData Data; }
 
         // Drags (mouse hold + move, 1 finger touch + move, controller button hold + move)
-        public struct DragUIEvent                           : IInputEvent { public PointerData Data; }
-        public struct DragOtherEvent                        : IInputEvent { public PointerData Data; }
+        public struct DragUIEvent                           : IInputEvent { public InputData Data; }
+        public struct DragOtherEvent                        : IInputEvent { public InputData Data; }
 
         // Holds (mouse long press - no move, touch long press - no move, button long press - no move )
-        public struct HoldUIEvent                           : IInputEvent { public PointerData Data; }
-        public struct HoldOtherEvent                        : IInputEvent { public PointerData Data; }
+        public struct HoldUIEvent                           : IInputEvent { public InputData Data; }
+        public struct HoldOtherEvent                        : IInputEvent { public InputData Data; }
 
         // DoubleClick, Double Tap, (no controller pendant)
-        public struct DoubleClickUIEvent                    : IInputEvent { public PointerData Data; }
-        public struct DoubleClickOtherEvent                 : IInputEvent { public PointerData Data; }
+        public struct DoubleClickUIEvent                    : IInputEvent { public InputData Data; }
+        public struct DoubleClickOtherEvent                 : IInputEvent { public InputData Data; }
 
         // Specifics - Pinch (determine that its no secondary drag or pinch!)
-        public struct PinchUIEvent                          : IInputEvent { public PointerData Data; }
-        public struct PinchOtherEvent                       : IInputEvent { public PointerData Data; }
+        public struct PinchUIEvent                          : IInputEvent { public InputData Data; public float PinchDistance; }
+        public struct PinchOtherEvent                       : IInputEvent { public InputData Data; public float PinchDistance; }
         
         // Specifics - Scroll Wheel
-        public struct MouseScrollUIEvent                    : IInputEvent { public PointerData Data; }
-        public struct MouseScrollOtherEvent                 : IInputEvent { public PointerData Data; }
+        public struct MouseScrollUIEvent                    : IInputEvent { public InputData Data; }
+        public struct MouseScrollOtherEvent                 : IInputEvent { public InputData Data; }
         
         // Specifics - Rotate (determine that its no secondary drag or pinch!)
-        public struct TouchRotateUIEvent                    : IInputEvent { public PointerData Data; }
-        public struct TouchRotateOtherEvent                 : IInputEvent { public PointerData Data; }
+        public struct TouchRotateUIEvent                    : IInputEvent { public InputData Data; public float RotationAngle; }
+        public struct TouchRotateOtherEvent                 : IInputEvent { public InputData Data; public float RotationAngle; }
 
         // Specifics - Thumbsticks (can we differentiate a thumbstick ui <> other ?)
-        public struct ThumbstickLeftUIEvent                 : IInputEvent { public PointerData Data; }
-        public struct ThumbstickLeftOtherEvent              : IInputEvent { public PointerData Data; }
+        public struct ThumbstickLeftUIEvent                 : IInputEvent { public InputData Data; }
+        public struct ThumbstickLeftOtherEvent              : IInputEvent { public InputData Data; }
         //... other specifics (Gyro, Controller-Trigger, ...)
 
 
