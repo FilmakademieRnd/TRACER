@@ -421,6 +421,13 @@ namespace tracer
             }
         }
 
+        // TODO: has to be reverted/set via prio, so that not some "low" modules reset it, if its overwritten by something higher!
+        private bool camNavigationAllowed = true;
+        public void SetAllowCamNavigation(bool allow){ camNavigationAllowed = allow; }
+        public bool IsCamNavigationAllowed(){ return camNavigationAllowed; }
+
+        //**************************
+
 
 
         public enum LayerToOperate{

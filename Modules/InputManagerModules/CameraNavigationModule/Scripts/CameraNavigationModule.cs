@@ -113,6 +113,10 @@ namespace tracer
         //! dont run the coroutine to focus on an object via double click twice
         //!
         private int m_smoothCameraFocusIsRunning = 0;
+        //!
+        //! storage variables for camera rotation, to not become weird angled, but take into account starting values
+        //!
+        private float m_pitch, m_yaw, m_roll = 0f;
 
         //!
         //! Constructor.
@@ -135,11 +139,13 @@ namespace tracer
             // Unsubscribe
             manager.pinchEvent -= CameraDolly;
             manager.twoDragEvent -= CameraOrbit;
-            manager.threeDragEvent -= CameraPedestalTruck;
+            //manager.threeDragEvent -= CameraPedestalTruck;
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged -= SelectionUpdate;
             uiManager.selectionFocus -= FocusOnSelection;
             manager.updateCameraUICommand -= CameraUpdated;
+
+            manager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
         }
 
         //! 
@@ -156,7 +162,7 @@ namespace tracer
             // Subscription to input events
             manager.pinchEvent += CameraDolly;
             manager.twoDragEvent += CameraOrbit;
-            manager.threeDragEvent += CameraPedestalTruck;
+            //manager.threeDragEvent += CameraPedestalTruck;
 
             // Subscribe to selection change
             UIManager uiManager = core.getManager<UIManager>();
@@ -166,6 +172,8 @@ namespace tracer
 
             // Subscribe to camera change
             manager.updateCameraUICommand += CameraUpdated;
+
+            manager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
 
             // Initialize control variables
             m_selectionCenter = Vector3.zero;
@@ -183,6 +191,87 @@ namespace tracer
             // Assign arbitrary center of interest
             centerOfInterest = m_camXform.TransformPoint(Vector3.forward * 6f);
 
+            // Store positional offset
+            coiOffset = m_camXform.position - centerOfInterest;
+        }
+
+        //!
+        //! Function to connect input managers input event for dragging a sceneObjects gizmo
+        //!
+        //! @param evt the InputData
+        //!
+        private void DragFunction(InputManager.DragOtherEvent evt){
+            
+            if(!manager.IsCamNavigationAllowed())
+                return;
+
+            // right now, only Primary
+            switch (evt.Data.Level) {
+                //ROTATE CAMERA
+                case InputManager.InputLevel.Primary:
+                    // check phase
+                    switch (evt.Data.State){
+                        case InputManager.InputState.Started:
+                            InitializeCameraAngles();
+                            break;
+                        case InputManager.InputState.Ongoing:
+                        case InputManager.InputState.Canceled:
+                            CameraLookAround(evt.Data.Delta);
+                            break;
+                        case InputManager.InputState.Ended:
+                            break;
+                    }
+                    break;
+                //MOVE CAMERA
+                case InputManager.InputLevel.Secondary:
+                    // check phase
+                    switch (evt.Data.State){
+                        case InputManager.InputState.Started:
+                            break;
+                        case InputManager.InputState.Ongoing:
+                        case InputManager.InputState.Canceled:
+                            CameraPedestalTruck(evt.Data.Delta);
+                            break;
+                        case InputManager.InputState.Ended:
+                            break;
+                    }
+                    break;  
+            } 
+            
+        }
+
+        private void InitializeCameraAngles() {    
+            Vector3 currentAngles = m_camXform.eulerAngles;
+            
+            m_pitch     = currentAngles.x;
+            m_yaw       = currentAngles.y;
+            m_roll      = currentAngles.z; // Capture the initial tilt!
+
+            // Normalize pitch to -180 to 180 so our Mathf.Clamp works correctly
+            if (m_pitch > 180f) { m_pitch -= 360f; }
+        }
+
+        //! 
+        //! rotate the camera from a pov
+        //! 
+        //! @param e The delta distance from drag input
+        //!
+        private void CameraLookAround(Vector2 delta){
+            
+           // Accumulate the angles
+            m_yaw   += s_orbitSpeed * delta.x;
+            m_pitch -= s_orbitSpeed * delta.y;
+
+            // Clamp the pitch so the camera can't flip upside down
+            // -89 is straight up, 89 is straight down
+            m_pitch = Mathf.Clamp(m_pitch, -89f, 89f);
+
+            // Apply the rotation via Euler Angles. 
+            // Notice the Z value is forced to 0f. It is mathematically impossible for the camera to tilt sideways now.
+            m_camXform.eulerAngles = new Vector3(m_pitch, m_yaw, m_roll);
+
+            // Update value
+            centerOfInterest = m_camXform.TransformPoint(Vector3.forward * 6f);
             // Store positional offset
             coiOffset = m_camXform.position - centerOfInterest;
         }
@@ -220,8 +309,7 @@ namespace tracer
         //! @param sender The input manager.
         //! @param e The delta distance from the touch gesture triggering the movement.
         //!
-        private void CameraOrbit(object sender, Vector2 delta)
-        {
+        private void CameraOrbit(object sender, Vector2 delta){
             if(!manager.IsScreenCamNavigationUsed())
                 return;
 
@@ -262,20 +350,14 @@ namespace tracer
             centerOfInterest = pivotPoint;
             // Store positional offset
             coiOffset = m_camXform.position - centerOfInterest;
-
         }
 
         //! 
         //! Pedestal & Truck function: moves the camera vertically or horizontally.
         //! 
-        //! @param sender The input manager.
         //! @param e The delta distance from the touch gesture triggering the movement.
         //!
-        private void CameraPedestalTruck(object sender, Vector2 delta)
-        {
-            if(!manager.IsScreenCamNavigationUsed())
-                return;
-
+        private void CameraPedestalTruck(Vector2 delta){
             // Adjust the input
             Vector2 offset = -s_panSpeed * delta;
 

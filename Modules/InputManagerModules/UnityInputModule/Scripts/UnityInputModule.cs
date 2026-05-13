@@ -142,17 +142,17 @@ namespace tracer{
             anyInputAction.performed += ProcessAnyInput;
 
             // --- POSITION ---
-            m_inputs.VPETMap.Position.performed += ProcessPositionInput;
+            //m_inputs.VPETMap.Position.performed += ProcessPositionInput;
 
             // --- PRIMARY (1-Finger / Left Mouse) ---
             m_inputs.VPETMap.OnPrimaryInputClick.started += ctx => OnPointerDown(_primary);
             m_inputs.VPETMap.OnPrimaryInputClick.canceled += ctx => OnPointerUp(_primary);
 
             // --- SECONDARY (2-Fingers / Right Mouse) ---
-            /*
             m_inputs.VPETMap.OnSecondaryInputClick.started += ctx => OnPointerDown(_secondary);
             m_inputs.VPETMap.OnSecondaryInputClick.canceled += ctx => OnPointerUp(_secondary);
 
+            /*
             // --- TERTIARY (3-Fingers / Middle Mouse) ---
             m_inputs.VPETMap.OnTertiaryInputClick.started += ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled += ctx => OnPointerUp(_tertiary);
@@ -189,16 +189,16 @@ namespace tracer{
             m_manager.core.updateEvent -= OnCoreUpdateEvent;
 
             // Unsubscribe
-             m_inputs.VPETMap.Position.performed += ProcessPositionInput;
+            //m_inputs.VPETMap.Position.performed += ProcessPositionInput;
 
             // --- PRIMARY (1-Finger / Left Mouse) ---
             m_inputs.VPETMap.OnPrimaryInputClick.started -= ctx => OnPointerDown(_primary);
             m_inputs.VPETMap.OnPrimaryInputClick.canceled -= ctx => OnPointerUp(_primary);
 
-            /*
             m_inputs.VPETMap.OnSecondaryInputClick.started -= ctx => OnPointerDown(_secondary);
             m_inputs.VPETMap.OnSecondaryInputClick.canceled -= ctx => OnPointerUp(_secondary);
 
+            /*
             m_inputs.VPETMap.OnTertiaryInputClick.started -= ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled -= ctx => OnPointerUp(_tertiary);
 
@@ -222,16 +222,15 @@ namespace tracer{
 
         #region PROCESSION
 
-        //!
+        //! obsolete - this event driven approach is not good for continous values
         //! tracks the positions of our primary input (primary touch, mouse pos)
         //! and writes them into a buffer to allow further calculations (delta, speed, etc)
         //!
-        private void ProcessPositionInput(InputAction.CallbackContext ctx){ 
+        private void ProcessPositionInput(){ 
             // Get the position
-            Vector2 newPos = ctx.ReadValue<Vector2>();
+            Vector2 newPos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
             m_delta = newPos - m_pos;
             m_pos = newPos;
-
         }
         //!
         //! call ProcessInputDetected in the manager
@@ -253,6 +252,9 @@ namespace tracer{
         //! Callback from TRACER _core when Unity calls it's render update
         //!
         private void OnCoreUpdateEvent(object sender, EventArgs e){
+            
+            ProcessPositionInput();
+
             ProcessTracker(_primary);
             ProcessTracker(_secondary);
             ProcessTracker(_tertiary);

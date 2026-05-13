@@ -504,6 +504,7 @@ namespace tracer
                         break;
                 }
             }
+            m_inputManager.SetAllowCamNavigation(false);
         }
 
         //!
@@ -691,6 +692,7 @@ namespace tracer
                         break;
                 }
             }
+            m_inputManager.SetAllowCamNavigation(true);
             manipulator = null;
             _dragViz.Cleanup();
         }
