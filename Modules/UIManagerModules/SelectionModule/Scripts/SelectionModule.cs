@@ -93,8 +93,7 @@ namespace tracer{
         //!
         //! Function to connect input managers input event for selecting a sceneObject
         //!
-        //! @param sender The input manager.
-        //! @param args The obj we hit, screen coorinates and input delta from the input event.
+        //! @param evt the InputData
         //!
         private void SelectFunction(InputManager.ClickOtherEvent evt){
 

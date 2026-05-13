@@ -131,6 +131,8 @@ namespace tracer{
             
             mainCam = Camera.main;
 
+            m_manager.core.updateEvent += OnCoreUpdateEvent;
+
             //enable input
             m_inputs = new Inputs();
 
@@ -183,6 +185,8 @@ namespace tracer{
         //!
         public override void Dispose(){
             base.Dispose();
+
+            m_manager.core.updateEvent -= OnCoreUpdateEvent;
 
             // Unsubscribe
              m_inputs.VPETMap.Position.performed += ProcessPositionInput;
@@ -245,7 +249,10 @@ namespace tracer{
         }
 
         // --- THE UPDATE LOOP (finite state machine) ---
-        void Update() {
+        //!
+        //! Callback from TRACER _core when Unity calls it's render update
+        //!
+        private void OnCoreUpdateEvent(object sender, EventArgs e){
             ProcessTracker(_primary);
             ProcessTracker(_secondary);
             ProcessTracker(_tertiary);
@@ -420,6 +427,8 @@ namespace tracer{
 
         private void FireDragEvent(InputManager.InputLevel level, InputManager.InputState state) {
             InputManager.InputData data = CreateData(level, state);
+
+            //Debug.Log("DRAG EVENT "+data.ToString());
 
             if(state == InputManager.InputState.Started) {
                 layerDrag = EvaluationHelper.Instance.EvaluateOperationLayer(m_pos);

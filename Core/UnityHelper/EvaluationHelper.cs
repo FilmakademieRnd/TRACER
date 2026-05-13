@@ -494,6 +494,13 @@ namespace tracer{
             return null;
         }
 
+        // Evaluate and return a Manipulator GameObject that was hit via a Physics Raycast at a different layer
+        public GameObject EvaluateManipulator(Vector2 screenPos) {
+            if(Is3DManipulator(screenPos))
+                return m_gameObjectWeHit;
+            return null;
+        }
+
         //!
         //! returns true if pos is over any UI element
         //! (it goes over all raycaster in the scene - ideally that would be GraphicRaycaster from the 2D UI)
@@ -518,6 +525,20 @@ namespace tracer{
         //!
         private bool Is3DUI(Vector2 pos){
             bool hitObject = Physics.Raycast(mainCam.ScreenPointToRay(pos), out RaycastHit hitInfo, Mathf.Infinity, 1 << 0);
+            if (hitObject) {
+                m_gameObjectWeHit = hitInfo.transform.gameObject;
+                m_worldGameObjectWeHit = null;
+                m_worldHitPos = hitInfo.point;
+                return true;
+            }
+            return false;
+        }
+
+        //!
+        //! returns true if pos is over any 3D manipulator object (layerMask 5 for UI)
+        //!
+        private bool Is3DManipulator(Vector2 pos){
+            bool hitObject = Physics.Raycast(mainCam.ScreenPointToRay(pos), out RaycastHit hitInfo, Mathf.Infinity, 1 << 5);
             if (hitObject) {
                 m_gameObjectWeHit = hitInfo.transform.gameObject;
                 m_worldGameObjectWeHit = null;

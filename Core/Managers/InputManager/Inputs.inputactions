@@ -232,6 +232,15 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "OnSecondaryInputClick",
+                    "type": "Button",
+                    "id": "6e678ca7-ce62-44ee-a63f-ea2119ddf67a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "OnPrimaryInputDrag",
                     "type": "Value",
                     "id": "b3e7ccbb-ed2d-45b2-adf0-efa294a5b3cd",
@@ -734,6 +743,39 @@
                     "processors": "",
                     "groups": "",
                     "action": "OnPrimaryInputClick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "9de3fd82-f4d2-4930-845a-6c21c45c8d2d",
+                    "path": "<Mouse>/rightButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnSecondaryInputClick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5c8372c0-3af6-41b6-b018-7dca44e64327",
+                    "path": "<Touchscreen>/touch1/tap",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnSecondaryInputClick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5b1f4483-81a1-4d7c-ba10-0c68ca9efe3c",
+                    "path": "<Keyboard>/space",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnSecondaryInputClick",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

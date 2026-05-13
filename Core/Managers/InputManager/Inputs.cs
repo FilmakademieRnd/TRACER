@@ -318,6 +318,15 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
+                    ""name"": ""OnSecondaryInputClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""6e678ca7-ce62-44ee-a63f-ea2119ddf67a"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
                     ""name"": ""OnPrimaryInputDrag"",
                     ""type"": ""Value"",
                     ""id"": ""b3e7ccbb-ed2d-45b2-adf0-efa294a5b3cd"",
@@ -825,6 +834,39 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
+                    ""id"": ""9de3fd82-f4d2-4930-845a-6c21c45c8d2d"",
+                    ""path"": ""<Mouse>/rightButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnSecondaryInputClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5c8372c0-3af6-41b6-b018-7dca44e64327"",
+                    ""path"": ""<Touchscreen>/touch1/tap"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnSecondaryInputClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5b1f4483-81a1-4d7c-ba10-0c68ca9efe3c"",
+                    ""path"": ""<Keyboard>/space"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnSecondaryInputClick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
                     ""id"": ""695ebaa8-ecb4-461d-a489-ae89c4034a69"",
                     ""path"": ""<Mouse>/leftButton"",
                     ""interactions"": """",
@@ -877,6 +919,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_Controller_Left_Stick = m_VPETMap.FindAction("Controller_Left_Stick", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
         m_VPETMap_OnPrimaryInputClick = m_VPETMap.FindAction("OnPrimaryInputClick", throwIfNotFound: true);
+        m_VPETMap_OnSecondaryInputClick = m_VPETMap.FindAction("OnSecondaryInputClick", throwIfNotFound: true);
         m_VPETMap_OnPrimaryInputDrag = m_VPETMap.FindAction("OnPrimaryInputDrag", throwIfNotFound: true);
     }
 
@@ -983,6 +1026,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_Controller_Left_Stick;
     private readonly InputAction m_VPETMap_Controller_Right_Stick;
     private readonly InputAction m_VPETMap_OnPrimaryInputClick;
+    private readonly InputAction m_VPETMap_OnSecondaryInputClick;
     private readonly InputAction m_VPETMap_OnPrimaryInputDrag;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
@@ -1096,6 +1140,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @OnPrimaryInputClick => m_Wrapper.m_VPETMap_OnPrimaryInputClick;
         /// <summary>
+        /// Provides access to the underlying input action "VPETMap/OnSecondaryInputClick".
+        /// </summary>
+        public InputAction @OnSecondaryInputClick => m_Wrapper.m_VPETMap_OnSecondaryInputClick;
+        /// <summary>
         /// Provides access to the underlying input action "VPETMap/OnPrimaryInputDrag".
         /// </summary>
         public InputAction @OnPrimaryInputDrag => m_Wrapper.m_VPETMap_OnPrimaryInputDrag;
@@ -1200,6 +1248,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @OnPrimaryInputClick.started += instance.OnOnPrimaryInputClick;
             @OnPrimaryInputClick.performed += instance.OnOnPrimaryInputClick;
             @OnPrimaryInputClick.canceled += instance.OnOnPrimaryInputClick;
+            @OnSecondaryInputClick.started += instance.OnOnSecondaryInputClick;
+            @OnSecondaryInputClick.performed += instance.OnOnSecondaryInputClick;
+            @OnSecondaryInputClick.canceled += instance.OnOnSecondaryInputClick;
             @OnPrimaryInputDrag.started += instance.OnOnPrimaryInputDrag;
             @OnPrimaryInputDrag.performed += instance.OnOnPrimaryInputDrag;
             @OnPrimaryInputDrag.canceled += instance.OnOnPrimaryInputDrag;
@@ -1289,6 +1340,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @OnPrimaryInputClick.started -= instance.OnOnPrimaryInputClick;
             @OnPrimaryInputClick.performed -= instance.OnOnPrimaryInputClick;
             @OnPrimaryInputClick.canceled -= instance.OnOnPrimaryInputClick;
+            @OnSecondaryInputClick.started -= instance.OnOnSecondaryInputClick;
+            @OnSecondaryInputClick.performed -= instance.OnOnSecondaryInputClick;
+            @OnSecondaryInputClick.canceled -= instance.OnOnSecondaryInputClick;
             @OnPrimaryInputDrag.started -= instance.OnOnPrimaryInputDrag;
             @OnPrimaryInputDrag.performed -= instance.OnOnPrimaryInputDrag;
             @OnPrimaryInputDrag.canceled -= instance.OnOnPrimaryInputDrag;
@@ -1507,6 +1561,13 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnOnPrimaryInputClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "OnSecondaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnOnSecondaryInputClick(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "OnPrimaryInputDrag" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
