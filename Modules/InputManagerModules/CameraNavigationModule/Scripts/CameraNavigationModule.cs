@@ -117,6 +117,13 @@ namespace tracer
         //! storage variables for camera rotation, to not become weird angled, but take into account starting values
         //!
         private float m_pitch, m_yaw, m_roll = 0f;
+        //!
+        //! if we receive that sensors values via input manager, refrain from allowing other rotation input!
+        //! comment out if this bevhaiour is not   intended
+        //!
+        private bool attitudeValuesIncoming = false;
+        private Quaternion cameraMainRotationOffset, invAttitudeSensorOffset;
+        private Transform camTransform;
 
         //!
         //! Constructor.
@@ -137,15 +144,16 @@ namespace tracer
             base.Dispose();
 
             // Unsubscribe
-            manager.pinchEvent -= CameraDolly;
-            manager.twoDragEvent -= CameraOrbit;
+//            manager.pinchEvent -= CameraDolly;
+//            manager.twoDragEvent -= CameraOrbit;
             //manager.threeDragEvent -= CameraPedestalTruck;
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged -= SelectionUpdate;
             uiManager.selectionFocus -= FocusOnSelection;
-            manager.updateCameraUICommand -= CameraUpdated;
+//            manager.updateCameraUICommand -= CameraUpdated;
 
             manager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
+            manager.Unsubscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
         }
 
         //! 
@@ -160,8 +168,8 @@ namespace tracer
             m_camXform = m_cam.transform;
 
             // Subscription to input events
-            manager.pinchEvent += CameraDolly;
-            manager.twoDragEvent += CameraOrbit;
+//            manager.pinchEvent += CameraDolly;
+//            manager.twoDragEvent += CameraOrbit;
             //manager.threeDragEvent += CameraPedestalTruck;
 
             // Subscribe to selection change
@@ -171,9 +179,10 @@ namespace tracer
             uiManager.selectionFocus += FocusOnSelection;   //change behaviour? subscribe to double click
 
             // Subscribe to camera change
-            manager.updateCameraUICommand += CameraUpdated;
+//            manager.updateCameraUICommand += CameraUpdated;
 
             manager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
+            manager.Subscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
 
             // Initialize control variables
             m_selectionCenter = Vector3.zero;
@@ -202,7 +211,7 @@ namespace tracer
         //!
         private void DragFunction(InputManager.DragOtherEvent evt){
             
-            if(!manager.IsCamNavigationAllowed())
+            if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
                 return;
 
             // right now, only Primary
@@ -237,7 +246,35 @@ namespace tracer
                     }
                     break;  
             } 
+        }
+
+        //!
+        //! Function to connect input managers input event when attitude sensor switched on
+        //!
+        //! @param evt the InputData
+        //!
+        private void AttitudeFunction(InputManager.AttitudeInputEvent evt){
             
+            switch (evt.Data.Level) {
+                //ROTATE CAMERA
+                case InputManager.InputLevel.Primary:
+                    switch (evt.Data.State){
+                        case InputManager.InputState.Started:
+                            attitudeValuesIncoming = true;
+                            camTransform = Camera.main.transform;
+                            InitializeAttitudeValues(evt.Rotation);
+                            break;
+                        case InputManager.InputState.Ongoing:
+                            camTransform.localRotation = evt.Rotation * Quaternion.Euler(0f, 0f, 180f);
+                            camTransform.rotation = cameraMainRotationOffset * invAttitudeSensorOffset * camTransform.rotation;
+                            break;
+                        case InputManager.InputState.Canceled:
+                        case InputManager.InputState.Ended:
+                            attitudeValuesIncoming = false;
+                            break;
+                    }
+                    break; 
+            } 
         }
 
         private void InitializeCameraAngles() {    
@@ -249,6 +286,11 @@ namespace tracer
 
             // Normalize pitch to -180 to 180 so our Mathf.Clamp works correctly
             if (m_pitch > 180f) { m_pitch -= 360f; }
+        }
+
+        private void InitializeAttitudeValues(Quaternion attitudeRotation) {    
+            cameraMainRotationOffset = Camera.main.transform.rotation;
+            invAttitudeSensorOffset = Quaternion.Inverse(attitudeRotation * Quaternion.Euler(0f, 0f, 180f));
         }
 
         //! 
@@ -285,7 +327,7 @@ namespace tracer
         //!
         private void CameraDolly(object sender, float distance)
         {
-            if(!manager.IsScreenCamNavigationUsed())
+            if(!manager.IsCamNavigationAllowed())
                 return;
 
             // Dolly cam
@@ -310,7 +352,7 @@ namespace tracer
         //! @param e The delta distance from the touch gesture triggering the movement.
         //!
         private void CameraOrbit(object sender, Vector2 delta){
-            if(!manager.IsScreenCamNavigationUsed())
+            if(!manager.IsCamNavigationAllowed())
                 return;
 
             // Prepare the pivot point
@@ -490,7 +532,7 @@ namespace tracer
                 if (m_cam.orthographic)
                     m_cam.orthographicSize = Mathf.Lerp(currentOrth, orthSize, easeProgress);
                 //invoke to update the gizmo sizes
-                manager.SmoothCameraFocusChange();
+//              manager.SmoothCameraFocusChange();
                 yield return null;
             }
         }

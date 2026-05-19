@@ -86,6 +86,8 @@ namespace tracer{
         public float pinchDistanceThreshold = 5f; 
         public float rotateAngleThreshold = 2f;
 
+        // TODO: put into InputManager & remove Unity dependency, so other modules could utilize it without referencing to other module
+        // e.g. like the AttitudeModule!
         public class InputTracker{
             public InputManager.InputLevel Level;   //primary, secondary, tertiary
             public InteractionState State = InteractionState.Idle;  //see above
@@ -383,13 +385,15 @@ namespace tracer{
         #region FIRE EVENTS
 
         // --- HELPER METHODS FOR FIRING EVENTS ---
+        // TODO: put into InputManager
         private InputManager.InputData CreateData(InputManager.InputLevel level, InputManager.InputState state) {
             return new InputManager.InputData {
                 Level = level,
                 State = state,
-                // Device = InputDeviceType.Touch, // Commented out per request
+                // Device = InputDeviceType.Touch, // no differentiation yet
                 Position = m_pos,
                 Delta = m_delta
+                // could also add rotation? or utilize pos+delta for performance?
             };
         }
 

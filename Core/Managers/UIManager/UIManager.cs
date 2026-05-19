@@ -26,8 +26,10 @@ if not go to https://opensource.org/licenses/MIT
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @author Paulo Scatena
-//! @version 0
-//! @date 21.08.2022
+//! @author Thomas Krüger
+//! @version 1
+//! @date 19.05.2026
+//! @revision added the role-dependent selection management within here
 
 using System.Collections.Generic;
 using System;
@@ -168,10 +170,6 @@ namespace tracer
         //! A list storing references to menu buttons created by the UI-Modules.
         //!
         private List<MenuButton> m_buttons;
-        //!
-        //! activating/deactivating 2D UI interaction
-        //!
-        bool _ui2Dinteractable;
         private MenuTree m_startMenu;
         //!
         //! A reference to the start menu.
@@ -179,18 +177,36 @@ namespace tracer
         public ref MenuTree startMenu
         { get => ref m_startMenu; }
         //!
-        //! Getter and setter for activating/deactivating 2D UI interaction
+        //! reference to the input manager
+        private InputManager inputManager;
         //!
-        public bool ui2Dinteractable
-        {
-            get { return _ui2Dinteractable; }
-            set { _ui2Dinteractable = value; }
-        }
+        //! Getter  2D UI interaction
+        //!
+        public bool ui2Dinteractable{ get { return inputManager.IsUiInteractionAllowed(); } }
         //!
         //! Event emitted when a uicreator3dmodule finished editing (move gizmo for example)
         //!
         public event EventHandler<AbstractParameter> m_manipulation3dDoneEvent;
 
+        public enum CameraControl{ STANDARD, ATTITUDE, AR }
+        //!
+        //! Flag defining if the camera is controlled by the attitide sensor.
+        //!
+        private CameraControl camControlBehaviour = CameraControl.STANDARD;
+        public CameraControl cameraControl{
+            get => camControlBehaviour;
+            set{
+                if(camControlBehaviour != value){
+                    camControlBehaviour = value;
+                    cameraControlChanged?.Invoke(this, value);
+                }
+            }
+        }
+
+        //!
+        //! Event linked to change of CameraControl
+        //!
+        public event EventHandler<CameraControl> cameraControlChanged;
 
         #region Selectable SceneObject via Pixel Data    
         // without ANY unity dependencie
@@ -231,7 +247,6 @@ namespace tracer
             m_menus = new List<MenuTree>();
             m_buttons = new List<MenuButton>();
             m_uiAppearanceSettings = Resources.Load("DATA_VPET_Colors") as VPETUISettings;
-            _ui2Dinteractable = true;
 
             List<AbstractParameter> roleList = new List<AbstractParameter> 
             { 
@@ -319,7 +334,7 @@ namespace tracer
             settings.uiScale.hasChanged += updateCanvasScales;
             core.orientationChangedEvent += updateCanvasScales;
             
-            core.getManager<InputManager>().toggle2DUIInteraction += activate2DUIInteraction;
+            inputManager = core.getManager<InputManager>();
 
             // close open menu layout and show start menu
             m_startMenu.End();
@@ -623,8 +638,31 @@ namespace tracer
         //!
         //! @ param sceneObject The selected scene object to be added.
         //!
-        public void addSelectedObject(SceneObject sceneObject)
-        {
+        public void addSelectedObject(SceneObject sceneObject){
+            // depending by our role
+            switch (sceneObject){
+                case SceneObjectCamera:
+                    if (activeRole == UIManager.Roles.EXPERT ||
+                        activeRole == UIManager.Roles.DOP){
+                        break;
+                    }else
+                        return;
+                case SceneObjectLight:
+                    if (activeRole == UIManager.Roles.EXPERT ||
+                        activeRole == UIManager.Roles.DOP ||
+                        activeRole == UIManager.Roles.LIGHTING ||
+                        activeRole == UIManager.Roles.SET){
+                        break;
+                    }else
+                        return;
+                default:
+                    if (activeRole == UIManager.Roles.EXPERT ||
+                        activeRole == UIManager.Roles.SET){
+                        break;
+                    }else
+                        return;
+            }
+
             if (!sceneObject._lock){
                 m_selectedObjects.Add(sceneObject);
 
@@ -706,14 +744,6 @@ namespace tracer
         public void emitUI2DCreated(UIBehaviour ui)
         {
             UI2DCreated?.Invoke(this, ui);
-        }
-
-        //!
-        //! Function that deactivates the 2D UI interaction
-        //!
-        private void activate2DUIInteraction(object sender, bool e)
-        {
-            _ui2Dinteractable = e;
         }
 
         //!

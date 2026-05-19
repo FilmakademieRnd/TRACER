@@ -27,16 +27,13 @@ if not go to https://opensource.org/licenses/MIT
 //! @author Jonas Trottnow
 //! @author Thomas Krüger
 //! @version 1
-//! @date 14.04.2026
-//! @changed outsourced color-array id calculation into IDExtractorModule
+//! @date 19.05.2026
+//! @changed moved role-dependent selection into UIManager selection!
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using Unity.Collections;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace tracer{
     //!
@@ -122,7 +119,7 @@ namespace tracer{
                     manager.clearSelectedObjects();
                 }
 
-                AddSelectionByRole(sceneObject);
+                manager.addSelectedObject(sceneObject);
             }else{
                 Debug.Log("<color=red>no valid SceneObject to select</color>");
                 manager.clearSelectedObjects();
@@ -143,30 +140,6 @@ namespace tracer{
             return EvaluationHelper.Instance.EvaluateSceneObject(screenPos);
         }
         
-        //!
-        //! Function to add the found selected object to the manager, depending by our Role
-        //!
-        private void AddSelectionByRole(SceneObject clickedSceneObject){
-            switch (clickedSceneObject){
-                case SceneObjectCamera:
-                    if (manager.activeRole == UIManager.Roles.EXPERT ||
-                        manager.activeRole == UIManager.Roles.DOP)
-                        manager.addSelectedObject(clickedSceneObject);
-                    break;
-                case SceneObjectLight:
-                    if (manager.activeRole == UIManager.Roles.EXPERT ||
-                        manager.activeRole == UIManager.Roles.DOP ||
-                        manager.activeRole == UIManager.Roles.LIGHTING ||
-                        manager.activeRole == UIManager.Roles.SET)
-                        manager.addSelectedObject(clickedSceneObject);
-                    break;
-                default:
-                    if (manager.activeRole == UIManager.Roles.EXPERT ||
-                        manager.activeRole == UIManager.Roles.SET)
-                        manager.addSelectedObject(clickedSceneObject);
-                    break;
-            }
-        }
         //!
         //! Function to check for a double-click/tap to focus on an object
         //! TODO: move into FocusObjectModule (which only listens to DoubleClick)

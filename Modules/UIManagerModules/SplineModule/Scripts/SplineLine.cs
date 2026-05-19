@@ -24,8 +24,10 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "SplineLine.cs"
 //! @brief Implementation of the 3D representation of the splinme and UI to add and remove keis.
 //! @author Alexandru-Sebastian Tufis-Schwartz
-//! @version 0
-//! @date 23.08.2024
+//! @author Thomas Krüger
+//! @version 1
+//! @date 19.05.2026
+//! @revision not functional after InputManager overhaul, also design was bad - more of a quick&dirty way
 
 
 using System;
@@ -35,12 +37,10 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Splines;
-using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 
-public class SplineLine : UIManagerModule
-{
+public class SplineLine : UIManagerModule{
     //!
     //! Currently selected object.
     //!
@@ -153,7 +153,7 @@ public class SplineLine : UIManagerModule
 
             if (_updateLineWhenZooming)
             {
-                _inputManager.pinchEvent -= EventCallDrawLineBetweenPoints;
+                //_inputManager.pinchEvent -= EventCallDrawLineBetweenPoints;
                 _updateLineWhenZooming = false;
             }
             // Thomas: reset the abstract parameter, otherwise an object could try to show the light settings which obviously does not work
@@ -252,7 +252,8 @@ public class SplineLine : UIManagerModule
 
                 if (!_updateLineWhenZooming)
                 {
-                    _inputManager.pinchEvent += EventCallDrawLineBetweenPoints;
+                    //fkn wrong! this does not mean we're zooming - need to subscribe to a "camera change/update event!"
+                    //_inputManager.pinchEvent += EventCallDrawLineBetweenPoints;
                     _updateLineWhenZooming = true;
                 }
             }

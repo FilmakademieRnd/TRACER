@@ -266,10 +266,8 @@ namespace tracer
             // NEW INPUT EVENTS
             m_inputManager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
 
-            //m_inputManager.tappedEvent -= Tapped;
-
-            m_inputManager.fingerGestureEvent -= updateGizmoScale;
-            m_inputManager.updateCameraUICommand -= updateGizmoScale;
+            /*m_inputManager.fingerGestureEvent -= updateGizmoScale;
+            m_inputManager.updateCameraUICommand -= updateGizmoScale;*/
 
             UICreator2DModule UI2DModule = manager.getModule<UICreator2DModule>();
             CameraSelectionModule CamModule = manager.getModule<CameraSelectionModule>();
@@ -313,10 +311,8 @@ namespace tracer
             m_inputManager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
 
             // Hookup to input events
-            //m_inputManager.tappedEvent += Tapped;
-
-            m_inputManager.fingerGestureEvent += updateGizmoScale;
-            m_inputManager.updateCameraUICommand += updateGizmoScale;
+            /*m_inputManager.fingerGestureEvent += updateGizmoScale;
+            m_inputManager.updateCameraUICommand += updateGizmoScale;*/
 
             // Grabbing scene scale
             uiScale = manager.settings.uiScale.value;

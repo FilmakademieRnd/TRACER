@@ -534,6 +534,8 @@ namespace tracer{
             return false;
         }
 
+        public Ray CreateScreenPointRay(Vector2 pos){ return mainCam.ScreenPointToRay(pos);}
+
         //!
         //! returns true if pos is over any 3D manipulator object (layerMask 5 for UI)
         //!

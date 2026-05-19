@@ -248,7 +248,7 @@ namespace tracer
             _sceneObjectCamerasList = _sceneManager.sceneCameraList;
 
             // Subscribe to controller button events.
-            manager.buttonNorth += PressNorth;
+/*            manager.buttonNorth += PressNorth;
             manager.buttonSouth += PressSouth;
             manager.buttonEast += PressEast;
             manager.buttonWest += PressWest;
@@ -263,7 +263,7 @@ namespace tracer
             manager.leftControllerStick += MoveLeftStick;
             manager.rightControllerStick += MoveRightStick;
             manager.ControllerStickCanceled += DoneEditing;
-
+*/
             // Subscribe to the _core update event.
             core.updateEvent += TracerUpdate;
 
@@ -281,7 +281,7 @@ namespace tracer
             base.Dispose();
 
             // Unsubscribe from controller button events.
-            manager.buttonNorth -= PressNorth;
+/*            manager.buttonNorth -= PressNorth;
             manager.buttonSouth -= PressSouth;
             manager.buttonEast -= PressEast;
             manager.buttonWest -= PressWest;
@@ -296,7 +296,7 @@ namespace tracer
             manager.leftControllerStick -= MoveLeftStick;
             manager.rightControllerStick -= MoveRightStick;
             manager.ControllerStickCanceled -= DoneEditing;
-
+*/
             // Unsubscribe from the _core update event.
             core.updateEvent -= TracerUpdate;
 
@@ -429,7 +429,7 @@ namespace tracer
         {
             if (_currentState == ControllerModes.MAIN_VIEW_MODE && _isCrosshairOn)
             {
-                SelectSceneObjectWithRaycastAndButton();
+                SelectSceneObject();
                 return;
             }
 
@@ -714,11 +714,24 @@ namespace tracer
         //!
         //! Turns off the crosshair, clears the selected object in the UI manager, and initiates controller selection.
         //!
-        private void SelectSceneObjectWithRaycastAndButton()
-        {
+        private void SelectSceneObject(){
             OffCrosshair();
             _uiManager.clearSelectedObjects();
-            manager.ControllerSelect(new Vector2(Screen.width / 2, Screen.height / 2));
+            //manager.ControllerSelect(new Vector2(Screen.width / 2, Screen.height / 2));
+            SceneObject sceneObject = EvaluationHelper.Instance.EvaluateSceneObject(new Vector2(Screen.width / 2, Screen.height / 2));
+
+            if (sceneObject != null){
+                if(_uiManager.isThisOurSelectedObject(sceneObject)){
+                    return;
+                }else{
+                    _uiManager.clearSelectedObjects();
+                }
+
+                _uiManager.addSelectedObject(sceneObject);
+            }else{
+                Debug.Log("<color=red>no valid SceneObject to select</color>");
+                _uiManager.clearSelectedObjects();
+            }
         }
         
         //!

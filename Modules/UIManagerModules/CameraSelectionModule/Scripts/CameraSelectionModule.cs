@@ -158,8 +158,8 @@ namespace tracer
             m_sceneManager.sceneReady += initCameraOnce;
             m_uiManager.selectionChanged += selection;
 
-            m_inputManager.cameraControlChanged += cameraControlChanged;
-            m_inputManager.cameraControlChanged += updateSelectCamera;
+            m_uiManager.cameraControlChanged += cameraControlChanged;
+            m_uiManager.cameraControlChanged += updateSelectCamera;
         }
 
         //! 
@@ -174,8 +174,8 @@ namespace tracer
 
             m_sceneManager.sceneReady -= initCameraOnce;
             m_uiManager.selectionChanged -= selection;
-            m_inputManager.cameraControlChanged -= cameraControlChanged;
-            m_inputManager.cameraControlChanged -= updateSelectCamera;
+            m_uiManager.cameraControlChanged -= cameraControlChanged;
+            m_uiManager.cameraControlChanged -= updateSelectCamera;
         }
 
         //!
@@ -262,27 +262,24 @@ namespace tracer
                 //Debug.Log("LOOK THROUGH "+m_selectedObject.name);
                 Type selectionType = m_selectedObject.GetType();
 
-                if (selectionType == typeof(SceneObjectCamera))
-                {
+                if (selectionType == typeof(SceneObjectCamera)){
                     copyCamera();
-                }
-                else if (selectionType == typeof(SceneObjectDirectionalLight) || (selectionType == typeof(SceneObjectSpotLight))){
-                    
+                }else if (selectionType == typeof(SceneObjectDirectionalLight) || (selectionType == typeof(SceneObjectSpotLight))){   
                 }
 
                 Camera.main.cullingMask &= ~(1 << 11);
                 Camera.main.transform.position = m_selectedObject.transform.position;
                 Camera.main.transform.rotation = m_selectedObject.transform.rotation;
                 
-                if (m_selectedObject.transform.parent.name != "Scene")
-                {
+                if (m_selectedObject.transform.parent.name != "Scene"){
                     Camera.main.transform.position = m_selectedObject.transform.parent.TransformPoint(m_selectedObject.transform.localPosition);
                     Camera.main.transform.rotation = m_selectedObject.transform.parent.rotation * m_selectedObject.transform.localRotation;
                 }
 
-                InputManager inputManager = core.getManager<InputManager>();
-                if (inputManager.cameraControl == InputManager.CameraControl.ATTITUDE)
-                    inputManager.setCameraAttitudeOffsets();
+//                if (manager.cameraControl == UIManager.CameraControl.ATTITUDE){
+//                    InputManager inputManager = core.getManager<InputManager>();
+//                    inputManager.setCameraAttitudeOffsets();
+//                }
 
                 core.updateEvent += updateLookThrough;
                 m_lockType = CameraLockageType.lookThrough;
@@ -411,9 +408,9 @@ namespace tracer
         //!
         //! update safeFrame
         //!
-        private void cameraControlChanged(object sender, InputManager.CameraControl c)
+        private void cameraControlChanged(object sender, UIManager.CameraControl c)
         {
-            if (c == InputManager.CameraControl.AR)
+            if (c == UIManager.CameraControl.AR)
             {
                 hideSafeFrame();
             }
@@ -422,9 +419,9 @@ namespace tracer
         //!
         //! update selectCamera
         //!
-        private void updateSelectCamera(object sender, InputManager.CameraControl c)
+        private void updateSelectCamera(object sender, UIManager.CameraControl c)
         {
-            if (c == InputManager.CameraControl.AR)
+            if (c == UIManager.CameraControl.AR)
             {
                 m_nextCameraButton.showHighlighted(false);
                 manager.removeButton(m_nextCameraButton);
@@ -508,9 +505,9 @@ namespace tracer
             manager.clearSelectedObjects();
             manager.addSelectedObject(m_sceneManager.sceneCameraList[m_cameraIndex]);
 
-            InputManager inputManager = core.getManager<InputManager>();
-            if (inputManager.cameraControl == InputManager.CameraControl.ATTITUDE)
-                inputManager.setCameraAttitudeOffsets();
+            // InputManager inputManager = core.getManager<InputManager>();
+            // if (inputManager.cameraControl == InputManager.CameraControl.ATTITUDE)
+            //     inputManager.setCameraAttitudeOffsets();
         }
 
         //!
@@ -537,7 +534,7 @@ namespace tracer
             mainCamera.enabled = true;
 
             // announce the UI operation to the input manager
-            m_inputManager.updateCameraCommand();
+//            m_inputManager.updateCameraCommand();
         }
 
         //!
@@ -570,11 +567,10 @@ namespace tracer
             Vector3 newPosition;
             Quaternion newRotation;
 
-            switch (m_inputManager.cameraControl)
+            switch (manager.cameraControl)
             {
-                case InputManager.CameraControl.ATTITUDE: 
-                case InputManager.CameraControl.AR:
-                case InputManager.CameraControl.TOUCH:
+                case UIManager.CameraControl.ATTITUDE: 
+                case UIManager.CameraControl.AR:
                    // newPosition = camTransform.position - objTransform.parent.position;
                     //newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
                     if (objTransform.parent.name != "Scene")
@@ -592,7 +588,7 @@ namespace tracer
                     if (m_selectedObject.rotation.value != newRotation)
                         m_selectedObject.rotation.setValue(newRotation);
                     break;
-                case InputManager.CameraControl.NONE:
+                case UIManager.CameraControl.STANDARD:
                     //do the same here right now, because the behaviour seems to be set to None from time to time (specifically AR mode did not work well anymore)
                     //newPosition = camTransform.position - objTransform.parent.position;
                     //newRotation = camTransform.rotation * Quaternion.Inverse(objTransform.parent.rotation);
@@ -622,12 +618,11 @@ namespace tracer
             if(!m_selectedObject)
                 return;
 
-            switch (m_inputManager.cameraControl)
+            switch (manager.cameraControl)
             {
-                case InputManager.CameraControl.ATTITUDE:
-                case InputManager.CameraControl.AR:
-                case InputManager.CameraControl.TOUCH:
-                case InputManager.CameraControl.NONE:
+                case UIManager.CameraControl.ATTITUDE:
+                case UIManager.CameraControl.AR:
+                case UIManager.CameraControl.STANDARD:
                     Vector3 localToWorldPos = Camera.main.transform.TransformPoint(m_localPositionWouldBe);
                     
                     Quaternion localToWorldRot = Camera.main.transform.rotation * m_localRotationWouldBe;

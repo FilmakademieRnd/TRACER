@@ -382,7 +382,10 @@ namespace tracer
                 m_removeKeyButton.onClick.              AddListener(RemoveKey);
                 m_removeAllKeysButton.onClick.          AddListener(RemoveAllKeys);
 
-                m_inputManager.inputPressStartedUI      += OnPointerDown; //OnBeginDrag;
+                m_inputManager.Subscribe<InputManager.ClickUIEvent>(ClickFunction);
+                m_inputManager.Subscribe<InputManager.DragUIEvent>(DragFunction);
+
+                /*m_inputManager.inputPressStartedUI      += OnPointerDown; //OnBeginDrag;
                 m_inputManager.inputPressEnd            += OnPointerEnd;
                 m_inputManager.inputMove                += OnMove;
                 m_inputManager.twoDragEvent             += OnTwoFingerDrag;
@@ -391,7 +394,8 @@ namespace tracer
                 m_inputManager.middleClickMoveEvent     += OnMiddleClickHold;
                 m_inputManager.middleClickReleaseEvent  += OnMiddleClickRelease;
                 
-                m_inputManager.pinchDetailedEvent       += OnPinchDetail;
+                m_inputManager.pinchDetailedEvent       += OnPinchDetail;*/
+                
                 manager.selectionChanged                += OnSelectionChanged;
 
                 manager.m_manipulation3dDoneEvent       += OnKeyframeValueManipulated;
@@ -403,7 +407,10 @@ namespace tracer
                 m_removeKeyButton.onClick.              RemoveListener(RemoveKey);
                 m_removeAllKeysButton.onClick.          RemoveListener(RemoveAllKeys);
 
-                m_inputManager.inputPressStartedUI      -= OnPointerDown; //OnBeginDrag;
+                m_inputManager.Unsubscribe<InputManager.ClickUIEvent>(ClickFunction);
+                m_inputManager.Unsubscribe<InputManager.DragUIEvent>(DragFunction);
+
+                /*m_inputManager.inputPressStartedUI      -= OnPointerDown; //OnBeginDrag;
                 m_inputManager.inputPressEnd            -= OnPointerEnd;
                 m_inputManager.inputMove                -= OnMove;
                 m_inputManager.twoDragEvent             -= OnTwoFingerDrag;
@@ -412,11 +419,101 @@ namespace tracer
                 m_inputManager.middleClickMoveEvent     -= OnMiddleClickHold;
                 m_inputManager.middleClickReleaseEvent  -= OnMiddleClickRelease;
                 
-                m_inputManager.pinchDetailedEvent       -= OnPinchDetail;
+                m_inputManager.pinchDetailedEvent       -= OnPinchDetail;*/
+
                 manager.selectionChanged                -= OnSelectionChanged;
 
                 manager.m_manipulation3dDoneEvent       -= OnKeyframeValueManipulated;
             }
+        }
+
+        #region Input Manager Overhaul
+
+        //!
+        //! Function to connect input managers input event for clicking on the timeline
+        //!
+        //! @param evt the InputData
+        //!
+        private void ClickFunction(InputManager.ClickUIEvent evt){
+
+            if(!m_inputManager.IsUiInteractionAllowed())
+                return;
+
+            if (evt.Data.Level != InputManager.InputLevel.Primary) return;
+
+            GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateGameObject(evt.Data.Position);
+
+            if (hitUIGameObject != m_timeLine)
+                return;
+
+            // check phase
+            switch (evt.Data.State){
+                case InputManager.InputState.Started:
+                case InputManager.InputState.Ongoing:
+                case InputManager.InputState.Canceled:
+                    //nothing to do
+                    break;
+                case InputManager.InputState.Ended:
+                    //set time instantly on click with no special action
+                    UpdateTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
+                    break;
+            }
+        }
+
+        //!
+        //! Function to connect input managers input event for dragging on the timeline
+        //!
+        //! @param evt the InputData
+        //!
+        private void DragFunction(InputManager.DragUIEvent evt){
+
+            if(!m_inputManager.IsUiInteractionAllowed())
+                return;
+
+            // right now, only Primary
+            if (evt.Data.Level != InputManager.InputLevel.Primary) return;
+
+            // check phase
+            switch (evt.Data.State){
+                case InputManager.InputState.Started:
+                    //Debug.Log("Primary Drag Started");
+                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateGameObject(evt.Data.Position);
+                    if (hitUIGameObject != m_timeLine)
+                        return;
+                    
+                    //we should/need to lock animated sceneobject if we are scrubbing the timeline manually
+                    if(!m_animatedSceneObjectsLockCalled){
+                        GatherAllAnimatedSceneObjects();
+                        LockAllAnimatedObjects();
+                        m_animatedSceneObjectsLockCalled = true;
+                    }
+
+                    deselectKeyframe(); //?
+
+                    m_isSelected = true;
+                    m_initalTouchPos = evt.Data.Position;
+                    m_initialTouchTime = Time.time;
+                    break;
+                case InputManager.InputState.Ongoing:
+                    //Debug.Log("Primary Drag ongoing");
+                    setTime(mapToCurrentTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x));
+                    break;
+                case InputManager.InputState.Canceled:
+                case InputManager.InputState.Ended:
+                    //Debug.Log("Primary Drag ended");
+                    if(m_animatedSceneObjectsLockCalled){
+                        UnlockAllAnimatedObjects();
+                    }
+                    m_isSelected = false;
+                    break;
+            }
+
+        }
+        #endregion
+
+        private void UpdateTime(float xValue){
+            float time = mapToCurrentTime(xValue);
+            setTime(time);
         }
 
         //!
@@ -1292,7 +1389,7 @@ namespace tracer
                 m_activeKeyframeIndex = -1;
             }
         }
-
+/*
         //!
         //! Function that is called when the input manager registers a pointer down event
         //! check whether we hit the timeline, do nothing more
@@ -1346,11 +1443,6 @@ namespace tracer
             }
             m_isSelected = false;
             m_didSpecialAction = false;
-        }
-
-        private void UpdateTime(float xValue){
-            float time = mapToCurrentTime(xValue);
-            setTime(time);
         }
 
 
@@ -1499,7 +1591,7 @@ namespace tracer
 
             DragTimeline(deltaPos);
         }
-
+*/
 
         private void ZoomTimeline(Vector2 point, float delta){
             //Debug.Log(">>ZoomTimeline dpi@"+Screen.dpi);
@@ -1507,7 +1599,8 @@ namespace tracer
             m_didSpecialAction = true;
 
             //correct delta for touch and big screens (touch should be less accurate)
-            delta *= (m_inputManager.IsInputTouch() ? 10f/Screen.dpi : 50f/Screen.dpi);
+            //delta *= (m_inputManager.IsInputTouch() ? 10f/Screen.dpi : 50f/Screen.dpi);
+            
             //Debug.Log(">>> delta@"+delta);
 
             //multiply delta accordingly to its timeline's time size

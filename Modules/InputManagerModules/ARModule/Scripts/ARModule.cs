@@ -126,6 +126,9 @@ namespace tracer
             get => _arActive;
         }
 
+        //! used as data for the inputmanager event as in the UnityInputModule
+        private InputManager.InputData arInputData;
+
         //!
         //! Constructor
         //! @param name Name of this module
@@ -173,6 +176,8 @@ namespace tracer
             if (arImgManager != null)
                 arImgManager.trackedImagesChanged -= MarkerTrackingChanged;
 
+            manager.Unsubscribe<InputManager.AttitudeInputEvent>(AttitudeInputFunction);
+
         }
 
         //!
@@ -186,6 +191,7 @@ namespace tracer
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.started += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.performed += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.canceled += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
+            manager.Subscribe<InputManager.AttitudeInputEvent>(AttitudeInputFunction);
         }
 
         //!
@@ -297,6 +303,32 @@ namespace tracer
         }
 
         //!
+        //! Function to disable ourself, if Attitude functionality got active
+        //! or let this be empty, so we always be prioritized!
+        //!
+        //! @param evt the InputData
+        //!
+        private void AttitudeInputFunction(InputManager.AttitudeInputEvent evt){
+
+            switch (evt.Data.Level) {
+                case InputManager.InputLevel.Primary:
+                    switch (evt.Data.State){
+                        case InputManager.InputState.Started:
+                            //disable possibility to activate this mode
+                            break;
+                        case InputManager.InputState.Ongoing:
+                            break;
+                        case InputManager.InputState.Canceled:
+                        case InputManager.InputState.Ended:
+                            //enable possibility to activate this mode (if available)
+                            //SetAttitudeUI(true);
+                            break;
+                    }
+                    break; 
+            } 
+        }
+
+        //!
         //! handle updates to marker tracking (added, updated, removed in camera view), triggered by ARImageManager
         //!
         private void MarkerTrackingChanged(ARTrackedImagesChangedEventArgs e)
@@ -330,22 +362,34 @@ namespace tracer
         //! @param sender event sender
         //! @param e event arguments
         //!
-        private void changeActive(object sender, bool b)
-        {
-            if (b)
-            {
+        private void changeActive(object sender, bool b){
+            if (b){
                 Camera.main.transform.parent = m_arOrigin.transform;
-                manager.disableAttitudeSensor();
-                manager.cameraControl = InputManager.CameraControl.AR;
-            }
-            else
-            {
-                manager.cameraControl = InputManager.CameraControl.NONE;
+                //manager.disableAttitudeSensor();
+                core.getManager<UIManager>().cameraControl = UIManager.CameraControl.AR;
+                
+                arInputData = new InputManager.InputData {
+                    Level = InputManager.InputLevel.Primary,
+                    State = InputManager.InputState.Started,
+                    Position = Vector2.zero,
+                    Delta = Vector2.zero
+                };
+                manager.Publish(new InputManager.ARInputEvent { Data = arInputData });
+            }else{
                 Camera.main.transform.parent = m_arOrigin.transform.parent;
                 m_arOrigin.transform.position = Vector3.zero;
                 m_arOrigin.transform.rotation = Quaternion.identity;
-                manager.enableAttitudeSensor();
-                manager.setCameraAttitudeOffsets();
+                //manager.enableAttitudeSensor();
+                //manager.setCameraAttitudeOffsets();
+                core.getManager<UIManager>().cameraControl = UIManager.CameraControl.STANDARD;
+
+                arInputData = new InputManager.InputData {
+                    Level = InputManager.InputLevel.Primary,
+                    State = InputManager.InputState.Ended,
+                    Position = Vector2.zero,
+                    Delta = Vector2.zero
+                };
+                manager.Publish(new InputManager.ARInputEvent { Data = arInputData });
             }
 
             if (arSession)
