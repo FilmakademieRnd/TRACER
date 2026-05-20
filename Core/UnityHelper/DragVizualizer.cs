@@ -3,6 +3,7 @@ using System.Collections;
 
 public class DragVisualizer {
 
+    private const bool PLANE_VIZ_ACTICVE = false;
     private GameObject _rootObj;
     private GameObject _planeObj;
     private GameObject _distanceLineObj;
@@ -73,6 +74,8 @@ public class DragVisualizer {
         _planeObj = GameObject.CreatePrimitive(PrimitiveType.Quad);
         SetupRenderer(_planeObj, new Material(_planeMat));
         _planeObj.transform.SetParent(_rootObj.transform);
+        if(!PLANE_VIZ_ACTICVE)
+            _planeObj.GetComponent<MeshRenderer>().enabled = false;
 
         _distanceLineObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
         SetupRenderer(_distanceLineObj, new Material(_lineMat));

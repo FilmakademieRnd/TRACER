@@ -29,11 +29,13 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 31.03.2026
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.EnhancedTouch;  //one has to add this to "Assembly Definition Reference" in the "ModulesAssembly"
+using UnityEngine.InputSystem.EnhancedTouch;
+using UnityEngine.UI;  //one has to add this to "Assembly Definition Reference" in the "ModulesAssembly"
 
 namespace tracer{
     //!
@@ -106,12 +108,23 @@ namespace tracer{
 
         //to request at start, but not ongoing!
         private EvaluationHelper.OperationLayer layerDrag, layerHold, layerPinch, layerRotate = EvaluationHelper.OperationLayer.OTHER;
+        #endregion
 
+        #region DEBUG VIZ VARS
+        // UI State Tracking
+        private GameObject mainUIContainer;
+        private Sprite circleSprite;
+        private Dictionary<InputManager.InputLevel, GameObject> evaluatingUIs = new Dictionary<InputManager.InputLevel, GameObject>();
+        private Dictionary<InputManager.InputLevel, GameObject> activeHoldUIs = new Dictionary<InputManager.InputLevel, GameObject>();
+        private Dictionary<InputManager.InputLevel, GameObject> activeDragUIs = new Dictionary<InputManager.InputLevel, GameObject>();
+        private Dictionary<InputManager.InputLevel, GameObject> activePinchUIs = new Dictionary<InputManager.InputLevel, GameObject>();
+        private Dictionary<InputManager.InputLevel, GameObject> activeRotateUIs = new Dictionary<InputManager.InputLevel, GameObject>();
+        // Optional: Enable/Disable the debug text
+        private const bool showDebugText = true;
         #endregion
 
 
         #region MODULE SETUP
-
         //!
         //! Constructor.
         //!
@@ -154,11 +167,11 @@ namespace tracer{
             m_inputs.VPETMap.OnSecondaryInputClick.started += ctx => OnPointerDown(_secondary);
             m_inputs.VPETMap.OnSecondaryInputClick.canceled += ctx => OnPointerUp(_secondary);
 
-            /*
             // --- TERTIARY (3-Fingers / Middle Mouse) ---
             m_inputs.VPETMap.OnTertiaryInputClick.started += ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled += ctx => OnPointerUp(_tertiary);
 
+            /*
             // --- GESTURES (Scrollwheel, Triggers, Touch Pinch/Rotate) ---
             m_inputs.VPETMap.Pinch.performed += ProcessPinchInput;
             m_inputs.VPETMap.Pinch.canceled += ProcessPinchInput;
@@ -200,10 +213,10 @@ namespace tracer{
             m_inputs.VPETMap.OnSecondaryInputClick.started -= ctx => OnPointerDown(_secondary);
             m_inputs.VPETMap.OnSecondaryInputClick.canceled -= ctx => OnPointerUp(_secondary);
 
-            /*
             m_inputs.VPETMap.OnTertiaryInputClick.started -= ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled -= ctx => OnPointerUp(_tertiary);
 
+            /*
             m_inputs.VPETMap.Pinch.performed -= ProcessPinchInput;
             m_inputs.VPETMap.Pinch.canceled -= ProcessPinchInput;
             
@@ -267,15 +280,22 @@ namespace tracer{
 
             if (tracker.State == InteractionState.Dragging) {
                 FireDragEvent(tracker.Level, InputManager.InputState.Ongoing);
+                UpdateDragActiveVisual(tracker.Level, m_pos);
                 return;
             }
             
+            //deny hold option for sec & tert?
             if (tracker.State == InteractionState.Holding) {
                 FireHoldEvent(tracker.Level, InputManager.InputState.Ongoing);
+
+                UpdateHoldActiveVisual(tracker.Level, tracker.StartPosition, m_pos);
                 return;
             }
 
             if (tracker.State == InteractionState.Evaluating) {
+                
+                UpdateEvaluatingVisual(tracker.Level, tracker.StartPosition, m_pos, tracker.TimeDown);
+
                 float distanceFromStart = Vector2.Distance(tracker.StartPosition, m_pos);
                 float timeHeld = Time.time - tracker.TimeDown;
 
@@ -283,6 +303,8 @@ namespace tracer{
                 if (distanceFromStart > dragDistanceThreshold) {
                     tracker.State = InteractionState.Dragging;
                     FireDragEvent(tracker.Level, InputManager.InputState.Started);
+
+                    ClearPreviews(tracker.Level); // Remove circle/rect
                 } 
                 // Time overrides Distance (Hold denies Drag)
                 else if (timeHeld > holdTimeThreshold) {
@@ -304,12 +326,15 @@ namespace tracer{
             if (ctx.phase == InputActionPhase.Canceled && tracker.State == InteractionState.Pinching) {
                 FirePinchEvent(tracker.Level, InputManager.InputState.Ended, pinchDelta);
                 tracker.Reset();
+                ClearPreviews(tracker.Level);
             } else {
                 if (tracker.State == InteractionState.Evaluating || tracker.State == InteractionState.Dragging || tracker.State == InteractionState.Idle) {
                     tracker.State = InteractionState.Pinching;
                     FirePinchEvent(tracker.Level, InputManager.InputState.Started, pinchDelta);
                 } else if (tracker.State == InteractionState.Pinching) {
                     FirePinchEvent(tracker.Level, InputManager.InputState.Ongoing, pinchDelta);
+
+                    UpdatePinchActiveVisual(tracker.Level, m_pos, pinchDelta);
                 }
             }
         }
@@ -324,12 +349,15 @@ namespace tracer{
             if (ctx.phase == InputActionPhase.Canceled && tracker.State == InteractionState.Rotating) {
                 FireRotateEvent(tracker.Level, InputManager.InputState.Ended, rotateDelta);
                 tracker.Reset();
+                ClearPreviews(tracker.Level);
             } else {
                 if (tracker.State == InteractionState.Evaluating || tracker.State == InteractionState.Dragging || tracker.State == InteractionState.Idle) {
                     tracker.State = InteractionState.Rotating;
                     FireRotateEvent(tracker.Level, InputManager.InputState.Started, rotateDelta);
                 } else if (tracker.State == InteractionState.Rotating) {
                     FireRotateEvent(tracker.Level, InputManager.InputState.Ongoing, rotateDelta);
+                    
+                    UpdateRotateActiveVisual(tracker.Level, m_pos, rotateDelta);
                 }
             }
         }
@@ -375,6 +403,7 @@ namespace tracer{
             // Pinch/Rotate cancels are handled in their own Process methods to support wheel/axis lifting
             if (tracker.State != InteractionState.Pinching && tracker.State != InteractionState.Rotating) {
                 tracker.Reset();
+                ClearPreviews(tracker.Level);
             }
         }
 
@@ -414,6 +443,8 @@ namespace tracer{
                     // }
                     break;
             }
+
+            SpawnClickVisual(level, m_pos, isDouble: false);
         }
 
         private void FireDoubleClickEvent(InputManager.InputLevel level) {
@@ -429,6 +460,7 @@ namespace tracer{
                     manager.Publish(new InputManager.DoubleClickOtherEvent { Data = data });
                     break;
             }
+            SpawnClickVisual(level, m_pos, isDouble: true);
         }
 
         private void FireDragEvent(InputManager.InputLevel level, InputManager.InputState state) {
@@ -509,6 +541,329 @@ namespace tracer{
             }
         }
 
+        #endregion
+
+        #region UI DEBUGGING
+        // --- ONE-SHOT VISUALS (Click & Text) ---
+        private void SpawnClickVisual(InputManager.InputLevel level, Vector2 pos, bool isDouble){
+            EnsureMainCanvasExists();
+
+            // Spawn Text
+            if (showDebugText){
+                string text = $"{level} {(isDouble ? "Double-Click" : "Click")}";
+                core.StartCoroutine(AnimateFloatingText(text, pos + new Vector2(0, 60f)));
+            }
+
+            // Spawn Circles
+            if (isDouble){
+                SpawnWobbleCircle(pos + new Vector2(-20f, -20));
+                SpawnWobbleCircle(pos + new Vector2(20f, -20));
+            }else
+                SpawnWobbleCircle(pos);
+            
+        }
+
+        private void SpawnWobbleCircle(Vector2 pos){
+            GameObject circleGO = new GameObject("ClickCircle");
+            circleGO.transform.SetParent(mainUIContainer.transform);
+            Image img = circleGO.AddComponent<Image>();
+            img.sprite = GetOrCreateCircleSprite(); // Your existing procedural circle
+            img.rectTransform.position = pos;
+            img.rectTransform.sizeDelta = new Vector2(30f, 30f);
+
+            core.StartCoroutine(AnimateWobble(img.rectTransform));
+        }
+
+        private IEnumerator AnimateWobble(RectTransform rect){
+            float duration = 0.6f;
+            float elapsed = 0f;
+
+            while (elapsed < duration){
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+
+                // Fast scale in with overshoot, then wobble (sin wave decaying over time), then scale to 0
+                float popIn = EaseOutBack(Mathf.Clamp01(t * 3f)); // Fast pop in (0 to 0.33 of duration)
+                float wobble = Mathf.Sin(t * Mathf.PI * 6f) * 0.3f * (1f - t); // 3 full wobbles, decaying amplitude
+                float scaleOut = 1f - Mathf.Pow(Mathf.Clamp01((t - 0.7f) * 3.33f), 2f); // Scale down at the end
+
+                float finalScale = (popIn + wobble) * scaleOut;
+                rect.localScale = Vector3.one * Mathf.Max(0, finalScale);
+                
+                yield return null;
+            }
+            UnityEngine.GameObject.Destroy(rect.gameObject);
+        }
+
+        private IEnumerator AnimateFloatingText(string message, Vector2 startPos){
+            GameObject textGO = new GameObject("InputText");
+            textGO.transform.SetParent(mainUIContainer.transform);
+            
+            Text txt = textGO.AddComponent<Text>();
+            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); // Default Unity font fallback
+            txt.text = message;
+            txt.fontSize = 24;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.color = Color.white;
+            txt.rectTransform.position = startPos;
+            
+            // Add shadow for readability
+            Outline outline = textGO.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(1, -1);
+
+            float duration = 1.0f;
+            float elapsed = 0f;
+
+            while (elapsed < duration){
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                
+                // Float up and fade out
+                txt.rectTransform.position = startPos + new Vector2(0, t * 50f);
+                txt.color = new Color(1f, 1f, 1f, 1f - Mathf.Pow(t, 2f));
+                outline.effectColor = new Color(0, 0, 0, 1f - Mathf.Pow(t, 2f));
+                
+                yield return null;
+            }
+            UnityEngine.GameObject.Destroy(textGO);
+        }
+
+        // --- CONTINUOUS VISUALS (Evaluating Previews & Active Hold Line) ---
+        private void UpdateEvaluatingVisual(InputManager.InputLevel level, Vector2 startPos, Vector2 currentPos, float timeDown){
+            EnsureMainCanvasExists();
+
+            if (!evaluatingUIs.TryGetValue(level, out GameObject container) || container == null){
+                container = new GameObject($"EvaluatingUI_{level}");
+                container.transform.SetParent(mainUIContainer.transform);
+                
+                // Setup Drag Rect Preview
+                GameObject rectGO = new GameObject("DragRect");
+                rectGO.transform.SetParent(container.transform);
+                Image rectImg = rectGO.AddComponent<Image>();
+                rectImg.color = new Color(1f, 1f, 1f, 0f); // Start transparent
+                rectImg.rectTransform.position = startPos;
+                rectImg.rectTransform.sizeDelta = new Vector2(dragDistanceThreshold * 2f, dragDistanceThreshold * 2f);
+
+                // Setup Hold Fill Circle
+                GameObject circleGO = new GameObject("HoldFillCircle");
+                circleGO.transform.SetParent(container.transform);
+                Image circleImg = circleGO.AddComponent<Image>();
+                circleImg.sprite = GetOrCreateCircleSprite();
+                circleImg.type = Image.Type.Filled;
+                circleImg.fillMethod = Image.FillMethod.Radial360;
+                circleImg.fillAmount = 0f;
+                circleImg.color = new Color(1f, 0.8f, 0.2f, 0.8f); // Yellowish
+                circleImg.rectTransform.position = startPos;
+                circleImg.rectTransform.sizeDelta = new Vector2(40f, 40f);
+
+                evaluatingUIs[level] = container;
+            }
+
+            // Update Values
+            float distance = Vector2.Distance(startPos, currentPos);
+            float holdProgress = (Time.time - timeDown) / holdTimeThreshold;
+            float dragProgress = distance / dragDistanceThreshold;
+
+            Image fillCircle = container.transform.GetChild(1).GetComponent<Image>();
+            Image dragRect = container.transform.GetChild(0).GetComponent<Image>();
+
+            fillCircle.fillAmount = Mathf.Clamp01(holdProgress);
+            dragRect.color = new Color(1f, 1f, 1f, Mathf.Clamp01(dragProgress) * 0.5f); // Max 50% opacity
+        }
+
+        private void UpdateHoldActiveVisual(InputManager.InputLevel level, Vector2 startPos, Vector2 currentPos){
+            EnsureMainCanvasExists();
+
+            if (!activeHoldUIs.TryGetValue(level, out GameObject container) || container == null){
+                container = new GameObject($"HoldLineUI_{level}");
+                container.transform.SetParent(mainUIContainer.transform);
+
+                // Center dot
+                GameObject dotGO = new GameObject("HoldStartDot");
+                dotGO.transform.SetParent(container.transform);
+                Image dotImg = dotGO.AddComponent<Image>();
+                dotImg.sprite = GetOrCreateCircleSprite();
+                dotImg.color = Color.green;
+                dotImg.rectTransform.position = startPos;
+                dotImg.rectTransform.sizeDelta = new Vector2(20f, 20f);
+
+                // Connecting Line
+                GameObject lineGO = new GameObject("HoldLine");
+                lineGO.transform.SetParent(container.transform);
+                Image lineImg = lineGO.AddComponent<Image>();
+                lineImg.color = new Color(0f, 1f, 0f, 0.5f); // Semi-transparent green
+                
+                // Pivot at the left center so stretching scales it forward
+                lineImg.rectTransform.pivot = new Vector2(0f, 0.5f); 
+                lineImg.rectTransform.position = startPos;
+
+                activeHoldUIs[level] = container;
+
+                if (showDebugText)
+                    core.StartCoroutine(AnimateFloatingText($"{level} Hold", startPos + new Vector2(0, 40f)));
+            }
+
+            // Math to stretch and rotate the line towards the current finger position
+            RectTransform lineRect = container.transform.GetChild(1).GetComponent<RectTransform>();
+            Vector2 dir = currentPos - startPos;
+            float distance = dir.magnitude;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+
+            lineRect.sizeDelta = new Vector2(distance, 4f); // 4px thick line
+            lineRect.rotation = Quaternion.Euler(0, 0, angle);
+        }
+
+        private void UpdateDragActiveVisual(InputManager.InputLevel level, Vector2 currentPos) {
+            EnsureMainCanvasExists();
+
+            if (!activeDragUIs.TryGetValue(level, out GameObject container) || container == null) {
+                container = new GameObject($"DragActiveUI_{level}");
+                container.transform.SetParent(mainUIContainer.transform);
+
+                // Persistent solid rectangle following the finger during the drag
+                GameObject rectGO = new GameObject("ActiveDragRect");
+                rectGO.transform.SetParent(container.transform);
+                Image rectImg = rectGO.AddComponent<Image>();
+                rectImg.color = new Color(1f, 1f, 1f, 0.4f); // 40% opacity white
+                rectImg.rectTransform.sizeDelta = new Vector2(dragDistanceThreshold * 2f, dragDistanceThreshold * 2f);
+
+                activeDragUIs[level] = container;
+
+                if (showDebugText) {
+                    core.StartCoroutine(AnimateFloatingText($"{level} Drag", currentPos + new Vector2(0, 50f)));
+                }
+            }
+
+            // Update the position every frame
+            RectTransform activeRect = container.transform.GetChild(0).GetComponent<RectTransform>();
+            activeRect.position = currentPos;
+        }
+
+        private void UpdatePinchActiveVisual(InputManager.InputLevel level, Vector2 centerPos, float pinchValue) {
+            EnsureMainCanvasExists();
+
+            if (!activePinchUIs.TryGetValue(level, out GameObject container) || container == null) {
+                container = new GameObject($"PinchUI_{level}");
+                container.transform.SetParent(mainUIContainer.transform);
+
+                GameObject circleGO = new GameObject("PinchCircle");
+                circleGO.transform.SetParent(container.transform);
+                Image circleImg = circleGO.AddComponent<Image>();
+                circleImg.sprite = GetOrCreateCircleSprite();
+                circleImg.color = new Color(1f, 0.5f, 0f, 0.3f); // Orange transparent
+                circleImg.rectTransform.position = centerPos;
+                
+                activePinchUIs[level] = container;
+
+                if (showDebugText) {
+                    core.StartCoroutine(AnimateFloatingText($"{level} Pinch", centerPos + new Vector2(0, 60f)));
+                }
+            }
+
+            // Scale the circle dynamically based on pinch value (adjust multiplier as needed for your data)
+            RectTransform circleRect = container.transform.GetChild(0).GetComponent<RectTransform>();
+            circleRect.position = centerPos;
+            float dynamicSize = 80f + (pinchValue * 20f); 
+            circleRect.sizeDelta = new Vector2(dynamicSize, dynamicSize);
+        }
+
+        private void UpdateRotateActiveVisual(InputManager.InputLevel level, Vector2 centerPos, float rotationAngle) {
+            EnsureMainCanvasExists();
+
+            if (!activeRotateUIs.TryGetValue(level, out GameObject container) || container == null) {
+                container = new GameObject($"RotateUI_{level}");
+                container.transform.SetParent(mainUIContainer.transform);
+
+                // A line across the center indicating the rotation angle
+                GameObject lineGO = new GameObject("RotateLine");
+                lineGO.transform.SetParent(container.transform);
+                Image lineImg = lineGO.AddComponent<Image>();
+                lineImg.color = new Color(0.8f, 0.2f, 1f, 0.8f); // Purple
+                lineImg.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                lineImg.rectTransform.sizeDelta = new Vector2(120f, 4f); 
+                lineImg.rectTransform.position = centerPos;
+
+                activeRotateUIs[level] = container;
+
+                if (showDebugText) {
+                    core.StartCoroutine(AnimateFloatingText($"{level} Rotate", centerPos + new Vector2(0, 60f)));
+                }
+            }
+
+            // Rotate the visual based on the angle
+            RectTransform lineRect = container.transform.GetChild(0).GetComponent<RectTransform>();
+            lineRect.position = centerPos;
+            lineRect.rotation = Quaternion.Euler(0, 0, rotationAngle);
+        }
+
+        // Clears specific continuous previews
+        private void ClearPreviews(InputManager.InputLevel level) {
+            if (evaluatingUIs.TryGetValue(level, out GameObject evalUI) && evalUI != null) {
+                UnityEngine.GameObject.Destroy(evalUI);
+            }
+            if (activeHoldUIs.TryGetValue(level, out GameObject holdUI) && holdUI != null) {
+                UnityEngine.GameObject.Destroy(holdUI);
+            }
+            if (activeDragUIs.TryGetValue(level, out GameObject dragUI) && dragUI != null) {
+                UnityEngine.GameObject.Destroy(dragUI);
+            }
+            if (activePinchUIs.TryGetValue(level, out GameObject pinchUI) && pinchUI != null) {
+                UnityEngine.GameObject.Destroy(pinchUI);
+            }
+            if (activeRotateUIs.TryGetValue(level, out GameObject rotateUI) && rotateUI != null) {
+                UnityEngine.GameObject.Destroy(rotateUI);
+            }
+        }
+
+        // Ensures we always have a canvas to draw on
+        private void EnsureMainCanvasExists(){
+            if (mainUIContainer != null) return;
+            mainUIContainer = new GameObject("InputModuleUI");
+            Canvas canvas = mainUIContainer.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 999;
+        }
+
+        // --- PROCEDURAL SPRITE GENERATION ---
+        private Sprite GetOrCreateCircleSprite(){
+            if (circleSprite != null) return circleSprite;
+
+            int resolution = 128; // 128x128 is a good balance for UI crispness vs generation speed
+            Texture2D tex = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
+            Color[] colors = new Color[resolution * resolution];
+            
+            float center = resolution / 2f;
+            float radius = resolution / 2f;
+
+            for (int y = 0; y < resolution; y++){
+                for (int x = 0; x < resolution; x++){
+                    // Calculate distance from center (with 0.5f offset for pixel center)
+                    float dx = (x + 0.5f) - center;
+                    float dy = (y + 0.5f) - center;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    // Anti-aliasing math: smooth fade over 1 pixel at the edge
+                    float alpha = Mathf.Clamp01(radius - distance);
+                    
+                    colors[y * resolution + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+
+            tex.SetPixels(colors);
+            tex.Apply(); // Upload to GPU
+
+            // Create the sprite and pivot at center
+            circleSprite = Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 100f);
+            return circleSprite;
+        }
+
+        // --- MATH HELPERS ---
+        private float EaseOutBack(float x){
+            const float c1 = 1.70158f;
+            const float c3 = c1 + 1f;
+            return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
+        }
         #endregion
 
     }

@@ -474,10 +474,9 @@ namespace tracer{
             }
         }
 
+        //TODO: implement a buffering system for screenPos and all queries!
+
         public SceneObject EvaluateSceneObject(Vector2 screenPos){
-            //implement
-            //SceneObject could've already been buffered, if so - use this
-            
             //how to implement an iterative selection of SceneObjects when clicking repeatingly at the same pos/obj?
             //  -> maybe within another "EvaluateSceneObjectsIterative"
 
@@ -498,6 +497,13 @@ namespace tracer{
         public GameObject EvaluateManipulator(Vector2 screenPos) {
             if(Is3DManipulator(screenPos))
                 return m_gameObjectWeHit;
+            return null;
+        }
+
+        // Evaluate and return a UI GameObject
+        public GameObject EvaluateUIGameObject(Vector2 screenPos) {
+            if(Is2DUI(screenPos))
+                return m_uiGameObjectWeHit;
             return null;
         }
 

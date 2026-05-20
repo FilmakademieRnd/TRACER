@@ -441,7 +441,7 @@ namespace tracer
 
             if (evt.Data.Level != InputManager.InputLevel.Primary) return;
 
-            GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateGameObject(evt.Data.Position);
+            GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
 
             if (hitUIGameObject != m_timeLine)
                 return;

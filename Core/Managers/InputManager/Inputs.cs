@@ -186,7 +186,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_North"",
                     ""type"": ""Button"",
                     ""id"": ""4b3b03eb-ea23-4db6-a494-85f3d376c061"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -195,7 +195,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_South"",
                     ""type"": ""Button"",
                     ""id"": ""a4aa1307-43a9-48fd-b194-df207465d766"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -204,7 +204,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_East"",
                     ""type"": ""Button"",
                     ""id"": ""e0fe635c-4ffe-4e5d-a9fe-b7f59facf37e"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -213,7 +213,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_West"",
                     ""type"": ""Button"",
                     ""id"": ""f934035e-33a2-48cc-ac1e-dde23b49734e"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -222,7 +222,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_Up"",
                     ""type"": ""Button"",
                     ""id"": ""29393c9b-2cb4-4331-9a5f-dc76939c36d9"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -231,7 +231,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_Down"",
                     ""type"": ""Button"",
                     ""id"": ""9be85056-b6c1-4c0d-a503-13e15f76f14c"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -240,7 +240,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_Left"",
                     ""type"": ""Button"",
                     ""id"": ""dab6d547-8df4-477f-8a74-877354e21f05"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -249,7 +249,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_Right"",
                     ""type"": ""Button"",
                     ""id"": ""a16a276a-6c17-48bf-8691-0795bf6797ba"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -258,7 +258,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_Left_Trigger"",
                     ""type"": ""Button"",
                     ""id"": ""bf109bae-7ae8-4aae-a4ec-6799dede3467"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -327,13 +327,13 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""OnPrimaryInputDrag"",
-                    ""type"": ""Value"",
-                    ""id"": ""b3e7ccbb-ed2d-45b2-adf0-efa294a5b3cd"",
-                    ""expectedControlType"": ""Vector2"",
+                    ""name"": ""OnTertiaryInputClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""cd2bebc0-9d17-4c9b-9b7d-909a1e43843d"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
-                    ""initialStateCheck"": true
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -823,17 +823,6 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
-                    ""id"": ""eb8a6a41-0cd3-4fde-8a3b-fb26218fb120"",
-                    ""path"": ""<Keyboard>/space"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": """",
-                    ""action"": ""OnPrimaryInputClick"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
                     ""id"": ""9de3fd82-f4d2-4930-845a-6c21c45c8d2d"",
                     ""path"": ""<Mouse>/rightButton"",
                     ""interactions"": """",
@@ -856,34 +845,23 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
-                    ""id"": ""5b1f4483-81a1-4d7c-ba10-0c68ca9efe3c"",
-                    ""path"": ""<Keyboard>/space"",
+                    ""id"": ""5151fc6a-879b-4c6c-ae32-97ecad348653"",
+                    ""path"": ""<Mouse>/middleButton"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""OnSecondaryInputClick"",
+                    ""action"": ""OnTertiaryInputClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
                 {
                     ""name"": """",
-                    ""id"": ""695ebaa8-ecb4-461d-a489-ae89c4034a69"",
-                    ""path"": ""<Mouse>/leftButton"",
+                    ""id"": ""63d5055a-7741-4412-af1e-59210d141a02"",
+                    ""path"": ""<Touchscreen>/touch2/tap"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
-                    ""action"": ""OnPrimaryInputDrag"",
-                    ""isComposite"": false,
-                    ""isPartOfComposite"": false
-                },
-                {
-                    ""name"": """",
-                    ""id"": ""d89ee2c2-5023-4926-a3f9-015e8b031e63"",
-                    ""path"": ""<Touchscreen>/primaryTouch/tap"",
-                    ""interactions"": """",
-                    ""processors"": """",
-                    ""groups"": """",
-                    ""action"": ""OnPrimaryInputDrag"",
+                    ""action"": ""OnTertiaryInputClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -920,7 +898,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
         m_VPETMap_OnPrimaryInputClick = m_VPETMap.FindAction("OnPrimaryInputClick", throwIfNotFound: true);
         m_VPETMap_OnSecondaryInputClick = m_VPETMap.FindAction("OnSecondaryInputClick", throwIfNotFound: true);
-        m_VPETMap_OnPrimaryInputDrag = m_VPETMap.FindAction("OnPrimaryInputDrag", throwIfNotFound: true);
+        m_VPETMap_OnTertiaryInputClick = m_VPETMap.FindAction("OnTertiaryInputClick", throwIfNotFound: true);
     }
 
     ~@Inputs()
@@ -1027,7 +1005,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_Controller_Right_Stick;
     private readonly InputAction m_VPETMap_OnPrimaryInputClick;
     private readonly InputAction m_VPETMap_OnSecondaryInputClick;
-    private readonly InputAction m_VPETMap_OnPrimaryInputDrag;
+    private readonly InputAction m_VPETMap_OnTertiaryInputClick;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
     /// </summary>
@@ -1144,9 +1122,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @OnSecondaryInputClick => m_Wrapper.m_VPETMap_OnSecondaryInputClick;
         /// <summary>
-        /// Provides access to the underlying input action "VPETMap/OnPrimaryInputDrag".
+        /// Provides access to the underlying input action "VPETMap/OnTertiaryInputClick".
         /// </summary>
-        public InputAction @OnPrimaryInputDrag => m_Wrapper.m_VPETMap_OnPrimaryInputDrag;
+        public InputAction @OnTertiaryInputClick => m_Wrapper.m_VPETMap_OnTertiaryInputClick;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1251,9 +1229,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @OnSecondaryInputClick.started += instance.OnOnSecondaryInputClick;
             @OnSecondaryInputClick.performed += instance.OnOnSecondaryInputClick;
             @OnSecondaryInputClick.canceled += instance.OnOnSecondaryInputClick;
-            @OnPrimaryInputDrag.started += instance.OnOnPrimaryInputDrag;
-            @OnPrimaryInputDrag.performed += instance.OnOnPrimaryInputDrag;
-            @OnPrimaryInputDrag.canceled += instance.OnOnPrimaryInputDrag;
+            @OnTertiaryInputClick.started += instance.OnOnTertiaryInputClick;
+            @OnTertiaryInputClick.performed += instance.OnOnTertiaryInputClick;
+            @OnTertiaryInputClick.canceled += instance.OnOnTertiaryInputClick;
         }
 
         /// <summary>
@@ -1343,9 +1321,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @OnSecondaryInputClick.started -= instance.OnOnSecondaryInputClick;
             @OnSecondaryInputClick.performed -= instance.OnOnSecondaryInputClick;
             @OnSecondaryInputClick.canceled -= instance.OnOnSecondaryInputClick;
-            @OnPrimaryInputDrag.started -= instance.OnOnPrimaryInputDrag;
-            @OnPrimaryInputDrag.performed -= instance.OnOnPrimaryInputDrag;
-            @OnPrimaryInputDrag.canceled -= instance.OnOnPrimaryInputDrag;
+            @OnTertiaryInputClick.started -= instance.OnOnTertiaryInputClick;
+            @OnTertiaryInputClick.performed -= instance.OnOnTertiaryInputClick;
+            @OnTertiaryInputClick.canceled -= instance.OnOnTertiaryInputClick;
         }
 
         /// <summary>
@@ -1569,11 +1547,11 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnOnSecondaryInputClick(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "OnPrimaryInputDrag" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "OnTertiaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnOnPrimaryInputDrag(InputAction.CallbackContext context);
+        void OnOnTertiaryInputClick(InputAction.CallbackContext context);
     }
 }

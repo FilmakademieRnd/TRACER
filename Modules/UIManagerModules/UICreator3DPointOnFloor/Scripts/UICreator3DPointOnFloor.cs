@@ -100,6 +100,9 @@ namespace tracer{
         public override void Dispose(){
             base.Dispose();
 
+            if(load || m_inputManager == null)
+                return;
+
             m_inputManager.Unsubscribe<InputManager.ClickOtherEvent>(ClickFunction);
             m_inputManager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
         }

@@ -31,6 +31,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace tracer
 {
@@ -47,7 +48,7 @@ namespace tracer
         //!
         //! A reference to the main camera transform.
         //!
-        private Transform m_camXform;
+        private Transform camTransform;
 
         //!
         //! Flag to specify if there are objects selected. 
@@ -123,7 +124,39 @@ namespace tracer
         //!
         private bool attitudeValuesIncoming = false;
         private Quaternion cameraMainRotationOffset, invAttitudeSensorOffset;
-        private Transform camTransform;
+
+        #region Fly Variables
+        //!
+        //! storage variables for camera fly around (distance from starting point for speed)
+        //!
+        private Vector2 screenStartPos;
+        private float maxSpeed = 5f;
+        private float acceleration = 1f;
+        private float deceleration = 2f;
+        
+        //Timers & Thresholds
+        private float bootDelay = 2.0f;
+        private float lookRecoveryDelay = 0.5f;
+        //public float lookDeadzone = 50f; // Pixels distance from startPos
+
+        //UI Resources
+        private Sprite circleSprite;
+
+        // State tracking
+        private float currentSpeed = 0f;
+        private float bootTimer = 0f;
+        private float lookRecoveryTimer = 0f;
+        private bool isBooted = false;
+        private bool isFlying = false;
+
+        // UI Tracking
+        private GameObject uiContainer;
+        private Image smallCircleFill;
+        private RectTransform largeCircleRect;
+        private Image largeCircleProgress;
+        private float largeCircleAnimTimer = 0f;
+
+        #endregion
 
         //!
         //! Constructor.
@@ -131,16 +164,13 @@ namespace tracer
         //! @param name Name of this module.
         //! @param _core Reference to the TRACER _core.
         //!
-        public CameraNavigationModule(string name, Manager manager) : base(name, manager)
-        {
-
+        public CameraNavigationModule(string name, Manager manager) : base(name, manager){
         }
 
         //!
         //! Destructor, cleaning up event registrations. 
         //!
-        public override void Dispose()
-        {
+        public override void Dispose(){
             base.Dispose();
 
             // Unsubscribe
@@ -153,7 +183,14 @@ namespace tracer
 //            manager.updateCameraUICommand -= CameraUpdated;
 
             manager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
+            manager.Unsubscribe<InputManager.HoldOtherEvent>(HoldFunction);
             manager.Unsubscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
+
+            if (circleSprite != null){
+                if (circleSprite.texture != null) 
+                    UnityEngine.GameObject.Destroy(circleSprite.texture);
+                UnityEngine.GameObject.Destroy(circleSprite);
+            }
         }
 
         //! 
@@ -165,7 +202,7 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             m_cam = Camera.main;
-            m_camXform = m_cam.transform;
+            camTransform = m_cam.transform;
 
             // Subscription to input events
 //            manager.pinchEvent += CameraDolly;
@@ -182,6 +219,7 @@ namespace tracer
 //            manager.updateCameraUICommand += CameraUpdated;
 
             manager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
+            manager.Subscribe<InputManager.HoldOtherEvent>(HoldFunction);
             manager.Subscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
 
             // Initialize control variables
@@ -198,10 +236,10 @@ namespace tracer
         private void CameraUpdated(object sender, bool e)
         {
             // Assign arbitrary center of interest
-            centerOfInterest = m_camXform.TransformPoint(Vector3.forward * 6f);
+            centerOfInterest = camTransform.TransformPoint(Vector3.forward * 6f);
 
             // Store positional offset
-            coiOffset = m_camXform.position - centerOfInterest;
+            coiOffset = camTransform.position - centerOfInterest;
         }
 
         //!
@@ -214,7 +252,6 @@ namespace tracer
             if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
                 return;
 
-            // right now, only Primary
             switch (evt.Data.Level) {
                 //ROTATE CAMERA
                 case InputManager.InputLevel.Primary:
@@ -244,8 +281,59 @@ namespace tracer
                         case InputManager.InputState.Ended:
                             break;
                     }
+                    break;
+                //Fly around?
+                //fwd/bck
+                case InputManager.InputLevel.Tertiary:
+                    // check phase
+                    switch (evt.Data.State){
+                        case InputManager.InputState.Started:
+                            StartFlightInteraction(evt.Data.Position);
+                            InitializeCameraAngles();
+                            screenStartPos = evt.Data.Position;
+                            break;
+                        case InputManager.InputState.Ongoing:
+                        case InputManager.InputState.Canceled:
+                            //float fwdSpeedByDistance = evt.Data.Position.y - screenStartPos.y;
+                            //CameraFlying(fwdSpeedByDistance, evt.Data.Delta.x);
+                            ProcessContinuousFlight(screenStartPos, evt.Data.Position, evt.Data.Delta);
+                            break;
+                        case InputManager.InputState.Ended:
+                            StopFlightInteraction();
+                            break;
+                    }
                     break;  
             } 
+        }
+
+        private void HoldFunction(InputManager.HoldOtherEvent evt){
+            
+            if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
+                return;
+
+            switch (evt.Data.Level) {
+                //Fly around?
+                //fwd/bck
+                case InputManager.InputLevel.Tertiary:
+                    // check phase
+                    switch (evt.Data.State){
+                        case InputManager.InputState.Started:
+                            StartFlightInteraction(evt.Data.Position);
+                            InitializeCameraAngles();
+                            screenStartPos = evt.Data.Position;
+                            break;
+                        case InputManager.InputState.Ongoing:
+                        case InputManager.InputState.Canceled:
+                            //float fwdSpeedByDistance = evt.Data.Position.y - screenStartPos.y;
+                            //CameraFlying(fwdSpeedByDistance, evt.Data.Delta.x);
+                            ProcessContinuousFlight(screenStartPos, evt.Data.Position, evt.Data.Delta);
+                            break;
+                        case InputManager.InputState.Ended:
+                            StopFlightInteraction();
+                            break;
+                    }
+                    break;  
+            }
         }
 
         //!
@@ -261,7 +349,6 @@ namespace tracer
                     switch (evt.Data.State){
                         case InputManager.InputState.Started:
                             attitudeValuesIncoming = true;
-                            camTransform = Camera.main.transform;
                             InitializeAttitudeValues(evt.Rotation);
                             break;
                         case InputManager.InputState.Ongoing:
@@ -278,7 +365,7 @@ namespace tracer
         }
 
         private void InitializeCameraAngles() {    
-            Vector3 currentAngles = m_camXform.eulerAngles;
+            Vector3 currentAngles = camTransform.eulerAngles;
             
             m_pitch     = currentAngles.x;
             m_yaw       = currentAngles.y;
@@ -310,12 +397,198 @@ namespace tracer
 
             // Apply the rotation via Euler Angles. 
             // Notice the Z value is forced to 0f. It is mathematically impossible for the camera to tilt sideways now.
-            m_camXform.eulerAngles = new Vector3(m_pitch, m_yaw, m_roll);
+            camTransform.eulerAngles = new Vector3(m_pitch, m_yaw, m_roll);
 
             // Update value
-            centerOfInterest = m_camXform.TransformPoint(Vector3.forward * 6f);
+        //    centerOfInterest = camTransform.TransformPoint(Vector3.forward * 6f);
             // Store positional offset
-            coiOffset = m_camXform.position - centerOfInterest;
+        //    coiOffset = camTransform.position - centerOfInterest;
+        }
+
+        private void StartFlightInteraction(Vector2 startPos){
+            isFlying = true;
+            isBooted = false;
+            bootTimer = 0f;
+            currentSpeed = 0f;
+            lookRecoveryTimer = 0f;
+            largeCircleAnimTimer = 0f;
+
+            CreateDynamicUI(startPos);
+        }
+
+        // --- DYNAMIC UI GENERATION ---
+        private void CreateDynamicUI(Vector2 screenPos){
+            if (uiContainer != null) UnityEngine.GameObject.Destroy(uiContainer);
+
+            circleSprite = GetOrCreateCircleSprite();
+
+            // Create Canvas overlay
+            uiContainer = new GameObject("FlightUI");
+            Canvas canvas = uiContainer.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100; // Render on top
+
+            // Container placed at touch position
+            GameObject posContainer = new GameObject("PosTracker");
+            posContainer.transform.SetParent(uiContainer.transform);
+            RectTransform posRect = posContainer.AddComponent<RectTransform>();
+            posRect.position = screenPos;
+
+            // 1. Small Boot Circle
+            GameObject smallGO = new GameObject("SmallBootCircle");
+            smallGO.transform.SetParent(posRect);
+            smallCircleFill = smallGO.AddComponent<Image>();
+            smallCircleFill.sprite = circleSprite;
+            smallCircleFill.color = new Color(1f, 1f, 1f, 0.8f);
+            smallCircleFill.type = Image.Type.Filled;
+            smallCircleFill.fillMethod = Image.FillMethod.Radial360;
+            smallCircleFill.fillAmount = 0f;
+            smallCircleFill.rectTransform.sizeDelta = new Vector2(40f, 40f);
+            smallGO.transform.localPosition = Vector3.zero;
+
+            // 2. Large Background Circle
+            GameObject largeBgGO = new GameObject("LargeCircleBg");
+            largeBgGO.transform.SetParent(posRect);
+            Image largeBg = largeBgGO.AddComponent<Image>();
+            largeBg.sprite = circleSprite;
+            largeBg.color = new Color(0f, 0f, 0f, 0.3f);
+            largeCircleRect = largeBg.rectTransform;
+            largeCircleRect.sizeDelta = new Vector2(120f, 120f);
+            largeCircleRect.localScale = Vector3.zero; // Start hidden for bounce anim
+            largeBgGO.transform.localPosition = Vector3.zero;
+
+            // 3. Large Progress Circle
+            GameObject largeProgGO = new GameObject("LargeCircleProgress");
+            largeProgGO.transform.SetParent(largeBgGO.transform);
+            largeCircleProgress = largeProgGO.AddComponent<Image>();
+            largeCircleProgress.sprite = circleSprite;
+            largeCircleProgress.color = new Color(0.2f, 0.8f, 1f, 0.9f); // Cyan
+            largeCircleProgress.type = Image.Type.Filled;
+            largeCircleProgress.fillMethod = Image.FillMethod.Radial360;
+            largeCircleProgress.fillAmount = 0f;
+            largeCircleProgress.rectTransform.sizeDelta = new Vector2(120f, 120f);
+            largeCircleProgress.rectTransform.localScale = Vector3.one;
+            largeProgGO.transform.localPosition = Vector3.zero;
+        }
+
+        // --- PROCEDURAL SPRITE GENERATION ---
+        private Sprite GetOrCreateCircleSprite(){
+            if (circleSprite != null) return circleSprite;
+
+            int resolution = 128; // 128x128 is a good balance for UI crispness vs generation speed
+            Texture2D tex = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
+            Color[] colors = new Color[resolution * resolution];
+            
+            float center = resolution / 2f;
+            float radius = resolution / 2f;
+
+            for (int y = 0; y < resolution; y++){
+                for (int x = 0; x < resolution; x++){
+                    // Calculate distance from center (with 0.5f offset for pixel center)
+                    float dx = (x + 0.5f) - center;
+                    float dy = (y + 0.5f) - center;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    // Anti-aliasing math: smooth fade over 1 pixel at the edge
+                    float alpha = Mathf.Clamp01(radius - distance);
+                    
+                    colors[y * resolution + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+
+            tex.SetPixels(colors);
+            tex.Apply(); // Upload to GPU
+
+            // Create the sprite and pivot at center
+            circleSprite = Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 100f);
+            return circleSprite;
+        }
+
+        // --- MATH HELPERS ---
+        private float EaseOutBack(float x){
+            const float c1 = 1.70158f;
+            const float c3 = c1 + 1f;
+            return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
+        }
+
+        private void ProcessContinuousFlight(Vector2 startPos, Vector2 currentPos, Vector2 delta){
+            if (!isFlying) return;
+
+            bool isLooking = delta.sqrMagnitude > 1f;
+
+            // --- 1. BOOT PHASE ---
+            if (!isBooted){
+                bootTimer += Time.deltaTime;
+                
+                // Update small circle UI
+                if (smallCircleFill != null)
+                    smallCircleFill.fillAmount = bootTimer / bootDelay;
+
+                if (bootTimer >= bootDelay){
+                    isBooted = true;
+                    if (smallCircleFill != null) UnityEngine.GameObject.Destroy(smallCircleFill.gameObject); // Vanish small circle
+                }
+                return; // Don't move or look while booting
+            }
+
+            // --- 2. ANIMATE LARGE CIRCLE ---
+            if (isBooted && largeCircleAnimTimer < 1f){
+                largeCircleAnimTimer += Time.deltaTime * 3f; // Animation speed
+                float t = Mathf.Clamp01(largeCircleAnimTimer);
+                largeCircleRect.localScale = Vector3.one * EaseOutBack(t);
+            }
+
+            // --- 3. LOOK & MOVE LOGIC ---
+            if (isLooking){
+                // Call your existing look function
+                CameraLookAround(delta);
+
+                // Natural deceleration: the faster you look (delta magnitude), the heavier the brake
+                float brakeFactor = Mathf.Clamp01(delta.magnitude / 10f);
+                currentSpeed = Mathf.Lerp(currentSpeed, 0f, deceleration * brakeFactor * Time.deltaTime);
+                
+                // Reset recovery timer
+                lookRecoveryTimer = lookRecoveryDelay;
+            }else{
+                // If we recently looked, wait for recovery
+                if (lookRecoveryTimer > 0){
+                    lookRecoveryTimer -= Time.deltaTime;
+                    // Minor natural friction while recovering
+                    currentSpeed = Mathf.Lerp(currentSpeed, 0f, (deceleration * 0.2f) * Time.deltaTime); 
+                }else{
+                    // Accelerate
+                    currentSpeed = Mathf.MoveTowards(currentSpeed, maxSpeed, acceleration * Time.deltaTime);
+                }
+            }
+
+            // Apply movement
+            camTransform.position += camTransform.forward * currentSpeed * Time.deltaTime;
+
+            // --- 4. UPDATE UI PROGRESS ---
+            if (largeCircleProgress != null){
+                largeCircleProgress.fillAmount = currentSpeed / maxSpeed;
+            }
+        }
+
+        private void StopFlightInteraction(){
+            isFlying = false;
+            if (uiContainer != null) UnityEngine.GameObject.Destroy(uiContainer);
+        }
+
+        //! 
+        //! fly cam through scene and be able to rotate as well
+        //! [REVISE] should we simply fly forward on tertiary and be able to look around fully? (slower if rotating faster?)
+        //! 
+        //! @param fwdSpeed speed of the camera going fwd or backwards
+        //! @param horRotSpeed speed for the cameras horizontal rotation
+        //!
+        private void CameraFlying(float fwdSpeed, float horRotSpeed) {
+            if(Mathf.Abs(horRotSpeed) > 0.1f) 
+                CameraLookAround(Vector2.right * horRotSpeed);
+            
+            //fwd or bckwd
+            if(Mathf.Abs(fwdSpeed) > 10f)
+                camTransform.Translate(0f, 0f, fwdSpeed/20f * Time.deltaTime);
         }
 
 
@@ -325,22 +598,21 @@ namespace tracer
         //! @param sender The input manager.
         //! @param e The distance between the touch gesture triggering the movement.
         //!
-        private void CameraDolly(object sender, float distance)
-        {
+        private void CameraDolly(object sender, float distance){
             if(!manager.IsCamNavigationAllowed())
                 return;
 
             // Dolly cam
-            m_camXform.Translate(0f, 0f, distance * s_dollySpeed);
+            camTransform.Translate(0f, 0f, distance * s_dollySpeed);
 
             // Check if center of interest is in front of camera
             Vector3 camCoord = m_cam.WorldToViewportPoint(centerOfInterest);
             if(camCoord.z < 0)
                 // Else snap to camera
-                centerOfInterest = m_camXform.position;
+                centerOfInterest = camTransform.position;
 
             // Store positional offset
-            coiOffset = m_camXform.position - centerOfInterest;
+            coiOffset = camTransform.position - centerOfInterest;
 
         }
 
@@ -371,7 +643,7 @@ namespace tracer
                     if (centerOfInterest == m_selectionCenter)
                     {
                         // It means the center of orbit was already set to an object, and needs to be reset to the center
-                        centerOfInterest = m_camXform.TransformPoint(Vector3.forward * 6f);
+                        centerOfInterest = camTransform.TransformPoint(Vector3.forward * 6f);
                     }
                     pivotPoint = centerOfInterest;
                     // And it should not change until selection is changed (else orbiting pivot will jump to object as soon as it 
@@ -384,14 +656,14 @@ namespace tracer
             }
 
             // Arc
-            m_camXform.RotateAround(pivotPoint, Vector3.up, s_orbitSpeed * delta.x);
+            camTransform.RotateAround(pivotPoint, Vector3.up, s_orbitSpeed * delta.x);
             // Tilt
-            m_camXform.RotateAround(pivotPoint, m_camXform.right, -s_orbitSpeed * delta.y);
+            camTransform.RotateAround(pivotPoint, camTransform.right, -s_orbitSpeed * delta.y);
 
             // Update value
             centerOfInterest = pivotPoint;
             // Store positional offset
-            coiOffset = m_camXform.position - centerOfInterest;
+            coiOffset = camTransform.position - centerOfInterest;
         }
 
         //! 
@@ -404,13 +676,13 @@ namespace tracer
             Vector2 offset = -s_panSpeed * delta;
 
             // Move around
-            m_camXform.Translate(offset.x, offset.y, 0);
+            camTransform.Translate(offset.x, offset.y, 0);
 
             // If it was not orbited
             if (centerOfInterest != m_selectionCenter)
             {
                 // Drag the center of interest with it
-                centerOfInterest = m_camXform.position - coiOffset;
+                centerOfInterest = camTransform.position - coiOffset;
             }
         }
 
@@ -432,7 +704,7 @@ namespace tracer
                     centerOfInterest = m_cam.ViewportToWorldPoint(bufferpos);
 
                     // Store positional offset
-                    coiOffset = m_camXform.position - centerOfInterest;
+                    coiOffset = camTransform.position - centerOfInterest;
                 }
                 return;
             }
@@ -500,10 +772,10 @@ namespace tracer
             //Debug.Log("Radius = " + radius + " dist = " + dist);
 
             //never go away if dist is bigger, instead keep the distance?
-            dist = Mathf.Min(dist, Vector3.Distance(go.transform.position, m_camXform.position));
+            dist = Mathf.Min(dist, Vector3.Distance(go.transform.position, camTransform.position));
 
             //Smooth transition
-            sceneObject.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - m_camXform.forward * dist));
+            sceneObject.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - camTransform.forward * dist));
 
             //TODO: add another function to lock view on a locked object!
             //AND update its position smoothly (update function?!)
@@ -521,14 +793,14 @@ namespace tracer
             float t = 0f;
             float easeProgress;
             float duration = 1f;
-            Vector3 currentPos = m_camXform.position;
-            Vector3 currentLookAt = currentPos + m_camXform.forward;
+            Vector3 currentPos = camTransform.position;
+            Vector3 currentLookAt = currentPos + camTransform.forward;
             float currentOrth = m_cam.orthographicSize;
             while(t<1f && coroNr == m_smoothCameraFocusIsRunning){
                 t += Time.deltaTime / duration;
                 easeProgress = EaseOutCirc(t);
-                m_camXform.position = Vector3.Lerp(currentPos, pos, easeProgress);
-                m_camXform.LookAt(Vector3.Lerp(currentLookAt, lookAt, easeProgress));
+                camTransform.position = Vector3.Lerp(currentPos, pos, easeProgress);
+                camTransform.LookAt(Vector3.Lerp(currentLookAt, lookAt, easeProgress));
                 if (m_cam.orthographic)
                     m_cam.orthographicSize = Mathf.Lerp(currentOrth, orthSize, easeProgress);
                 //invoke to update the gizmo sizes
