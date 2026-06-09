@@ -205,8 +205,7 @@ namespace tracer
         //! Create and insert a new key element to the parameters key list, 
         //! based on the current parameter value and Animation Manager time.
         //!
-        public void setKey()
-        {
+        public void setKey(){
             if (!_isAnimated)
                 InitAnimation();
 
@@ -220,8 +219,7 @@ namespace tracer
         //! @param time The time at which the new key is to be added.
         //! @param value The the value for the new keyframe to be added.
         //!
-        public void setKey(Key<T> key)
-        {
+        public void setKey(Key<T> key){
             addKey(key);
         }
 
@@ -230,10 +228,8 @@ namespace tracer
         //! 
         //! @ param index The index of the key for which the value is to be changed.
         //!
-        public void updateKey(int index)
-        {
-            _keyList.RemoveAt(index);
-            _keyList.Insert(index, new Key<T>(_animationManager.time, _value));
+        public void updateKey(int index){
+            ((Key<T>)_keyList[index]).value = _value;
         }
 
         //!

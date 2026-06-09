@@ -466,6 +466,7 @@ namespace tracer{
         private void FireDragEvent(InputManager.InputLevel level, InputManager.InputState state) {
             InputManager.InputData data = CreateData(level, state);
 
+            //[!REVISE] do we need to have "initial click pos"? (for evaluation for the correct thing we hit - that we want to drag)
             //Debug.Log("DRAG EVENT "+data.ToString());
 
             if(state == InputManager.InputState.Started) {
