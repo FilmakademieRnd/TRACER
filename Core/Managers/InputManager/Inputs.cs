@@ -334,6 +334,15 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""OnPinch"",
+                    ""type"": ""Value"",
+                    ""id"": ""9b04f0d9-0140-4758-bae0-3c86a3464c70"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -864,6 +873,17 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""action"": ""OnTertiaryInputClick"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5a173870-d421-410b-8323-30d0c0de0c46"",
+                    ""path"": ""<Mouse>/scroll/y"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""OnPinch"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -899,6 +919,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_OnPrimaryInputClick = m_VPETMap.FindAction("OnPrimaryInputClick", throwIfNotFound: true);
         m_VPETMap_OnSecondaryInputClick = m_VPETMap.FindAction("OnSecondaryInputClick", throwIfNotFound: true);
         m_VPETMap_OnTertiaryInputClick = m_VPETMap.FindAction("OnTertiaryInputClick", throwIfNotFound: true);
+        m_VPETMap_OnPinch = m_VPETMap.FindAction("OnPinch", throwIfNotFound: true);
     }
 
     ~@Inputs()
@@ -1006,6 +1027,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_OnPrimaryInputClick;
     private readonly InputAction m_VPETMap_OnSecondaryInputClick;
     private readonly InputAction m_VPETMap_OnTertiaryInputClick;
+    private readonly InputAction m_VPETMap_OnPinch;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
     /// </summary>
@@ -1126,6 +1148,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @OnTertiaryInputClick => m_Wrapper.m_VPETMap_OnTertiaryInputClick;
         /// <summary>
+        /// Provides access to the underlying input action "VPETMap/OnPinch".
+        /// </summary>
+        public InputAction @OnPinch => m_Wrapper.m_VPETMap_OnPinch;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_VPETMap; }
@@ -1232,6 +1258,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @OnTertiaryInputClick.started += instance.OnOnTertiaryInputClick;
             @OnTertiaryInputClick.performed += instance.OnOnTertiaryInputClick;
             @OnTertiaryInputClick.canceled += instance.OnOnTertiaryInputClick;
+            @OnPinch.started += instance.OnOnPinch;
+            @OnPinch.performed += instance.OnOnPinch;
+            @OnPinch.canceled += instance.OnOnPinch;
         }
 
         /// <summary>
@@ -1324,6 +1353,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @OnTertiaryInputClick.started -= instance.OnOnTertiaryInputClick;
             @OnTertiaryInputClick.performed -= instance.OnOnTertiaryInputClick;
             @OnTertiaryInputClick.canceled -= instance.OnOnTertiaryInputClick;
+            @OnPinch.started -= instance.OnOnPinch;
+            @OnPinch.performed -= instance.OnOnPinch;
+            @OnPinch.canceled -= instance.OnOnPinch;
         }
 
         /// <summary>
@@ -1553,5 +1585,12 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnOnTertiaryInputClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "OnPinch" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnOnPinch(InputAction.CallbackContext context);
     }
 }

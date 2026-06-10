@@ -248,6 +248,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "OnPinch",
+                    "type": "Value",
+                    "id": "9b04f0d9-0140-4758-bae0-3c86a3464c70",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -776,6 +785,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "OnTertiaryInputClick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5a173870-d421-410b-8323-30d0c0de0c46",
+                    "path": "<Mouse>/scroll/y",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "OnPinch",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

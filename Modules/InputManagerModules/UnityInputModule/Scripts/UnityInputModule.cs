@@ -48,17 +48,7 @@ namespace tracer{
         //! The generated Unity input class defining all available user inputs.
         //!
         private Inputs m_inputs;
-
-        //!
-        //! The latest main input position (primary touch, mouse pos)
-        //!
-        private Vector2 m_pos;
-
-        //!
-        //! The latest main input delta (primary touch, mouse pos)
-        //!
-        private Vector2 m_delta;
-        
+      
         //!
         //! We create a custom action entirely in code, no Asset required, checking for ANY input
         //!
@@ -78,28 +68,32 @@ namespace tracer{
             Rotating        // Surpassed rotation delta (Drags/Holds denied)
         }
 
-        [Header("Interaction Thresholds")]
-        public float dragDistanceThreshold = 15f; 
-        public float clickTimeThreshold = 0.3f;
-        public float holdTimeThreshold = 0.4f;
-        public float doubleClickTimeThreshold = 0.35f;
+        //Interaction Thresholds
+        private const float DragDistanceThreshold = 15f; 
+        private const float ClickTimeThreshold = 0.3f;
+        private const float HoldTimeThreshold = 0.4f;
+        private const float DoubleClickTimeThreshold = 0.35f;
 
-        // Note: These values rely on your UI/Screen scale
-        public float pinchDistanceThreshold = 5f; 
-        public float rotateAngleThreshold = 2f;
+        //Multi-Touch Settings, Note: some values rely on UI/Screen scale
+        private const float PinchDeadzone = 5f; // Pixels distance change to trigger pinch
+        private const float RotateDeadzone = 2f; // Degrees change to trigger rotate
+
+        private bool isMultiTouching = false;
+        private float initialPinchDistance, previousPinchDistance, initialRotateAngle, previousRotateAngle;
 
         // TODO: put into InputManager & remove Unity dependency, so other modules could utilize it without referencing to other module
         // e.g. like the AttitudeModule!
         public class InputTracker{
             public InputManager.InputLevel Level;   //primary, secondary, tertiary
             public InteractionState State = InteractionState.Idle;  //see above
-        
+            public Vector2 CurrentPosition; //necessary for multitouch and for correct oop approach
+            public Vector2 CurrentDelta;
             public float TimeDown;
             public Vector2 StartPosition;
             public float LastClickTime = -100f; // Tracked for Double Click
 
             public InputTracker(InputManager.InputLevel level){ Level = level; }
-            public void Reset(){ State = InteractionState.Idle; }
+            public void Reset(){ State = InteractionState.Idle; CurrentDelta = Vector2.zero; }
         }
 
         private InputTracker _primary   = new InputTracker(InputManager.InputLevel.Primary);
@@ -132,7 +126,6 @@ namespace tracer{
         //! @param manager Reference to our Manager our class inherits from
         //!
         public UnityInputModule(string name, Manager manager) : base(name, manager){
-
         }
 
 
@@ -156,9 +149,6 @@ namespace tracer{
             SetupAnyInputAction();
             anyInputAction.performed += ProcessAnyInput;
 
-            // --- POSITION ---
-            //m_inputs.VPETMap.Position.performed += ProcessPositionInput;
-
             // --- PRIMARY (1-Finger / Left Mouse) ---
             m_inputs.VPETMap.OnPrimaryInputClick.started += ctx => OnPointerDown(_primary);
             m_inputs.VPETMap.OnPrimaryInputClick.canceled += ctx => OnPointerUp(_primary);
@@ -171,12 +161,13 @@ namespace tracer{
             m_inputs.VPETMap.OnTertiaryInputClick.started += ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled += ctx => OnPointerUp(_tertiary);
 
-            /*
-            // --- GESTURES (Scrollwheel, Triggers, Touch Pinch/Rotate) ---
-            m_inputs.VPETMap.Pinch.performed += ProcessPinchInput;
-            m_inputs.VPETMap.Pinch.canceled += ProcessPinchInput;
             
-            m_inputs.VPETMap.Rotate.performed += ProcessRotateInput;
+            // --- GESTURES (Scrollwheel, Triggers, Touch Pinch/Rotate) ---
+            m_inputs.VPETMap.OnPinch.started += ProcessPinchInput;
+            m_inputs.VPETMap.OnPinch.performed += ProcessPinchInput;
+            m_inputs.VPETMap.OnPinch.canceled += ProcessPinchInput;
+            
+            /*m_inputs.VPETMap.Rotate.performed += ProcessRotateInput;
             m_inputs.VPETMap.Rotate.canceled += ProcessRotateInput;
             */
 
@@ -203,9 +194,6 @@ namespace tracer{
 
             m_manager.core.updateEvent -= OnCoreUpdateEvent;
 
-            // Unsubscribe
-            //m_inputs.VPETMap.Position.performed += ProcessPositionInput;
-
             // --- PRIMARY (1-Finger / Left Mouse) ---
             m_inputs.VPETMap.OnPrimaryInputClick.started -= ctx => OnPointerDown(_primary);
             m_inputs.VPETMap.OnPrimaryInputClick.canceled -= ctx => OnPointerUp(_primary);
@@ -216,11 +204,11 @@ namespace tracer{
             m_inputs.VPETMap.OnTertiaryInputClick.started -= ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled -= ctx => OnPointerUp(_tertiary);
 
-            /*
-            m_inputs.VPETMap.Pinch.performed -= ProcessPinchInput;
-            m_inputs.VPETMap.Pinch.canceled -= ProcessPinchInput;
+            m_inputs.VPETMap.OnPinch.started -= ProcessPinchInput;
+            m_inputs.VPETMap.OnPinch.performed -= ProcessPinchInput;
+            m_inputs.VPETMap.OnPinch.canceled -= ProcessPinchInput;
             
-            m_inputs.VPETMap.Rotate.performed -= ProcessRotateInput;
+            /*m_inputs.VPETMap.Rotate.performed -= ProcessRotateInput;
             m_inputs.VPETMap.Rotate.canceled -= ProcessRotateInput;
             */
             
@@ -237,15 +225,47 @@ namespace tracer{
 
         #region PROCESSION
 
-        //! obsolete - this event driven approach is not good for continous values
+        //! obsolete - the event driven approach is not good for continous values
         //! tracks the positions of our primary input (primary touch, mouse pos)
         //! and writes them into a buffer to allow further calculations (delta, speed, etc)
         //!
         private void ProcessPositionInput(){ 
             // Get the position
-            Vector2 newPos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            m_delta = newPos - m_pos;
-            m_pos = newPos;
+            Vector2 primaryPos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
+            UpdateTrackerPosition(_primary, primaryPos);
+
+            // 2. Check if we are currently using a Touchscreen
+            bool isTouch = Touchscreen.current != null && Input.touchCount > 0;//Touchscreen.current.touches.Count > 0;
+            //[REVISE] remove Positiom [TouchScreen] from Unity Input Actions (?)
+
+            if (isTouch) {  //Debug.Log("IS TOUCH!!!!!! "+Input.touchCount);
+                // Touch fallback: Read exact finger positions
+                if (Touchscreen.current.touches.Count > 1) {
+                    Vector2 secPos = Touchscreen.current.touches[1].position.ReadValue();
+                    UpdateTrackerPosition(_secondary, secPos);
+                }
+                
+                if (Touchscreen.current.touches.Count > 2) {
+                    Vector2 tertPos = Touchscreen.current.touches[2].position.ReadValue();
+                    UpdateTrackerPosition(_tertiary, tertPos);
+                }
+            } else {
+                // Mouse fallback: Secondary (Right Click) and Tertiary (Middle Click) 
+                // physically share the same position as Primary on a PC.
+                UpdateTrackerPosition(_secondary, primaryPos);
+                UpdateTrackerPosition(_tertiary, primaryPos);
+            }
+        }
+
+        // Helper to safely calculate deltas per-tracker
+        private void UpdateTrackerPosition(InputTracker tracker, Vector2 newPos) {
+            // Only calculate delta if the tracker is actively being used, otherwise keep it 0
+            if (tracker.State != InteractionState.Idle) {
+                tracker.CurrentDelta = newPos - tracker.CurrentPosition;
+            } else {
+                tracker.CurrentDelta = Vector2.zero;
+            }
+            tracker.CurrentPosition = newPos;
         }
         //!
         //! call ProcessInputDetected in the manager
@@ -256,8 +276,8 @@ namespace tracer{
             InputManager.InputData anyInputData = new() {
                 Level = InputManager.InputLevel.Primary,
                 State = InputManager.InputState.Ended,
-                Position = m_pos,
-                Delta = m_delta
+                Position = _primary.CurrentPosition,
+                Delta = _primary.CurrentDelta
             };
             manager.Publish(new InputManager.AnyInputEvent { Data = anyInputData });
         }
@@ -270,76 +290,169 @@ namespace tracer{
             
             ProcessPositionInput();
 
+            ProcessMultiTouchGestures();
+
             ProcessTracker(_primary);
             ProcessTracker(_secondary);
             ProcessTracker(_tertiary);
+        }
+
+        private void ProcessMultiTouchGestures() {
+            // 1. Exit early if we don't have exactly two active fingers
+            if (_primary.State == InteractionState.Idle || _secondary.State == InteractionState.Idle) {
+                isMultiTouching = false;
+                return; 
+            }
+
+            // 2. FSM Safety Check: We can ONLY initiate a gesture if BOTH trackers are Evaluating.
+            // If either tracker is already Dragging or Holding, we deny the multi-touch entirely.
+            bool canStartGesture   = _primary.State == InteractionState.Evaluating && _secondary.State == InteractionState.Evaluating;
+            bool isAlreadyPinching = _primary.State == InteractionState.Pinching;
+            bool isAlreadyRotating = _primary.State == InteractionState.Rotating;
+
+            if (!canStartGesture && !isAlreadyPinching && !isAlreadyRotating) {
+                return; // Denied by FSM rules
+            }
+
+            // Get current tracking data
+            Vector2 currentP1 = _primary.CurrentPosition; 
+            Vector2 currentP2 = _secondary.CurrentPosition;
+            float currentDistance = Vector2.Distance(currentP1, currentP2);
+            Vector2 dir = currentP2 - currentP1;
+            float currentAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            Vector2 centerPos = (currentP1 + currentP2) / 2f;
+
+            // 3. Initialization Phase (First frame the second finger touches)
+            if (!isMultiTouching) {
+                isMultiTouching = true;
+                initialPinchDistance = currentDistance;
+                previousPinchDistance = currentDistance;
+                initialRotateAngle = currentAngle;
+                previousRotateAngle = currentAngle;
+                return; 
+            }
+
+            // 4. Handle Start Phase (Transitioning from Evaluating -> Pinching/Rotating)
+            if (canStartGesture) {
+                float distanceDeltaFromStart = Mathf.Abs(currentDistance - initialPinchDistance);
+                float angleDeltaFromStart = Mathf.Abs(Mathf.DeltaAngle(initialRotateAngle, currentAngle));
+
+                if (distanceDeltaFromStart > PinchDeadzone) {
+                    // Lock states to prevent Drag/Hold/Click
+                    _primary.State = InteractionState.Pinching;
+                    _secondary.State = InteractionState.Pinching;
+                    ClearPreviews(InputManager.InputLevel.Primary);
+                    ClearPreviews(InputManager.InputLevel.Secondary);
+
+                    float framePinchDelta = currentDistance - previousPinchDistance;
+                    UpdatePinchActiveVisual(InputManager.InputLevel.Primary, centerPos, framePinchDelta);
+                    FirePinchEvent(_primary, InputManager.InputState.Started, centerPos, framePinchDelta);
+                }
+                else if (angleDeltaFromStart > RotateDeadzone) {
+                    // Lock states
+                    _primary.State = InteractionState.Rotating;
+                    _secondary.State = InteractionState.Rotating;
+                    ClearPreviews(InputManager.InputLevel.Primary);
+                    ClearPreviews(InputManager.InputLevel.Secondary);
+
+                    float frameAngleDelta = Mathf.DeltaAngle(previousRotateAngle, currentAngle);
+                    UpdateRotateActiveVisual(InputManager.InputLevel.Primary, centerPos, currentAngle);
+                    FireRotateEvent(_primary, InputManager.InputState.Started, centerPos, frameAngleDelta);
+                }
+            }
+            // 5. Handle Ongoing Phase
+            else if (isAlreadyPinching) {
+                float framePinchDelta = currentDistance - previousPinchDistance;
+                if (Mathf.Abs(framePinchDelta) > 0.01f) {
+                    UpdatePinchActiveVisual(InputManager.InputLevel.Primary, centerPos, framePinchDelta);
+                    FirePinchEvent(_primary, InputManager.InputState.Ongoing, centerPos, framePinchDelta);
+                }
+            }
+            else if (isAlreadyRotating) {
+                float frameAngleDelta = Mathf.DeltaAngle(previousRotateAngle, currentAngle);
+                if (Mathf.Abs(frameAngleDelta) > 0.01f) {
+                    UpdateRotateActiveVisual(InputManager.InputLevel.Primary, centerPos, currentAngle);
+                    FireRotateEvent(_primary, InputManager.InputState.Ongoing, centerPos, frameAngleDelta);
+                }
+            }
+
+            // Store for the next frame
+            previousPinchDistance = currentDistance;
+            previousRotateAngle = currentAngle;
         }
 
         private void ProcessTracker(InputTracker tracker) {
             if (tracker.State == InteractionState.Idle || tracker.State == InteractionState.Pinching || tracker.State == InteractionState.Rotating) { return; }
 
             if (tracker.State == InteractionState.Dragging) {
-                FireDragEvent(tracker.Level, InputManager.InputState.Ongoing);
-                UpdateDragActiveVisual(tracker.Level, m_pos);
+                FireDragEvent(tracker, InputManager.InputState.Ongoing);
+                UpdateDragActiveVisual(tracker.Level, tracker.CurrentPosition);
                 return;
             }
             
             //deny hold option for sec & tert?
             if (tracker.State == InteractionState.Holding) {
-                FireHoldEvent(tracker.Level, InputManager.InputState.Ongoing);
+                FireHoldEvent(tracker, InputManager.InputState.Ongoing);
 
-                UpdateHoldActiveVisual(tracker.Level, tracker.StartPosition, m_pos);
+                UpdateHoldActiveVisual(tracker.Level, tracker.StartPosition, tracker.CurrentPosition);
                 return;
             }
 
             if (tracker.State == InteractionState.Evaluating) {
                 
-                UpdateEvaluatingVisual(tracker.Level, tracker.StartPosition, m_pos, tracker.TimeDown);
+                UpdateEvaluatingVisual(tracker.Level, tracker.StartPosition, tracker.CurrentPosition, tracker.TimeDown);
 
-                float distanceFromStart = Vector2.Distance(tracker.StartPosition, m_pos);
+                float distanceFromStart = Vector2.Distance(tracker.StartPosition, tracker.CurrentPosition);
                 float timeHeld = Time.time - tracker.TimeDown;
 
                 // Distance overrides Time (Drag denies Hold)
-                if (distanceFromStart > dragDistanceThreshold) {
+                if (distanceFromStart > DragDistanceThreshold) {
                     tracker.State = InteractionState.Dragging;
-                    FireDragEvent(tracker.Level, InputManager.InputState.Started);
+                    FireDragEvent(tracker, InputManager.InputState.Started);
 
                     ClearPreviews(tracker.Level); // Remove circle/rect
                 } 
                 // Time overrides Distance (Hold denies Drag)
-                else if (timeHeld > holdTimeThreshold) {
+                else if (timeHeld > HoldTimeThreshold) {
                     tracker.State = InteractionState.Holding;
-                    FireHoldEvent(tracker.Level, InputManager.InputState.Started);
+                    FireHoldEvent(tracker, InputManager.InputState.Started);
                 }
             }
         }
 
         private void ProcessPinchInput(InputAction.CallbackContext ctx) {
+            //this is only called via scroll-wheel / specific input event
+            //thats why we handle start, ongoing, end here
+            //OnPointerUp is not called via Scrollwheel (specific buttons may have to handle it otherwise!)
             float pinchDelta = ctx.ReadValue<float>();
             
-            // Deadzone check
+            // Deadzone check (but what about moving position (without necessary delta))
             if (Mathf.Abs(pinchDelta) < 0.01f && ctx.phase != InputActionPhase.Canceled) { return; }
 
             // Example: Map 2-finger pinch to Primary. (Adjust if your logic maps it to Secondary)
             InputTracker tracker = _primary; 
 
             if (ctx.phase == InputActionPhase.Canceled && tracker.State == InteractionState.Pinching) {
-                FirePinchEvent(tracker.Level, InputManager.InputState.Ended, pinchDelta);
+                //implement to use only when not using Touches/Buttons (no axis!)
+                FirePinchEvent(tracker, InputManager.InputState.Ended, tracker.CurrentPosition, pinchDelta);
                 tracker.Reset();
                 ClearPreviews(tracker.Level);
             } else {
                 if (tracker.State == InteractionState.Evaluating || tracker.State == InteractionState.Dragging || tracker.State == InteractionState.Idle) {
                     tracker.State = InteractionState.Pinching;
-                    FirePinchEvent(tracker.Level, InputManager.InputState.Started, pinchDelta);
+                    FirePinchEvent(tracker, InputManager.InputState.Started, tracker.CurrentPosition, pinchDelta);
                 } else if (tracker.State == InteractionState.Pinching) {
-                    FirePinchEvent(tracker.Level, InputManager.InputState.Ongoing, pinchDelta);
+                    FirePinchEvent(tracker, InputManager.InputState.Ongoing, tracker.CurrentPosition, pinchDelta);
 
-                    UpdatePinchActiveVisual(tracker.Level, m_pos, pinchDelta);
+                    UpdatePinchActiveVisual(tracker.Level, tracker.CurrentPosition, pinchDelta);
                 }
             }
         }
 
         private void ProcessRotateInput(InputAction.CallbackContext ctx) {
+             //this is only called via scroll-wheel / specific input event
+            //thats why we handle start, ongoing here BUT have to 
+            //handle the end state within OnPointerUp (removed cancel-listener)
             float rotateDelta = ctx.ReadValue<float>();
             
             if (Mathf.Abs(rotateDelta) < 0.01f && ctx.phase != InputActionPhase.Canceled) { return; }
@@ -347,17 +460,18 @@ namespace tracer{
             InputTracker tracker = _primary; // Map to primary or secondary depending on your scheme
 
             if (ctx.phase == InputActionPhase.Canceled && tracker.State == InteractionState.Rotating) {
-                FireRotateEvent(tracker.Level, InputManager.InputState.Ended, rotateDelta);
+                //implement to use only when not using Touches/Buttons (no axis!)
+                FireRotateEvent(tracker, InputManager.InputState.Ended, tracker.CurrentPosition, rotateDelta);
                 tracker.Reset();
                 ClearPreviews(tracker.Level);
             } else {
                 if (tracker.State == InteractionState.Evaluating || tracker.State == InteractionState.Dragging || tracker.State == InteractionState.Idle) {
                     tracker.State = InteractionState.Rotating;
-                    FireRotateEvent(tracker.Level, InputManager.InputState.Started, rotateDelta);
+                    FireRotateEvent(tracker, InputManager.InputState.Started, tracker.CurrentPosition,  rotateDelta);
                 } else if (tracker.State == InteractionState.Rotating) {
-                    FireRotateEvent(tracker.Level, InputManager.InputState.Ongoing, rotateDelta);
+                    FireRotateEvent(tracker, InputManager.InputState.Ongoing, tracker.CurrentPosition,  rotateDelta);
                     
-                    UpdateRotateActiveVisual(tracker.Level, m_pos, rotateDelta);
+                    UpdateRotateActiveVisual(tracker.Level, tracker.CurrentPosition, rotateDelta);
                 }
             }
         }
@@ -376,7 +490,7 @@ namespace tracer{
 
             tracker.State = InteractionState.Evaluating;
             tracker.TimeDown = Time.time;
-            tracker.StartPosition = m_pos;
+            tracker.StartPosition = tracker.CurrentPosition;
         }
 
         private void OnPointerUp(InputTracker tracker) {
@@ -385,26 +499,30 @@ namespace tracer{
             if (tracker.State == InteractionState.Evaluating) {
                 float duration = Time.time - tracker.TimeDown;
                 
-                if (duration <= clickTimeThreshold) {
-                    if (Time.time - tracker.LastClickTime <= doubleClickTimeThreshold) {
-                        FireDoubleClickEvent(tracker.Level);
+                if (duration <= ClickTimeThreshold) {
+                    if (Time.time - tracker.LastClickTime <= DoubleClickTimeThreshold) {
+                        FireDoubleClickEvent(tracker);
                         tracker.LastClickTime = -100f; 
                     } else {
-                        FireClickEvent(tracker.Level);
+                        FireClickEvent(tracker);
                         tracker.LastClickTime = Time.time; 
                     }
                 }
             } else if (tracker.State == InteractionState.Dragging) {
-                FireDragEvent(tracker.Level, InputManager.InputState.Ended);
+                FireDragEvent(tracker, InputManager.InputState.Ended);
             } else if (tracker.State == InteractionState.Holding) {
-                FireHoldEvent(tracker.Level, InputManager.InputState.Ended);
+                FireHoldEvent(tracker, InputManager.InputState.Ended);
+            }else if (tracker.State == InteractionState.Pinching) {
+                FirePinchEvent(tracker, InputManager.InputState.Ended, tracker.CurrentPosition, 0f);
+            }else if (tracker.State == InteractionState.Rotating) {
+                FireRotateEvent(tracker, InputManager.InputState.Ended, tracker.CurrentPosition, 0f);
             }
 
             // Pinch/Rotate cancels are handled in their own Process methods to support wheel/axis lifting
-            if (tracker.State != InteractionState.Pinching && tracker.State != InteractionState.Rotating) {
-                tracker.Reset();
-                ClearPreviews(tracker.Level);
-            }
+            //if (tracker.State != InteractionState.Pinching && tracker.State != InteractionState.Rotating) {
+            tracker.Reset();
+            ClearPreviews(tracker.Level);
+            //}
         }
 
         #endregion
@@ -415,21 +533,21 @@ namespace tracer{
 
         // --- HELPER METHODS FOR FIRING EVENTS ---
         // TODO: put into InputManager
-        private InputManager.InputData CreateData(InputManager.InputLevel level, InputManager.InputState state) {
+        private InputManager.InputData CreateData(InputTracker tracker, InputManager.InputState state) {
             return new InputManager.InputData {
-                Level = level,
+                Level = tracker.Level,
                 State = state,
                 // Device = InputDeviceType.Touch, // no differentiation yet
-                Position = m_pos,
-                Delta = m_delta
+                Position = tracker.CurrentPosition,
+                Delta = tracker.CurrentDelta
                 // could also add rotation? or utilize pos+delta for performance?
             };
         }
 
-        private void FireClickEvent(InputManager.InputLevel level) {
-            InputManager.InputData data = CreateData(level, InputManager.InputState.Ended);
+        private void FireClickEvent(InputTracker tracker) {
+            InputManager.InputData data = CreateData(tracker, InputManager.InputState.Ended);
             
-            switch (EvaluationHelper.Instance.EvaluateOperationLayer(m_pos)){
+            switch (EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition)){
                 case EvaluationHelper.OperationLayer.UI2D:
                     manager.Publish(new InputManager.ClickUIEvent { Data = data });
                     break;
@@ -444,13 +562,13 @@ namespace tracer{
                     break;
             }
 
-            SpawnClickVisual(level, m_pos, isDouble: false);
+            SpawnClickVisual(tracker.Level, tracker.CurrentPosition, isDouble: false);
         }
 
-        private void FireDoubleClickEvent(InputManager.InputLevel level) {
-            InputManager.InputData data = CreateData(level, InputManager.InputState.Ended);
+        private void FireDoubleClickEvent(InputTracker tracker) {
+            InputManager.InputData data = CreateData(tracker, InputManager.InputState.Ended);
             
-            switch (EvaluationHelper.Instance.EvaluateOperationLayer(m_pos)){
+            switch (EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition)){
                 case EvaluationHelper.OperationLayer.UI2D:
                     manager.Publish(new InputManager.DoubleClickUIEvent { Data = data });
                     break;
@@ -460,36 +578,36 @@ namespace tracer{
                     manager.Publish(new InputManager.DoubleClickOtherEvent { Data = data });
                     break;
             }
-            SpawnClickVisual(level, m_pos, isDouble: true);
+            SpawnClickVisual(tracker.Level, tracker.CurrentPosition, isDouble: true);
         }
 
-        private void FireDragEvent(InputManager.InputLevel level, InputManager.InputState state) {
-            InputManager.InputData data = CreateData(level, state);
+        private void FireDragEvent(InputTracker tracker, InputManager.InputState state) {
+            InputManager.InputData data = CreateData(tracker, state);
 
             //[!REVISE] do we need to have "initial click pos"? (for evaluation for the correct thing we hit - that we want to drag)
             //Debug.Log("DRAG EVENT "+data.ToString());
 
             if(state == InputManager.InputState.Started) {
-                layerDrag = EvaluationHelper.Instance.EvaluateOperationLayer(m_pos);
+                layerDrag = EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition);
             }
 
             switch (layerDrag){
                 case EvaluationHelper.OperationLayer.UI2D:
-                    manager.Publish(new InputManager.DragUIEvent { Data = data });
+                    manager.Publish(new InputManager.DragUIEvent { Data = data, StartPos = tracker.StartPosition });
                     break;
                 case EvaluationHelper.OperationLayer.UI3D:
                 case EvaluationHelper.OperationLayer.SCENEOBJECT:
                 case EvaluationHelper.OperationLayer.OTHER:
-                    manager.Publish(new InputManager.DragOtherEvent { Data = data });
+                    manager.Publish(new InputManager.DragOtherEvent { Data = data, StartPos = tracker.StartPosition });
                     break;
             }
         }
 
-        private void FireHoldEvent(InputManager.InputLevel level, InputManager.InputState state) {
-            InputManager.InputData data = CreateData(level, state);
+        private void FireHoldEvent(InputTracker tracker, InputManager.InputState state) {
+            InputManager.InputData data = CreateData(tracker, state);
 
             if(state == InputManager.InputState.Started) {
-                layerHold = EvaluationHelper.Instance.EvaluateOperationLayer(m_pos);
+                layerHold = EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition);
             }
 
             switch (layerHold){
@@ -504,11 +622,12 @@ namespace tracer{
             }
         }
 
-        private void FirePinchEvent(InputManager.InputLevel level, InputManager.InputState state, float pinchDelta) {
-            InputManager.InputData data = CreateData(level, state);
+        private void FirePinchEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float pinchDelta) {
+            InputManager.InputData data = CreateData(tracker, state);
+            data.Position = centerPos;
             
             if(state == InputManager.InputState.Started) {
-                layerPinch = EvaluationHelper.Instance.EvaluateOperationLayer(m_pos);
+                layerPinch = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
             }
 
             switch (layerPinch){
@@ -523,11 +642,12 @@ namespace tracer{
             }
         }
 
-        private void FireRotateEvent(InputManager.InputLevel level, InputManager.InputState state, float rotateDelta) {
-            InputManager.InputData data = CreateData(level, state);
+        private void FireRotateEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float rotateDelta) {
+            InputManager.InputData data = CreateData(tracker, state);
+            data.Position = centerPos;
             
             if(state == InputManager.InputState.Started) {
-                layerRotate = EvaluationHelper.Instance.EvaluateOperationLayer(m_pos);
+                layerRotate = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
             }
 
             switch (layerRotate){
@@ -644,7 +764,7 @@ namespace tracer{
                 Image rectImg = rectGO.AddComponent<Image>();
                 rectImg.color = new Color(1f, 1f, 1f, 0f); // Start transparent
                 rectImg.rectTransform.position = startPos;
-                rectImg.rectTransform.sizeDelta = new Vector2(dragDistanceThreshold * 2f, dragDistanceThreshold * 2f);
+                rectImg.rectTransform.sizeDelta = new Vector2(DragDistanceThreshold * 2f, DragDistanceThreshold * 2f);
 
                 // Setup Hold Fill Circle
                 GameObject circleGO = new GameObject("HoldFillCircle");
@@ -663,8 +783,8 @@ namespace tracer{
 
             // Update Values
             float distance = Vector2.Distance(startPos, currentPos);
-            float holdProgress = (Time.time - timeDown) / holdTimeThreshold;
-            float dragProgress = distance / dragDistanceThreshold;
+            float holdProgress = (Time.time - timeDown) / HoldTimeThreshold;
+            float dragProgress = distance / DragDistanceThreshold;
 
             Image fillCircle = container.transform.GetChild(1).GetComponent<Image>();
             Image dragRect = container.transform.GetChild(0).GetComponent<Image>();
@@ -727,7 +847,7 @@ namespace tracer{
                 rectGO.transform.SetParent(container.transform);
                 Image rectImg = rectGO.AddComponent<Image>();
                 rectImg.color = new Color(1f, 1f, 1f, 0.4f); // 40% opacity white
-                rectImg.rectTransform.sizeDelta = new Vector2(dragDistanceThreshold * 2f, dragDistanceThreshold * 2f);
+                rectImg.rectTransform.sizeDelta = new Vector2(DragDistanceThreshold * 2f, DragDistanceThreshold * 2f);
 
                 activeDragUIs[level] = container;
 
@@ -761,11 +881,12 @@ namespace tracer{
                     core.StartCoroutine(AnimateFloatingText($"{level} Pinch", centerPos + new Vector2(0, 60f)));
                 }
             }
+            //if we use the scroll-wheel, this will flicker!
 
             // Scale the circle dynamically based on pinch value (adjust multiplier as needed for your data)
             RectTransform circleRect = container.transform.GetChild(0).GetComponent<RectTransform>();
             circleRect.position = centerPos;
-            float dynamicSize = 80f + (pinchValue * 20f); 
+            float dynamicSize = 80f;// + (pinchValue * 20f); 
             circleRect.sizeDelta = new Vector2(dynamicSize, dynamicSize);
         }
 

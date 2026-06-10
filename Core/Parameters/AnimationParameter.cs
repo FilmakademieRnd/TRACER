@@ -288,9 +288,8 @@ namespace tracer
         //! @ param index The index of the key for which the time is to be changed.
         //! @ param time The time the geven key shall be moved to.
         //!
-        public void setKeyTime(int index, float time)
-        {
-            Debug.Log("setKeyTime at index "+index);
+        public void setKeyTime(int index, float time){
+            //Debug.Log("setKeyTime at index "+index);
             if(index < 0 || index >= _keyList.Count){
                 Debug.LogWarning("setKeyTime::index ("+index+") of _keyList would be out of bounds.");
                 return;

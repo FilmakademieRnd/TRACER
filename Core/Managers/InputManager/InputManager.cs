@@ -69,8 +69,8 @@ namespace tracer{
         public struct ClickOtherEvent                       : IInputEvent { public InputData Data; }
 
         // Drags (mouse hold + move, 1 finger touch + move, controller button hold + move)
-        public struct DragUIEvent                           : IInputEvent { public InputData Data; }
-        public struct DragOtherEvent                        : IInputEvent { public InputData Data; }
+        public struct DragUIEvent                           : IInputEvent { public InputData Data; public UnityEngine.Vector2 StartPos; }
+        public struct DragOtherEvent                        : IInputEvent { public InputData Data; public UnityEngine.Vector2 StartPos; }
 
         // Holds (mouse long press - no move, touch long press - no move, button long press - no move )
         public struct HoldUIEvent                           : IInputEvent { public InputData Data; }

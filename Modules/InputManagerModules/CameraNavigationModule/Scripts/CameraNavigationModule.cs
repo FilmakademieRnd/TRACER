@@ -184,6 +184,7 @@ namespace tracer
 
             manager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
             manager.Unsubscribe<InputManager.HoldOtherEvent>(HoldFunction);
+            manager.Unsubscribe<InputManager.PinchOtherEvent>(PinchFunction);
             manager.Unsubscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
 
             if (circleSprite != null){
@@ -220,6 +221,7 @@ namespace tracer
 
             manager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
             manager.Subscribe<InputManager.HoldOtherEvent>(HoldFunction);
+            manager.Subscribe<InputManager.PinchOtherEvent>(PinchFunction);
             manager.Subscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
 
             // Initialize control variables
@@ -330,6 +332,29 @@ namespace tracer
                             break;
                         case InputManager.InputState.Ended:
                             StopFlightInteraction();
+                            break;
+                    }
+                    break;  
+            }
+        }
+
+        private void PinchFunction(InputManager.PinchOtherEvent evt){
+            
+            if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
+                return;
+
+            switch (evt.Data.Level) {
+                //Fly around?
+                //fwd/bck
+                case InputManager.InputLevel.Primary:
+                    // check phase
+                    switch (evt.Data.State){
+                        case InputManager.InputState.Started:
+                        case InputManager.InputState.Ongoing:
+                            camTransform.Translate(0f, 0f, evt.PinchDistance * s_dollySpeed);
+                            break;
+                        case InputManager.InputState.Canceled:
+                        case InputManager.InputState.Ended:
                             break;
                     }
                     break;  

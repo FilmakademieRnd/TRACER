@@ -108,7 +108,7 @@ namespace tracer{
         private List<KeyFrame> m_keyframeList;
         private KeyFrame selectedKeyframe;
         private KeyFrame dragginKeyframe;
-        private float prevKeyFrameTime, nextKeyFrameTime;   //for not re-ordering keyframes index when dragging
+        private float prevKeyFrameTime, nextKeyFrameTime;   //for not "re-ordering" keyframes index when dragging
 
         //!
         //! The list containing all UI elemets of the current menu.
@@ -160,10 +160,6 @@ namespace tracer{
         //!
         private List<SceneObject> m_allAnimatedObjects = null;
         //!
-        //! Time we touch/clicked, needed to check if we drag the time or just click
-        //!
-        private float m_initialTouchTime = 0f;
-        //!
         //! did we call to lock and set all animated sceneobject to playedByTimeline? necessary for scrubbing
         //!
         private bool m_animatedSceneObjectsLockCalled = false;
@@ -212,10 +208,6 @@ namespace tracer{
         }
 
         private float preModifiedStartTime, preModifiedEndTime;
-        //!
-        //! Initial position we touched, only important for zooming via alt + click
-        //!
-        private Vector2 m_initalTouchPos;
         //!
         //! pos buffer to calculate the drag movement delta which we already get from touches
         //!
@@ -366,6 +358,7 @@ namespace tracer{
                 m_inputManager.Subscribe<InputManager.ClickUIEvent>(ClickFunction);
                 m_inputManager.Subscribe<InputManager.DragUIEvent>(DragFunction);
                 m_inputManager.Subscribe<InputManager.HoldUIEvent>(HoldFunction);
+                m_inputManager.Subscribe<InputManager.PinchUIEvent>(EvaluatePinchFunction);
 
                 /*m_inputManager.inputPressStartedUI      += OnPointerDown; //OnBeginDrag;
                 m_inputManager.inputPressEnd            += OnPointerEnd;
@@ -392,6 +385,7 @@ namespace tracer{
                 m_inputManager.Unsubscribe<InputManager.ClickUIEvent>(ClickFunction);
                 m_inputManager.Unsubscribe<InputManager.DragUIEvent>(DragFunction);
                 m_inputManager.Unsubscribe<InputManager.HoldUIEvent>(HoldFunction);
+                m_inputManager.Unsubscribe<InputManager.PinchUIEvent>(EvaluatePinchFunction);
 
                 /*m_inputManager.inputPressStartedUI      -= OnPointerDown; //OnBeginDrag;
                 m_inputManager.inputPressEnd            -= OnPointerEnd;
@@ -437,6 +431,7 @@ namespace tracer{
                             break;
                         case InputManager.InputState.Ended:
                             //set time instantly on click with no special action
+                            // [REVISE] do we have to lock objects and unlock instantly?
                             if (hitUIGameObject == m_timeLine){
                                 UpdateTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
                                 deselectKeyframe();
@@ -449,6 +444,7 @@ namespace tracer{
                     break;  
                 //- nothing to do: create keyframe via primary hold!
                 case InputManager.InputLevel.Secondary:
+                    EvaluateCreateKeyframeFunction(evt);
                     break;    
             }
         }
@@ -456,34 +452,30 @@ namespace tracer{
         //!
         //! Function to connect input managers input event for dragging on the timeline
         //!
-        //! @param evt the InputData
+        //! @param evt the InputData, startPos for exactly checking what to drag
         //!
         private void DragFunction(InputManager.DragUIEvent evt){
 
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;
 
-            //if we did not select the timeline within the InputState.Started, either way of the InputLevel: stop here
-                //return;
-            //Debug.Log(m_isSelected ? "<color=green>timeline selected</color>" : "<color=red>no timeline selected</color>");
-            //Debug.Log("drag @"+evt.Data.Level+" > "+evt.Data.State.ToString()+ (m_isSelected ? " <color=green>m_isSelected</color>" : " <color=red>m_isSelected</color>"));
-
             switch (evt.Data.Level) {
                 case InputManager.InputLevel.Primary:
                     if(evt.Data.State == InputManager.InputState.Started){
-                        EvaluateDragKeyframeFunction(evt);
+                        //changed to multiple values, so we can have the samer function for hold!
+                        EvaluateDragKeyframeFunction(evt.Data.State, evt.Data.Position, evt.StartPos);
                         if(!dragginKeyframe)
-                            EvaluateSetTimeFunction(evt);
+                            EvaluateSetTimeFunction(evt.Data.State, evt.Data.Position, evt.StartPos);
                     } else {
                         if(m_isSelected)
-                            EvaluateSetTimeFunction(evt);
+                            EvaluateSetTimeFunction(evt.Data.State, evt.Data.Position, evt.StartPos);
                         else if(dragginKeyframe)
-                            EvaluateDragKeyframeFunction(evt);
+                            EvaluateDragKeyframeFunction(evt.Data.State, evt.Data.Position, evt.StartPos);
                     }                    
                     break;  
                 case InputManager.InputLevel.Secondary:
                     if(evt.Data.State == InputManager.InputState.Started || m_isSelected)
-                        EvaluateDragTimelineFunction(evt);
+                        EvaluateDragTimelineFunction(evt.Data.State, evt.Data.Delta, evt.StartPos);
                     break;    
             }
         }
@@ -494,60 +486,117 @@ namespace tracer{
                 return;
 
             //if we did not select the timeline within the InputState.Started, either way of the InputLevel: stop here
-            if(evt.Data.State > InputManager.InputState.Started && !m_isSelected)
-                return;
+            // if(evt.Data.State > InputManager.InputState.Started && !m_isSelected)
+            //     return;
 
-            //Debug.Log("hold @"+evt.Data.Level+" > "+evt.Data.State.ToString());
+            //TODO: no special hold here (or increase countdown)
+            //      instead trigger scrubbing or dragging kf as well?!
+            
+
             switch (evt.Data.Level) {
                 case InputManager.InputLevel.Primary:
-                    EvaluateCreateKeyframeFunction(evt);
+                    //moved to secondary click
+                    //EvaluateCreateKeyframeFunction(evt);
+
+                    //new: similiar to DragFunction
+                    if(evt.Data.State == InputManager.InputState.Started){
+                        EvaluateDragKeyframeFunction(evt.Data.State, evt.Data.Position, evt.Data.Position);
+                        if(!dragginKeyframe)
+                            EvaluateSetTimeFunction(evt.Data.State, evt.Data.Position, evt.Data.Position);
+                    } else {
+                        if(m_isSelected)
+                            EvaluateSetTimeFunction(evt.Data.State, evt.Data.Position, evt.Data.Position);
+                        else if(dragginKeyframe)
+                            EvaluateDragKeyframeFunction(evt.Data.State, evt.Data.Position, evt.Data.Position);
+                    }  
                     break;  
                 case InputManager.InputLevel.Secondary:
-                    //nothing to do
+                    //new: similiar to DragFunction
+                    if(evt.Data.State == InputManager.InputState.Started || m_isSelected)
+                        EvaluateDragTimelineFunction(evt.Data.State, evt.Data.Delta, evt.Data.Position);
                     break;    
             }
         }
 
-        private void EvaluateSetTimeFunction(InputManager.DragUIEvent evt) {
+        private void EvaluatePinchFunction(InputManager.PinchUIEvent evt) {
+            if(!m_inputManager.IsUiInteractionAllowed())
+                return;
+
+            //if we did not select the timeline within the InputState.Started, either way of the InputLevel: stop here
+            if(evt.Data.State > InputManager.InputState.Started && !m_isSelected)
+                return;
+
+            switch (evt.Data.Level) {
+                case InputManager.InputLevel.Primary:
+                     switch (evt.Data.State){
+                        case InputManager.InputState.Started:
+                            GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                            if (hitUIGameObject != m_timeLine && !HitKeyFrame(hitUIGameObject, out KeyFrame kf)) 
+                                return;
+                            
+                            m_isSelected = true;
+                            break;
+                        case InputManager.InputState.Ongoing:
+                            ZoomTimeline(evt.Data.Position, evt.PinchDistance);
+                            break;
+                        case InputManager.InputState.Canceled:
+                        case InputManager.InputState.Ended:
+                            //recalc KeyFrame's visibility already done in Ongoing state 
+                            m_isSelected = false;
+                            break;
+                    }
+                    break;  
+                case InputManager.InputLevel.Secondary:
+                    //..
+                    break;    
+            }
+        }
+
+        private void EvaluateSetTimeFunction(InputManager.InputState state, Vector2 pos, Vector2 startPos) {
             // check phase
-            switch (evt.Data.State){
+            switch (state){
                 case InputManager.InputState.Started:
-                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(startPos);
                     if (hitUIGameObject != m_timeLine)
                         return;
                     
-                    //we should/need to lock animated sceneobject if we are scrubbing the timeline manually
-                    if(!m_animatedSceneObjectsLockCalled){
-                        GatherAllAnimatedSceneObjects();
-                        LockAllAnimatedObjects();
-                        m_animatedSceneObjectsLockCalled = true;
-                    }
-
-                    deselectKeyframe();
-
+                    PrepareTimelineMovingStart();
                     m_isSelected = true;
-                    m_initalTouchPos = evt.Data.Position;
-                    m_initialTouchTime = Time.time;
                     break;
                 case InputManager.InputState.Ongoing:
-                    //setTime(mapToCurrentTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x));
-                    UpdateTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
+                    UpdateTime(m_timelineRect.InverseTransformPoint(pos).x);
                     break;
                 case InputManager.InputState.Canceled:
                 case InputManager.InputState.Ended:
-                    if(m_animatedSceneObjectsLockCalled){
-                        UnlockAllAnimatedObjects();
-                    }
+                    PrepareTimelineMovingEnd();
                     updateButtonInteractability();
                     m_isSelected = false;
                     break;
             }
         }
-        private void EvaluateDragTimelineFunction(InputManager.DragUIEvent evt) {
+
+        private void PrepareTimelineMovingStart() {
+            //we should/need to lock animated sceneobject if we are scrubbing the timeline manually
+            if(!m_animatedSceneObjectsLockCalled){
+                GatherAllAnimatedSceneObjects();
+                LockAllAnimatedObjects();
+                m_animatedSceneObjectsLockCalled = true;
+            }
+
+            if(dragginKeyframe == null)
+                deselectKeyframe();
+        }
+        private void PrepareTimelineMovingEnd() {
+            if(m_animatedSceneObjectsLockCalled){
+                UnlockAllAnimatedObjects();
+            }
+        }
+
+        private void EvaluateDragTimelineFunction(InputManager.InputState state, Vector2 delta, Vector2 startPos) {
             // check phase
-            switch (evt.Data.State){
+            switch (state){
                 case InputManager.InputState.Started:
-                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(startPos);
                     if (hitUIGameObject != m_timeLine)
                         return;
                     
@@ -555,14 +604,12 @@ namespace tracer{
                         deselectKeyframe(); //deselect if out of scope
 
                     m_isSelected = true;
-                    m_initalTouchPos = evt.Data.Position;
-                    m_initialTouchTime = Time.time;
                     preModifiedStartTime = StartTime;
                     preModifiedEndTime = EndTime;
                     break;
                 case InputManager.InputState.Ongoing:
                     // [REVISE] use mapping instead of delta?!
-                    float horizontalDelta = evt.Data.Delta.x * Time.deltaTime;  //if inverted-scroll-drag *-1
+                    float horizontalDelta = delta.x * Time.deltaTime;  //if inverted-scroll-drag *-1
 
                     //act like clamping, dont change nor update
                     if(StartTime - horizontalDelta <= (float)TIMELINE_START_MINIMUM/m_framerate){
@@ -596,27 +643,34 @@ namespace tracer{
             }
         }
 
-        private void EvaluateDragKeyframeFunction(InputManager.DragUIEvent evt) {
+
+        private void EvaluateDragKeyframeFunction(InputManager.InputState state, Vector2 pos, Vector2 startPos) {
             // check phase
-            switch (evt.Data.State){
+            switch (state){
                 case InputManager.InputState.Started:
-                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(startPos);
                     if(HitKeyFrame(hitUIGameObject, out KeyFrame kf)){
                         dragginKeyframe = kf;
                         dragginKeyframe.DragStart();
 
                         prevKeyFrameTime = dragginKeyframe.GetIndex() > 0 ? m_keyframeList[dragginKeyframe.GetIndex()-1].key.time : 0;
                         nextKeyFrameTime = dragginKeyframe.GetIndex()+1 < m_keyframeList.Count ? m_keyframeList[dragginKeyframe.GetIndex()+1].key.time : EndTime+1;
+                    
+                        if(selectedKeyframe != null)
+                            PrepareTimelineMovingStart();   //since we should move the time as well!
+                    
                     }
                     
                     break;
                 case InputManager.InputState.Ongoing:
-                    float evaluateTime = mapToCurrentTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
+                    float evaluateTime = mapToCurrentTime(m_timelineRect.InverseTransformPoint(pos).x);
                     
                     if(evaluateTime < prevKeyFrameTime || evaluateTime > nextKeyFrameTime) {
                         //DO NOT UPDATE (show via color?)
-                        dragginKeyframe.DebugColor(Color.red);
+                        dragginKeyframe.DragError(true);
                         return;
+                    } else {
+                        dragginKeyframe.DragError(false);
                     }
                     
                     //check that not out of range AND NOT before/after another key (no index changing!)
@@ -631,14 +685,10 @@ namespace tracer{
                     dragginKeyframe.Dragging(worldPosX);
                     
                     m_activeParameter.setKeyTime(dragginKeyframe.key, evaluateTime);
-                    //NO! but beware sorting at the end!
-                    //clearFrames();
-                    //NO!
-                    //CreateFrames(m_activeParameter);
-                    //NO!
-                    //setTime(m_currentTime);
-                    //update
-                    //UpdateFrames();
+
+                    if(selectedKeyframe != null)
+                        UpdateTime(m_timelineRect.InverseTransformPoint(pos).x);
+
                     break;
                 case InputManager.InputState.Canceled:
                 case InputManager.InputState.Ended:
@@ -651,27 +701,25 @@ namespace tracer{
                         //re-evaluate index BOTH IN m_keyframeList AND keyframes
                         //RIGHT NOW: DONT ALLOW THAT KIND OF BEHAVIOUR (see above)
                     }
+                    if(selectedKeyframe != null)
+                        PrepareTimelineMovingEnd();   //since we should move the time as well!
+
                     dragginKeyframe = null;
                     break;
             }
         }
         
-        private void EvaluateCreateKeyframeFunction(InputManager.HoldUIEvent evt) {
+        private void EvaluateCreateKeyframeFunction(InputManager.ClickUIEvent evt) {
             switch (evt.Data.State){
                 case InputManager.InputState.Started:
+                case InputManager.InputState.Ongoing:
+                case InputManager.InputState.Canceled:
+                    break;
+                case InputManager.InputState.Ended:
                     GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
                     if (hitUIGameObject != m_timeLine)
                         return;
-
-                    m_isSelected = true;
-                    break;
-                case InputManager.InputState.Ongoing:
-                    break;
-                case InputManager.InputState.Canceled:
-                    m_isSelected = false;
-                    break;
-                case InputManager.InputState.Ended:
-                    //could become a spherical menu to choose which type of kf should be created (and switch to that one in the selection)
+                    
                     if(m_activeParameter != null) {
                         //create new key at current time and evaluate current values (if before first/after last, use that values or interpolate)
                         float evaluateTimeForNewKey = mapToCurrentTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
@@ -680,9 +728,7 @@ namespace tracer{
                             updateButtonInteractability();
                             m_activeParameter.InvokeKeyHasChanged();
                         }
-                        
                     }
-                    m_isSelected = false;
                     break;
             }
         }
@@ -1132,8 +1178,7 @@ namespace tracer{
         //! Add a frame representing m_image to the timeline
         //! @param      key    key at which to add the keyframe to the timeline
         //!
-        private void addFrame(AbstractKey key)
-        {
+        private void addFrame(AbstractKey key){
             float time = key.time;
             GameObject keyframeGO = GameObject.Instantiate<GameObject>(m_keyframePrefab, m_timelineRect, false);
             if (keyframeGO.GetComponentInChildren<Text>()) {
@@ -1152,9 +1197,6 @@ namespace tracer{
                 keyframeGO.SetActive(true);
             else
                 keyframeGO.SetActive(false);
-
-            //keyframeComponent.KeyframeDragEndEvent = setTimeFromGlobalPositionX;
-            //keyframeComponent.KeyframeSelectedEvent = keyframeSelected;
 
             updateButtonInteractability();
         }
@@ -1476,6 +1518,10 @@ namespace tracer{
             if (m_isPlaying){
                 m_isPlaying = false;
                 core.StopCoroutine(playCoroutine());
+                //set all visible keyframe colors
+                foreach(KeyFrame kfComp in m_keyframeList)
+                    kfComp.SetPlayMode(false);
+
                 UnlockAllAnimatedObjects();
             }else{
                 GatherAllAnimatedSceneObjects();
@@ -1569,11 +1615,16 @@ namespace tracer{
         //!
         //! Coroutine to update the time and trigger all evaluations in play mode.
         //!
-        private IEnumerator playCoroutine()
-        {
+        private IEnumerator playCoroutine(){
+            //set all visible keyframe colors
+            foreach(KeyFrame kfComp in m_keyframeList)
+                kfComp.SetPlayMode(true);
+
             if(m_keyframeList != null && m_keyframeList.Count > 0)
                 lastKeyFrame = m_keyframeList[^1];
                 
+            float prevTime = m_currentTime;
+            
             while (m_isPlaying){
                 yield return new WaitForSecondsRealtime(Mathf.FloorToInt(1000f / core.settings.framerate) / 1000f);
                 
@@ -1593,6 +1644,12 @@ namespace tracer{
                 focusOnCurrentTime();
                 setTime(m_currentTime + (1f / m_framerate));
 
+                //highlight frame that we've passed
+                //TODO: improve to not iterate over all keyframes, just use subset currently visible
+                //or even better just check for the next one?!
+                foreach(KeyFrame kfComp in m_keyframeList)
+                    kfComp.HighlightIfTimePassedThisKeyFrame(prevTime, m_currentTime);
+
                 //if bigger than last keyframe, stop playback (if no keyframes are there, play endless)
                 if(STOP_ON_LAST_KEYFRAME && lastKeyFrame && m_currentTime > lastKeyFrame.key.time){
                     play();
@@ -1600,6 +1657,8 @@ namespace tracer{
                 }else if(LOOP_IN_CURRENT_VIEW && m_currentTime >= EndTime){
                     setTime(StartTime);
                 }
+
+                prevTime = m_currentTime;
             }
         }
 
@@ -1854,22 +1913,9 @@ namespace tracer{
 */
 
         private void ZoomTimeline(Vector2 point, float delta){
-            //Debug.Log(">>ZoomTimeline dpi@"+Screen.dpi);
-            m_timeLastZoomed = Time.time;
-            m_didSpecialAction = true;
-
-            //correct delta for touch and big screens (touch should be less accurate)
-            //delta *= (m_inputManager.IsInputTouch() ? 10f/Screen.dpi : 50f/Screen.dpi);
-            
-            //Debug.Log(">>> delta@"+delta);
-
             //multiply delta accordingly to its timeline's time size
-            delta *= (EndTime-StartTime)/2f;// /m_framerate;
+            //delta *= (EndTime-StartTime)/2f;
 
-            //use point to offset the zoom on where we are on the timeline (would be timeOnTimeline if *= m_framerate)
-            float valueOnTimeline = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
-            //float timeOnTimeline = valueOnTimeline * m_framerate;
-            
             //minimum delta of 1/Framerate
             delta = delta > 0 ? Mathf.Max(delta * Time.deltaTime, 1f/m_framerate) : Mathf.Min(delta * Time.deltaTime, -1f/m_framerate);
 
@@ -1885,9 +1931,14 @@ namespace tracer{
             //          == we dont change the starttime, but the endtime (and vice versa below)
             //      on the center (startTimeDragInit + delta * 0.5f) and (endTimeDragInit - delta * 0.5f)
 
-            //gather start/end offset via zoom-pos
+            //use point to offset the zoom on where we are on the timeline (would be timeOnTimeline if *= m_framerate)
+            //float startEndOffsetRatio = 0.5f; //set to center!
+            float valueOnTimeline = mapToCurrentTime(m_timelineRect.InverseTransformPoint(point).x);
             float startEndOffsetRatio = (float)(valueOnTimeline-StartTime)/(EndTime-StartTime);
+            // if(delta < 0)
+            //     startEndOffsetRatio = 1f - startEndOffsetRatio;
 
+            //gather start/end offset via zoom-pos
             //increase or decrease the startTime accordingly to the point where we are zooming at
             StartTime   += delta * startEndOffsetRatio;
             //never go below the frame -10 at the start
