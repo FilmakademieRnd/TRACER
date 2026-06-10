@@ -42,7 +42,7 @@ namespace tracer
     public class SceneObject : ParameterObject
     {
         //!
-        //! The global _id counter for generating unique parameterObject IDs.
+        //! The global _id counter for generating unique sceneObject IDs.
         //!
         private static short s_oid = 1;
         //!
@@ -137,7 +137,7 @@ namespace tracer
             if (_core == null)
                 _core = GameObject.FindObjectOfType<Core>();
 
-            _sceneID = 255;
+            _sceneID = 254;
 
             _id = s_oid++;
             _parameterList = new List<AbstractParameter>();

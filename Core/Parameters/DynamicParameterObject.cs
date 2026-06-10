@@ -45,7 +45,7 @@ public class DynamicParameterObject : ParameterObject
     //! @param gameObject The gameObject the new ParameterObject will be attached to.
     //! @sceneID The scene ID for the new ParameterObject.
     //!
-    public new static DynamicParameterObject Attach(GameObject gameObject, byte sceneID = 254)
+    public new static DynamicParameterObject Attach(GameObject gameObject, byte sceneID = 255)
     {
         DynamicParameterObject obj = gameObject.AddComponent<DynamicParameterObject>();
         obj.Init(sceneID);
