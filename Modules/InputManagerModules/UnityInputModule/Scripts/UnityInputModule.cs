@@ -59,13 +59,28 @@ namespace tracer{
         //!
         private Camera mainCam;
 
+        //!
+        //! Interaction Rules
+        //! If false, only one tracker can be active (Drag/Hold) at a time
+        //!
+        private bool allowSimultaneousInteractions = false;
+
+        //!
+        //! Dot product threshold (0.5 to 0.9). Higher means fingers must move more perfectly parallel to trigger a Two-Finger Drag instead of a Pinch
+        //!
+        private float parallelDotThreshold = 0.7f; 
+
+        // Add this to your InteractionState enum:
+        // InteractionState { Idle, Evaluating, Dragging, Holding, Pinching, Rotating, TwoFingerDragging }
+
         public enum InteractionState { 
             Idle,           // Nothing is happening
             Evaluating,     // Pointer is down, waiting to see if it becomes Click, Drag, or Hold
             Dragging,       // Surpassed distance threshold (Holds are now denied)
             Holding,        // Surpassed time threshold (Drags are now denied)
             Pinching,       // Surpassed pinch delta (Drags/Holds denied)
-            Rotating        // Surpassed rotation delta (Drags/Holds denied)
+            Rotating,       // Surpassed rotation delta (Drags/Holds denied)
+            TwoFingerDragging   //Started a two-finger drag, which will be a "secondary drag"
         }
 
         //Interaction Thresholds
@@ -173,6 +188,7 @@ namespace tracer{
 
             m_inputs.VPETMap.Enable();
 
+            EnhancedTouchSupport.Enable();
         }
 
         //!
@@ -230,31 +246,38 @@ namespace tracer{
         //! and writes them into a buffer to allow further calculations (delta, speed, etc)
         //!
         private void ProcessPositionInput(){ 
-            // Get the position
-            Vector2 primaryPos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            UpdateTrackerPosition(_primary, primaryPos);
+            //https://docs.unity3d.com/Packages/com.unity.inputsystem@1.19/manual/Touch.html
+            // You should not use Touchscreen for polling. If you want to read out touches similar to UnityEngine.Input.touches, see EnhancedTouch. 
+            UpdateTrackerPosition(_primary,     GetCurrentPos(InputManager.InputLevel.Primary));
+            UpdateTrackerPosition(_secondary,   GetCurrentPos(InputManager.InputLevel.Secondary));
+            UpdateTrackerPosition(_tertiary,    GetCurrentPos(InputManager.InputLevel.Tertiary));
+        }
 
-            // 2. Check if we are currently using a Touchscreen
-            bool isTouch = Touchscreen.current != null && Input.touchCount > 0;//Touchscreen.current.touches.Count > 0;
-            //[REVISE] remove Positiom [TouchScreen] from Unity Input Actions (?)
+        private bool IsTouch(out int nrOfTouches){
+            nrOfTouches = UnityEngine.InputSystem.Touchscreen.current != null ? UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches.Count : 0;
+            bool isTouch = nrOfTouches > 0;
+            return isTouch;
+        }
 
-            if (isTouch) {  //Debug.Log("IS TOUCH!!!!!! "+Input.touchCount);
-                // Touch fallback: Read exact finger positions
-                if (Touchscreen.current.touches.Count > 1) {
-                    Vector2 secPos = Touchscreen.current.touches[1].position.ReadValue();
-                    UpdateTrackerPosition(_secondary, secPos);
+        private Vector2 GetCurrentPos(InputManager.InputLevel level) {
+            if (IsTouch(out int touchesWeHave)) {
+                // Return the specific finger's position based on the level
+                switch (level) {
+                    case InputManager.InputLevel.Primary:
+                        return UnityEngine.InputSystem.Touchscreen.current.touches[0].position.ReadValue();
+                    case InputManager.InputLevel.Secondary:
+                        if (UnityEngine.InputSystem.Touchscreen.current.touches.Count > 1)
+                            return UnityEngine.InputSystem.Touchscreen.current.touches[1].position.ReadValue();
+                        break;
+                    case InputManager.InputLevel.Tertiary:
+                        if (UnityEngine.InputSystem.Touchscreen.current.touches.Count > 2)
+                            return UnityEngine.InputSystem.Touchscreen.current.touches[2].position.ReadValue();
+                        break;
                 }
-                
-                if (Touchscreen.current.touches.Count > 2) {
-                    Vector2 tertPos = Touchscreen.current.touches[2].position.ReadValue();
-                    UpdateTrackerPosition(_tertiary, tertPos);
-                }
-            } else {
-                // Mouse fallback: Secondary (Right Click) and Tertiary (Middle Click) 
-                // physically share the same position as Primary on a PC.
-                UpdateTrackerPosition(_secondary, primaryPos);
-                UpdateTrackerPosition(_tertiary, primaryPos);
             }
+            
+            // Mouse fallback: All levels share the primary pointer position
+            return m_inputs.VPETMap.Position.ReadValue<Vector2>();
         }
 
         // Helper to safely calculate deltas per-tracker
@@ -267,6 +290,17 @@ namespace tracer{
             }
             tracker.CurrentPosition = newPos;
         }
+
+        //!
+        //! Check (if option to not allow multi tracker use) which one we use right now
+        //!
+        private bool IsAnyOtherTrackerActive(InputTracker excludeTracker) {
+            if (_primary    != excludeTracker && _primary.State     >= InteractionState.Dragging) return true;
+            if (_secondary  != excludeTracker && _secondary.State   >= InteractionState.Dragging) return true;
+            if (_tertiary   != excludeTracker && _tertiary.State    >= InteractionState.Dragging) return true;
+            return false;
+        }
+
         //!
         //! call ProcessInputDetected in the manager
         //! which is currently used to execute IDExtractorModule
@@ -299,7 +333,7 @@ namespace tracer{
 
         private void ProcessMultiTouchGestures() {
             // 1. Exit early if we don't have exactly two active fingers
-            if (_primary.State == InteractionState.Idle || _secondary.State == InteractionState.Idle) {
+            if (!IsTouch(out int i) || _primary.State == InteractionState.Idle || _secondary.State == InteractionState.Idle) {
                 isMultiTouching = false;
                 return; 
             }
@@ -309,8 +343,9 @@ namespace tracer{
             bool canStartGesture   = _primary.State == InteractionState.Evaluating && _secondary.State == InteractionState.Evaluating;
             bool isAlreadyPinching = _primary.State == InteractionState.Pinching;
             bool isAlreadyRotating = _primary.State == InteractionState.Rotating;
+            bool isAlreadyTwoFingerDragging = _primary.State == InteractionState.TwoFingerDragging;
 
-            if (!canStartGesture && !isAlreadyPinching && !isAlreadyRotating) {
+            if (!canStartGesture && !isAlreadyPinching && !isAlreadyRotating && !isAlreadyTwoFingerDragging) {
                 return; // Denied by FSM rules
             }
 
@@ -337,27 +372,50 @@ namespace tracer{
                 float distanceDeltaFromStart = Mathf.Abs(currentDistance - initialPinchDistance);
                 float angleDeltaFromStart = Mathf.Abs(Mathf.DeltaAngle(initialRotateAngle, currentAngle));
 
-                if (distanceDeltaFromStart > PinchDeadzone) {
-                    // Lock states to prevent Drag/Hold/Click
-                    _primary.State = InteractionState.Pinching;
-                    _secondary.State = InteractionState.Pinching;
-                    ClearPreviews(InputManager.InputLevel.Primary);
-                    ClearPreviews(InputManager.InputLevel.Secondary);
+                if (distanceDeltaFromStart > PinchDeadzone || angleDeltaFromStart > RotateDeadzone) {
+            
+                    // --- NEW: PARALLEL DIRECTION CHECK ---
+                    // Calculate total movement vector of both fingers since they touched the screen
+                    Vector2 p1MoveDir = (currentP1 - _primary.StartPosition).normalized;
+                    Vector2 p2MoveDir = (currentP2 - _secondary.StartPosition).normalized;
+                    
+                    // Dot product: 1 = perfectly parallel, -1 = perfectly opposite
+                    float directionDot = Vector2.Dot(p1MoveDir, p2MoveDir);
 
-                    float framePinchDelta = currentDistance - previousPinchDistance;
-                    UpdatePinchActiveVisual(InputManager.InputLevel.Primary, centerPos, framePinchDelta);
-                    FirePinchEvent(_primary, InputManager.InputState.Started, centerPos, framePinchDelta);
-                }
-                else if (angleDeltaFromStart > RotateDeadzone) {
-                    // Lock states
-                    _primary.State = InteractionState.Rotating;
-                    _secondary.State = InteractionState.Rotating;
-                    ClearPreviews(InputManager.InputLevel.Primary);
-                    ClearPreviews(InputManager.InputLevel.Secondary);
+                    if (directionDot > parallelDotThreshold) {
+                        // They are moving in the same direction! It's a Pan/2-Finger Drag.
+                        _primary.State = InteractionState.TwoFingerDragging;
+                        _secondary.State = InteractionState.TwoFingerDragging;
+                        ClearPreviews(InputManager.InputLevel.Primary);
+                        ClearPreviews(InputManager.InputLevel.Secondary);
 
-                    float frameAngleDelta = Mathf.DeltaAngle(previousRotateAngle, currentAngle);
-                    UpdateRotateActiveVisual(InputManager.InputLevel.Primary, centerPos, currentAngle);
-                    FireRotateEvent(_primary, InputManager.InputState.Started, centerPos, frameAngleDelta);
+                        // For a 2-finger drag, the delta is the average movement of both fingers
+                        Vector2 avgDelta = (_primary.CurrentDelta + _secondary.CurrentDelta) / 2f;
+                        //beware! secondary should be the two finger drag! (like right mouse button)
+                        FireTwoFingerDragEvent(_secondary, InputManager.InputState.Started, centerPos, avgDelta);
+
+                    }else if (distanceDeltaFromStart > PinchDeadzone) {
+                        // Lock states to prevent Drag/Hold/Click
+                        _primary.State = InteractionState.Pinching;
+                        _secondary.State = InteractionState.Pinching;
+                        ClearPreviews(InputManager.InputLevel.Primary);
+                        ClearPreviews(InputManager.InputLevel.Secondary);
+
+                        float framePinchDelta = currentDistance - previousPinchDistance;
+                        UpdatePinchActiveVisual(InputManager.InputLevel.Primary, centerPos, framePinchDelta);
+                        FirePinchEvent(_primary, InputManager.InputState.Started, centerPos, framePinchDelta);
+
+                    }else if (angleDeltaFromStart > RotateDeadzone) {
+                        // Lock states
+                        _primary.State = InteractionState.Rotating;
+                        _secondary.State = InteractionState.Rotating;
+                        ClearPreviews(InputManager.InputLevel.Primary);
+                        ClearPreviews(InputManager.InputLevel.Secondary);
+
+                        float frameAngleDelta = Mathf.DeltaAngle(previousRotateAngle, currentAngle);
+                        UpdateRotateActiveVisual(InputManager.InputLevel.Primary, centerPos, currentAngle);
+                        FireRotateEvent(_primary, InputManager.InputState.Started, centerPos, frameAngleDelta);
+                    }
                 }
             }
             // 5. Handle Ongoing Phase
@@ -367,12 +425,18 @@ namespace tracer{
                     UpdatePinchActiveVisual(InputManager.InputLevel.Primary, centerPos, framePinchDelta);
                     FirePinchEvent(_primary, InputManager.InputState.Ongoing, centerPos, framePinchDelta);
                 }
-            }
-            else if (isAlreadyRotating) {
+            }else if (isAlreadyRotating) {
                 float frameAngleDelta = Mathf.DeltaAngle(previousRotateAngle, currentAngle);
                 if (Mathf.Abs(frameAngleDelta) > 0.01f) {
                     UpdateRotateActiveVisual(InputManager.InputLevel.Primary, centerPos, currentAngle);
                     FireRotateEvent(_primary, InputManager.InputState.Ongoing, centerPos, frameAngleDelta);
+                }
+            }else if (isAlreadyTwoFingerDragging) {
+                Vector2 avgDelta = (_primary.CurrentDelta + _secondary.CurrentDelta) / 2f;
+                if (avgDelta.magnitude > 0.01f) {
+                    // Call your visual preview for 2-finger drag here if you want one
+                    FireTwoFingerDragEvent(_secondary, InputManager.InputState.Ongoing, centerPos, avgDelta); 
+                    UpdateDragActiveVisual(_secondary.Level, _secondary.CurrentPosition);
                 }
             }
 
@@ -405,48 +469,66 @@ namespace tracer{
                 float distanceFromStart = Vector2.Distance(tracker.StartPosition, tracker.CurrentPosition);
                 float timeHeld = Time.time - tracker.TimeDown;
 
-                // Distance overrides Time (Drag denies Hold)
-                if (distanceFromStart > DragDistanceThreshold) {
-                    tracker.State = InteractionState.Dragging;
-                    FireDragEvent(tracker, InputManager.InputState.Started);
+                if (!allowSimultaneousInteractions && (distanceFromStart > DragDistanceThreshold || timeHeld > HoldTimeThreshold)) {
+                    if (IsAnyOtherTrackerActive(tracker)) {
+                        return;
+                    }else{
+                        // Distance overrides Time (Drag denies Hold)
+                        if (distanceFromStart > DragDistanceThreshold) {
+                            tracker.State = InteractionState.Dragging;
+                            FireDragEvent(tracker, InputManager.InputState.Started);
 
-                    ClearPreviews(tracker.Level); // Remove circle/rect
-                } 
-                // Time overrides Distance (Hold denies Drag)
-                else if (timeHeld > HoldTimeThreshold) {
-                    tracker.State = InteractionState.Holding;
-                    FireHoldEvent(tracker, InputManager.InputState.Started);
+                            ClearPreviews(tracker.Level); // Remove circle/rect
+                        } 
+                        // Time overrides Distance (Hold denies Drag)
+                        else if (timeHeld > HoldTimeThreshold) {
+                            tracker.State = InteractionState.Holding;
+                            FireHoldEvent(tracker, InputManager.InputState.Started);
+                        }
+                    }
                 }
             }
         }
 
+        //this is only called via scroll-wheel / specific input event
         private void ProcessPinchInput(InputAction.CallbackContext ctx) {
-            //this is only called via scroll-wheel / specific input event
             //thats why we handle start, ongoing, end here
             //OnPointerUp is not called via Scrollwheel (specific buttons may have to handle it otherwise!)
-            float pinchDelta = ctx.ReadValue<float>();
+            float pinchDelta = VerifyPersistentScrollSpeed(ctx.ReadValue<float>() * scrollWheelSensitivity);
             
             // Deadzone check (but what about moving position (without necessary delta))
             if (Mathf.Abs(pinchDelta) < 0.01f && ctx.phase != InputActionPhase.Canceled) { return; }
 
             // Example: Map 2-finger pinch to Primary. (Adjust if your logic maps it to Secondary)
-            InputTracker tracker = _primary; 
-
+            InputTracker tracker = _tertiary; 
+            
             if (ctx.phase == InputActionPhase.Canceled && tracker.State == InteractionState.Pinching) {
                 //implement to use only when not using Touches/Buttons (no axis!)
                 FirePinchEvent(tracker, InputManager.InputState.Ended, tracker.CurrentPosition, pinchDelta);
                 tracker.Reset();
-                ClearPreviews(tracker.Level);
+                //does not work well, because mouse wheel gets all states in one frame
+                //ClearPreviews(tracker.Level);
             } else {
                 if (tracker.State == InteractionState.Evaluating || tracker.State == InteractionState.Dragging || tracker.State == InteractionState.Idle) {
                     tracker.State = InteractionState.Pinching;
                     FirePinchEvent(tracker, InputManager.InputState.Started, tracker.CurrentPosition, pinchDelta);
                 } else if (tracker.State == InteractionState.Pinching) {
                     FirePinchEvent(tracker, InputManager.InputState.Ongoing, tracker.CurrentPosition, pinchDelta);
-
-                    UpdatePinchActiveVisual(tracker.Level, tracker.CurrentPosition, pinchDelta);
+                    //does not work well, because mouse wheel gets all states in one frame
+                    //UpdatePinchActiveVisual(tracker.Level, tracker.CurrentPosition, pinchDelta);
                 }
             }
+        }
+
+        private float scrollCooldown = 0.01f;
+        private float scrollWheelSensitivity = 10f;
+        private float lastScrollTime = -999f;
+        private float VerifyPersistentScrollSpeed(float scrollDelta){
+            var currentTime = Time.unscaledTime;
+            if (currentTime - lastScrollTime < scrollCooldown)
+                return 0f;
+            lastScrollTime = currentTime;
+            return scrollDelta;
         }
 
         private void ProcessRotateInput(InputAction.CallbackContext ctx) {
@@ -484,16 +566,24 @@ namespace tracer{
             if (tracker.State == InteractionState.Pinching || tracker.State == InteractionState.Rotating) { return; }
 
             // DEBUG
-            // Debug.Log("<color=yellow>Primary Input Click Started</color>");
-            // DebugPointer(tracker);
+            Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
             // -----
 
-            tracker.State = InteractionState.Evaluating;
-            tracker.TimeDown = Time.time;
-            tracker.StartPosition = tracker.CurrentPosition;
+            // Fetch the exact position right now, bypassing the Update loop delay
+            Vector2 exactStartPos = GetCurrentPos(tracker.Level);
+            
+
+            tracker.State           = InteractionState.Evaluating;
+            tracker.TimeDown        = Time.time;
+            // Initialize all position data to this exact point
+            tracker.StartPosition   = exactStartPos;
+            tracker.CurrentPosition = exactStartPos;
+            tracker.CurrentDelta    = Vector2.zero; // Explicitly zero out the delta
         }
 
         private void OnPointerUp(InputTracker tracker) {
+            Debug.Log("<color=yellow>OnPointerUp "+tracker.Level+" / "+tracker.State+"</color>");
+
             if (tracker.State == InteractionState.Idle) { return; }
 
             if (tracker.State == InteractionState.Evaluating) {
@@ -516,6 +606,11 @@ namespace tracer{
                 FirePinchEvent(tracker, InputManager.InputState.Ended, tracker.CurrentPosition, 0f);
             }else if (tracker.State == InteractionState.Rotating) {
                 FireRotateEvent(tracker, InputManager.InputState.Ended, tracker.CurrentPosition, 0f);
+            }else if (tracker.State == InteractionState.TwoFingerDragging) {
+                // Find the midpoint one last time based on CurrentPosition
+                Vector2 centerPos = (_primary.CurrentPosition + _secondary.CurrentPosition) / 2f;
+                FireTwoFingerDragEvent(_secondary, InputManager.InputState.Ended, centerPos, Vector2.zero);
+                ClearPreviews(tracker.Level);
             }
 
             // Pinch/Rotate cancels are handled in their own Process methods to support wheel/axis lifting
@@ -602,6 +697,28 @@ namespace tracer{
                     break;
             }
         }
+
+        private void FireTwoFingerDragEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, Vector2 avgDelta) {
+            InputManager.InputData data = CreateData(tracker, state);
+            data.Position = centerPos;
+            data.Delta = avgDelta;
+
+            if(state == InputManager.InputState.Started) {
+                layerDrag = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
+            }
+
+            switch (layerDrag){
+                case EvaluationHelper.OperationLayer.UI2D:
+                    manager.Publish(new InputManager.DragUIEvent { Data = data, StartPos = tracker.StartPosition });
+                    break;
+                case EvaluationHelper.OperationLayer.UI3D:
+                case EvaluationHelper.OperationLayer.SCENEOBJECT:
+                case EvaluationHelper.OperationLayer.OTHER:
+                    manager.Publish(new InputManager.DragOtherEvent { Data = data, StartPos = tracker.StartPosition });
+                    break;
+            }
+        }
+
 
         private void FireHoldEvent(InputTracker tracker, InputManager.InputState state) {
             InputManager.InputData data = CreateData(tracker, state);

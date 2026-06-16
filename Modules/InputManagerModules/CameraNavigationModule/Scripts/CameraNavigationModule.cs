@@ -344,9 +344,10 @@ namespace tracer
                 return;
 
             switch (evt.Data.Level) {
-                //Fly around?
-                //fwd/bck
+                //allow all levels
                 case InputManager.InputLevel.Primary:
+                case InputManager.InputLevel.Secondary:
+                case InputManager.InputLevel.Tertiary:
                     // check phase
                     switch (evt.Data.State){
                         case InputManager.InputState.Started:
