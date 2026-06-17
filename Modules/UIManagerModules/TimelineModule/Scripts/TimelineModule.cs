@@ -356,6 +356,7 @@ namespace tracer{
                 m_removeAllKeysButton.onClick.          AddListener(RemoveAllKeys);
 
                 m_inputManager.Subscribe<InputManager.ClickUIEvent>(ClickFunction);
+                m_inputManager.Subscribe<InputManager.DoubleClickUIEvent>(DoubleClickFunction);
                 m_inputManager.Subscribe<InputManager.DragUIEvent>(DragFunction);
                 m_inputManager.Subscribe<InputManager.HoldUIEvent>(HoldFunction);
                 m_inputManager.Subscribe<InputManager.PinchUIEvent>(EvaluatePinchFunction);
@@ -383,6 +384,7 @@ namespace tracer{
                 m_removeAllKeysButton.onClick.          RemoveListener(RemoveAllKeys);
 
                 m_inputManager.Unsubscribe<InputManager.ClickUIEvent>(ClickFunction);
+                m_inputManager.Unsubscribe<InputManager.DoubleClickUIEvent>(DoubleClickFunction);
                 m_inputManager.Unsubscribe<InputManager.DragUIEvent>(DragFunction);
                 m_inputManager.Unsubscribe<InputManager.HoldUIEvent>(HoldFunction);
                 m_inputManager.Unsubscribe<InputManager.PinchUIEvent>(EvaluatePinchFunction);
@@ -443,9 +445,33 @@ namespace tracer{
                     }
                     break;  
                 //- nothing to do: create keyframe via primary hold!
-                case InputManager.InputLevel.Secondary:
-                    EvaluateCreateKeyframeFunction(evt);
-                    break;    
+                // case InputManager.InputLevel.Secondary: //dificult to do on mobile (two finger click...)
+                //     EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position);
+                //     break;    
+            }
+        }
+
+        //!
+        //! Function to connect input managers input event for clicking on the timeline
+        //!
+        //! @param evt the InputData
+        //!
+        private void DoubleClickFunction(InputManager.DoubleClickUIEvent evt){
+
+            if(!m_inputManager.IsUiInteractionAllowed())
+                return;
+
+            switch (evt.Data.Level) {
+                case InputManager.InputLevel.Primary:
+                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                    if (HitKeyFrame(hitUIGameObject, out KeyFrame kf)) {
+                        //...
+                    }else if (hitUIGameObject == m_timeLine){
+                        EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position);
+                        UpdateTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
+                        //select keyframe?
+                    }
+                    break;  
             }
         }
 
@@ -496,7 +522,7 @@ namespace tracer{
             switch (evt.Data.Level) {
                 case InputManager.InputLevel.Primary:
                     //moved to secondary click
-                    //EvaluateCreateKeyframeFunction(evt);
+                    //EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position);
 
                     //new: similiar to DragFunction
                     if(evt.Data.State == InputManager.InputState.Started){
@@ -527,7 +553,10 @@ namespace tracer{
                 return;
 
             switch (evt.Data.Level) {
+                //right now allow all levels, since touch could be secondary or tertiary!
                 case InputManager.InputLevel.Primary:
+                case InputManager.InputLevel.Secondary:
+                case InputManager.InputLevel.Tertiary:
                      switch (evt.Data.State){
                         case InputManager.InputState.Started:
                             GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
@@ -546,9 +575,9 @@ namespace tracer{
                             break;
                     }
                     break;  
-                case InputManager.InputLevel.Secondary:
-                    //..
-                    break;    
+                // case InputManager.InputLevel.Secondary:
+                //     //..
+                //     break;    
             }
         }
 
@@ -709,20 +738,20 @@ namespace tracer{
             }
         }
         
-        private void EvaluateCreateKeyframeFunction(InputManager.ClickUIEvent evt) {
-            switch (evt.Data.State){
+        private void EvaluateCreateKeyframeFunction(InputManager.InputState evtState, Vector2 evtPos) {
+            switch (evtState){
                 case InputManager.InputState.Started:
                 case InputManager.InputState.Ongoing:
                 case InputManager.InputState.Canceled:
                     break;
                 case InputManager.InputState.Ended:
-                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evtPos);
                     if (hitUIGameObject != m_timeLine)
                         return;
                     
                     if(m_activeParameter != null) {
                         //create new key at current time and evaluate current values (if before first/after last, use that values or interpolate)
-                        float evaluateTimeForNewKey = mapToCurrentTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
+                        float evaluateTimeForNewKey = mapToCurrentTime(m_timelineRect.InverseTransformPoint(evtPos).x);
                         if(CreateKey(evaluateTimeForNewKey)){
                             //was created, update visuals
                             updateButtonInteractability();
