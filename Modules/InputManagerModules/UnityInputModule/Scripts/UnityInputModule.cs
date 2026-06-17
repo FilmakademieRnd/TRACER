@@ -83,10 +83,12 @@ namespace tracer{
         }
 
         //Interaction Thresholds
-        private const float DragDistanceThreshold = 15f; 
-        private const float ClickTimeThreshold = 0.3f;
+        private const float DragDistanceThreshold = 30f;    //in pixels!
         private const float HoldTimeThreshold = 0.4f;
         private const float DoubleClickTimeThreshold = 0.35f;
+        // Add a tiny time buffer (e.g., 0.06 seconds). 
+        // This forces the FSM to wait 60ms before committing to a 1-finger drag, giving the user time to place their 2nd or 3rd finger!
+        private const float TouchTimeGracePeriod = 0.06f;
 
         //Multi-Touch Settings, Note: some values rely on UI/Screen scale
         private const float PinchDeadzone = 5f; // Pixels distance change to trigger pinch
@@ -454,7 +456,7 @@ namespace tracer{
                 float distanceMoved     = Vector2.Distance(avgStartPos, avgCurrentPos);
 
                 // A. Evaluate Drags, Pinches, and Rotates
-                if (distanceMoved > DragDistanceThreshold || pinchSpreadDelta > PinchDeadzone || angleDeltaFromStart > RotateDeadzone) {
+                if ((distanceMoved > DragDistanceThreshold && maxTimeDown > 0.06f) || pinchSpreadDelta > PinchDeadzone || angleDeltaFromStart > RotateDeadzone) {
                     if (directionDot > ParallelDotThreshold) {
                         if (distanceMoved > DragDistanceThreshold) {
                             if (evalCount == 3) 
@@ -582,7 +584,7 @@ namespace tracer{
                 }
 
                 // Standard Single-Finger escalations
-                if (distanceFromStart > DragDistanceThreshold) {
+                if (distanceFromStart > DragDistanceThreshold && timeHeld > TouchTimeGracePeriod) {
                     ExecuteGroupGesture(InteractionState.Dragging, tracker); // Works for a group of 1!
                 } else if (timeHeld > HoldTimeThreshold) {
                     ExecuteGroupGesture(InteractionState.Holding, tracker);

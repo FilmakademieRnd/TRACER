@@ -446,7 +446,7 @@ namespace tracer{
                     break;  
                 //- nothing to do: create keyframe via primary hold!
                 // case InputManager.InputLevel.Secondary: //dificult to do on mobile (two finger click...)
-                //     EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position);
+                //     EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position, true);
                 //     break;    
             }
         }
@@ -467,9 +467,7 @@ namespace tracer{
                     if (HitKeyFrame(hitUIGameObject, out KeyFrame kf)) {
                         //...
                     }else if (hitUIGameObject == m_timeLine){
-                        EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position);
-                        UpdateTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
-                        //select keyframe?
+                        EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position, true);
                     }
                     break;  
             }
@@ -522,7 +520,7 @@ namespace tracer{
             switch (evt.Data.Level) {
                 case InputManager.InputLevel.Primary:
                     //moved to secondary click
-                    //EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position);
+                    //EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position, true);
 
                     //new: similiar to DragFunction
                     if(evt.Data.State == InputManager.InputState.Started){
@@ -738,7 +736,7 @@ namespace tracer{
             }
         }
         
-        private void EvaluateCreateKeyframeFunction(InputManager.InputState evtState, Vector2 evtPos) {
+        private void EvaluateCreateKeyframeFunction(InputManager.InputState evtState, Vector2 evtPos, bool selectKf) {
             switch (evtState){
                 case InputManager.InputState.Started:
                 case InputManager.InputState.Ongoing:
@@ -751,9 +749,15 @@ namespace tracer{
                     
                     if(m_activeParameter != null) {
                         //create new key at current time and evaluate current values (if before first/after last, use that values or interpolate)
-                        float evaluateTimeForNewKey = mapToCurrentTime(m_timelineRect.InverseTransformPoint(evtPos).x);
+                        float xValueOnTimeline = m_timelineRect.InverseTransformPoint(evtPos).x;
+                        float evaluateTimeForNewKey = mapToCurrentTime(xValueOnTimeline);
                         if(CreateKey(evaluateTimeForNewKey)){
                             //was created, update visuals
+                            //not possible to select it instant, since KF will be created in CreateFrames via parameter callback
+                            if (selectKf) 
+                                selectNewKeyFrameAtTime = evaluateTimeForNewKey;
+                            //     SelectKeyFrame(GetKeyFrameClosestToTime(m_currentTime), false);
+                            
                             updateButtonInteractability();
                             m_activeParameter.InvokeKeyHasChanged();
                         }
@@ -761,6 +765,7 @@ namespace tracer{
                     break;
             }
         }
+        private float selectNewKeyFrameAtTime; //if we create a new KeyFrame, select it after the callback happened (could also add a time, to not add them as a debris)
         #endregion
 
         private void UpdateTime(float xValue){
@@ -991,8 +996,7 @@ namespace tracer{
         //! @param o The UI manager.
         //! @param sceneObjects The list containing the selected objects. 
         //!
-        private void OnKeyAddOrRemoved(object o, EventArgs e)
-        {
+        private void OnKeyAddOrRemoved(object o, EventArgs e){
             //only execute for creation: only if selected and visible
             if(manager.SelectedObjects.Count < 0 || !m_showTimeLine)
                 return;
@@ -1001,6 +1005,11 @@ namespace tracer{
             clearFrames();
             //CreateFrames(m_activeParameter);  //-> did not update the light color correctly!
             CreateFrames((IAnimationParameter) o);
+
+            if(selectNewKeyFrameAtTime >= 0) {
+                SelectKeyFrame(GetKeyFrameClosestToTime(selectNewKeyFrameAtTime), true);
+                selectNewKeyFrameAtTime = -1;
+            }
         }
 
         //!
@@ -1184,6 +1193,27 @@ namespace tracer{
                 if(diff < closestTime) {
                     closestTime = diff;
                     closestIndex = kfComp.GetIndex();
+                }
+            }
+            return m_keyframeList[closestIndex];
+        }
+
+        private KeyFrame GetKeyFrameClosestToTimeInDirection(float timeIs, float time) {
+            float closestTime = 10000;
+            int closestIndex = 0;
+            foreach(KeyFrame kfComp in m_keyframeList) {
+                if(timeIs < time && kfComp.key.time < time){
+                    float diff = Mathf.Abs(kfComp.key.time - time);
+                    if(diff < closestTime) {
+                        closestTime = diff;
+                        closestIndex = kfComp.GetIndex();
+                    }
+                }else if(timeIs > time && kfComp.key.time > time){
+                    float diff = Mathf.Abs(kfComp.key.time - time);
+                    if(diff < closestTime) {
+                        closestTime = diff;
+                        closestIndex = kfComp.GetIndex();
+                    }
                 }
             }
             return m_keyframeList[closestIndex];
@@ -1500,7 +1530,7 @@ namespace tracer{
         private void nextFrame(){
             if(selectedKeyframe == null) {
                 //find keyframe closest to time
-                selectedKeyframe = GetKeyFrameClosestToTime(m_currentTime) ;
+                selectedKeyframe = GetKeyFrameClosestToTime(m_currentTime);
             } else {
                 int nextIndex = selectedKeyframe.GetIndex()+1;
                 if(m_keyframeList.Count > nextIndex) {
@@ -1523,7 +1553,7 @@ namespace tracer{
         private void prevFrame(){
             if(selectedKeyframe == null) {
                 //find keyframe closest to time
-                selectedKeyframe = GetKeyFrameClosestToTime(m_currentTime) ;
+                selectedKeyframe = GetKeyFrameClosestToTime(m_currentTime);
             } else {
                 int prevIndex = selectedKeyframe.GetIndex()-1;
                 if(prevIndex >= 0) {

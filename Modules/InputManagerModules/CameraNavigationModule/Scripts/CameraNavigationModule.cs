@@ -82,11 +82,6 @@ namespace tracer
         private static readonly float s_focusDistance = 1.5f;
 
         //!
-        //! The camera center of interest point
-        //!
-        private Vector3 centerOfInterest;
-
-        //!
         //! do we focus an object? If so and we focus it again, lock to the view and follow it!
         //!
         private SceneObject currentFocusedObject;
@@ -95,16 +90,6 @@ namespace tracer
         //! Follow this focused object (not if we do any gizmo transformation)
         //!
         private SceneObject currentFollowObject;
-
-        //!
-        //! A buffer vector storing the position offset between camera and center of interest
-        //!
-        private Vector3 coiOffset;
-
-        //!
-        //! A control variable for orbiting operation
-        //!
-        private bool stickToOrbit = false;
 
         //!
         //! A parameter defining how close to the edge an object can be and still act as center of interest
@@ -174,18 +159,17 @@ namespace tracer
             base.Dispose();
 
             // Unsubscribe
-//            manager.pinchEvent -= CameraDolly;
-//            manager.twoDragEvent -= CameraOrbit;
-            //manager.threeDragEvent -= CameraPedestalTruck;
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged -= SelectionUpdate;
-            uiManager.selectionFocus -= FocusOnSelection;
+//            uiManager.selectionFocus -= FocusOnSelection;
 //            manager.updateCameraUICommand -= CameraUpdated;
 
             manager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
             manager.Unsubscribe<InputManager.HoldOtherEvent>(HoldFunction);
             manager.Unsubscribe<InputManager.PinchOtherEvent>(PinchFunction);
             manager.Unsubscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
+            manager.Unsubscribe<InputManager.DoubleClickOtherEvent>(DoubleClickFunction);
+            
 
             if (circleSprite != null){
                 if (circleSprite.texture != null) 
@@ -206,15 +190,12 @@ namespace tracer
             camTransform = m_cam.transform;
 
             // Subscription to input events
-//            manager.pinchEvent += CameraDolly;
-//            manager.twoDragEvent += CameraOrbit;
-            //manager.threeDragEvent += CameraPedestalTruck;
 
             // Subscribe to selection change
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged += SelectionUpdate;
             // Subscribe to focus event
-            uiManager.selectionFocus += FocusOnSelection;   //change behaviour? subscribe to double click
+//            uiManager.selectionFocus += FocusOnSelection;   //change behaviour? subscribe to double click
 
             // Subscribe to camera change
 //            manager.updateCameraUICommand += CameraUpdated;
@@ -223,26 +204,13 @@ namespace tracer
             manager.Subscribe<InputManager.HoldOtherEvent>(HoldFunction);
             manager.Subscribe<InputManager.PinchOtherEvent>(PinchFunction);
             manager.Subscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
+            manager.Subscribe<InputManager.DoubleClickOtherEvent>(DoubleClickFunction);
 
             // Initialize control variables
             m_selectionCenter = Vector3.zero;
             m_hasSelection = false;
         }
 
-        //! 
-        //! Function that updates the camera center of interest for new camera selection.
-        //! 
-        //! @param sender The input manager.
-        //! @param e Not used.
-        //!
-        private void CameraUpdated(object sender, bool e)
-        {
-            // Assign arbitrary center of interest
-            centerOfInterest = camTransform.TransformPoint(Vector3.forward * 6f);
-
-            // Store positional offset
-            coiOffset = camTransform.position - centerOfInterest;
-        }
 
         //!
         //! Function to connect input managers input event for dragging a sceneObjects gizmo
@@ -284,24 +252,19 @@ namespace tracer
                             break;
                     }
                     break;
-                //Fly around?
-                //fwd/bck
+                //Rotate Around center of selected object(s)
                 case InputManager.InputLevel.Tertiary:
                     // check phase
                     switch (evt.Data.State){
                         case InputManager.InputState.Started:
-                            StartFlightInteraction(evt.Data.Position);
                             InitializeCameraAngles();
-                            screenStartPos = evt.Data.Position;
                             break;
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
-                            //float fwdSpeedByDistance = evt.Data.Position.y - screenStartPos.y;
-                            //CameraFlying(fwdSpeedByDistance, evt.Data.Delta.x);
-                            ProcessContinuousFlight(screenStartPos, evt.Data.Position, evt.Data.Delta);
+                            if(m_hasSelection)
+                                CameraLookAroundObject(evt.Data.Delta, m_selectionCenter);
                             break;
                         case InputManager.InputState.Ended:
-                            StopFlightInteraction();
                             break;
                     }
                     break;  
@@ -390,6 +353,21 @@ namespace tracer
             } 
         }
 
+        //!
+        //! Function to connect input managers input event for clicking on the timeline
+        //!
+        //! @param evt the InputData
+        //!
+        private void DoubleClickFunction(InputManager.DoubleClickOtherEvent evt){
+
+            switch (evt.Data.Level) {
+                case InputManager.InputLevel.Primary:
+                    SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(evt.Data.Position);
+                    FocusOnSelection(hitSO);
+                    break;  
+            }
+        }
+
         private void InitializeCameraAngles() {    
             Vector3 currentAngles = camTransform.eulerAngles;
             
@@ -412,7 +390,6 @@ namespace tracer
         //! @param e The delta distance from drag input
         //!
         private void CameraLookAround(Vector2 delta){
-            
            // Accumulate the angles
             m_yaw   += s_orbitSpeed * delta.x;
             m_pitch -= s_orbitSpeed * delta.y;
@@ -424,11 +401,67 @@ namespace tracer
             // Apply the rotation via Euler Angles. 
             // Notice the Z value is forced to 0f. It is mathematically impossible for the camera to tilt sideways now.
             camTransform.eulerAngles = new Vector3(m_pitch, m_yaw, m_roll);
+        }
 
-            // Update value
-        //    centerOfInterest = camTransform.TransformPoint(Vector3.forward * 6f);
-            // Store positional offset
-        //    coiOffset = camTransform.position - centerOfInterest;
+        //! 
+        //! Orbit function: rotates the camera around a selected object
+        //! @param delta The delta distance from the touch gesture triggering the movement.
+        //! @param objsCenter the center of the object or multiple objects if more are selected
+        //!
+        private void CameraLookAroundObject(Vector2 delta, Vector3 objsCenter){
+            // Check if selection center is inside camera view
+            Vector3 objInViewportCoords = m_cam.WorldToViewportPoint(objsCenter);
+            // If any element is negative, it out of camera
+            if (objInViewportCoords.x < screenTolerance || objInViewportCoords.y < screenTolerance || objInViewportCoords.x > 1 - screenTolerance || objInViewportCoords.y > 1 - screenTolerance || objInViewportCoords.z < 0)
+                return;
+        
+            // 1. Calculate desired deltas
+            float yawDelta = s_orbitSpeed * delta.x;
+            float pitchDelta = -s_orbitSpeed * delta.y;
+
+            // 2. Predict the new pitch to clamp it properly before moving
+            float nextPitch = m_pitch + pitchDelta;
+            
+            if (nextPitch > 89f) {
+                // Clamp going too far down
+                pitchDelta = 89f - m_pitch;
+                m_pitch = 89f;
+            }else if (nextPitch < -89f) {
+                // Clamp going too far up
+                pitchDelta = -89f - m_pitch;
+                m_pitch = -89f;
+            }else{
+                // Normal movement
+                m_pitch = nextPitch;
+            }
+
+            // Keep yaw tracked for seamless switching with standard LookAround
+            m_yaw += yawDelta;
+
+            // 3. Apply the Orbit
+            // Rotate around World Up for horizontal movement
+            camTransform.RotateAround(objsCenter, Vector3.up, yawDelta);
+            // Rotate around the Camera's Local Right for vertical movement
+            camTransform.RotateAround(objsCenter, camTransform.right, pitchDelta);
+
+            // 4. Force the Roll to stay locked
+            // RotateAround can introduce microscopic floating-point roll drift over time. 
+            // This locks it back to your desired m_roll.
+            Vector3 currentEuler = camTransform.eulerAngles;
+            camTransform.eulerAngles = new Vector3(currentEuler.x, currentEuler.y, m_roll);
+        }
+
+        //! 
+        //! Pedestal & Truck function: moves the camera vertically or horizontally.
+        //! 
+        //! @param e The delta distance from the touch gesture triggering the movement.
+        //!
+        private void CameraPedestalTruck(Vector2 delta){
+            // Adjust the input
+            Vector2 offset = -s_panSpeed * delta;
+
+            // Move around
+            camTransform.Translate(offset.x, offset.y, 0);
         }
 
         private void StartFlightInteraction(Vector2 startPos){
@@ -601,137 +634,13 @@ namespace tracer
             if (uiContainer != null) UnityEngine.GameObject.Destroy(uiContainer);
         }
 
-        //! 
-        //! fly cam through scene and be able to rotate as well
-        //! [REVISE] should we simply fly forward on tertiary and be able to look around fully? (slower if rotating faster?)
-        //! 
-        //! @param fwdSpeed speed of the camera going fwd or backwards
-        //! @param horRotSpeed speed for the cameras horizontal rotation
-        //!
-        private void CameraFlying(float fwdSpeed, float horRotSpeed) {
-            if(Mathf.Abs(horRotSpeed) > 0.1f) 
-                CameraLookAround(Vector2.right * horRotSpeed);
-            
-            //fwd or bckwd
-            if(Mathf.Abs(fwdSpeed) > 10f)
-                camTransform.Translate(0f, 0f, fwdSpeed/20f * Time.deltaTime);
-        }
-
-
-        //! 
-        //! Dolly function: moves the camera forward.
-        //! 
-        //! @param sender The input manager.
-        //! @param e The distance between the touch gesture triggering the movement.
-        //!
-        private void CameraDolly(object sender, float distance){
-            if(!manager.IsCamNavigationAllowed())
-                return;
-
-            // Dolly cam
-            camTransform.Translate(0f, 0f, distance * s_dollySpeed);
-
-            // Check if center of interest is in front of camera
-            Vector3 camCoord = m_cam.WorldToViewportPoint(centerOfInterest);
-            if(camCoord.z < 0)
-                // Else snap to camera
-                centerOfInterest = camTransform.position;
-
-            // Store positional offset
-            coiOffset = camTransform.position - centerOfInterest;
-
-        }
-
-        //! 
-        //! Orbit function: rotates the camera around a pivot point.
-        //! Currently the orbit point is set to a specific distance from the camera.
-        //! 
-        //! @param sender The input manager.
-        //! @param e The delta distance from the touch gesture triggering the movement.
-        //!
-        private void CameraOrbit(object sender, Vector2 delta){
-            if(!manager.IsCamNavigationAllowed())
-                return;
-
-            // Prepare the pivot point
-            Vector3 pivotPoint;
-
-            // If an object is selected
-            if (m_hasSelection)
-            {
-                pivotPoint = m_selectionCenter;
-                // Check if selection center is inside camera view
-                Vector3 camCoord = m_cam.WorldToViewportPoint(m_selectionCenter);
-                // If any element is negative, it out of camera
-                if (camCoord.x < screenTolerance || camCoord.y < screenTolerance || camCoord.x > 1 - screenTolerance || camCoord.y > 1 - screenTolerance || camCoord.z < 0 || stickToOrbit)
-                {
-                    // If center of interest coincides with selection center
-                    if (centerOfInterest == m_selectionCenter)
-                    {
-                        // It means the center of orbit was already set to an object, and needs to be reset to the center
-                        centerOfInterest = camTransform.TransformPoint(Vector3.forward * 6f);
-                    }
-                    pivotPoint = centerOfInterest;
-                    // And it should not change until selection is changed (else orbiting pivot will jump to object as soon as it 
-                    stickToOrbit = true;
-                }
-            }
-            else
-            {
-                pivotPoint = centerOfInterest;
-            }
-
-            // Arc
-            camTransform.RotateAround(pivotPoint, Vector3.up, s_orbitSpeed * delta.x);
-            // Tilt
-            camTransform.RotateAround(pivotPoint, camTransform.right, -s_orbitSpeed * delta.y);
-
-            // Update value
-            centerOfInterest = pivotPoint;
-            // Store positional offset
-            coiOffset = camTransform.position - centerOfInterest;
-        }
-
-        //! 
-        //! Pedestal & Truck function: moves the camera vertically or horizontally.
-        //! 
-        //! @param e The delta distance from the touch gesture triggering the movement.
-        //!
-        private void CameraPedestalTruck(Vector2 delta){
-            // Adjust the input
-            Vector2 offset = -s_panSpeed * delta;
-
-            // Move around
-            camTransform.Translate(offset.x, offset.y, 0);
-
-            // If it was not orbited
-            if (centerOfInterest != m_selectionCenter)
-            {
-                // Drag the center of interest with it
-                centerOfInterest = camTransform.position - coiOffset;
-            }
-        }
 
         //!
         //! Function called when selection has changed.
         //!
-        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects)
-        {
+        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects){
             m_hasSelection = false;
-            if (sceneObjects.Count < 1)
-            {
-                // In case of deselection, set the center of interest back to the center of the view
-                // If it has been orbited (meaning center of interest coincides to selection), preserve distance to camera
-                if (centerOfInterest == m_selectionCenter)
-                {
-                    Vector3 bufferpos = m_cam.WorldToViewportPoint(m_selectionCenter);
-                    bufferpos.x = .5f;
-                    bufferpos.y = .5f;
-                    centerOfInterest = m_cam.ViewportToWorldPoint(bufferpos);
-
-                    // Store positional offset
-                    coiOffset = camTransform.position - centerOfInterest;
-                }
+            if (sceneObjects.Count < 1){
                 return;
             }
 
@@ -745,16 +654,14 @@ namespace tracer
 
             m_selectionCenter = averagePos;
             m_hasSelection = true;
-
-            // Reset control variable
-            stickToOrbit = false;
         }
 
         //!
         //! Focus on the current object (center it, move cam to it)
-        //! if we already focused it, lock to it!
+        //! [TODO] have closer/farther look at object as iteration
+        //! [TODO] have "lock to object" via hold? (we may have a radial options menu for all this stuff)
         //!
-        private void FocusOnSelection(object sender, SceneObject sceneObject){
+        private void FocusOnSelection(SceneObject sceneObject){
             if(!sceneObject){
                 currentFocusedObject = null;
                 currentFollowObject = null;     //we follow this object, but not if we do any gizmo transformation!
@@ -782,9 +689,6 @@ namespace tracer
                     }
                     break;
             }
-
-            //set focus point as well
-            centerOfInterest = b.center;
 
             Vector3 max = b.size;
             // Get the radius of a sphere circumscribing the bounds, multiply by s_focusDistance (the higher the multiply, the farther away)
