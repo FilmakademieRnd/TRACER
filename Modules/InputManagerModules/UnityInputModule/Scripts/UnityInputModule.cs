@@ -65,11 +65,6 @@ namespace tracer{
         //!
         private bool allowSimultaneousInteractions = false;
 
-        //!
-        //! Dot product threshold (0.5 to 0.9). Higher means fingers must move more perfectly parallel to trigger a Two-Finger Drag instead of a Pinch
-        //!
-        private float ParallelDotThreshold = 0.5f; 
-
         // Add this to your InteractionState enum:
         // InteractionState { Idle, Evaluating, Dragging, Holding, Pinching, Rotating, TwoFingerDragging }
 
@@ -83,18 +78,22 @@ namespace tracer{
         }
 
         //Interaction Thresholds
-        private const float DragDistanceThreshold = 30f;    //in pixels!
-        private const float HoldTimeThreshold = 0.4f;
+        private readonly float[] DragDistanceThreshold = {30f, 20f, 10f};       //in pixels!
+        private readonly float[] HoldTimeThreshold = {0.45f, 0.4f, 0.35f};      //in seconds
         private const float DoubleClickTimeThreshold = 0.35f;
         // Add a tiny time buffer (e.g., 0.06 seconds). 
         // This forces the FSM to wait 60ms before committing to a 1-finger drag, giving the user time to place their 2nd or 3rd finger!
-        private const float TouchTimeGracePeriod = 0.06f;
+        private readonly float[] TouchTimeGracePeriod = {0.08f, 0.04f, 0.01f};
 
         //Multi-Touch Settings, Note: some values rely on UI/Screen scale
         private const float PinchDeadzone = 5f; // Pixels distance change to trigger pinch
         private const float RotateDeadzone = 5f; // Degrees change to rotate
+        // Dot product threshold (0.5 to 0.9). Higher means fingers must move more perfectly parallel to trigger a Two-Finger Drag instead of a Pinch
+        private const float ParallelDotThreshold = 0.5f; 
 
-        private float initialPinchDistance, previousPinchDistance, initialRotateAngle, previousRotateAngle;
+        private float GetDragThreshold(int fingerCount) { return DragDistanceThreshold[Mathf.Clamp(fingerCount - 1, 0, 2)];}
+        private float GetHoldThreshold(int fingerCount) { return HoldTimeThreshold[Mathf.Clamp(fingerCount - 1, 0, 2)]; }
+        private float GetGracePeriod(int fingerCount) { return TouchTimeGracePeriod[Mathf.Clamp(fingerCount - 1, 0, 2)]; }
 
         // TODO: put into InputManager & remove Unity dependency, so other modules could utilize it without referencing to other module
         // e.g. like the AttitudeModule!
@@ -225,7 +224,6 @@ namespace tracer{
             //add listener
             //trigger "any input detected"
             SetupAnyInputAction();
-            anyInputAction.performed += ProcessAnyInput;
 
             // --- PRIMARY (1-Finger / Left Mouse) ---
             m_inputs.VPETMap.OnPrimaryInputClick.started += ctx => OnPointerDown(_primary);
@@ -258,11 +256,27 @@ namespace tracer{
         //! setup the unity input action via code
         //!
         private void SetupAnyInputAction() {
-            anyInputAction = new InputAction(type: InputActionType.Button);
-            anyInputAction.AddBinding("/*/<button>");       // 1. Catch every keyboard key, gamepad button, or joystick button
-            anyInputAction.AddBinding("<Pointer>/press");   // 2. Catch mouse clicks, pen taps, and touchscreen presses
-            //maybe also add joystick/mouse movement?
-            anyInputAction.Enable();                        // The action must be enabled to start listening to the hardware
+            // anyInputAction = new InputAction(type: InputActionType.Button);
+            // //error on Android!
+            // anyInputAction.AddBinding("/*/<button>");       // 1. Catch every keyboard key, gamepad button, or joystick button
+            // anyInputAction.AddBinding("<Pointer>/press");   // 2. Catch mouse clicks, pen taps, and touchscreen presses
+            // //maybe also add joystick/mouse movement?
+            // anyInputAction.Enable();                        // The action must be enabled to start listening to the hardware
+
+            InputAction anyAction = new InputAction("AnyInput", InputActionType.Button);
+            // 1. Catches any touch on the screen (or mouse click/pen tap)
+            anyAction.AddBinding("<Pointer>/press");
+
+            // 2. Catches any button on a Bluetooth/USB Gamepad
+            anyAction.AddBinding("<Gamepad>/<button>");
+
+            // 3. Catches any physical keyboard key connected via USB/Bluetooth
+            anyAction.AddBinding("<Keyboard>/anyKey");
+
+            // Subscribe to your events
+            anyAction.performed += ProcessAnyInput;
+            
+            anyAction.Enable();
         }
 
         //!
@@ -455,10 +469,15 @@ namespace tracer{
 
                 float distanceMoved     = Vector2.Distance(avgStartPos, avgCurrentPos);
 
+                // Query the thresholds based on how many fingers are evaluating!
+                float reqDistance = GetDragThreshold(evalCount);
+                float reqGrace = GetGracePeriod(evalCount);
+                float reqHold = GetHoldThreshold(evalCount);
+
                 // A. Evaluate Drags, Pinches, and Rotates
-                if ((distanceMoved > DragDistanceThreshold && maxTimeDown > 0.06f) || pinchSpreadDelta > PinchDeadzone || angleDeltaFromStart > RotateDeadzone) {
+                if ((distanceMoved > reqDistance && maxTimeDown > reqGrace) || pinchSpreadDelta > PinchDeadzone || angleDeltaFromStart > RotateDeadzone) {
                     if (directionDot > ParallelDotThreshold) {
-                        if (distanceMoved > DragDistanceThreshold) {
+                        if (distanceMoved > reqDistance) {
                             if (evalCount == 3) 
                                 ExecuteGroupGesture(InteractionState.Dragging, _primary, _secondary, _tertiary);
                             else 
@@ -495,7 +514,7 @@ namespace tracer{
                     }
                 }
                 // B. Evaluate Holds
-                else if (maxTimeDown > HoldTimeThreshold) {
+                else if (maxTimeDown > reqHold) {
                     if (evalCount == 3) 
                         ExecuteGroupGesture(InteractionState.Holding, _primary, _secondary, _tertiary);
                     else 
@@ -578,15 +597,24 @@ namespace tracer{
                 float distanceFromStart = Vector2.Distance(tracker.StartPosition, tracker.CurrentPosition);
                 float timeHeld = Time.time - tracker.TimeDown;
 
-                if (!allowSimultaneousInteractions && (distanceFromStart > DragDistanceThreshold || timeHeld > HoldTimeThreshold)) {
+                //use the fastest one, if we are not on touch!
+                int thresholdIndex = 1;
+                if(!IsTouch(out int nrOfTouches))
+                    thresholdIndex = 0;
+
+                float reqDistance = GetDragThreshold(thresholdIndex);
+                float reqGrace = GetGracePeriod(thresholdIndex);
+                float reqHold = GetHoldThreshold(thresholdIndex);
+
+                if (!allowSimultaneousInteractions && (distanceFromStart > reqDistance || timeHeld > reqHold)) {
                     if (IsAnyOtherTrackerActive(tracker)) 
                         return; 
                 }
 
                 // Standard Single-Finger escalations
-                if (distanceFromStart > DragDistanceThreshold && timeHeld > TouchTimeGracePeriod) {
+                if (distanceFromStart > reqDistance && timeHeld > reqGrace) {
                     ExecuteGroupGesture(InteractionState.Dragging, tracker); // Works for a group of 1!
-                } else if (timeHeld > HoldTimeThreshold) {
+                } else if (timeHeld > reqHold) {
                     ExecuteGroupGesture(InteractionState.Holding, tracker);
                 }
             }
@@ -982,6 +1010,12 @@ namespace tracer{
         private void UpdateEvaluatingVisual(InputManager.InputLevel level, Vector2 startPos, Vector2 currentPos, float timeDown){
             EnsureMainCanvasExists();
 
+            int inputLevelForThresholds = 0;
+            if(level == InputManager.InputLevel.Secondary)
+                inputLevelForThresholds = 1;
+            else if(level == InputManager.InputLevel.Tertiary)
+                inputLevelForThresholds = 2;
+
             if (!evaluatingUIs.TryGetValue(level, out GameObject container) || container == null){
                 container = new GameObject($"EvaluatingUI_{level}");
                 container.transform.SetParent(mainUIContainer.transform);
@@ -992,7 +1026,7 @@ namespace tracer{
                 Image rectImg = rectGO.AddComponent<Image>();
                 rectImg.color = new Color(1f, 1f, 1f, 0f); // Start transparent
                 rectImg.rectTransform.position = startPos;
-                rectImg.rectTransform.sizeDelta = new Vector2(DragDistanceThreshold * 2f, DragDistanceThreshold * 2f);
+                rectImg.rectTransform.sizeDelta = Vector2.one * GetDragThreshold(inputLevelForThresholds) * 2f;
 
                 // Setup Hold Fill Circle
                 GameObject circleGO = new GameObject("HoldFillCircle");
@@ -1011,8 +1045,8 @@ namespace tracer{
 
             // Update Values
             float distance = Vector2.Distance(startPos, currentPos);
-            float holdProgress = (Time.time - timeDown) / HoldTimeThreshold;
-            float dragProgress = distance / DragDistanceThreshold;
+            float holdProgress = (Time.time - timeDown) / GetHoldThreshold(inputLevelForThresholds);
+            float dragProgress = distance / GetDragThreshold(inputLevelForThresholds);
 
             Image fillCircle = container.transform.GetChild(1).GetComponent<Image>();
             Image dragRect = container.transform.GetChild(0).GetComponent<Image>();
@@ -1067,6 +1101,12 @@ namespace tracer{
             EnsureMainCanvasExists();
 
             if (!activeDragUIs.TryGetValue(level, out GameObject container) || container == null) {
+                int inputLevelForThresholds = 0;
+                if(level == InputManager.InputLevel.Secondary)
+                    inputLevelForThresholds = 1;
+                else if(level == InputManager.InputLevel.Tertiary)
+                    inputLevelForThresholds = 2;
+
                 container = new GameObject($"DragActiveUI_{level}");
                 container.transform.SetParent(mainUIContainer.transform);
 
@@ -1075,7 +1115,7 @@ namespace tracer{
                 rectGO.transform.SetParent(container.transform);
                 Image rectImg = rectGO.AddComponent<Image>();
                 rectImg.color = new Color(1f, 1f, 1f, 0.4f); // 40% opacity white
-                rectImg.rectTransform.sizeDelta = new Vector2(DragDistanceThreshold * 2f, DragDistanceThreshold * 2f);
+                rectImg.rectTransform.sizeDelta = Vector2.one * GetDragThreshold(inputLevelForThresholds) * 2f;
 
                 activeDragUIs[level] = container;
 

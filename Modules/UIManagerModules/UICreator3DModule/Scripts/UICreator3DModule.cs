@@ -323,6 +323,7 @@ namespace tracer
             HideAxes();
 
             _dragViz = new DragVisualizer();
+            _dragRotateViz = new DragRotateVisualizer();
 
             this.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
             this.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
@@ -331,6 +332,7 @@ namespace tracer
         #region NEW INPUT EVENTS
 
         private DragVisualizer _dragViz;
+        private DragRotateVisualizer _dragRotateViz;
 
         //!
         //! Function to connect input managers input event for dragging a sceneObjects gizmo
@@ -401,7 +403,7 @@ namespace tracer
             if (manipulator){
                 // make a plane based on it
                 planeVec = manipulator.transform.forward;
-                helperPlaneCenter = manipulator.GetComponent<Collider>().bounds.center;
+                helperPlaneCenter = selObj.transform.position; //manipulator.GetComponent<Collider>().bounds.center;
                 helperPlane = new Plane(planeVec, helperPlaneCenter);
                 //Debug.DrawRay(center, planeVec * 10, Color.red, 1);
 
@@ -488,6 +490,7 @@ namespace tracer
                         // Convert to object space
                         hitPoint = selObj.transform.parent.transform.InverseTransformPoint(hitPoint);
                         hitPosOffset = hitPoint - localManipPosition;
+                        rotationDragWorldStartVec = selObj.transform.parent.TransformDirection(hitPosOffset);
                         break;
                     // drag object - scale
                     case 2:
@@ -502,6 +505,8 @@ namespace tracer
             }
             m_inputManager.SetAllowCamNavigation(false);
         }
+
+        private Vector3 rotationDragWorldStartVec;  //used just for visualization of how "far" we drag the rotation
 
         //!
         //! Function to be performed on click/touch drag
@@ -573,8 +578,25 @@ namespace tracer
                 rotQuat.SetFromToRotation(hitPosOffset, hitPoint - localManipPosition);
 
                 // Strengthen free rotation
-                if (manipulator == manipR)
+                bool isFreeRotation = false;
+                if (manipulator == manipR){
                     rotQuat *= rotQuat;
+                    isFreeRotation = true;
+                }
+
+                //****** ONLY FOR VISUALIZATION
+                // Convert the local drag vectors into World Space so the visualizer can draw them accurately
+                Vector3 worldCurrentVec = selObj.transform.parent.TransformDirection(hitPoint - localManipPosition);
+
+                // Call the visualizer
+                _dragRotateViz.UpdateVisuals(
+                    helperPlaneCenter, 
+                    helperPlane.normal, 
+                    rotationDragWorldStartVec, 
+                    worldCurrentVec, 
+                    isFreeRotation
+                );
+                //*****************************
 
                 // Actual rotation operation
                 // For a single object
@@ -691,6 +713,7 @@ namespace tracer
             m_inputManager.SetAllowCamNavigation(true);
             manipulator = null;
             _dragViz.Cleanup();
+            _dragRotateViz.Cleanup();
         }
 
         //!

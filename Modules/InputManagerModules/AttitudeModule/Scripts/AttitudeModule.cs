@@ -131,7 +131,7 @@ namespace tracer{
                 //should be greyed out, instead of removing it!
                 core.getManager<UIManager>().removeButton(m_attitudeButton);
             }else if (show) {
-                if(m_attitudeButton != null) {
+                if(m_attitudeButton == null) {
                     m_attitudeButton = new MenuButton("", SwitchAttitudeCamControl);
                     m_attitudeButton.setIcon("Images/button_attitude"); //how is the order set up?
                 }

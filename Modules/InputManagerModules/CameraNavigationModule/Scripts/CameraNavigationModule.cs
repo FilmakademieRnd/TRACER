@@ -59,6 +59,10 @@ namespace tracer
         //! The average position of the selected objects.
         //!
         private Vector3 m_selectionCenter;
+        //!
+        //! An evaluated position to orbit around if we have no object selected
+        //!
+        private Vector3 evaluatedNonSelectionCenterForOrbit;
 
         // TODO: maybe promote these variables to configuration options
         //!
@@ -258,11 +262,14 @@ namespace tracer
                     switch (evt.Data.State){
                         case InputManager.InputState.Started:
                             InitializeCameraAngles();
+                            EvaluateObjectForOrbit(new Vector2(Screen.width/2f, Screen.height/2f));
                             break;
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
                             if(m_hasSelection)
                                 CameraLookAroundObject(evt.Data.Delta, m_selectionCenter);
+                            else
+                                CameraLookAroundObject(evt.Data.Delta, evaluatedNonSelectionCenterForOrbit);
                             break;
                         case InputManager.InputState.Ended:
                             break;
@@ -377,6 +384,36 @@ namespace tracer
 
             // Normalize pitch to -180 to 180 so our Mathf.Clamp works correctly
             if (m_pitch > 180f) { m_pitch -= 360f; }
+        }
+
+        //!
+        //! [NO] ~~when on mobile or via controller, us the cam fwd vectror projected onto the ground plane~~
+        //! [NO] ~~via mouse use input start position to use for rotate around check~~
+        //! have same behaviour everywhere:
+        //! make an evaluation from the camera center and use any non-2d hit as rotate-around-center
+        //!     if no hit was made, use ground plane height (Y = 0!)
+        //!
+        private void EvaluateObjectForOrbit(Vector2 sceenCenterPos) {
+            SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(sceenCenterPos);
+            if (hitSO) {
+                evaluatedNonSelectionCenterForOrbit = hitSO.transform.position;
+                return;
+            }
+            GameObject hitGO = EvaluationHelper.Instance.EvaluateGameObject(sceenCenterPos);
+            if (hitGO) {
+                evaluatedNonSelectionCenterForOrbit = hitGO.transform.position;
+                return;
+            }
+
+            //make the raycast to the imaginary ground plane at Y = 0
+            Ray ray = new(Camera.main.transform.position, Camera.main.transform.forward);
+            Plane plane = new(Vector3.up, Vector3.zero);
+
+            if (plane.Raycast(ray, out float distance)) {
+                evaluatedNonSelectionCenterForOrbit = ray.GetPoint(distance);
+            } else {
+                evaluatedNonSelectionCenterForOrbit = Camera.main.transform.forward * 30;
+            }
         }
 
         private void InitializeAttitudeValues(Quaternion attitudeRotation) {    
