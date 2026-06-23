@@ -210,6 +210,9 @@ namespace tracer
             manager.Subscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
             manager.Subscribe<InputManager.DoubleClickOtherEvent>(DoubleClickFunction);
 
+            // Instantiate once
+            _orbitViz = new OrbitImpactPin(core);
+
             // Initialize control variables
             m_selectionCenter = Vector3.zero;
             m_hasSelection = false;
@@ -262,16 +265,25 @@ namespace tracer
                     switch (evt.Data.State){
                         case InputManager.InputState.Started:
                             InitializeCameraAngles();
-                            EvaluateObjectForOrbit(new Vector2(Screen.width/2f, Screen.height/2f));
+                            if(!m_hasSelection){
+                                EvaluateObjectForOrbit(new Vector2(Screen.width/2f, Screen.height/2f));
+                                // Drops the pin and spawns the expanding ground ring
+                                _orbitViz.StartPin(evaluatedNonSelectionCenterForOrbit, camTransform.position);
+                            }
                             break;
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
                             if(m_hasSelection)
                                 CameraLookAroundObject(evt.Data.Delta, m_selectionCenter);
-                            else
+                            else{
                                 CameraLookAroundObject(evt.Data.Delta, evaluatedNonSelectionCenterForOrbit);
+                                // Dynamically fills the ground arc as the camera swings around
+                                _orbitViz.UpdateOrbit(camTransform.position);
+                            }
                             break;
                         case InputManager.InputState.Ended:
+                            // Gracefully shrinks and fades away, even if it was interrupted mid-drop
+                            _orbitViz.Dismiss();
                             break;
                     }
                     break;  
@@ -346,10 +358,11 @@ namespace tracer
                         case InputManager.InputState.Started:
                             attitudeValuesIncoming = true;
                             InitializeAttitudeValues(evt.Rotation);
+                            //TODO: dont allow camera view manipulation!
                             break;
                         case InputManager.InputState.Ongoing:
                             camTransform.localRotation = evt.Rotation * Quaternion.Euler(0f, 0f, 180f);
-                            camTransform.rotation = cameraMainRotationOffset * invAttitudeSensorOffset * camTransform.rotation;
+                            camTransform.rotation = cameraMainRotationOffset * camTransform.rotation;
                             break;
                         case InputManager.InputState.Canceled:
                         case InputManager.InputState.Ended:
@@ -384,6 +397,12 @@ namespace tracer
 
             // Normalize pitch to -180 to 180 so our Mathf.Clamp works correctly
             if (m_pitch > 180f) { m_pitch -= 360f; }
+
+            //check again for selection center, since we could have moved the object in the meantime
+            // [!REVISE] what if animation is playing and the object is moving, re-evalute all the time?
+            if (m_hasSelection) {
+                SetSelectionCenter(core.getManager<UIManager>().SelectedObjects);
+            }
         }
 
         //!
@@ -418,7 +437,7 @@ namespace tracer
 
         private void InitializeAttitudeValues(Quaternion attitudeRotation) {    
             cameraMainRotationOffset = Camera.main.transform.rotation;
-            invAttitudeSensorOffset = Quaternion.Inverse(attitudeRotation * Quaternion.Euler(0f, 0f, 180f));
+            //invAttitudeSensorOffset = Quaternion.Inverse(attitudeRotation * Quaternion.Euler(0f, 0f, 180f));
         }
 
         //! 
@@ -676,13 +695,18 @@ namespace tracer
         //! Function called when selection has changed.
         //!
         private void SelectionUpdate(object sender, List<SceneObject> sceneObjects){
-            m_hasSelection = false;
+            currentFollowObject = null;
+
             if (sceneObjects.Count < 1){
+                m_hasSelection = false;
                 return;
             }
 
-            currentFollowObject = null;
+            SetSelectionCenter(sceneObjects);
+            m_hasSelection = true;
+        }
 
+        private void SetSelectionCenter(List<SceneObject> sceneObjects) {
             // Calculate the average position
             Vector3 averagePos = Vector3.zero;
             foreach (SceneObject obj in sceneObjects)
@@ -690,7 +714,6 @@ namespace tracer
             averagePos /= sceneObjects.Count;
 
             m_selectionCenter = averagePos;
-            m_hasSelection = true;
         }
 
         //!
@@ -780,5 +803,10 @@ namespace tracer
             return Mathf.Sqrt(1 - Mathf.Pow(progress01 - 1f, 2f));
         }
 
+        #region DEBUG VIZ
+        private OrbitImpactPin _orbitViz;
+
+        #endregion
     }
+
 }

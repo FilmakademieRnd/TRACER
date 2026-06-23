@@ -233,6 +233,12 @@ namespace tracer
         Camera mainCamera;
 
         //!
+        //! do so only when selection changed, to not do this runtime all the time
+        //! add to do this for ALL other calcs in GetModifierScale and subscribe to changes of FielOfView as well!
+        //! 
+        private float camMathValues;
+
+        //!
         //! Event emitted when parameter has changed
         //!
         public event EventHandler<AbstractParameter> doneEditing;
@@ -247,8 +253,7 @@ namespace tracer
         //! @param name Name of this module
         //! @param _core Reference to the TRACER _core
         //!
-        public UICreator3DModule(string name, Manager manager) : base(name, manager)
-        {
+        public UICreator3DModule(string name, Manager manager) : base(name, manager){
 
         }
 
@@ -268,6 +273,7 @@ namespace tracer
 
             /*m_inputManager.fingerGestureEvent -= updateGizmoScale;
             m_inputManager.updateCameraUICommand -= updateGizmoScale;*/
+            core.updateEvent -= OnCoreUpdateEvent;
 
             UICreator2DModule UI2DModule = manager.getModule<UICreator2DModule>();
             CameraSelectionModule CamModule = manager.getModule<CameraSelectionModule>();
@@ -314,6 +320,10 @@ namespace tracer
             /*m_inputManager.fingerGestureEvent += updateGizmoScale;
             m_inputManager.updateCameraUICommand += updateGizmoScale;*/
 
+            //TODO: have UI (?) Event for CamChanged (pos)
+            //just do this in update
+            core.updateEvent += OnCoreUpdateEvent;
+
             // Grabbing scene scale
             uiScale = manager.settings.uiScale.value;
             manager.settings.uiScale.hasChanged += updateUIScale;
@@ -328,8 +338,20 @@ namespace tracer
             this.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
             this.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
         }
+        
 
         #region NEW INPUT EVENTS
+
+        //!
+        //! Callback from TRACER _core when Unity calls it's render update
+        //! [!REVISE] only do on updates? cam update, gizmo manipulation, animation?
+        //!
+        private void OnCoreUpdateEvent(object sender, EventArgs e){
+            if(!selObj)
+                return;
+
+            UpdateManipScale();
+        }
 
         private DragVisualizer _dragViz;
         private DragRotateVisualizer _dragRotateViz;
@@ -353,17 +375,21 @@ namespace tracer
             switch (evt.Data.State){
                 case InputManager.InputState.Started:
                     //Debug.Log("Primary Drag Started");
-                    SetupManipulatorForTransformations(evt.Data.Position);
-                    CalculateStartOffset(evt.Data.Position);
+                    SetupManipulatorForTransformations(evt.StartPos);
+                    CalculateStartOffset(evt.StartPos);
+                    //better for viz?
+                    //HideGizmo();
                     break;
                 case InputManager.InputState.Ongoing:
-                case InputManager.InputState.Canceled:
                     //Debug.Log("Primary Drag ongoing");
                     ExecuteManipulatorTransformation(evt.Data.Position);
                     break;
+                case InputManager.InputState.Canceled:
                 case InputManager.InputState.Ended:
                     //Debug.Log("Primary Drag ended");
                     FinalizeManipulatorTransformation(evt.Data.Position);
+                    //better for viz?
+                    //ShowGizmo();
                     break;
             }
 
@@ -399,8 +425,9 @@ namespace tracer
         private void SetupManipulatorForTransformations(Vector2 point){
             // grab the hit manip
             manipulator = EvaluationHelper.Instance.EvaluateManipulator(point);
-
             if (manipulator){
+                Debug.Log("HIT MANIPULATOR");
+                
                 // make a plane based on it
                 planeVec = manipulator.transform.forward;
                 helperPlaneCenter = selObj.transform.position; //manipulator.GetComponent<Collider>().bounds.center;
@@ -412,7 +439,9 @@ namespace tracer
                     helperPlane = new Plane(mainCamera.transform.forward, helperPlaneCenter);
 
                 // HACK - if translate single axis - plane normal is camera axis projected on the axis plane
-                if (manipulator == manipTx || manipulator == manipTy || manipulator == manipTz)
+                if (manipulator == manipTx || manipulator == manipTy || manipulator == manipTz ||
+                    manipulator == manipSx || manipulator == manipSy || manipulator == manipSz
+                )
                     helperPlane = new Plane(Vector3.ProjectOnPlane(mainCamera.transform.forward, manipulator.transform.up), helperPlaneCenter);
 
                 // semi hack - if manip = main rotator - free rotation
@@ -594,7 +623,8 @@ namespace tracer
                     helperPlane.normal, 
                     rotationDragWorldStartVec, 
                     worldCurrentVec, 
-                    isFreeRotation
+                    isFreeRotation,
+                    selObj.transform
                 );
                 //*****************************
 
@@ -716,6 +746,14 @@ namespace tracer
             _dragRotateViz.Cleanup();
         }
 
+        private void HideGizmo() {
+            
+        }
+
+        private void ShowGizmo() {
+            
+        }
+
         //!
         //! Function that does nothing.
         //! Being called when selection has changed.
@@ -780,6 +818,7 @@ namespace tracer
                 SetManipulatorMode(null, -1);
             }
 
+            camMathValues = Screen.dpi / (Screen.width + Screen.height);
         }
 
 
@@ -1058,16 +1097,17 @@ namespace tracer
         //!
         //! Helper function for transform gizmo scale adjustment according to screen and UI scale parameter
         //!
-        private Vector3 GetModifierScale()
-        {
+        private Vector3 GetModifierScale(){
             if (!selObj)
                 return Vector3.one;
          
             return Vector3.one * uiScale 
                        * (Vector3.Distance(mainCamera.transform.position, selObj.transform.position)
                        * (4.0f * Mathf.Tan(0.5f * (Mathf.Deg2Rad * mainCamera.fieldOfView)))
-                       * Screen.dpi / (Screen.width + Screen.height));
+                       * camMathValues);
+
         }
+
 
         //!
         //! Set transform gizmo to translate mode

@@ -166,7 +166,7 @@ namespace tracer{
         private void SwitchAttitudeCamControl(){
             if (AttitudeSensor.current == null) return;
 
-            if (sensorIsReading){
+            if (!sensorIsReading){
                 // Crucial for performance/battery: Power up the hardware sensor
                 InputSystem.EnableDevice(AttitudeSensor.current);
                 attitudeInputAction.Enable();
@@ -210,6 +210,10 @@ namespace tracer{
 
             // Read the value directly
             Quaternion currentAttitude = attitudeInputAction.ReadValue<Quaternion>();
+
+            //we probably have some latency at the start, that's why we have a rotation "jump" - ignore it with this
+            if(currentAttitude == Quaternion.identity)
+                return;
 
             attitudeInputData.State = InputManager.InputState.Ongoing;
             

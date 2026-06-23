@@ -95,6 +95,11 @@ namespace tracer{
         private float GetHoldThreshold(int fingerCount) { return HoldTimeThreshold[Mathf.Clamp(fingerCount - 1, 0, 2)]; }
         private float GetGracePeriod(int fingerCount) { return TouchTimeGracePeriod[Mathf.Clamp(fingerCount - 1, 0, 2)]; }
 
+        //fixing of scroll input action 'canceled' gets swallowed!
+        private float scrollTimeout = 0.15f; // The delay before a scroll is considered "Ended"
+        private bool _isMouseScrolling = false;
+        private float _lastScrollTime = 0f;
+
         // TODO: put into InputManager & remove Unity dependency, so other modules could utilize it without referencing to other module
         // e.g. like the AttitudeModule!
         public class InputTracker{
@@ -239,9 +244,6 @@ namespace tracer{
 
             
             // --- GESTURES (Scrollwheel, Triggers, Touch Pinch/Rotate) ---
-            m_inputs.VPETMap.OnPinch.started += ProcessPinchInput;
-            m_inputs.VPETMap.OnPinch.performed += ProcessPinchInput;
-            m_inputs.VPETMap.OnPinch.canceled += ProcessPinchInput;
             
             /*m_inputs.VPETMap.Rotate.performed += ProcessRotateInput;
             m_inputs.VPETMap.Rotate.canceled += ProcessRotateInput;
@@ -296,11 +298,7 @@ namespace tracer{
 
             m_inputs.VPETMap.OnTertiaryInputClick.started -= ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled -= ctx => OnPointerUp(_tertiary);
-
-            m_inputs.VPETMap.OnPinch.started -= ProcessPinchInput;
-            m_inputs.VPETMap.OnPinch.performed -= ProcessPinchInput;
-            m_inputs.VPETMap.OnPinch.canceled -= ProcessPinchInput;
-            
+           
             /*m_inputs.VPETMap.Rotate.performed -= ProcessRotateInput;
             m_inputs.VPETMap.Rotate.canceled -= ProcessRotateInput;
             */
@@ -393,6 +391,54 @@ namespace tracer{
             manager.Publish(new InputManager.AnyInputEvent { Data = anyInputData });
         }
 
+        //!
+        //! verifying that scroll input via the mouse wheel
+        //! relying on the started, ongoing, canceled action was not trustworthy
+        //!
+        private void ProcessScrollInput() {
+            // 1. Read the raw value directly
+            float scrollDelta = m_inputs.VPETMap.OnPinch.ReadValue<float>();
+
+            // 2. IS ACTIVELY SCROLLING
+            if (Mathf.Abs(scrollDelta) > 0.01f) {
+                Vector2 mousePos = GetCurrentPos(InputManager.InputLevel.Primary);
+
+                float scrollDeltaAdjusted = VerifyPersistentScrollSpeed(scrollDelta * scrollWheelSensitivity);
+
+                if (!_isMouseScrolling) {
+                    // --- STARTED PHASE ---
+                    _isMouseScrolling = true;
+                    _secondary.State = InteractionState.Pinching; // Lock state so right-clicks are ignored
+                    
+                    UpdatePinchActiveVisual(_tertiary.Level, mousePos, scrollDeltaAdjusted);
+                    FirePinchEvent(_tertiary, InputManager.InputState.Started, mousePos, scrollDeltaAdjusted);
+                } else {
+                    // --- ONGOING PHASE ---
+                    UpdatePinchActiveVisual(_tertiary.Level, mousePos, scrollDeltaAdjusted);
+                    FirePinchEvent(_tertiary, InputManager.InputState.Ongoing, mousePos, scrollDeltaAdjusted);
+                }
+
+                // Reset the timeout timer every frame the wheel is moving
+                _lastScrollTime = Time.time;
+            }
+            // 3. STOPPED SCROLLING (EVALUATING TIMEOUT)
+            else if (_isMouseScrolling) {
+                if (Time.time - _lastScrollTime > scrollTimeout) {
+                    // --- ENDED PHASE ---
+                    _isMouseScrolling = false;
+                    _secondary.Reset(); // Unlock the tracker
+                    
+                    Vector2 mousePos = GetCurrentPos(InputManager.InputLevel.Primary);
+                    FirePinchEvent(_tertiary, InputManager.InputState.Ended, mousePos, 0f);
+                    ClearPreviews(_tertiary.Level);
+                }
+            }
+            
+            // 4. IDLE
+            // If _isMouseScrolling is false AND scrollDelta is 0, the function just exits.
+            // Zero unnecessary logic is executed.
+        }
+
         // --- THE UPDATE LOOP (finite state machine) ---
         //!
         //! Callback from TRACER _core when Unity calls it's render update
@@ -402,6 +448,8 @@ namespace tracer{
             ProcessPositionInput();
 
             ProcessMultiTouchGestures();
+
+            ProcessScrollInput();
 
             ProcessTracker(_primary);
             ProcessTracker(_secondary);
@@ -633,35 +681,6 @@ namespace tracer{
             
         }
 
-        //this is only called via scroll-wheel / specific input event
-        private void ProcessPinchInput(InputAction.CallbackContext ctx) {
-            //thats why we handle start, ongoing, end here
-            //OnPointerUp is not called via Scrollwheel (specific buttons may have to handle it otherwise!)
-            float pinchDelta = VerifyPersistentScrollSpeed(ctx.ReadValue<float>() * scrollWheelSensitivity);
-            
-            // Deadzone check (but what about moving position (without necessary delta))
-            if (Mathf.Abs(pinchDelta) < 0.01f && ctx.phase != InputActionPhase.Canceled) { return; }
-
-            // Example: Map 2-finger pinch to Primary. (Adjust if your logic maps it to Secondary)
-            InputTracker tracker = _tertiary; 
-            
-            if (ctx.phase == InputActionPhase.Canceled && tracker.State == InteractionState.Pinching) {
-                //implement to use only when not using Touches/Buttons (no axis!)
-                FirePinchEvent(tracker, InputManager.InputState.Ended, tracker.CurrentPosition, pinchDelta);
-                tracker.Reset();
-                //does not work well, because mouse wheel gets all states in one frame
-                //ClearPreviews(tracker.Level);
-            } else {
-                if (tracker.State == InteractionState.Evaluating || tracker.State == InteractionState.Dragging || tracker.State == InteractionState.Idle) {
-                    tracker.State = InteractionState.Pinching;
-                    FirePinchEvent(tracker, InputManager.InputState.Started, tracker.CurrentPosition, pinchDelta);
-                } else if (tracker.State == InteractionState.Pinching) {
-                    FirePinchEvent(tracker, InputManager.InputState.Ongoing, tracker.CurrentPosition, pinchDelta);
-                    //does not work well, because mouse wheel gets all states in one frame
-                    //UpdatePinchActiveVisual(tracker.Level, tracker.CurrentPosition, pinchDelta);
-                }
-            }
-        }
 
         /**** PINCH SPECIFIC SCROLL WHEEL INPUT **/
         private float scrollCooldown = 0.01f;
@@ -842,7 +861,7 @@ namespace tracer{
             //Debug.Log("DRAG EVENT "+data.ToString());
 
             if(state == InputManager.InputState.Started) {
-                layerDrag = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
+                layerDrag = EvaluationHelper.Instance.EvaluateOperationLayer(tracker.StartPosition);
             }
 
             switch (layerDrag){
