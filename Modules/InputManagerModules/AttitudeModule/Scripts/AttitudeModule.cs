@@ -70,6 +70,8 @@ namespace tracer{
 
         //! used as data for the inputmanager event as in the UnityInputModule
         private InputManager.InputData attitudeInputData;
+        private int discardedFudgeValues = 0;
+        private const int StartFramesToDiscard = 5;
         //! 
         //! Init m_callback
         //! 
@@ -170,9 +172,9 @@ namespace tracer{
                 // Crucial for performance/battery: Power up the hardware sensor
                 InputSystem.EnableDevice(AttitudeSensor.current);
                 attitudeInputAction.Enable();
-                sensorIsReading = true;
 
                 StartAttitudeEvent();
+                
             }else{
                 // Power down the hardware sensor and stop the action
                 StopAttitude();
@@ -186,8 +188,8 @@ namespace tracer{
                 Position = Vector2.zero,
                 Delta = Vector2.zero
             };
-
-            manager.Publish(new InputManager.AttitudeInputEvent { Data = attitudeInputData, Rotation = Quaternion.identity });
+            discardedFudgeValues = 0;
+            sensorIsReading = true;
         }
 
         private void StopAttitudeEvent() {
@@ -211,17 +213,22 @@ namespace tracer{
             // Read the value directly
             Quaternion currentAttitude = attitudeInputAction.ReadValue<Quaternion>();
 
-            //we probably have some latency at the start, that's why we have a rotation "jump" - ignore it with this
-            if(currentAttitude == Quaternion.identity)
+            //ignore the "wake-up lag" and not initialized values
+            if(discardedFudgeValues < StartFramesToDiscard || (currentAttitude.x == 0 && currentAttitude.y == 0 && currentAttitude.z == 0 && currentAttitude.w == 0)){
+                discardedFudgeValues++;
                 return;
+            }
 
-            attitudeInputData.State = InputManager.InputState.Ongoing;
-            
-            // Example: Apply to camera or object (Note: You may need to adapt the coordinate system 
-            // depending on your device orientation, often requiring a 90-degree rotation adjustment).
-            // transform.rotation = currentAttitude;
-
-            manager.Publish(new InputManager.AttitudeInputEvent { Data = attitudeInputData, Rotation = currentAttitude });
+            if(attitudeInputData.State == InputManager.InputState.Started) {
+                //if still started, publish here started and go to ongoing then (do not distribute started with zero value)
+                manager.Publish(new InputManager.AttitudeInputEvent { Data = attitudeInputData, Rotation = currentAttitude });
+                attitudeInputData.State = InputManager.InputState.Ongoing;
+            }else{
+                // Example: Apply to camera or object (Note: You may need to adapt the coordinate system 
+                // depending on your device orientation, often requiring a 90-degree rotation adjustment).
+                // transform.rotation = currentAttitude;
+                manager.Publish(new InputManager.AttitudeInputEvent { Data = attitudeInputData, Rotation = currentAttitude });
+            }
         }
     }
 

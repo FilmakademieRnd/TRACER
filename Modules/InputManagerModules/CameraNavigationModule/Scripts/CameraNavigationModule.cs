@@ -112,7 +112,7 @@ namespace tracer
         //! comment out if this bevhaiour is not   intended
         //!
         private bool attitudeValuesIncoming = false;
-        private Quaternion cameraMainRotationOffset, invAttitudeSensorOffset;
+        private Quaternion cameraMainRotationOffset, attitudeOffset;
 
         #region Fly Variables
         //!
@@ -361,8 +361,9 @@ namespace tracer
                             //TODO: dont allow camera view manipulation!
                             break;
                         case InputManager.InputState.Ongoing:
-                            camTransform.localRotation = evt.Rotation * Quaternion.Euler(0f, 0f, 180f);
-                            camTransform.rotation = cameraMainRotationOffset * camTransform.rotation;
+                            // if(!attitudeValuesIncoming){
+                            // }else
+                                ApplyAttitudeValues(evt.Rotation);
                             break;
                         case InputManager.InputState.Canceled:
                         case InputManager.InputState.Ended:
@@ -435,10 +436,17 @@ namespace tracer
             }
         }
 
+        #region Magic Window Metapher
         private void InitializeAttitudeValues(Quaternion attitudeRotation) {    
-            cameraMainRotationOffset = Camera.main.transform.rotation;
-            //invAttitudeSensorOffset = Quaternion.Inverse(attitudeRotation * Quaternion.Euler(0f, 0f, 180f));
+            cameraMainRotationOffset = camTransform.rotation;
+            attitudeOffset = Quaternion.Inverse(attitudeRotation * Quaternion.Euler(0f, 0f, 180f));
         }
+
+        private void ApplyAttitudeValues(Quaternion attitudeRotation) {
+            camTransform.localRotation = attitudeRotation * Quaternion.Euler(0f, 0f, 180f);
+            camTransform.rotation = cameraMainRotationOffset * attitudeOffset * camTransform.rotation;
+        }
+        #endregion
 
         //! 
         //! rotate the camera from a pov
