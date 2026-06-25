@@ -226,12 +226,14 @@ namespace tracer
         //!
         private void DragFunction(InputManager.DragOtherEvent evt){
             
-            if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
+            if(!manager.IsCamNavigationAllowed())
                 return;
 
             switch (evt.Data.Level) {
                 //ROTATE CAMERA
                 case InputManager.InputLevel.Primary:
+                    if(attitudeValuesIncoming)
+                        return;
                     // check phase
                     switch (evt.Data.State){
                         case InputManager.InputState.Started:
@@ -322,7 +324,7 @@ namespace tracer
 
         private void PinchFunction(InputManager.PinchOtherEvent evt){
             
-            if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
+            if(!manager.IsCamNavigationAllowed()) // || attitudeValuesIncoming)
                 return;
 
             switch (evt.Data.Level) {
@@ -437,6 +439,26 @@ namespace tracer
         }
 
         #region Magic Window Metapher
+
+        /****** 
+        *
+        *   AI DESCRIPTION WHAT THE BELOW DOES
+        *   - as I'm no Quaternion Expert, Thomas
+        *
+        *   Look at Line 1, and then look at the far right of Line 2. You are setting localRotation, 
+        *   and then immediately reading rotation in the very next instruction.
+        *
+        *   In pure C#, that looks redundant. But in Unity's underlying C++ engine, setting localRotation 
+        *   sets a dirty flag. The millisecond you call .rotation on Line 2, you force Unity's C++ main 
+        *   thread to halt, grab the parent's world matrix, multiply your Line 1 local pose by the parent's 
+        *   world space, and hand it back to C#.
+        *
+        *   By taking the result of Line 1, getting Unity to bake it into World Space, and feeding it back 
+        *   into the delta multiplier on Line 2, you created a self-clearing feedback loop that renders the 
+        *   camera 100% immune to its parent transform's scale or rotation. Write a comment above those two 
+        *   functions warning future developers never to touch them
+        *
+        */
         private void InitializeAttitudeValues(Quaternion attitudeRotation) {    
             cameraMainRotationOffset = camTransform.rotation;
             attitudeOffset = Quaternion.Inverse(attitudeRotation * Quaternion.Euler(0f, 0f, 180f));
