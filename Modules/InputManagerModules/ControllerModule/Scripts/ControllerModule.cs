@@ -25,22 +25,22 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "ControllerModule.cs"
 //! @brief Controller input 
 //! @author Alexandru Schwartz
-//! @version 0
-//! @date 26.10.2023
+//! @author Thomas Krüger
+//! @version 1
+//! @date 25.06.2026
+//! @note revise behaviour, should be implemented more convenient and abstract with our new input behaviour
+//! @note2 should the controller be an equal input behaviour as mouse/touch or just implement generics (move, look, select)?
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
-using Object = UnityEngine.Object;
 
-namespace tracer
-{
+namespace tracer{
 
-    public class ControllerModule : InputManagerModule
-    {
-               //!
+    public class ControllerModule : InputManagerModule{
+
+        //!
         //! Reference to the main camera GameObject
         //!
         private GameObject _mainCamera;
@@ -215,6 +215,19 @@ namespace tracer
         //!
         public event EventHandler<AbstractParameter> ControllerdoneEditing;
 
+        #region NEW INPUT MANAGER ADJUSTMENT
+        //!
+        //! The generated Unity input class defining all available user inputs.
+        //!
+        private Inputs m_inputs;
+        private float stickDeadzone = 0.15f; 
+        // Converts normalized stick input (-1 to 1) into simulated pixel deltas.
+        private float syntheticSensitivity = 500f; 
+        private bool _isLeftStickDragging = false;
+        private InputManager.InputTracker _primary   = new InputManager.InputTracker(InputManager.InputLevel.Primary);
+
+        #endregion
+
 
         //!
         //! Initialization method for the controller.
@@ -248,7 +261,7 @@ namespace tracer
             _sceneObjectCamerasList = _sceneManager.sceneCameraList;
 
             // Subscribe to controller button events.
-/*            manager.buttonNorth += PressNorth;
+/*          manager.buttonNorth += PressNorth;
             manager.buttonSouth += PressSouth;
             manager.buttonEast += PressEast;
             manager.buttonWest += PressWest;
@@ -267,6 +280,12 @@ namespace tracer
             // Subscribe to the _core update event.
             core.updateEvent += TracerUpdate;
 
+            //enable input
+            m_inputs = new Inputs();
+            m_inputs.VPETMap.Enable();
+            //doing this in the update!
+            //m_inputs.VPETMap.Controller_Left_Stick += MoveLeftStick;
+
             // Subscribe to UI manager events.
             _uiManager.selectionChanged += UiManagerSelectionChanged;
             _uiManager.selectionRemoved += UiManagerSelectionRemoved;
@@ -276,12 +295,11 @@ namespace tracer
         //!
         //! Cleanup method for the controller.
         //!
-        public override void Dispose()
-        {
+        public override void Dispose(){
             base.Dispose();
 
             // Unsubscribe from controller button events.
-/*            manager.buttonNorth -= PressNorth;
+/*          manager.buttonNorth -= PressNorth;
             manager.buttonSouth -= PressSouth;
             manager.buttonEast -= PressEast;
             manager.buttonWest -= PressWest;
@@ -590,12 +608,74 @@ namespace tracer
         {
             
         }
+
+        #region PROCESSING
+        private void ProcessLeftStick() {
+            // 1. Read the raw normalized Vector2 from the Left Stick
+            // (Assuming your action is named "LeftStick" and mapped to Gamepad > Left Stick)
+            Vector2 rawStickInput = m_inputs.VPETMap.Controller_Left_Stick.ReadValue<Vector2>();
+
+            // 2. Evaluate Deadzone
+            if (rawStickInput.magnitude > stickDeadzone) {
+                
+                // 3. Synthesize the Touch Data
+                // Multiply by deltaTime to make the panning frame-rate independent, 
+                // just like a smooth finger drag.
+                Vector2 syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime;
+                
+                // Controllers don't have a screen position, so we anchor the action to the dead center of the screen.
+                Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
+
+                // --- STARTED PHASE ---
+                if (!_isLeftStickDragging) {
+                    _isLeftStickDragging = true;
+                    
+                    // Fire your specific DragOtherEvent
+                    FireDragOtherEvent(_primary, InputManager.InputState.Started, screenCenter, syntheticDelta);
+                } 
+                // --- ONGOING PHASE ---
+                else {
+                    FireDragOtherEvent(_primary, InputManager.InputState.Ongoing, screenCenter, syntheticDelta);
+                }
+            }
+            // 4. Evaluate Stick Release
+            else if (_isLeftStickDragging) {
+                // --- ENDED PHASE ---
+                // The stick snapped back to the center (inside the deadzone)
+                _isLeftStickDragging = false;
+                
+                Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
+                
+                // Delta is zero because the movement has stopped
+                FireDragOtherEvent(_primary, InputManager.InputState.Ended, screenCenter, Vector2.zero);
+            }
+        }
+
+        // Your existing Helper Function format adapted for the "Other" layer
+        private void FireDragOtherEvent(InputManager.InputTracker tracker, InputManager.InputState state, Vector2 position, Vector2 delta) {
+            // Construct your InputData payload exactly as you do in the UnityInputModule
+            tracker.CurrentPosition = position;
+            tracker.CurrentDelta = delta;
+
+            if(state == InputManager.InputState.Started) {
+                tracker.StartPosition = position;
+            }
+
+            InputManager.InputData data = InputManager.CreateData(tracker, state);
+
+            manager.Publish(new InputManager.DragOtherEvent { Data = data, StartPos = tracker.StartPosition });
+        }
+        #endregion
         
         //!
         //! Tracer update function
         //!
-        private void TracerUpdate(object sender, EventArgs e)
-        {
+        private void TracerUpdate(object sender, EventArgs e){
+
+            ProcessLeftStick();
+            return;
+            
+
             if (_isCrosshairOn)
             {
                 CrosshairChangeColor();
@@ -688,13 +768,13 @@ namespace tracer
         {
             if (!_isCrosshairOn)
             {
-                _controllerCanvas = Object.Instantiate(_controllerCanvasPrefab, _camera.transform);
+                _controllerCanvas = UnityEngine.Object.Instantiate(_controllerCanvasPrefab, _camera.transform);
                 _crossHairImg = _controllerCanvas.GetComponentInChildren<Image>();
                 _isCrosshairOn = true;
             }
             else
             {
-                Object.Destroy(_controllerCanvas);
+                UnityEngine.Object.Destroy(_controllerCanvas);
                 _isCrosshairOn = false;
             }
         }
@@ -706,7 +786,7 @@ namespace tracer
         {
             if (_isCrosshairOn)
             {
-                Object.Destroy(_controllerCanvas);
+                UnityEngine.Object.Destroy(_controllerCanvas);
                 _isCrosshairOn = false;
             }
         }
@@ -886,7 +966,7 @@ namespace tracer
 
                 if (_controllerCanvas)
                 {
-                    Object.Destroy(_controllerCanvas);
+                    UnityEngine.Object.Destroy(_controllerCanvas);
                 }
                 GetCurrentSelector();
             }
@@ -911,13 +991,23 @@ namespace tracer
         //!
         //! This method retrieves the current selector when not in MAIN_VIEW_MODE.
         //!
-        private void GetCurrentSelector()
-        {
-            if (_currentState != ControllerModes.MAIN_VIEW_MODE)
-            {
+        private void GetCurrentSelector(){
+            if (_currentState != ControllerModes.MAIN_VIEW_MODE){
                 _selectorSnapSelect = GameObject.Find("PRE_UI_AddSelector(Clone)").GetComponent<SnapSelect>();
                 _selectorSnapSelect.parameterChanged += ParamChange;
-                _selectorSnapSelectElementsList = _selectorSnapSelect.elements.GroupBy(element => element.buttonID).Select(group => group.First()).ToList();
+                
+                // not using Linq
+                //_selectorSnapSelectElementsList = _selectorSnapSelect.elements.GroupBy(element => element.buttonID).Select(group => group.First()).ToList();
+                
+                // int because buttonID is int
+                HashSet<int> seenButtonIDs = new HashSet<int>(); 
+
+                foreach (var element in _selectorSnapSelect.elements){
+                    // HashSet.Add() returns true if the item was added, and false if it already existed.
+                    if (seenButtonIDs.Add(element.buttonID)){
+                        _selectorSnapSelectElementsList.Add(element);
+                    }
+                }
                 _selectorCurrentSelectedSnapSelectElement = 0;
                 _selectedAbstractParam =
                     _currentSelectedSceneObject.parameterList[_selectorCurrentSelectedSnapSelectElement];
