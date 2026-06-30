@@ -34,6 +34,8 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace tracer{
@@ -220,11 +222,24 @@ namespace tracer{
         //! The generated Unity input class defining all available user inputs.
         //!
         private Inputs m_inputs;
+        
+        //! left and right sticks
         private float stickDeadzone = 0.15f; 
         // Converts normalized stick input (-1 to 1) into simulated pixel deltas.
         private float syntheticSensitivity = 500f; 
-        private bool _isLeftStickDragging = false;
+        private bool _isLeftStickDragging, _isRightStickDragging = false;
+        //! dpad
+        private float dpadDeadzone = 0.5f;
+        private Selectable _currentSelection;
+        private Image _currentSelectionImage;
+        private Color _selectionColorWas;
+        private bool _dpadInUse = false;
+        //! triggers
+        private float triggerDeadzone = 0.1f;
+        private bool _isLeftTriggerHold, _isRightTriggerHold = false;
+        //! our input trackers for abstract utilization
         private InputManager.InputTracker _primary   = new InputManager.InputTracker(InputManager.InputLevel.Primary);
+        private InputManager.InputTracker _secondary   = new InputManager.InputTracker(InputManager.InputLevel.Secondary);
 
         #endregion
 
@@ -277,6 +292,10 @@ namespace tracer{
             manager.rightControllerStick += MoveRightStick;
             manager.ControllerStickCanceled += DoneEditing;
 */
+
+            //TODO: start controller peripherie check method
+            //      do not subscribe to events if we have no controller!
+
             // Subscribe to the _core update event.
             core.updateEvent += TracerUpdate;
 
@@ -284,7 +303,7 @@ namespace tracer{
             m_inputs = new Inputs();
             m_inputs.VPETMap.Enable();
             //doing this in the update!
-            //m_inputs.VPETMap.Controller_Left_Stick += MoveLeftStick;
+            m_inputs.VPETMap.Controller_South.started += PressConfirm;
 
             // Subscribe to UI manager events.
             _uiManager.selectionChanged += UiManagerSelectionChanged;
@@ -610,11 +629,7 @@ namespace tracer{
         }
 
         #region PROCESSING
-        private void ProcessLeftStick() {
-            // 1. Read the raw normalized Vector2 from the Left Stick
-            // (Assuming your action is named "LeftStick" and mapped to Gamepad > Left Stick)
-            Vector2 rawStickInput = m_inputs.VPETMap.Controller_Left_Stick.ReadValue<Vector2>();
-
+        private void ProcessRightStick(InputManager.InputTracker _tracker, Vector2 rawStickInput) {
             // 2. Evaluate Deadzone
             if (rawStickInput.magnitude > stickDeadzone) {
                 
@@ -623,35 +638,156 @@ namespace tracer{
                 // just like a smooth finger drag.
                 Vector2 syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime;
                 
+                // dont accidentaly trigger a gizmo drag!
+                Vector2 ghostCursor = new Vector2(-9999f, -9999f);
                 // Controllers don't have a screen position, so we anchor the action to the dead center of the screen.
-                Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
+                Vector2 screenCenter = ghostCursor; //new Vector2(Screen.width / 2f, Screen.height / 2f);
 
                 // --- STARTED PHASE ---
-                if (!_isLeftStickDragging) {
-                    _isLeftStickDragging = true;
+                if (!_isRightStickDragging) {
+                    _isRightStickDragging = true;
+                    ShowCrosshair();
                     
                     // Fire your specific DragOtherEvent
-                    FireDragOtherEvent(_primary, InputManager.InputState.Started, screenCenter, syntheticDelta);
+                    FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, syntheticDelta);
                 } 
                 // --- ONGOING PHASE ---
                 else {
-                    FireDragOtherEvent(_primary, InputManager.InputState.Ongoing, screenCenter, syntheticDelta);
+                    FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, syntheticDelta);
                 }
             }
             // 4. Evaluate Stick Release
-            else if (_isLeftStickDragging) {
+            else if (_isRightStickDragging) {
                 // --- ENDED PHASE ---
                 // The stick snapped back to the center (inside the deadzone)
-                _isLeftStickDragging = false;
+                _isRightStickDragging = false;
                 
                 Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
                 
                 // Delta is zero because the movement has stopped
-                FireDragOtherEvent(_primary, InputManager.InputState.Ended, screenCenter, Vector2.zero);
+                FireDragOtherEvent(_tracker, InputManager.InputState.Ended, screenCenter, Vector2.zero);
             }
         }
 
-        // Your existing Helper Function format adapted for the "Other" layer
+        //!
+        //! similiar to ProcessLeftStick, but
+        //! hor input is left/right move, ver is fwd/back (pinch)
+        //!
+        private void ProcessLeftStick(InputManager.InputTracker _tracker, Vector2 rawStickInput) {
+            if (rawStickInput.magnitude > stickDeadzone) {
+                Vector2 syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime;
+                Vector2 horDragDelta = -syntheticDelta; horDragDelta.y = 0;
+                float verPinchDelta = syntheticDelta.y;
+
+                // dont accidentaly trigger a gizmo drag!
+                Vector2 ghostCursor = new Vector2(-9999f, -9999f);
+                Vector2 screenCenter = ghostCursor; //new Vector2(Screen.width / 2f, Screen.height / 2f);
+                if (!_isLeftStickDragging) {
+                    _isLeftStickDragging = true;
+                    ShowCrosshair();
+                    
+                    FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, horDragDelta);
+                    FirePinchOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, verPinchDelta);
+                }else {
+                    FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, horDragDelta);
+                    FirePinchOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, verPinchDelta);
+                }
+            }else if (_isLeftStickDragging) {
+                _isLeftStickDragging = false;
+                Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
+                FireDragOtherEvent(_tracker, InputManager.InputState.Ended, screenCenter, Vector2.zero);
+                FirePinchOtherEvent(_tracker, InputManager.InputState.Ended, screenCenter, 0f);
+            }
+        }
+
+        //!
+        //! similiar to ProcessLeftStick, but
+        //! going down
+        //! attention! the standard move/rotate should never hit an object for dragging! use start position workaround
+        //!
+        private void ProcessLeftTrigger(InputManager.InputTracker _tracker, float delta) {
+            if (Mathf.Abs(delta) > triggerDeadzone) {
+                Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
+                
+                if (!_isLeftTriggerHold) {
+                    _isLeftTriggerHold = true;
+                    FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, Vector2.up*delta);
+                }else {
+                    FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, Vector2.up*delta);
+                }
+            }else if (_isLeftTriggerHold) {
+                _isLeftTriggerHold = false;
+                Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
+                FireDragOtherEvent(_tracker, InputManager.InputState.Ended, screenCenter, Vector2.zero);
+            }
+        }
+        //!
+        //! similiar to ProcessLeftTrigger, but
+        //! going up
+        //!
+        private void ProcessRightTrigger(InputManager.InputTracker _tracker, float delta) {
+            if (Mathf.Abs(delta) > triggerDeadzone) {
+                Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
+                
+                if (!_isRightTriggerHold) {
+                    _isRightTriggerHold = true;
+                    FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, Vector2.down*delta);
+                }else {
+                    FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, Vector2.down*delta);
+                }
+            }else if (_isRightTriggerHold) {
+                _isRightTriggerHold = false;
+                Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
+                FireDragOtherEvent(_tracker, InputManager.InputState.Ended, screenCenter, Vector2.zero);
+            }
+        }
+
+        //! cycle through ui and 'select' it
+        private void ProcessDPad() {
+            // 1. Read the raw D-pad Vector
+            Vector2 dpadInput = m_inputs.VPETMap.Controller_Dpad.ReadValue<Vector2>();
+
+            // 2. Evaluate Deadzone & Discrete Press Logic
+            if (dpadInput.sqrMagnitude > dpadDeadzone * dpadDeadzone){
+                if (!_dpadInUse){
+                    _dpadInUse = true;
+                    NavigateUI(dpadInput);
+                } else {
+                    //we could have a timer that counts up a limit to rush through the selectables instead of manually pressing
+                }
+            }else{
+                // Reset the lock when the player lets go of the D-pad
+                _dpadInUse = false; 
+            }
+        }
+
+        #endregion
+
+        #region BTN EVENTS
+        private void PressConfirm(InputAction.CallbackContext ctx) {
+            if(_currentSelection != null) {
+                if(_currentSelection.GetComponent<SnapSelectElement>()){
+                    Debug.Log("Confirm selection as ControllerClick");
+                    _currentSelection.GetComponent<SnapSelectElement>().ControllerClick();
+                }else{
+                    Debug.Log("Confirm selection as Selectable.OnSelect");
+                    //_currentSelection.OnSelect(new UnityEngine.EventSystems.BaseEventData (UnityEngine.EventSystems.EventSystem.current));
+                    //_currentSelection.OnPointerUp();
+
+                    // lightweight base event payload
+                    BaseEventData baseEvent = new BaseEventData(EventSystem.current);
+                    
+                    // fire 'submit interface' directly to the object
+                    ExecuteEvents.Execute(_currentSelection.gameObject, baseEvent, ExecuteEvents.submitHandler);
+                }
+            } else {
+                SelectSceneObject();
+            }
+        }
+        #endregion
+
+        #region CALLBACK EVENTS
+
         private void FireDragOtherEvent(InputManager.InputTracker tracker, InputManager.InputState state, Vector2 position, Vector2 delta) {
             // Construct your InputData payload exactly as you do in the UnityInputModule
             tracker.CurrentPosition = position;
@@ -662,8 +798,122 @@ namespace tracer{
             }
 
             InputManager.InputData data = InputManager.CreateData(tracker, state);
-
             manager.Publish(new InputManager.DragOtherEvent { Data = data, StartPos = tracker.StartPosition });
+        }
+        private void FirePinchOtherEvent(InputManager.InputTracker tracker, InputManager.InputState state, Vector2 position, float delta) {
+            // Construct your InputData payload exactly as you do in the UnityInputModule
+            tracker.CurrentPosition = position;
+
+            if(state == InputManager.InputState.Started) {
+                tracker.StartPosition = position;
+            }
+
+            InputManager.InputData data = InputManager.CreateData(tracker, state);
+            manager.Publish(new InputManager.PinchOtherEvent { Data = data, PinchDistance = delta });
+        }
+        #endregion
+
+        #region UI NAV
+        //!
+        //! called when destroying UI elements, or switching menus.
+        //! ensures our current selection hasn't been disabled or destroyed.
+        //!
+        public void RefreshUIElements(){
+            Debug.Log("RefreshUIElements");
+            // If our selected object was destroyed or turned off, clear it.
+            if (_currentSelection != null && (!_currentSelection.gameObject.activeInHierarchy || !_currentSelection.interactable)){
+                if(_currentSelectionImage)
+                    _currentSelectionImage.color = _selectionColorWas;
+
+                _currentSelection = null;
+                _currentSelectionImage = null;
+                Debug.Log("set current selection to null");
+            }
+
+            //try reselecting previous element, if available!
+
+            // If you want to force a re-evaluation of the screen immediately:
+            // if (_currentSelection == null)
+            //     SelectFallbackTopLeft();
+        }
+        private void NavigateUI(Vector2 rawDirection){
+            // 1. Ensure we have a starting point
+            if (_currentSelection == null || !_currentSelection.gameObject.activeInHierarchy){
+                SelectFallbackTopLeft();
+                return;
+            }
+
+            // 2. Snap the raw Vector2 to a strict 4-way direction
+            Vector3 navDir;
+            if (Mathf.Abs(rawDirection.x) > Mathf.Abs(rawDirection.y))
+                navDir = rawDirection.x > 0 ? Vector3.right : Vector3.left;
+            else
+                navDir = rawDirection.y > 0 ? Vector3.up : Vector3.down;
+            
+
+            // 3. The Magic Function: Finds the closest UI element in that direction
+            Selectable nextElement = _currentSelection.FindSelectable(navDir);
+
+            //TODO: check for hidden/faded elements and do not select them
+            //      e.g. the spinning wheel
+            //      or at least do not select in circles but cycle through
+
+            if (nextElement != null)
+                SetSelection(nextElement);
+            else
+                Debug.Log("no next selectable found in direction "+navDir);
+            
+        }
+
+        private void SetSelection(Selectable newSelection){
+            if(_currentSelection && _currentSelectionImage)
+                _currentSelectionImage.color = _selectionColorWas;
+
+            _currentSelection = newSelection;
+
+            if(_currentSelection && _currentSelection.GetComponent<Image>()){
+                _currentSelectionImage = _currentSelection.GetComponent<Image>();
+                _selectionColorWas = _currentSelectionImage.color;
+                _currentSelectionImage.color = Color.green;
+            }
+
+            // Tells the Unity EventSystem that this is the active object.
+            // This triggers the Hover/Selected color changes on your Buttons automatically!
+            _currentSelection.Select(); 
+            Debug.Log("Selected "+_currentSelection.name);
+        }
+
+        /// <summary>
+        /// Finds the interactable UI element closest to the Top-Left of the screen.
+        /// </summary>
+        private void SelectFallbackTopLeft(){
+            Debug.Log("Select Fallback Top Left");
+
+            // Selectable.allSelectabless is a built-in static list maintained by Unity!
+            // No performance-heavy FindObjectsOfType needed.
+            var allSelectables = Selectable.allSelectablesArray;
+            
+            Selectable closestToTopLeft = null;
+            float minDistance = float.MaxValue;
+            
+            // Screen space top-left is (0, Screen.height)
+            Vector2 topLeft = new Vector2(0, Screen.height);
+
+            foreach (Selectable s in allSelectables){
+                if (!s.interactable || !s.gameObject.activeInHierarchy) continue;
+
+                // Get screen position of the UI element
+                Vector2 screenPos = RectTransformUtility.WorldToScreenPoint(null, s.transform.position);
+                
+                float distance = Vector2.Distance(topLeft, screenPos);
+                if (distance < minDistance){
+                    minDistance = distance;
+                    closestToTopLeft = s;
+                }
+            }
+
+            if (closestToTopLeft != null)
+                SetSelection(closestToTopLeft);
         }
         #endregion
         
@@ -672,7 +922,19 @@ namespace tracer{
         //!
         private void TracerUpdate(object sender, EventArgs e){
 
-            ProcessLeftStick();
+            //FREE MODE (not in manipulating)
+
+            //look around
+            ProcessRightStick(_primary, m_inputs.VPETMap.Controller_Right_Stick.ReadValue<Vector2>());
+            //moving
+            ProcessLeftStick(_secondary, m_inputs.VPETMap.Controller_Left_Stick.ReadValue<Vector2>());
+            //shoulder trigger for going up/down
+            ProcessLeftTrigger(_secondary, m_inputs.VPETMap.Controller_Left_Trigger.ReadValue<float>());
+            ProcessRightTrigger(_secondary, m_inputs.VPETMap.Controller_Right_Trigger.ReadValue<float>());
+            //shoulder buttons for combo: running (move faster)
+            //shoulder buttons as switch: orbit<>look, 
+
+            ProcessDPad();
             return;
             
 
@@ -778,6 +1040,14 @@ namespace tracer{
                 _isCrosshairOn = false;
             }
         }
+
+        private void ShowCrosshair(){
+            if (!_isCrosshairOn){
+                _controllerCanvas = UnityEngine.Object.Instantiate(_controllerCanvasPrefab, _camera.transform);
+                _crossHairImg = _controllerCanvas.GetComponentInChildren<Image>();
+                _isCrosshairOn = true;
+            }
+        }
         
         //!
         //! If the crosshair is on, it is immediately destroyed.
@@ -795,9 +1065,8 @@ namespace tracer{
         //! Turns off the crosshair, clears the selected object in the UI manager, and initiates controller selection.
         //!
         private void SelectSceneObject(){
-            OffCrosshair();
-            _uiManager.clearSelectedObjects();
-            //manager.ControllerSelect(new Vector2(Screen.width / 2, Screen.height / 2));
+            //OffCrosshair();
+            //_uiManager.clearSelectedObjects();
             SceneObject sceneObject = EvaluationHelper.Instance.EvaluateSceneObject(new Vector2(Screen.width / 2, Screen.height / 2));
 
             if (sceneObject != null){
@@ -940,8 +1209,10 @@ namespace tracer{
         //!
         //! This method responds to a change in the selected objects within the UI manager.
         //!
-        private void UiManagerSelectionChanged(object sender, List<SceneObject> sceneObjects)
-        {
+        private void UiManagerSelectionChanged(object sender, List<SceneObject> sceneObjects){
+            //new!
+            RefreshUIElements();
+
             OffCrosshair();
             if (sceneObjects.Count > 0)
             {
@@ -975,8 +1246,10 @@ namespace tracer{
         //!
         //! This method responds to the removal of selected objects in the UI manager.
         //!
-        private void UiManagerSelectionRemoved(object sender, SceneObject sceneObject)
-        {
+        private void UiManagerSelectionRemoved(object sender, SceneObject sceneObject){
+            //new!
+            RefreshUIElements();
+
             OffCrosshair();
             _currentState = 0;
             _selectedListObject = 0;
@@ -1001,6 +1274,7 @@ namespace tracer{
                 
                 // int because buttonID is int
                 HashSet<int> seenButtonIDs = new HashSet<int>(); 
+                _selectorSnapSelectElementsList = new();
 
                 foreach (var element in _selectorSnapSelect.elements){
                     // HashSet.Add() returns true if the item was added, and false if it already existed.

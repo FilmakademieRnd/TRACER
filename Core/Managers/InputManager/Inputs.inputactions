@@ -16,18 +16,99 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Controller_North",
+                    "name": "OnPrimaryInputClick",
                     "type": "Button",
-                    "id": "4b3b03eb-ea23-4db6-a494-85f3d376c061",
+                    "id": "9354ff82-3767-4fbd-9a6d-3ced7d5cd2a3",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
                 },
                 {
+                    "name": "OnSecondaryInputClick",
+                    "type": "Button",
+                    "id": "6e678ca7-ce62-44ee-a63f-ea2119ddf67a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "OnTertiaryInputClick",
+                    "type": "Button",
+                    "id": "cd2bebc0-9d17-4c9b-9b7d-909a1e43843d",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "OnPinch",
+                    "type": "Value",
+                    "id": "9b04f0d9-0140-4758-bae0-3c86a3464c70",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Controller_Left_Stick",
+                    "type": "Value",
+                    "id": "82115d1b-d9f8-4926-8857-6460d26e82cb",
+                    "expectedControlType": "Stick",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Controller_Right_Stick",
+                    "type": "Value",
+                    "id": "ce9f2dde-4df1-498f-bde9-b3bee002100b",
+                    "expectedControlType": "Stick",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Controller_Dpad",
+                    "type": "Value",
+                    "id": "b504901e-1da8-4252-b755-dbb192629a21",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Controller_Left_Trigger",
+                    "type": "Value",
+                    "id": "bf109bae-7ae8-4aae-a4ec-6799dede3467",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Controller_Right_Trigger",
+                    "type": "Value",
+                    "id": "9e2a419a-dc73-4fb0-a421-847721028a72",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
                     "name": "Controller_South",
                     "type": "Button",
                     "id": "a4aa1307-43a9-48fd-b194-df207465d766",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Controller_North",
+                    "type": "Button",
+                    "id": "4b3b03eb-ea23-4db6-a494-85f3d376c061",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -88,24 +169,6 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Controller_Left_Trigger",
-                    "type": "Button",
-                    "id": "bf109bae-7ae8-4aae-a4ec-6799dede3467",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "Controller_Right_Trigger",
-                    "type": "Button",
-                    "id": "9e2a419a-dc73-4fb0-a421-847721028a72",
-                    "expectedControlType": "Button",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "Controller_Left_Shoulder",
                     "type": "Button",
                     "id": "b9eae21c-7390-4ee4-9b42-21d240bb79d1",
@@ -118,64 +181,10 @@
                     "name": "Controller_Right_Shoulder",
                     "type": "Button",
                     "id": "7ea99cd4-06e7-41e8-928c-02ab555c0689",
-                    "expectedControlType": "Button",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "Controller_Left_Stick",
-                    "type": "Value",
-                    "id": "82115d1b-d9f8-4926-8857-6460d26e82cb",
-                    "expectedControlType": "Stick",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "Controller_Right_Stick",
-                    "type": "Value",
-                    "id": "ce9f2dde-4df1-498f-bde9-b3bee002100b",
-                    "expectedControlType": "Stick",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
-                },
-                {
-                    "name": "OnPrimaryInputClick",
-                    "type": "Button",
-                    "id": "9354ff82-3767-4fbd-9a6d-3ced7d5cd2a3",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
-                },
-                {
-                    "name": "OnSecondaryInputClick",
-                    "type": "Button",
-                    "id": "6e678ca7-ce62-44ee-a63f-ea2119ddf67a",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "OnTertiaryInputClick",
-                    "type": "Button",
-                    "id": "cd2bebc0-9d17-4c9b-9b7d-909a1e43843d",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "OnPinch",
-                    "type": "Value",
-                    "id": "9b04f0d9-0140-4758-bae0-3c86a3464c70",
-                    "expectedControlType": "Axis",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -215,7 +224,7 @@
                 {
                     "name": "",
                     "id": "1ce0de03-5768-4bd6-b437-0d811a8f463c",
-                    "path": "<Keyboard>/x",
+                    "path": "<Keyboard>/enter",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -237,7 +246,18 @@
                 {
                     "name": "",
                     "id": "8a393865-7476-411c-bf32-493f3143cd4f",
-                    "path": "<Keyboard>/g",
+                    "path": "<Keyboard>/q",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Trigger",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "e552c345-7e2f-4722-aa29-47545f389641",
+                    "path": "<Keyboard>/numpadMinus",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -291,6 +311,28 @@
                 },
                 {
                     "name": "",
+                    "id": "a602fd1f-1279-4f80-827b-94a9e9523e7b",
+                    "path": "<Keyboard>/e",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Right_Trigger",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "67d81ce0-4c6b-4117-851d-b964086f5185",
+                    "path": "<Keyboard>/numpadPlus",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Right_Trigger",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "f263e263-a976-4571-9c4c-24cffa679b85",
                     "path": "<Gamepad>/leftStick",
                     "interactions": "",
@@ -301,6 +343,116 @@
                     "isPartOfComposite": false
                 },
                 {
+                    "name": "WASD",
+                    "id": "95ca333e-b741-4215-a67c-2daf0128559b",
+                    "path": "2DVector",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": true,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "up",
+                    "id": "05997b4f-28d3-4808-aed6-9de50613f6de",
+                    "path": "<Keyboard>/w",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "down",
+                    "id": "f111f4a8-5574-45a7-a996-12a2df450071",
+                    "path": "<Keyboard>/s",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "left",
+                    "id": "1d3d1b5f-a71b-4d07-9e0a-494096579c29",
+                    "path": "<Keyboard>/a",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "right",
+                    "id": "53aeab7e-fc83-431f-9953-c66daa96f95e",
+                    "path": "<Keyboard>/d",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "Arrow Keys",
+                    "id": "7e743ae4-207b-4cdb-aeb1-e27cfa9dfac9",
+                    "path": "2DVector",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": true,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "up",
+                    "id": "995e1a74-f5e6-4dec-87a3-ec2dfe2d37dd",
+                    "path": "<Keyboard>/upArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "down",
+                    "id": "45e6c188-8e58-4af5-8dad-bfc742c16aa5",
+                    "path": "<Keyboard>/downArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "left",
+                    "id": "257367b7-7414-4a1b-a0d1-5f568e2bdb58",
+                    "path": "<Keyboard>/leftArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "right",
+                    "id": "72ecd358-af1f-4e47-8433-98f8c0484d00",
+                    "path": "<Keyboard>/rightArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
                     "name": "",
                     "id": "cd19e369-9581-4712-81ab-66556866887e",
                     "path": "<Gamepad>/rightStick",
@@ -308,6 +460,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "Controller_Right_Stick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "3aba40a5-5b38-4195-9576-51be86adfd19",
+                    "path": "<Gamepad>/dpad",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Dpad",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

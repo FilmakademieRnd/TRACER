@@ -102,18 +102,99 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""Controller_North"",
+                    ""name"": ""OnPrimaryInputClick"",
                     ""type"": ""Button"",
-                    ""id"": ""4b3b03eb-ea23-4db6-a494-85f3d376c061"",
+                    ""id"": ""9354ff82-3767-4fbd-9a6d-3ced7d5cd2a3"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
                 },
                 {
+                    ""name"": ""OnSecondaryInputClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""6e678ca7-ce62-44ee-a63f-ea2119ddf67a"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""OnTertiaryInputClick"",
+                    ""type"": ""Button"",
+                    ""id"": ""cd2bebc0-9d17-4c9b-9b7d-909a1e43843d"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""OnPinch"",
+                    ""type"": ""Value"",
+                    ""id"": ""9b04f0d9-0140-4758-bae0-3c86a3464c70"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Controller_Left_Stick"",
+                    ""type"": ""Value"",
+                    ""id"": ""82115d1b-d9f8-4926-8857-6460d26e82cb"",
+                    ""expectedControlType"": ""Stick"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Controller_Right_Stick"",
+                    ""type"": ""Value"",
+                    ""id"": ""ce9f2dde-4df1-498f-bde9-b3bee002100b"",
+                    ""expectedControlType"": ""Stick"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Controller_Dpad"",
+                    ""type"": ""Value"",
+                    ""id"": ""b504901e-1da8-4252-b755-dbb192629a21"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Controller_Left_Trigger"",
+                    ""type"": ""Value"",
+                    ""id"": ""bf109bae-7ae8-4aae-a4ec-6799dede3467"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
+                    ""name"": ""Controller_Right_Trigger"",
+                    ""type"": ""Value"",
+                    ""id"": ""9e2a419a-dc73-4fb0-a421-847721028a72"",
+                    ""expectedControlType"": ""Axis"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
                     ""name"": ""Controller_South"",
                     ""type"": ""Button"",
                     ""id"": ""a4aa1307-43a9-48fd-b194-df207465d766"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Controller_North"",
+                    ""type"": ""Button"",
+                    ""id"": ""4b3b03eb-ea23-4db6-a494-85f3d376c061"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
@@ -174,24 +255,6 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": false
                 },
                 {
-                    ""name"": ""Controller_Left_Trigger"",
-                    ""type"": ""Button"",
-                    ""id"": ""bf109bae-7ae8-4aae-a4ec-6799dede3467"",
-                    ""expectedControlType"": """",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": false
-                },
-                {
-                    ""name"": ""Controller_Right_Trigger"",
-                    ""type"": ""Button"",
-                    ""id"": ""9e2a419a-dc73-4fb0-a421-847721028a72"",
-                    ""expectedControlType"": ""Button"",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": false
-                },
-                {
                     ""name"": ""Controller_Left_Shoulder"",
                     ""type"": ""Button"",
                     ""id"": ""b9eae21c-7390-4ee4-9b42-21d240bb79d1"",
@@ -204,64 +267,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_Right_Shoulder"",
                     ""type"": ""Button"",
                     ""id"": ""7ea99cd4-06e7-41e8-928c-02ab555c0689"",
-                    ""expectedControlType"": ""Button"",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": false
-                },
-                {
-                    ""name"": ""Controller_Left_Stick"",
-                    ""type"": ""Value"",
-                    ""id"": ""82115d1b-d9f8-4926-8857-6460d26e82cb"",
-                    ""expectedControlType"": ""Stick"",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": true
-                },
-                {
-                    ""name"": ""Controller_Right_Stick"",
-                    ""type"": ""Value"",
-                    ""id"": ""ce9f2dde-4df1-498f-bde9-b3bee002100b"",
-                    ""expectedControlType"": ""Stick"",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": true
-                },
-                {
-                    ""name"": ""OnPrimaryInputClick"",
-                    ""type"": ""Button"",
-                    ""id"": ""9354ff82-3767-4fbd-9a6d-3ced7d5cd2a3"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
-                },
-                {
-                    ""name"": ""OnSecondaryInputClick"",
-                    ""type"": ""Button"",
-                    ""id"": ""6e678ca7-ce62-44ee-a63f-ea2119ddf67a"",
-                    ""expectedControlType"": """",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": false
-                },
-                {
-                    ""name"": ""OnTertiaryInputClick"",
-                    ""type"": ""Button"",
-                    ""id"": ""cd2bebc0-9d17-4c9b-9b7d-909a1e43843d"",
-                    ""expectedControlType"": """",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": false
-                },
-                {
-                    ""name"": ""OnPinch"",
-                    ""type"": ""Value"",
-                    ""id"": ""9b04f0d9-0140-4758-bae0-3c86a3464c70"",
-                    ""expectedControlType"": ""Axis"",
-                    ""processors"": """",
-                    ""interactions"": """",
-                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -301,7 +310,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""1ce0de03-5768-4bd6-b437-0d811a8f463c"",
-                    ""path"": ""<Keyboard>/x"",
+                    ""path"": ""<Keyboard>/enter"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -323,7 +332,18 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 {
                     ""name"": """",
                     ""id"": ""8a393865-7476-411c-bf32-493f3143cd4f"",
-                    ""path"": ""<Keyboard>/g"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Trigger"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""e552c345-7e2f-4722-aa29-47545f389641"",
+                    ""path"": ""<Keyboard>/numpadMinus"",
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": """",
@@ -377,6 +397,28 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
+                    ""id"": ""a602fd1f-1279-4f80-827b-94a9e9523e7b"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Right_Trigger"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""67d81ce0-4c6b-4117-851d-b964086f5185"",
+                    ""path"": ""<Keyboard>/numpadPlus"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Right_Trigger"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
                     ""id"": ""f263e263-a976-4571-9c4c-24cffa679b85"",
                     ""path"": ""<Gamepad>/leftStick"",
                     ""interactions"": """",
@@ -387,6 +429,116 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""isPartOfComposite"": false
                 },
                 {
+                    ""name"": ""WASD"",
+                    ""id"": ""95ca333e-b741-4215-a67c-2daf0128559b"",
+                    ""path"": ""2DVector"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""up"",
+                    ""id"": ""05997b4f-28d3-4808-aed6-9de50613f6de"",
+                    ""path"": ""<Keyboard>/w"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""down"",
+                    ""id"": ""f111f4a8-5574-45a7-a996-12a2df450071"",
+                    ""path"": ""<Keyboard>/s"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""left"",
+                    ""id"": ""1d3d1b5f-a71b-4d07-9e0a-494096579c29"",
+                    ""path"": ""<Keyboard>/a"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""right"",
+                    ""id"": ""53aeab7e-fc83-431f-9953-c66daa96f95e"",
+                    ""path"": ""<Keyboard>/d"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""Arrow Keys"",
+                    ""id"": ""7e743ae4-207b-4cdb-aeb1-e27cfa9dfac9"",
+                    ""path"": ""2DVector"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""up"",
+                    ""id"": ""995e1a74-f5e6-4dec-87a3-ec2dfe2d37dd"",
+                    ""path"": ""<Keyboard>/upArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""down"",
+                    ""id"": ""45e6c188-8e58-4af5-8dad-bfc742c16aa5"",
+                    ""path"": ""<Keyboard>/downArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""left"",
+                    ""id"": ""257367b7-7414-4a1b-a0d1-5f568e2bdb58"",
+                    ""path"": ""<Keyboard>/leftArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""right"",
+                    ""id"": ""72ecd358-af1f-4e47-8433-98f8c0484d00"",
+                    ""path"": ""<Keyboard>/rightArrow"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
                     ""name"": """",
                     ""id"": ""cd19e369-9581-4712-81ab-66556866887e"",
                     ""path"": ""<Gamepad>/rightStick"",
@@ -394,6 +546,17 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""Controller_Right_Stick"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""3aba40a5-5b38-4195-9576-51be86adfd19"",
+                    ""path"": ""<Gamepad>/dpad"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Dpad"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 },
@@ -581,24 +744,25 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         // VPETMap
         m_VPETMap = asset.FindActionMap("VPETMap", throwIfNotFound: true);
         m_VPETMap_Position = m_VPETMap.FindAction("Position", throwIfNotFound: true);
-        m_VPETMap_Controller_North = m_VPETMap.FindAction("Controller_North", throwIfNotFound: true);
+        m_VPETMap_OnPrimaryInputClick = m_VPETMap.FindAction("OnPrimaryInputClick", throwIfNotFound: true);
+        m_VPETMap_OnSecondaryInputClick = m_VPETMap.FindAction("OnSecondaryInputClick", throwIfNotFound: true);
+        m_VPETMap_OnTertiaryInputClick = m_VPETMap.FindAction("OnTertiaryInputClick", throwIfNotFound: true);
+        m_VPETMap_OnPinch = m_VPETMap.FindAction("OnPinch", throwIfNotFound: true);
+        m_VPETMap_Controller_Left_Stick = m_VPETMap.FindAction("Controller_Left_Stick", throwIfNotFound: true);
+        m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
+        m_VPETMap_Controller_Dpad = m_VPETMap.FindAction("Controller_Dpad", throwIfNotFound: true);
+        m_VPETMap_Controller_Left_Trigger = m_VPETMap.FindAction("Controller_Left_Trigger", throwIfNotFound: true);
+        m_VPETMap_Controller_Right_Trigger = m_VPETMap.FindAction("Controller_Right_Trigger", throwIfNotFound: true);
         m_VPETMap_Controller_South = m_VPETMap.FindAction("Controller_South", throwIfNotFound: true);
+        m_VPETMap_Controller_North = m_VPETMap.FindAction("Controller_North", throwIfNotFound: true);
         m_VPETMap_Controller_East = m_VPETMap.FindAction("Controller_East", throwIfNotFound: true);
         m_VPETMap_Controller_West = m_VPETMap.FindAction("Controller_West", throwIfNotFound: true);
         m_VPETMap_Controller_Up = m_VPETMap.FindAction("Controller_Up", throwIfNotFound: true);
         m_VPETMap_Controller_Down = m_VPETMap.FindAction("Controller_Down", throwIfNotFound: true);
         m_VPETMap_Controller_Left = m_VPETMap.FindAction("Controller_Left", throwIfNotFound: true);
         m_VPETMap_Controller_Right = m_VPETMap.FindAction("Controller_Right", throwIfNotFound: true);
-        m_VPETMap_Controller_Left_Trigger = m_VPETMap.FindAction("Controller_Left_Trigger", throwIfNotFound: true);
-        m_VPETMap_Controller_Right_Trigger = m_VPETMap.FindAction("Controller_Right_Trigger", throwIfNotFound: true);
         m_VPETMap_Controller_Left_Shoulder = m_VPETMap.FindAction("Controller_Left_Shoulder", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Shoulder = m_VPETMap.FindAction("Controller_Right_Shoulder", throwIfNotFound: true);
-        m_VPETMap_Controller_Left_Stick = m_VPETMap.FindAction("Controller_Left_Stick", throwIfNotFound: true);
-        m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
-        m_VPETMap_OnPrimaryInputClick = m_VPETMap.FindAction("OnPrimaryInputClick", throwIfNotFound: true);
-        m_VPETMap_OnSecondaryInputClick = m_VPETMap.FindAction("OnSecondaryInputClick", throwIfNotFound: true);
-        m_VPETMap_OnTertiaryInputClick = m_VPETMap.FindAction("OnTertiaryInputClick", throwIfNotFound: true);
-        m_VPETMap_OnPinch = m_VPETMap.FindAction("OnPinch", throwIfNotFound: true);
     }
 
     ~@Inputs()
@@ -680,24 +844,25 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputActionMap m_VPETMap;
     private List<IVPETMapActions> m_VPETMapActionsCallbackInterfaces = new List<IVPETMapActions>();
     private readonly InputAction m_VPETMap_Position;
-    private readonly InputAction m_VPETMap_Controller_North;
+    private readonly InputAction m_VPETMap_OnPrimaryInputClick;
+    private readonly InputAction m_VPETMap_OnSecondaryInputClick;
+    private readonly InputAction m_VPETMap_OnTertiaryInputClick;
+    private readonly InputAction m_VPETMap_OnPinch;
+    private readonly InputAction m_VPETMap_Controller_Left_Stick;
+    private readonly InputAction m_VPETMap_Controller_Right_Stick;
+    private readonly InputAction m_VPETMap_Controller_Dpad;
+    private readonly InputAction m_VPETMap_Controller_Left_Trigger;
+    private readonly InputAction m_VPETMap_Controller_Right_Trigger;
     private readonly InputAction m_VPETMap_Controller_South;
+    private readonly InputAction m_VPETMap_Controller_North;
     private readonly InputAction m_VPETMap_Controller_East;
     private readonly InputAction m_VPETMap_Controller_West;
     private readonly InputAction m_VPETMap_Controller_Up;
     private readonly InputAction m_VPETMap_Controller_Down;
     private readonly InputAction m_VPETMap_Controller_Left;
     private readonly InputAction m_VPETMap_Controller_Right;
-    private readonly InputAction m_VPETMap_Controller_Left_Trigger;
-    private readonly InputAction m_VPETMap_Controller_Right_Trigger;
     private readonly InputAction m_VPETMap_Controller_Left_Shoulder;
     private readonly InputAction m_VPETMap_Controller_Right_Shoulder;
-    private readonly InputAction m_VPETMap_Controller_Left_Stick;
-    private readonly InputAction m_VPETMap_Controller_Right_Stick;
-    private readonly InputAction m_VPETMap_OnPrimaryInputClick;
-    private readonly InputAction m_VPETMap_OnSecondaryInputClick;
-    private readonly InputAction m_VPETMap_OnTertiaryInputClick;
-    private readonly InputAction m_VPETMap_OnPinch;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
     /// </summary>
@@ -714,13 +879,49 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @Position => m_Wrapper.m_VPETMap_Position;
         /// <summary>
-        /// Provides access to the underlying input action "VPETMap/Controller_North".
+        /// Provides access to the underlying input action "VPETMap/OnPrimaryInputClick".
         /// </summary>
-        public InputAction @Controller_North => m_Wrapper.m_VPETMap_Controller_North;
+        public InputAction @OnPrimaryInputClick => m_Wrapper.m_VPETMap_OnPrimaryInputClick;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/OnSecondaryInputClick".
+        /// </summary>
+        public InputAction @OnSecondaryInputClick => m_Wrapper.m_VPETMap_OnSecondaryInputClick;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/OnTertiaryInputClick".
+        /// </summary>
+        public InputAction @OnTertiaryInputClick => m_Wrapper.m_VPETMap_OnTertiaryInputClick;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/OnPinch".
+        /// </summary>
+        public InputAction @OnPinch => m_Wrapper.m_VPETMap_OnPinch;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_Left_Stick".
+        /// </summary>
+        public InputAction @Controller_Left_Stick => m_Wrapper.m_VPETMap_Controller_Left_Stick;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_Right_Stick".
+        /// </summary>
+        public InputAction @Controller_Right_Stick => m_Wrapper.m_VPETMap_Controller_Right_Stick;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_Dpad".
+        /// </summary>
+        public InputAction @Controller_Dpad => m_Wrapper.m_VPETMap_Controller_Dpad;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_Left_Trigger".
+        /// </summary>
+        public InputAction @Controller_Left_Trigger => m_Wrapper.m_VPETMap_Controller_Left_Trigger;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_Right_Trigger".
+        /// </summary>
+        public InputAction @Controller_Right_Trigger => m_Wrapper.m_VPETMap_Controller_Right_Trigger;
         /// <summary>
         /// Provides access to the underlying input action "VPETMap/Controller_South".
         /// </summary>
         public InputAction @Controller_South => m_Wrapper.m_VPETMap_Controller_South;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_North".
+        /// </summary>
+        public InputAction @Controller_North => m_Wrapper.m_VPETMap_Controller_North;
         /// <summary>
         /// Provides access to the underlying input action "VPETMap/Controller_East".
         /// </summary>
@@ -746,14 +947,6 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @Controller_Right => m_Wrapper.m_VPETMap_Controller_Right;
         /// <summary>
-        /// Provides access to the underlying input action "VPETMap/Controller_Left_Trigger".
-        /// </summary>
-        public InputAction @Controller_Left_Trigger => m_Wrapper.m_VPETMap_Controller_Left_Trigger;
-        /// <summary>
-        /// Provides access to the underlying input action "VPETMap/Controller_Right_Trigger".
-        /// </summary>
-        public InputAction @Controller_Right_Trigger => m_Wrapper.m_VPETMap_Controller_Right_Trigger;
-        /// <summary>
         /// Provides access to the underlying input action "VPETMap/Controller_Left_Shoulder".
         /// </summary>
         public InputAction @Controller_Left_Shoulder => m_Wrapper.m_VPETMap_Controller_Left_Shoulder;
@@ -761,30 +954,6 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "VPETMap/Controller_Right_Shoulder".
         /// </summary>
         public InputAction @Controller_Right_Shoulder => m_Wrapper.m_VPETMap_Controller_Right_Shoulder;
-        /// <summary>
-        /// Provides access to the underlying input action "VPETMap/Controller_Left_Stick".
-        /// </summary>
-        public InputAction @Controller_Left_Stick => m_Wrapper.m_VPETMap_Controller_Left_Stick;
-        /// <summary>
-        /// Provides access to the underlying input action "VPETMap/Controller_Right_Stick".
-        /// </summary>
-        public InputAction @Controller_Right_Stick => m_Wrapper.m_VPETMap_Controller_Right_Stick;
-        /// <summary>
-        /// Provides access to the underlying input action "VPETMap/OnPrimaryInputClick".
-        /// </summary>
-        public InputAction @OnPrimaryInputClick => m_Wrapper.m_VPETMap_OnPrimaryInputClick;
-        /// <summary>
-        /// Provides access to the underlying input action "VPETMap/OnSecondaryInputClick".
-        /// </summary>
-        public InputAction @OnSecondaryInputClick => m_Wrapper.m_VPETMap_OnSecondaryInputClick;
-        /// <summary>
-        /// Provides access to the underlying input action "VPETMap/OnTertiaryInputClick".
-        /// </summary>
-        public InputAction @OnTertiaryInputClick => m_Wrapper.m_VPETMap_OnTertiaryInputClick;
-        /// <summary>
-        /// Provides access to the underlying input action "VPETMap/OnPinch".
-        /// </summary>
-        public InputAction @OnPinch => m_Wrapper.m_VPETMap_OnPinch;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -814,12 +983,39 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Position.started += instance.OnPosition;
             @Position.performed += instance.OnPosition;
             @Position.canceled += instance.OnPosition;
-            @Controller_North.started += instance.OnController_North;
-            @Controller_North.performed += instance.OnController_North;
-            @Controller_North.canceled += instance.OnController_North;
+            @OnPrimaryInputClick.started += instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputClick.performed += instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputClick.canceled += instance.OnOnPrimaryInputClick;
+            @OnSecondaryInputClick.started += instance.OnOnSecondaryInputClick;
+            @OnSecondaryInputClick.performed += instance.OnOnSecondaryInputClick;
+            @OnSecondaryInputClick.canceled += instance.OnOnSecondaryInputClick;
+            @OnTertiaryInputClick.started += instance.OnOnTertiaryInputClick;
+            @OnTertiaryInputClick.performed += instance.OnOnTertiaryInputClick;
+            @OnTertiaryInputClick.canceled += instance.OnOnTertiaryInputClick;
+            @OnPinch.started += instance.OnOnPinch;
+            @OnPinch.performed += instance.OnOnPinch;
+            @OnPinch.canceled += instance.OnOnPinch;
+            @Controller_Left_Stick.started += instance.OnController_Left_Stick;
+            @Controller_Left_Stick.performed += instance.OnController_Left_Stick;
+            @Controller_Left_Stick.canceled += instance.OnController_Left_Stick;
+            @Controller_Right_Stick.started += instance.OnController_Right_Stick;
+            @Controller_Right_Stick.performed += instance.OnController_Right_Stick;
+            @Controller_Right_Stick.canceled += instance.OnController_Right_Stick;
+            @Controller_Dpad.started += instance.OnController_Dpad;
+            @Controller_Dpad.performed += instance.OnController_Dpad;
+            @Controller_Dpad.canceled += instance.OnController_Dpad;
+            @Controller_Left_Trigger.started += instance.OnController_Left_Trigger;
+            @Controller_Left_Trigger.performed += instance.OnController_Left_Trigger;
+            @Controller_Left_Trigger.canceled += instance.OnController_Left_Trigger;
+            @Controller_Right_Trigger.started += instance.OnController_Right_Trigger;
+            @Controller_Right_Trigger.performed += instance.OnController_Right_Trigger;
+            @Controller_Right_Trigger.canceled += instance.OnController_Right_Trigger;
             @Controller_South.started += instance.OnController_South;
             @Controller_South.performed += instance.OnController_South;
             @Controller_South.canceled += instance.OnController_South;
+            @Controller_North.started += instance.OnController_North;
+            @Controller_North.performed += instance.OnController_North;
+            @Controller_North.canceled += instance.OnController_North;
             @Controller_East.started += instance.OnController_East;
             @Controller_East.performed += instance.OnController_East;
             @Controller_East.canceled += instance.OnController_East;
@@ -838,36 +1034,12 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right.started += instance.OnController_Right;
             @Controller_Right.performed += instance.OnController_Right;
             @Controller_Right.canceled += instance.OnController_Right;
-            @Controller_Left_Trigger.started += instance.OnController_Left_Trigger;
-            @Controller_Left_Trigger.performed += instance.OnController_Left_Trigger;
-            @Controller_Left_Trigger.canceled += instance.OnController_Left_Trigger;
-            @Controller_Right_Trigger.started += instance.OnController_Right_Trigger;
-            @Controller_Right_Trigger.performed += instance.OnController_Right_Trigger;
-            @Controller_Right_Trigger.canceled += instance.OnController_Right_Trigger;
             @Controller_Left_Shoulder.started += instance.OnController_Left_Shoulder;
             @Controller_Left_Shoulder.performed += instance.OnController_Left_Shoulder;
             @Controller_Left_Shoulder.canceled += instance.OnController_Left_Shoulder;
             @Controller_Right_Shoulder.started += instance.OnController_Right_Shoulder;
             @Controller_Right_Shoulder.performed += instance.OnController_Right_Shoulder;
             @Controller_Right_Shoulder.canceled += instance.OnController_Right_Shoulder;
-            @Controller_Left_Stick.started += instance.OnController_Left_Stick;
-            @Controller_Left_Stick.performed += instance.OnController_Left_Stick;
-            @Controller_Left_Stick.canceled += instance.OnController_Left_Stick;
-            @Controller_Right_Stick.started += instance.OnController_Right_Stick;
-            @Controller_Right_Stick.performed += instance.OnController_Right_Stick;
-            @Controller_Right_Stick.canceled += instance.OnController_Right_Stick;
-            @OnPrimaryInputClick.started += instance.OnOnPrimaryInputClick;
-            @OnPrimaryInputClick.performed += instance.OnOnPrimaryInputClick;
-            @OnPrimaryInputClick.canceled += instance.OnOnPrimaryInputClick;
-            @OnSecondaryInputClick.started += instance.OnOnSecondaryInputClick;
-            @OnSecondaryInputClick.performed += instance.OnOnSecondaryInputClick;
-            @OnSecondaryInputClick.canceled += instance.OnOnSecondaryInputClick;
-            @OnTertiaryInputClick.started += instance.OnOnTertiaryInputClick;
-            @OnTertiaryInputClick.performed += instance.OnOnTertiaryInputClick;
-            @OnTertiaryInputClick.canceled += instance.OnOnTertiaryInputClick;
-            @OnPinch.started += instance.OnOnPinch;
-            @OnPinch.performed += instance.OnOnPinch;
-            @OnPinch.canceled += instance.OnOnPinch;
         }
 
         /// <summary>
@@ -882,12 +1054,39 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Position.started -= instance.OnPosition;
             @Position.performed -= instance.OnPosition;
             @Position.canceled -= instance.OnPosition;
-            @Controller_North.started -= instance.OnController_North;
-            @Controller_North.performed -= instance.OnController_North;
-            @Controller_North.canceled -= instance.OnController_North;
+            @OnPrimaryInputClick.started -= instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputClick.performed -= instance.OnOnPrimaryInputClick;
+            @OnPrimaryInputClick.canceled -= instance.OnOnPrimaryInputClick;
+            @OnSecondaryInputClick.started -= instance.OnOnSecondaryInputClick;
+            @OnSecondaryInputClick.performed -= instance.OnOnSecondaryInputClick;
+            @OnSecondaryInputClick.canceled -= instance.OnOnSecondaryInputClick;
+            @OnTertiaryInputClick.started -= instance.OnOnTertiaryInputClick;
+            @OnTertiaryInputClick.performed -= instance.OnOnTertiaryInputClick;
+            @OnTertiaryInputClick.canceled -= instance.OnOnTertiaryInputClick;
+            @OnPinch.started -= instance.OnOnPinch;
+            @OnPinch.performed -= instance.OnOnPinch;
+            @OnPinch.canceled -= instance.OnOnPinch;
+            @Controller_Left_Stick.started -= instance.OnController_Left_Stick;
+            @Controller_Left_Stick.performed -= instance.OnController_Left_Stick;
+            @Controller_Left_Stick.canceled -= instance.OnController_Left_Stick;
+            @Controller_Right_Stick.started -= instance.OnController_Right_Stick;
+            @Controller_Right_Stick.performed -= instance.OnController_Right_Stick;
+            @Controller_Right_Stick.canceled -= instance.OnController_Right_Stick;
+            @Controller_Dpad.started -= instance.OnController_Dpad;
+            @Controller_Dpad.performed -= instance.OnController_Dpad;
+            @Controller_Dpad.canceled -= instance.OnController_Dpad;
+            @Controller_Left_Trigger.started -= instance.OnController_Left_Trigger;
+            @Controller_Left_Trigger.performed -= instance.OnController_Left_Trigger;
+            @Controller_Left_Trigger.canceled -= instance.OnController_Left_Trigger;
+            @Controller_Right_Trigger.started -= instance.OnController_Right_Trigger;
+            @Controller_Right_Trigger.performed -= instance.OnController_Right_Trigger;
+            @Controller_Right_Trigger.canceled -= instance.OnController_Right_Trigger;
             @Controller_South.started -= instance.OnController_South;
             @Controller_South.performed -= instance.OnController_South;
             @Controller_South.canceled -= instance.OnController_South;
+            @Controller_North.started -= instance.OnController_North;
+            @Controller_North.performed -= instance.OnController_North;
+            @Controller_North.canceled -= instance.OnController_North;
             @Controller_East.started -= instance.OnController_East;
             @Controller_East.performed -= instance.OnController_East;
             @Controller_East.canceled -= instance.OnController_East;
@@ -906,36 +1105,12 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right.started -= instance.OnController_Right;
             @Controller_Right.performed -= instance.OnController_Right;
             @Controller_Right.canceled -= instance.OnController_Right;
-            @Controller_Left_Trigger.started -= instance.OnController_Left_Trigger;
-            @Controller_Left_Trigger.performed -= instance.OnController_Left_Trigger;
-            @Controller_Left_Trigger.canceled -= instance.OnController_Left_Trigger;
-            @Controller_Right_Trigger.started -= instance.OnController_Right_Trigger;
-            @Controller_Right_Trigger.performed -= instance.OnController_Right_Trigger;
-            @Controller_Right_Trigger.canceled -= instance.OnController_Right_Trigger;
             @Controller_Left_Shoulder.started -= instance.OnController_Left_Shoulder;
             @Controller_Left_Shoulder.performed -= instance.OnController_Left_Shoulder;
             @Controller_Left_Shoulder.canceled -= instance.OnController_Left_Shoulder;
             @Controller_Right_Shoulder.started -= instance.OnController_Right_Shoulder;
             @Controller_Right_Shoulder.performed -= instance.OnController_Right_Shoulder;
             @Controller_Right_Shoulder.canceled -= instance.OnController_Right_Shoulder;
-            @Controller_Left_Stick.started -= instance.OnController_Left_Stick;
-            @Controller_Left_Stick.performed -= instance.OnController_Left_Stick;
-            @Controller_Left_Stick.canceled -= instance.OnController_Left_Stick;
-            @Controller_Right_Stick.started -= instance.OnController_Right_Stick;
-            @Controller_Right_Stick.performed -= instance.OnController_Right_Stick;
-            @Controller_Right_Stick.canceled -= instance.OnController_Right_Stick;
-            @OnPrimaryInputClick.started -= instance.OnOnPrimaryInputClick;
-            @OnPrimaryInputClick.performed -= instance.OnOnPrimaryInputClick;
-            @OnPrimaryInputClick.canceled -= instance.OnOnPrimaryInputClick;
-            @OnSecondaryInputClick.started -= instance.OnOnSecondaryInputClick;
-            @OnSecondaryInputClick.performed -= instance.OnOnSecondaryInputClick;
-            @OnSecondaryInputClick.canceled -= instance.OnOnSecondaryInputClick;
-            @OnTertiaryInputClick.started -= instance.OnOnTertiaryInputClick;
-            @OnTertiaryInputClick.performed -= instance.OnOnTertiaryInputClick;
-            @OnTertiaryInputClick.canceled -= instance.OnOnTertiaryInputClick;
-            @OnPinch.started -= instance.OnOnPinch;
-            @OnPinch.performed -= instance.OnOnPinch;
-            @OnPinch.canceled -= instance.OnOnPinch;
         }
 
         /// <summary>
@@ -984,12 +1159,68 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnPosition(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "Controller_North" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// Method invoked when associated input action "OnPrimaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnController_North(InputAction.CallbackContext context);
+        void OnOnPrimaryInputClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "OnSecondaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnOnSecondaryInputClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "OnTertiaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnOnTertiaryInputClick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "OnPinch" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnOnPinch(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Controller_Left_Stick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_Left_Stick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Controller_Right_Stick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_Right_Stick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Controller_Dpad" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_Dpad(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Controller_Left_Trigger" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_Left_Trigger(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Controller_Right_Trigger" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_Right_Trigger(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "Controller_South" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
@@ -997,6 +1228,13 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_South(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Controller_North" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_North(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "Controller_East" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
@@ -1040,20 +1278,6 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_Right(InputAction.CallbackContext context);
         /// <summary>
-        /// Method invoked when associated input action "Controller_Left_Trigger" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnController_Left_Trigger(InputAction.CallbackContext context);
-        /// <summary>
-        /// Method invoked when associated input action "Controller_Right_Trigger" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnController_Right_Trigger(InputAction.CallbackContext context);
-        /// <summary>
         /// Method invoked when associated input action "Controller_Left_Shoulder" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
@@ -1067,47 +1291,5 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_Right_Shoulder(InputAction.CallbackContext context);
-        /// <summary>
-        /// Method invoked when associated input action "Controller_Left_Stick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnController_Left_Stick(InputAction.CallbackContext context);
-        /// <summary>
-        /// Method invoked when associated input action "Controller_Right_Stick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnController_Right_Stick(InputAction.CallbackContext context);
-        /// <summary>
-        /// Method invoked when associated input action "OnPrimaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnOnPrimaryInputClick(InputAction.CallbackContext context);
-        /// <summary>
-        /// Method invoked when associated input action "OnSecondaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnOnSecondaryInputClick(InputAction.CallbackContext context);
-        /// <summary>
-        /// Method invoked when associated input action "OnTertiaryInputClick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnOnTertiaryInputClick(InputAction.CallbackContext context);
-        /// <summary>
-        /// Method invoked when associated input action "OnPinch" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
-        /// </summary>
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
-        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
-        void OnOnPinch(InputAction.CallbackContext context);
     }
 }

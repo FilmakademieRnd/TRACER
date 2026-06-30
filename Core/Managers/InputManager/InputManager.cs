@@ -107,6 +107,7 @@ namespace tracer{
         public struct ClickOtherEvent                       : IInputEvent { public InputData Data; }
 
         // Drags (mouse hold + move, 1 finger touch + move, controller button hold + move)
+        // Primary: 1f, left mouse, right stick, Second: 2f, right mouse, left stick
         public struct DragUIEvent                           : IInputEvent { public InputData Data; public UnityEngine.Vector2 StartPos; }
         public struct DragOtherEvent                        : IInputEvent { public InputData Data; public UnityEngine.Vector2 StartPos; }
 
@@ -119,6 +120,7 @@ namespace tracer{
         public struct DoubleClickOtherEvent                 : IInputEvent { public InputData Data; }
 
         // Specifics - Pinch (determine that its no secondary drag or pinch!)
+        // also controller stick abstracts to pinch to move fwd!
         public struct PinchUIEvent                          : IInputEvent { public InputData Data; public float PinchDistance; }
         public struct PinchOtherEvent                       : IInputEvent { public InputData Data; public float PinchDistance; }
         
@@ -130,10 +132,12 @@ namespace tracer{
         public struct TouchRotateUIEvent                    : IInputEvent { public InputData Data; public float RotationAngle; }
         public struct TouchRotateOtherEvent                 : IInputEvent { public InputData Data; public float RotationAngle; }
 
-        // Specifics - Thumbsticks (can we differentiate a thumbstick ui <> other ?)
-        public struct ThumbstickLeftUIEvent                 : IInputEvent { public InputData Data; }
-        public struct ThumbstickLeftOtherEvent              : IInputEvent { public InputData Data; }
-        //... other specifics (Gyro, Controller-Trigger, ...)
+        // Specifics - Thumbsticks ( ? nec bc a drag could become a gizmo drag via stick...)
+        // public struct ThumbstickLeftUIEvent                 : IInputEvent { public InputData Data; }
+        // public struct ThumbstickLeftOtherEvent              : IInputEvent { public InputData Data; }
+        // public struct ThumbstickRightUIEvent                 : IInputEvent { public InputData Data; }
+        // public struct ThumbstickRightOtherEvent              : IInputEvent { public InputData Data; }
+        //... other specifics (GController-Trigger, ...)
 
         public struct AttitudeInputEvent                    : IInputEvent { public InputData Data; public UnityEngine.Quaternion Rotation;}
         //from AR module, subscribe for switch also ui stuff on start/end!
