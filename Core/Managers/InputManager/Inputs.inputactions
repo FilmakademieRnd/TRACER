@@ -61,6 +61,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Controller_Left_Stick_Press",
+                    "type": "Button",
+                    "id": "b27ea89d-4680-4e06-a890-f10f2f09a8fa",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
                     "name": "Controller_Right_Stick",
                     "type": "Value",
                     "id": "ce9f2dde-4df1-498f-bde9-b3bee002100b",
@@ -172,7 +181,7 @@
                     "name": "Controller_Left_Shoulder",
                     "type": "Button",
                     "id": "b9eae21c-7390-4ee4-9b42-21d240bb79d1",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -451,6 +460,28 @@
                     "action": "Controller_Left_Stick",
                     "isComposite": false,
                     "isPartOfComposite": true
+                },
+                {
+                    "name": "",
+                    "id": "b5b7082c-5e9e-40c5-800f-b3fa8c9c8475",
+                    "path": "<Gamepad>/leftStickPress",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick_Press",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2c108a6f-d614-4f24-9376-2f5292b1c5bd",
+                    "path": "<Keyboard>/tab",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Left_Stick_Press",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 },
                 {
                     "name": "",

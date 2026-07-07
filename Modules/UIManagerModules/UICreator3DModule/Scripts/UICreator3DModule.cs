@@ -248,6 +248,10 @@ namespace tracer
         //!
         private InputManager m_inputManager;
 
+        //only used for manipulation mode Viewport - to update the gizmo alignemnt accordingly
+        private Vector3 lastCamPos;
+        private Quaternion lastCamRot;
+
         //!
         //! Constructor
         //! @param name Name of this module
@@ -300,6 +304,7 @@ namespace tracer
 
             // Subscribe to selection change
             manager.selectionChanged += SelectionUpdate;
+            manager.manipulationLayerChanged += ManipulationLayerChanged;
 
             // Subscribe to manipulator change
             UICreator2DModule UI2DModule = manager.getModule<UICreator2DModule>();
@@ -351,6 +356,16 @@ namespace tracer
                 return;
 
             UpdateManipScale();
+
+            if(manager.ManipulationLayer == UIManager.ManipulationLayerEnum.VIEWPORT && lastActiveManip) {
+                Transform camTr = mainCamera.transform;
+                if(camTr.position != lastCamPos || camTr.rotation != lastCamRot) {
+                    UpdateGizmoAxisLayer(lastActiveManip.transform, selObj.transform, Camera.main.transform, manager.ManipulationLayer);
+                }
+                lastCamPos = camTr.position;
+                lastCamRot = camTr.rotation;
+            }
+
         }
 
         private DragVisualizer _dragViz;
@@ -464,20 +479,6 @@ namespace tracer
             }
         }
 
-        //!
-        //! Helper function that raycasts from camera and returns hit game object
-        //! It subscribes (at PressStart) to the event triggered at every position update from InputManager
-        //! @param pos screen point through which to raycast
-        //! @param layerMask layer mask containing the objects to be considered
-        //!
-        // Warning?
-        // Potential bad behaviors if there are other objects besides the manipulators with physics collider inside UI layer
-        /*private GameObject CameraRaycast(Vector3 pos, int layerMask = 1 << 5){
-            if (Physics.Raycast(mainCamera.ScreenPointToRay(pos), out RaycastHit hit, Mathf.Infinity, layerMask))
-                return hit.collider.gameObject;
-
-            return null;
-        }*/
 
         private void CalculateStartOffset(Vector2 clickPos) {
             if(!manipulator)
@@ -598,7 +599,7 @@ namespace tracer
 
 
             // drag rotate - manip version
-            if (modeTRS == 1){
+            else if (modeTRS == 1){
                 // Convert to object space
                 hitPoint = selObj.transform.parent.InverseTransformPoint(hitPoint);
                 // get orientation quaternion
@@ -662,7 +663,7 @@ namespace tracer
             }
 
             // drag object - scale
-            if (modeTRS == 2){
+            else if (modeTRS == 2){
                 
                 Vector3 projectedVec = hitPoint;
                 // temp hack - identify if single axis
@@ -820,6 +821,10 @@ namespace tracer
 
             camMathValues = Screen.dpi / (Screen.width + Screen.height);
         }
+        private void ManipulationLayerChanged(object sender, UIManager.ManipulationLayerEnum newManipulationLayer) {
+            if(lastActiveManip)
+                UpdateGizmoAxisLayer(lastActiveManip.transform, selObjs[0].transform, Camera.main.transform, newManipulationLayer);
+        }
 
 
         void GrabParameterIndex()
@@ -920,8 +925,47 @@ namespace tracer
             if (selObjs.Count > 1)
                 manip.transform.rotation = Quaternion.identity;
 
+
             // Adjust scale
             manip.transform.localScale = GetModifierScale();
+
+            UpdateGizmoAxisLayer(manip.transform, selObjs[0].transform, Camera.main.transform, manager.ManipulationLayer);
+        }
+
+        public void UpdateGizmoAxisLayer(Transform gizmoRoot, Transform targetObject, Transform cameraTransform, UIManager.ManipulationLayerEnum mode) {
+            // Orient the Gizmo arrows based on the current mode
+            switch (mode) {
+                case UIManager.ManipulationLayerEnum.LOCAL:
+                    // The arrows perfectly match the object's internal tilt and spin
+                    gizmoRoot.rotation = targetObject.rotation;
+                    break;
+
+                case UIManager.ManipulationLayerEnum.GLOBAL:
+                    // The arrows lock to the absolute World grid (Identity = No rotation)
+                    gizmoRoot.rotation = Quaternion.identity;
+                    break;
+
+                case UIManager.ManipulationLayerEnum.VIEWPORT:
+                    // The arrows point away from the camera, but stay flat on the floor
+                    Vector3 flatCamForward = cameraTransform.forward;
+                    flatCamForward.y = 0f; // no vertical pitch
+
+                    // Safety check: Prevent errors if the camera looks EXACTLY straight down
+                    if (flatCamForward.sqrMagnitude > 0.0001f) {
+                        flatCamForward.Normalize();
+                        
+                        // LookRotation mathematically builds a Quaternion where "Forward" is our flatCamForward, 
+                        // and "Up" is the world's absolute Up.
+                        gizmoRoot.rotation = Quaternion.LookRotation(flatCamForward, Vector3.up);
+                    }else{
+                        // Fallback if the camera is pointing straight at the floor: 
+                        // Use the camera's UP vector (flattened) as the new forward
+                        Vector3 flatCamUp = cameraTransform.up;
+                        flatCamUp.y = 0f;
+                        gizmoRoot.rotation = Quaternion.LookRotation(flatCamUp.normalized, Vector3.up);
+                    }
+                    break;
+            }
         }
 
         //!
@@ -968,11 +1012,9 @@ namespace tracer
         //!
         //! Set the mode of operation of the manipulator and its respective event subscriptions
         //!
-        private void SetManipulatorMode(object sender, int manipulatorMode)
-        {
+        private void SetManipulatorMode(object sender, int manipulatorMode){
             // Disable manipulator
-            if (manipulatorMode < 0 || manipulatorMode > 2)
-            {
+            if (manipulatorMode < 0 || manipulatorMode > 2){
                 HideAxes();
                 modeTRS = -1;
                 // Place manipulator out of range to avoid unwanted click recognition when it's activated
@@ -1113,7 +1155,7 @@ namespace tracer
         //! Set transform gizmo to translate mode
         //!
         public void SetModeT(){
-            Debug.Log("T mode");
+            //Debug.Log("T mode");
             if (selObj != null){
                 HideAxes();
                 ShowAxis(manipT);
@@ -1126,11 +1168,9 @@ namespace tracer
         //!
         //! Set transform gizmo to rotate mode
         //!
-        public void SetModeR()
-        {
+        public void SetModeR(){
             //Debug.Log("R mode");
-            if (selObj != null)
-            {
+            if (selObj != null){
                 HideAxes();
                 ShowAxis(manipR);
                 TransformAxisMulti(manipR);
@@ -1142,11 +1182,9 @@ namespace tracer
         //!
         //! Set transform gizmo to scale mode
         //!
-        public void SetModeS()
-        {
+        public void SetModeS(){
             //Debug.Log("S mode");
-            if (selObj != null)
-            {
+            if (selObj != null){
                 HideAxes();
                 ShowAxis(manipS);
                 TransformAxisMulti(manipS);

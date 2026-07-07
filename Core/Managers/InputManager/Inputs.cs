@@ -147,6 +147,15 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": true
                 },
                 {
+                    ""name"": ""Controller_Left_Stick_Press"",
+                    ""type"": ""Button"",
+                    ""id"": ""b27ea89d-4680-4e06-a890-f10f2f09a8fa"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
                     ""name"": ""Controller_Right_Stick"",
                     ""type"": ""Value"",
                     ""id"": ""ce9f2dde-4df1-498f-bde9-b3bee002100b"",
@@ -258,7 +267,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_Left_Shoulder"",
                     ""type"": ""Button"",
                     ""id"": ""b9eae21c-7390-4ee4-9b42-21d240bb79d1"",
-                    ""expectedControlType"": ""Button"",
+                    ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
@@ -540,6 +549,28 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
+                    ""id"": ""b5b7082c-5e9e-40c5-800f-b3fa8c9c8475"",
+                    ""path"": ""<Gamepad>/leftStickPress"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick_Press"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""2c108a6f-d614-4f24-9376-2f5292b1c5bd"",
+                    ""path"": ""<Keyboard>/tab"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Left_Stick_Press"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
                     ""id"": ""cd19e369-9581-4712-81ab-66556866887e"",
                     ""path"": ""<Gamepad>/rightStick"",
                     ""interactions"": """",
@@ -749,6 +780,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_OnTertiaryInputClick = m_VPETMap.FindAction("OnTertiaryInputClick", throwIfNotFound: true);
         m_VPETMap_OnPinch = m_VPETMap.FindAction("OnPinch", throwIfNotFound: true);
         m_VPETMap_Controller_Left_Stick = m_VPETMap.FindAction("Controller_Left_Stick", throwIfNotFound: true);
+        m_VPETMap_Controller_Left_Stick_Press = m_VPETMap.FindAction("Controller_Left_Stick_Press", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
         m_VPETMap_Controller_Dpad = m_VPETMap.FindAction("Controller_Dpad", throwIfNotFound: true);
         m_VPETMap_Controller_Left_Trigger = m_VPETMap.FindAction("Controller_Left_Trigger", throwIfNotFound: true);
@@ -849,6 +881,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_OnTertiaryInputClick;
     private readonly InputAction m_VPETMap_OnPinch;
     private readonly InputAction m_VPETMap_Controller_Left_Stick;
+    private readonly InputAction m_VPETMap_Controller_Left_Stick_Press;
     private readonly InputAction m_VPETMap_Controller_Right_Stick;
     private readonly InputAction m_VPETMap_Controller_Dpad;
     private readonly InputAction m_VPETMap_Controller_Left_Trigger;
@@ -898,6 +931,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "VPETMap/Controller_Left_Stick".
         /// </summary>
         public InputAction @Controller_Left_Stick => m_Wrapper.m_VPETMap_Controller_Left_Stick;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_Left_Stick_Press".
+        /// </summary>
+        public InputAction @Controller_Left_Stick_Press => m_Wrapper.m_VPETMap_Controller_Left_Stick_Press;
         /// <summary>
         /// Provides access to the underlying input action "VPETMap/Controller_Right_Stick".
         /// </summary>
@@ -998,6 +1035,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Left_Stick.started += instance.OnController_Left_Stick;
             @Controller_Left_Stick.performed += instance.OnController_Left_Stick;
             @Controller_Left_Stick.canceled += instance.OnController_Left_Stick;
+            @Controller_Left_Stick_Press.started += instance.OnController_Left_Stick_Press;
+            @Controller_Left_Stick_Press.performed += instance.OnController_Left_Stick_Press;
+            @Controller_Left_Stick_Press.canceled += instance.OnController_Left_Stick_Press;
             @Controller_Right_Stick.started += instance.OnController_Right_Stick;
             @Controller_Right_Stick.performed += instance.OnController_Right_Stick;
             @Controller_Right_Stick.canceled += instance.OnController_Right_Stick;
@@ -1069,6 +1109,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Left_Stick.started -= instance.OnController_Left_Stick;
             @Controller_Left_Stick.performed -= instance.OnController_Left_Stick;
             @Controller_Left_Stick.canceled -= instance.OnController_Left_Stick;
+            @Controller_Left_Stick_Press.started -= instance.OnController_Left_Stick_Press;
+            @Controller_Left_Stick_Press.performed -= instance.OnController_Left_Stick_Press;
+            @Controller_Left_Stick_Press.canceled -= instance.OnController_Left_Stick_Press;
             @Controller_Right_Stick.started -= instance.OnController_Right_Stick;
             @Controller_Right_Stick.performed -= instance.OnController_Right_Stick;
             @Controller_Right_Stick.canceled -= instance.OnController_Right_Stick;
@@ -1193,6 +1236,13 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_Left_Stick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Controller_Left_Stick_Press" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_Left_Stick_Press(InputAction.CallbackContext context);
         /// <summary>
         /// Method invoked when associated input action "Controller_Right_Stick" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>

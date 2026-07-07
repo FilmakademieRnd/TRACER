@@ -151,6 +151,8 @@ namespace tracer{
         // cycle through visible scene objects
         // ~ will not work convenient: timeline, measure
 
+        // Direct manipulation events? so we can show all viz-helper like before.
+
 
         // **** EVENT HUB ****
         // save abos sorted by event-type

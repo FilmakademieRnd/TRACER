@@ -81,6 +81,31 @@ namespace tracer
         {
             get => (Roles)settings.roles.value;
         }
+
+        public enum ManipulationLayerEnum{
+            LOCAL, GLOBAL, VIEWPORT
+        }
+        public ManipulationLayerEnum ManipulationLayer {
+            get => manipulationLayer;
+            set{
+                if(manipulationLayer != value){
+                    manipulationLayer = value;
+                    manipulationLayerChanged?.Invoke(this, value);
+                }
+            }
+        }
+        private ManipulationLayerEnum manipulationLayer = ManipulationLayerEnum.LOCAL;
+        public event EventHandler<ManipulationLayerEnum> manipulationLayerChanged;
+        public ManipulationLayerEnum CycleManipulationMode() {
+            if(ManipulationLayer == ManipulationLayerEnum.LOCAL)
+                ManipulationLayer = ManipulationLayerEnum.GLOBAL;
+            else if(ManipulationLayer == ManipulationLayerEnum.GLOBAL)
+                ManipulationLayer = ManipulationLayerEnum.VIEWPORT;
+            else
+                ManipulationLayer = ManipulationLayerEnum.LOCAL;
+            return ManipulationLayer;
+        }
+
         //!
         //! Areference to the About Menu prefab.
         //!

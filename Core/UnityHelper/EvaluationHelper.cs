@@ -616,5 +616,93 @@ namespace tracer{
 
         #endregion
 
+        #region SCENE OBJECT NAVIGATOR
+
+        public enum NavDirection { Left, Right }
+
+
+        /// <summary>
+        /// Finds the next visible object in the specified direction, or the center-closest if no selection exists.
+        /// </summary>
+        public SceneObject FindNextVisibleObject(List<SceneObject> sceneObjects, SceneObject currentSelection, Camera mainCam, NavDirection direction){
+            if (sceneObjects == null || sceneObjects.Count == 0 || mainCam == null) return null;
+
+            SceneObject bestMatch = null;
+            float bestScore = float.MaxValue;
+
+            // NO CURRENT SELECTION (select center-most, nearest to camera)
+            if (currentSelection == null){
+                Vector2 screenCenter = new Vector2(0.5f, 0.5f);
+
+                foreach (var obj in sceneObjects){
+                    if (obj == null || !obj.gameObject.activeInHierarchy) continue;
+
+                    Vector3 vp = mainCam.WorldToViewportPoint(obj.transform.position);
+
+                    if (IsWithinViewport(vp)){
+
+                        float distanceFromCenter = Vector2.Distance(new Vector2(vp.x, vp.y), screenCenter);
+                        
+                        // multiply screen distance by 100 so the algorithm prioritizes centering over depth,
+                        // but uses depth (vp.z) as the tie-breaker for objects stacked perfectly behind each other.
+                        float score = (distanceFromCenter * 100f) + vp.z;
+
+                        if (score < bestScore){
+                            bestScore = score;
+                            bestMatch = obj;
+                        }
+                    }
+                }
+                return bestMatch;
+            }
+
+            // NAVIGATING LEFT OR RIGHT
+            Vector3 currentVp = mainCam.WorldToViewportPoint(currentSelection.transform.position);
+
+            foreach (var obj in sceneObjects){
+                if (obj == null || obj == currentSelection || !obj.gameObject.activeInHierarchy) continue;
+
+                Vector3 vp = mainCam.WorldToViewportPoint(obj.transform.position);
+
+                if (IsWithinViewport(vp)){
+                    bool isRightwards = vp.x > currentVp.x;
+                    bool isLeftwards = vp.x < currentVp.x;
+
+                    if ((direction == NavDirection.Right && isRightwards) || 
+                        (direction == NavDirection.Left && isLeftwards)){
+                        
+                        float screenDistance = Vector2.Distance(new Vector2(currentVp.x, currentVp.y), new Vector2(vp.x, vp.y));
+
+                        // Multiply the Y-difference to penalize objects that are technically closer diagonally, 
+                        // but feel unnatural because they are way above or below the current object.
+                        float verticalPenalty = Mathf.Abs(vp.y - currentVp.y) * 2f; 
+                        
+                        float score = screenDistance + verticalPenalty;
+
+                        if (score < bestScore){
+                            bestScore = score;
+                            bestMatch = obj;
+                        }
+                    }
+                }
+            }
+
+            return bestMatch;
+        }
+
+        //!
+        //! Checks if a Viewport point is within the camera's viewing frustum
+        //! TODO: check if behind walls ("real IsVisible")
+        //!
+        private bool IsWithinViewport(Vector3 viewportPoint){
+            // Z > 0 ensures it is in front of the camera.
+            // X and Y between 0 and 1 ensures it is within the screen bounds.
+            return viewportPoint.z > 0f && 
+                viewportPoint.x >= 0f && viewportPoint.x <= 1f && 
+                viewportPoint.y >= 0f && viewportPoint.y <= 1f;
+        }
+
+        #endregion
+
     }
 }
