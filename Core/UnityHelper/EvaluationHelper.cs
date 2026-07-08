@@ -624,7 +624,7 @@ namespace tracer{
         /// <summary>
         /// Finds the next visible object in the specified direction, or the center-closest if no selection exists.
         /// </summary>
-        public SceneObject FindNextVisibleObject(List<SceneObject> sceneObjects, SceneObject currentSelection, Camera mainCam, NavDirection direction){
+        public SceneObject FindNextVisibleObject(List<SceneObject> sceneObjects, SceneObject currentSelection, Camera mainCam, NavDirection direction, UIManager.Roles role){
             if (sceneObjects == null || sceneObjects.Count == 0 || mainCam == null) return null;
 
             SceneObject bestMatch = null;
@@ -635,7 +635,7 @@ namespace tracer{
                 Vector2 screenCenter = new Vector2(0.5f, 0.5f);
 
                 foreach (var obj in sceneObjects){
-                    if (obj == null || !obj.gameObject.activeInHierarchy) continue;
+                    if (obj == null || !obj.gameObject.activeInHierarchy || !IsSelectableWithRole(obj, role)) continue;
 
                     Vector3 vp = mainCam.WorldToViewportPoint(obj.transform.position);
 
@@ -659,23 +659,36 @@ namespace tracer{
             // NAVIGATING LEFT OR RIGHT
             Vector3 currentVp = mainCam.WorldToViewportPoint(currentSelection.transform.position);
 
+            // track the  opposite for our wrap-around fallback
+            SceneObject oppositeFallback = null;
+            float oppositeVpX = (direction == NavDirection.Right) ? float.MaxValue : float.MinValue;
+
             foreach (var obj in sceneObjects){
                 if (obj == null || obj == currentSelection || !obj.gameObject.activeInHierarchy) continue;
 
                 Vector3 vp = mainCam.WorldToViewportPoint(obj.transform.position);
 
                 if (IsWithinViewport(vp)){
+                    // Continuously update the extreme opposite candidate
+                    if (direction == NavDirection.Right && vp.x < oppositeVpX) {
+                        oppositeVpX = vp.x;
+                        oppositeFallback = obj;
+                    }else if (direction == NavDirection.Left && vp.x > oppositeVpX) {
+                        oppositeVpX = vp.x;
+                        oppositeFallback = obj;
+                    }
+
                     bool isRightwards = vp.x > currentVp.x;
                     bool isLeftwards = vp.x < currentVp.x;
 
                     if ((direction == NavDirection.Right && isRightwards) || 
                         (direction == NavDirection.Left && isLeftwards)){
                         
-                        float screenDistance = Vector2.Distance(new Vector2(currentVp.x, currentVp.y), new Vector2(vp.x, vp.y));
+                        float screenDistance = Vector2.Distance(currentVp, vp);
 
                         // Multiply the Y-difference to penalize objects that are technically closer diagonally, 
                         // but feel unnatural because they are way above or below the current object.
-                        float verticalPenalty = Mathf.Abs(vp.y - currentVp.y) * 2f; 
+                        float verticalPenalty = 0; //Mathf.Abs(vp.y - currentVp.y) * 2f; 
                         
                         float score = screenDistance + verticalPenalty;
 
@@ -687,7 +700,7 @@ namespace tracer{
                 }
             }
 
-            return bestMatch;
+            return bestMatch != null ? bestMatch : oppositeFallback;
         }
 
         //!
@@ -700,6 +713,27 @@ namespace tracer{
             return viewportPoint.z > 0f && 
                 viewportPoint.x >= 0f && viewportPoint.x <= 1f && 
                 viewportPoint.y >= 0f && viewportPoint.y <= 1f;
+        }
+
+        public bool IsSelectableWithRole(SceneObject obj, UIManager.Roles role){
+            switch (obj){
+                case SceneObjectCamera:
+                    if (role == UIManager.Roles.EXPERT ||
+                        role == UIManager.Roles.DOP)
+                        return true;
+                    return false;
+                case SceneObjectLight:
+                    if (role == UIManager.Roles.EXPERT ||
+                        role == UIManager.Roles.LIGHTING ||
+                        role == UIManager.Roles.SET)
+                        return true;
+                    return false;
+                default:
+                    if (role == UIManager.Roles.EXPERT ||
+                        role == UIManager.Roles.SET)
+                        return true;
+                    return false;
+            }
         }
 
         #endregion

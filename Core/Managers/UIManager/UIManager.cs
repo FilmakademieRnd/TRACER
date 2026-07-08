@@ -665,28 +665,8 @@ namespace tracer
         //!
         public void addSelectedObject(SceneObject sceneObject){
             // depending by our role
-            switch (sceneObject){
-                case SceneObjectCamera:
-                    if (activeRole == UIManager.Roles.EXPERT ||
-                        activeRole == UIManager.Roles.DOP){
-                        break;
-                    }else
-                        return;
-                case SceneObjectLight:
-                    if (activeRole == UIManager.Roles.EXPERT ||
-                        activeRole == UIManager.Roles.DOP ||
-                        activeRole == UIManager.Roles.LIGHTING ||
-                        activeRole == UIManager.Roles.SET){
-                        break;
-                    }else
-                        return;
-                default:
-                    if (activeRole == UIManager.Roles.EXPERT ||
-                        activeRole == UIManager.Roles.SET){
-                        break;
-                    }else
-                        return;
-            }
+            if(!EvaluationHelper.Instance.IsSelectableWithRole(sceneObject, activeRole))
+                return;
 
             if (!sceneObject._lock){
                 m_selectedObjects.Add(sceneObject);

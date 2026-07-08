@@ -24,8 +24,10 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "CameraNavigationModule.cs"
 //! @brief implementation of TRACER camera navigation features
 //! @author Paulo Scatena
-//! @version 0
-//! @date 23.03.2022
+//! @author Thomas Krüger
+//! @version 1
+//! @date 08.07.2026
+//! @note adapt to InputManager, new navigation modes
 
 using System;
 using System.Collections;

@@ -208,9 +208,9 @@ namespace tracer
         int modeTRS = -1;
 
         //!
-        //! store previous mode to restore when unhiding
+        //! store mode to restore when unhiding
         //!
-        private int previousTrsMode = -1;
+        private int savedTrsMode = -1;
 
         //!
         //! Auxiliary preconstructed vector - XY plane
@@ -402,6 +402,7 @@ namespace tracer
                 case InputManager.InputState.Canceled:
                 case InputManager.InputState.Ended:
                     //Debug.Log("Primary Drag ended");
+                    //TODO: dont execute via controller-right-stick drag, since we only every rotate the cam with it
                     FinalizeManipulatorTransformation(evt.Data.Position);
                     //better for viz?
                     //ShowGizmo();
@@ -694,6 +695,7 @@ namespace tracer
         //! @param e event reference
         //!
         private void FinalizeManipulatorTransformation(Vector2 point){
+            Debug.Log("FinalizeManipulatorTransformation");
             // Hack - restore scale
             // restore position instead
             if (modeTRS == 2){
@@ -763,7 +765,7 @@ namespace tracer
         {
 
             // Log
-            Debug.Log("<i>UICreator3DModule.SelectionUpdate()</i> "+sceneObjects.Count);
+            //Debug.Log("<i>UICreator3DModule.SelectionUpdate()</i> "+sceneObjects.Count);
 
             if (sceneObjects.Count > 0)
             {
@@ -823,6 +825,13 @@ namespace tracer
         }
         private void ManipulationLayerChanged(object sender, UIManager.ManipulationLayerEnum newManipulationLayer) {
             if(lastActiveManip)
+                switch ((TRSModeEnum)savedTrsMode) {
+                    case TRSModeEnum.SCALE:     newManipulationLayer = UIManager.ManipulationLayerEnum.LOCAL; break;
+                    case TRSModeEnum.TRANSLATE:
+                    case TRSModeEnum.ROTATE:
+                    default:
+                        break;
+                }
                 UpdateGizmoAxisLayer(lastActiveManip.transform, selObjs[0].transform, Camera.main.transform, newManipulationLayer);
         }
 
@@ -896,7 +905,7 @@ namespace tracer
             lastActiveManip.SetActive(true);
             //also update scale!
             lastActiveManip.transform.localScale = GetModifierScale();
-            modeTRS = previousTrsMode;
+            modeTRS = savedTrsMode;
         }
 
         //!
@@ -928,8 +937,6 @@ namespace tracer
 
             // Adjust scale
             manip.transform.localScale = GetModifierScale();
-
-            UpdateGizmoAxisLayer(manip.transform, selObjs[0].transform, Camera.main.transform, manager.ManipulationLayer);
         }
 
         public void UpdateGizmoAxisLayer(Transform gizmoRoot, Transform targetObject, Transform cameraTransform, UIManager.ManipulationLayerEnum mode) {
@@ -963,6 +970,11 @@ namespace tracer
                         Vector3 flatCamUp = cameraTransform.up;
                         flatCamUp.y = 0f;
                         gizmoRoot.rotation = Quaternion.LookRotation(flatCamUp.normalized, Vector3.up);
+                    }
+
+                    if((TRSModeEnum)savedTrsMode == TRSModeEnum.ROTATE){
+                        // Multiplies the current rotation by a local 90-degree spin on the Y-axis, swapping X and Z visually.
+                        gizmoRoot.rotation *= Quaternion.Euler(0f, 90f, 0f);
                     }
                     break;
             }
@@ -1005,7 +1017,7 @@ namespace tracer
             manipT.transform.rotation = Quaternion.identity;
             manipT.transform.localScale = GetModifierScale();
             modeTRS = 0;
-            previousTrsMode = modeTRS;
+            savedTrsMode = modeTRS;
             // Incomplete function - lacking manipulator mode
         }
 
@@ -1028,20 +1040,8 @@ namespace tracer
                 return;
             }
 
-            if (selObj)
-            {
-                if (manipulatorMode == 0 )
-                {
-                    SetModeT();
-                }
-                else if (manipulatorMode == 1)
-                {
-                    SetModeR();
-                }
-                else if (manipulatorMode == 2)
-                {
-                    SetModeS();
-                }
+            if (selObj){
+                SetModeTRS((TRSModeEnum)manipulatorMode);
             }
 
         }
@@ -1069,14 +1069,27 @@ namespace tracer
         //!
         //! Update the manipulator rotation according to rotation parameter changes
         //!
-        public void UpdateManipulatorRotation(object sender, Quaternion rotation)
-        {
-            if (selObjs.Count == 1) // only update here if single selection
-            {
+        public void UpdateManipulatorRotation(object sender, Quaternion rotation){
+            // only update here if single selection
+            if (selObjs.Count == 1) {
+                //Debug.Log("UpdateManipulatorRotation");
+                //this will happen ongoing while we hold to rotate
+                //and it is completely wrong for other ManipulationLayers like global or viewport!
                 Quaternion q = selObj.transform.rotation;
                 manipT.transform.localRotation = q;
                 manipR.transform.localRotation = q;
                 manipS.transform.localRotation = q;
+
+                switch ((TRSModeEnum)savedTrsMode) {
+                    case TRSModeEnum.ROTATE:
+                        //global/viewport: does not rotate the gizmo...
+                        UpdateGizmoAxisLayer(manipR.transform, selObj.transform, Camera.main.transform, manager.ManipulationLayer);
+                        break;
+                    case TRSModeEnum.SCALE:
+                    case TRSModeEnum.TRANSLATE:
+                    default:
+                        break;
+                }     
             }
         }
 
@@ -1150,46 +1163,27 @@ namespace tracer
 
         }
 
-
-        //!
-        //! Set transform gizmo to translate mode
-        //!
-        public void SetModeT(){
-            //Debug.Log("T mode");
-            if (selObj != null){
-                HideAxes();
-                ShowAxis(manipT);
-                TransformAxisMulti(manipT);
-                modeTRS = 0;
-                previousTrsMode = modeTRS;
-            }
+        public enum TRSModeEnum {
+            TRANSLATE = 0, ROTATE = 1, SCALE = 2, NONE
         }
 
-        //!
-        //! Set transform gizmo to rotate mode
-        //!
-        public void SetModeR(){
-            //Debug.Log("R mode");
-            if (selObj != null){
+        public void SetModeTRS(TRSModeEnum mode) {
+            if (selObj != null && mode != TRSModeEnum.NONE){
+                GameObject manipulator = null;
+                UIManager.ManipulationLayerEnum manipLayer = manager.ManipulationLayer;;
+                switch (mode) {
+                    case TRSModeEnum.TRANSLATE: manipulator = manipT; break;
+                    case TRSModeEnum.ROTATE:    manipulator = manipR; break;
+                    case TRSModeEnum.SCALE:     manipulator = manipS; manipLayer = UIManager.ManipulationLayerEnum.LOCAL; break;
+                }
                 HideAxes();
-                ShowAxis(manipR);
-                TransformAxisMulti(manipR);
-                modeTRS = 1;
-                previousTrsMode = modeTRS;
-            }
-        }
+                ShowAxis(manipulator);
+                TransformAxisMulti(manipulator);
+                
+                UpdateGizmoAxisLayer(manipulator.transform, selObj.transform, Camera.main.transform, manipLayer);
 
-        //!
-        //! Set transform gizmo to scale mode
-        //!
-        public void SetModeS(){
-            //Debug.Log("S mode");
-            if (selObj != null){
-                HideAxes();
-                ShowAxis(manipS);
-                TransformAxisMulti(manipS);
-                modeTRS = 2;
-                previousTrsMode = modeTRS;
+                modeTRS = (int)mode;
+                savedTrsMode = modeTRS;
             }
         }
 

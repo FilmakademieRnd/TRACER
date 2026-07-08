@@ -166,24 +166,9 @@ namespace tracer{
             if(!obj || manager.isThisOurSelectedObject(obj))
                 return;
             manager.clearSelectedObjects();
-            switch (obj){
-                case SceneObjectCamera:
-                    if (manager.activeRole == UIManager.Roles.EXPERT ||
-                        manager.activeRole == UIManager.Roles.DOP)
-                        manager.addSelectedObject(obj);
-                    break;
-                case SceneObjectLight:
-                    if (manager.activeRole == UIManager.Roles.EXPERT ||
-                        manager.activeRole == UIManager.Roles.LIGHTING ||
-                        manager.activeRole == UIManager.Roles.SET)
-                        manager.addSelectedObject(obj);
-                    break;
-                default:
-                    if (manager.activeRole == UIManager.Roles.EXPERT ||
-                        manager.activeRole == UIManager.Roles.SET)
-                        manager.addSelectedObject(obj);
-                    break;
-            }
+            
+            if(EvaluationHelper.Instance.IsSelectableWithRole(obj, manager.activeRole))
+                manager.addSelectedObject(obj);
         }
         
         //!

@@ -43,35 +43,13 @@ namespace tracer{
     public class ControllerModule : InputManagerModule{
 
         //!
-        //! Reference to the main camera GameObject
-        //!
-        private GameObject _mainCamera;
-
-        //!
-        //! Reference to the crosshair GameObject
-        //!
-        private GameObject _crosshair;
-
-        //!
-        //! Prefab for the controller canvas
-        //!
-        private GameObject _controllerCanvasPrefab;
-
-        //!
         //! Reference to the instantiated controller canvas
         //!
-        private GameObject _controllerCanvas;
-
+        private GameObject _controllerCrosshairCanvas;
         //!
-        //! Reference to the current add selector GameObject
+        //! Instead of checking for other input, we simply switch the croshair off after a certain time w/o input
         //!
-        private GameObject _currentAddSelector;
-
-        //!
-        //! Reference to the crosshair m_image
-        //!
-        private Image _crossHairImg;
-
+        private float crosshairOffTimer = -1f;
         //!
         //! Reference to the currently selected scene object
         //!
@@ -83,24 +61,9 @@ namespace tracer{
         private SnapSelect _selectorSnapSelect;
 
         //!
-        //! Reference to the spinner SnapSelect component
-        //!
-        private SnapSelect _spinnerSnapSelect;
-
-        //!
-        //! Reference to the button selector SnapSelect component
-        //!
-        private SnapSelect _buttonSelectorPrefabSnapSelect; // (Clone)
-
-        //!
         //! Reference to the color select component
         //!
         private ColorSelect _colorSelect;
-
-        //!
-        //! Reference to the Camera component
-        //!
-        private Camera _camera;
 
         //!
         //! Reference to the UIManager
@@ -113,31 +76,6 @@ namespace tracer{
         private SceneManager _sceneManager;
 
         //!
-        //! Reference to the SelectionModule
-        //!
-        private SelectionModule _selectionModule;
-
-        //!
-        //! Reference to the CameraSelectionModule
-        //!
-        private CameraSelectionModule _cameraSelectionModule;
-
-        //!
-        //! List of scene objects
-        //!
-        private List<SceneObject> _sceneObjectsList;
-
-        //!
-        //! List of scene lights
-        //!
-        private List<SceneObjectLight> _sceneObjectLightsList;
-
-        //!
-        //! List of scene cameras
-        //!
-        private List<SceneObjectCamera> _sceneObjectCamerasList;
-
-        //!
         //! List of elements in the selector SnapSelect
         //!
         private List<SnapSelectElement> _selectorSnapSelectElementsList;
@@ -147,65 +85,6 @@ namespace tracer{
         //!
         private int _selectorCurrentSelectedSnapSelectElement = 0;
 
-        //!
-        //! The index of the currently selected SnapSelect element in the spinner
-        //!
-        // private int _spinnerCurrentSelectedSnapSelectElement = 0;
-
-        //!
-        //! The index of the currently selected object in the list
-        //!
-        private int _selectedListObject;
-
-        //!
-        //! The ID of the camera selection button
-        //!
-        private int _cameraSelectionButtonID;
-
-        //!
-        //! The value of the left stick on the controller
-        //!
-        private Vector2 _leftStickValue;
-
-        //!
-        //! The value of the right stick on the controller
-        //!
-        private Vector2 _rightStickValue;
-
-        //!
-        //! The resulting vector from controller input
-        //!
-        private Vector3 _result;
-
-        //!
-        //! Flag indicating whether the crosshair is currently visible
-        //!
-        private bool _isCrosshairOn;
-
-        //!
-        //! Flag indicating whether the "look through" mode is active
-        //!
-        private bool _lookThroughOn;
-
-        //!
-        //! Constant for movement speed
-        //!
-        private const float Speed = 3f;
-
-        //!
-        //! Constant for rotation speed
-        //!
-        private const float RptationSpeed = 100f;
-
-        //!
-        //! The ray used for raycasting
-        //!
-        private Ray _ray;
-
-        //!
-        //! The RaycastHit data from raycasting
-        //!
-        private RaycastHit _hit;
 
         //!
         //! The currently selected abstract parameter
@@ -263,51 +142,19 @@ namespace tracer{
         //!
         //! Initialization method for the controller.
         //!
-        protected override void Init(object sender, EventArgs e)
-        {
-            // Load the controller canvas prefab.
-            _controllerCanvasPrefab = Resources.Load("Prefabs/ControllerCanvas") as GameObject;
-            
-            // Find the main camera.
-            _mainCamera = GameObject.FindGameObjectsWithTag("MainCamera")[0];
-            
-            // Get the camera component.
-            _camera = _mainCamera.GetComponent<Camera>();
-            
+        protected override void Init(object sender, EventArgs e){
             // Get the scene manager from the _core.
             _sceneManager = core.getManager<SceneManager>();
             
             // Get the UI manager from the _core.
             _uiManager = core.getManager<UIManager>();
-            
-            // Get the selection module from the UI manager.
-            _selectionModule = _uiManager.getModule<SelectionModule>();
 
             // Subscribe to the ControllerdoneEditing event.
             ControllerdoneEditing += _sceneManager.getModule<UndoRedoModule>().addHistoryStep;
 
-            // Initialize lists for scene objects, lights, and cameras.
-            _sceneObjectsList = _sceneManager.simpleSceneObjectList;
-            _sceneObjectLightsList = _sceneManager.sceneLightList;
-            _sceneObjectCamerasList = _sceneManager.sceneCameraList;
-
-            // Subscribe to controller button events.
-/*          manager.buttonNorth += PressNorth;
-            manager.buttonSouth += PressSouth;
-            manager.buttonEast += PressEast;
-            manager.buttonWest += PressWest;
-            manager.buttonUp += PressUp;
-            manager.buttonDown += PressDown;
-            manager.buttonLeft += PressLeft;
-            manager.buttonRight += PressRight;
-            manager.buttonLeftTrigger += PressLeftTrigger;
-            manager.buttonRightTrigger += PressRightTrigger;
-            manager.buttonLeftShoulder += PressLeftShoulder;
-            manager.buttonRighrShoulder += PressRightShoulder;
-            manager.leftControllerStick += MoveLeftStick;
-            manager.rightControllerStick += MoveRightStick;
-            manager.ControllerStickCanceled += DoneEditing;
-*/
+            //SHOW CORSHAIR
+            _controllerCrosshairCanvas = UnityEngine.Object.Instantiate(Resources.Load("Prefabs/ControllerCanvas") as GameObject, Camera.main.transform);
+            _controllerCrosshairCanvas.SetActive(false);
 
             //TODO: start controller peripherie check method
             //      do not subscribe to events if we have no controller!
@@ -319,17 +166,18 @@ namespace tracer{
             m_inputs = new Inputs();
             m_inputs.VPETMap.Enable();
             //doing this in the update!
-            m_inputs.VPETMap.Controller_South.started   += PressConfirm;
-            m_inputs.VPETMap.Controller_East.started    += PressCancel;
-            m_inputs.VPETMap.Controller_Left_Shoulder.started    += PressLeftShoulder;
-            m_inputs.VPETMap.Controller_Right_Shoulder.started   += PressRightShoulder;
-            m_inputs.VPETMap.Controller_Left_Stick_Press.started += PressLeftStick;
+            m_inputs.VPETMap.Controller_South.canceled   += PressConfirm;
+            m_inputs.VPETMap.Controller_East.canceled    += PressCancel;
+            m_inputs.VPETMap.Controller_Left_Shoulder.canceled    += PressLeftShoulder;
+            m_inputs.VPETMap.Controller_Right_Shoulder.canceled   += PressRightShoulder;
+            m_inputs.VPETMap.Controller_Left_Stick_Press.canceled += PressLeftStick;
 
             
 
             // Subscribe to UI manager events.
             _uiManager.selectionChanged += UiManagerSelectionChanged;
-            _uiManager.selectionRemoved += UiManagerSelectionRemoved;
+            //_uiManager.selectionRemoved += UiManagerSelectionRemoved;
+            _uiManager.UI2DCreated += UiCreationFinished;
             _uiManager.colorSelectGameObject += GetColorSelect;
         }
 
@@ -361,7 +209,8 @@ namespace tracer{
 
             // Unsubscribe from UI manager events.
             _uiManager.selectionChanged -= UiManagerSelectionChanged;
-            _uiManager.selectionRemoved -= UiManagerSelectionRemoved;
+            //_uiManager.selectionRemoved -= UiManagerSelectionRemoved;
+            _uiManager.UI2DCreated      -= UiCreationFinished;
             _uiManager.colorSelectGameObject -= GetColorSelect;
 
             // Unsubscribe from the ControllerdoneEditing event.
@@ -370,143 +219,9 @@ namespace tracer{
             // Direct access to a module should be prevented!
             //ControllerdoneEditing -= _sceneManager.getModule<UndoRedoModule>().addHistoryStep;
         }
-        
-        #region ControllerInputs
-        //!
-        //! Handles the "North" button press on the controller.
-        //!
-        private void PressNorth(object sender, float e){
-            // if (_currentState != ControllerModes.MAIN_VIEW_MODE)
-            //     core.getManager<SceneManager>().getModule<UndoRedoModule>().undoStep();
-        }
+    
 
-        //!
-        //! Handles the "South" button press on the controller.
-        //!
-        private void PressSouth(object sender, float e){
-            /*if (_currentState == ControllerModes.MAIN_VIEW_MODE && _isCrosshairOn)
-            {
-                SelectSceneObject();
-                return;
-            }
-
-            if (_currentState == ControllerModes.CAMERAS_MODE && !_lookThroughOn)
-            {
-                _uiManager.getButton("CameraSelectionButton").action.Invoke();
-                _uiManager.getButton("CameraSelectionButton").showHighlighted(true);
-
-                _lookThroughOn = true;
-            }
-            else if (_lookThroughOn)
-            {
-                _uiManager.getButton("CameraSelectionButton").action.Invoke();
-                _uiManager.getButton("CameraSelectionButton").showHighlighted(false);
-
-                SwitchToDefaultMode();
-                _lookThroughOn = false;
-            }*/
-        }
-
-        //!
-        //! Handles the "East" button press on the controller.
-        //!
-        private void PressEast(object sender, float e){
-           /*if (_lookThroughOn)
-            {
-                _uiManager.getButton("CameraSelectionButton").action.Invoke();
-                _uiManager.getButton("CameraSelectionButton").showHighlighted(false);
-                _lookThroughOn = false;
-            }
-
-            SwitchToDefaultMode();*/
-        }
-
-        //!
-        //! Handles the "West" button press on the controller.
-        //!
-        private void PressWest(object sender, float e){
-            /*if (_currentState == ControllerModes.MAIN_VIEW_MODE)
-            {
-                OnOrOffCrosshair();
-            }
-
-            if (_currentState != ControllerModes.MAIN_VIEW_MODE)
-            {
-                core.getManager<SceneManager>().getModule<UndoRedoModule>().redoStep();
-            }*/
-        }
-
-
-        //!
-        //! Handles the "Left" button press on the controller.
-        //!
-        private void PressLeft(object sender, float e)
-        {
-            /*if (_currentState != ControllerModes.MAIN_VIEW_MODE)
-            {
-                SwitchToPreviousSpinnerMode();
-            }*/
-            
-            // Handle left button press.
-        }
-
-        //!
-        //! Handles the "Right" button press on the controller.
-        //!
-        private void PressRight(object sender, float e)
-        {
-            
-            /*if (_currentState != ControllerModes.MAIN_VIEW_MODE)
-               {
-                   SwitchToNextSpinnerMode();
-               }*/
-            
-            // Handle right button press.
-        }
-
-        //!
-        //! Handles the "Left Trigger" button press on the controller.
-        //!
-        private void PressLeftTrigger(object sender, float e)
-        {
-            
-        }
-
-        //!
-        //! Handles the "Right Trigger" button press on the controller.
-        //!
-        private void PressRightTrigger(object sender, float e)
-        {
-            
-        }
-
-
-        //!
-        //! Handles the left controller stick movement.
-        //!
-        //! @param value The vector representing the stick movement.
-        //!
-        private void MoveLeftStick(object sender, Vector2 value)
-        {
-            _leftStickValue = value;
-        }
-
-        //!
-        //! Handles the right controller stick movement.
-        //!
-        //! @param value The vector representing the stick movement.
-        //!
-        private void MoveRightStick(object sender, Vector2 value)
-        {
-            _rightStickValue = value;
-        }
-
-        #endregion
-
-        public ControllerModule(string name, Manager manager) : base(name, manager)
-        {
-            
-        }
+        public ControllerModule(string name, Manager manager) : base(name, manager){}
 
         #region PROCESSING
         private void ProcessRightStick(InputManager.InputTracker _tracker, Vector2 rawStickInput) {
@@ -526,7 +241,8 @@ namespace tracer{
                 // --- STARTED PHASE ---
                 if (!_isRightStickDragging) {
                     _isRightStickDragging = true;
-                    ShowCrosshair();
+                    _controllerCrosshairCanvas.SetActive(true);
+                    crosshairOffTimer = 10f;
                     
                     // Fire your specific DragOtherEvent
                     FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, syntheticDelta);
@@ -555,7 +271,9 @@ namespace tracer{
         //!
         private void ProcessLeftStick(InputManager.InputTracker _tracker, Vector2 rawStickInput) {
             Vector2 syntheticDelta;
+            Quaternion parentRotation;
             float manipulationSpeed = Time.deltaTime;
+
             switch (controlMode) {
                 case ControllerModeEnum.Viewing:
                     //MOVING AROUND (switch to orbit by pressing the right stick - AND show the orbit around viz)
@@ -569,7 +287,8 @@ namespace tracer{
                         Vector2 screenCenter = ghostCursor; //new Vector2(Screen.width / 2f, Screen.height / 2f);
                         if (!_isLeftStickDragging) {
                             _isLeftStickDragging = true;
-                            ShowCrosshair();
+                            _controllerCrosshairCanvas.SetActive(true);
+                            crosshairOffTimer = 10f;
 
                             FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, horDragDelta);
                             FirePinchOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, verPinchDelta);
@@ -586,52 +305,70 @@ namespace tracer{
                     break;
 
                 case ControllerModeEnum.Manip_Translate:
+                    if (rawStickInput.magnitude < stickDeadzone)
+                        return;
                     // Moves Object Local X / Z -> fire a drag event that emulates a hit at that gizmo part (this is prone to errors!)
                     // by just changing the parameter values, we dont have any of the "fancy ui" as when dragging though...
                     // -> either way, do like this for now (waiting for final ui/ux either way)
                     Parameter<Vector3> pos = (Parameter<Vector3>)_selectedAbstractParam;
                     syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime;
                     Vector3 manipulationVec;
-                    // if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                    //     manipulationVec = _currentSelectedSceneObject.transform.right + _currentSelectedSceneObject.transform.forward;
-                    // else
-                    //     manipulationVec = Vector3.right + Vector3.forward;
 
-                     if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                        manipulationVec = CalculateLocalPosition(_currentSelectedSceneObject.transform.position, _currentSelectedSceneObject.transform.rotation, syntheticDelta, manipulationSpeed);
+                    parentRotation = _currentSelectedSceneObject.transform.parent ? _currentSelectedSceneObject.transform.parent.rotation : Quaternion.identity;
+
+                    if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
+                        manipulationVec = CalculateLocalPosition(_currentSelectedSceneObject.transform.localPosition, _currentSelectedSceneObject.transform.localRotation, syntheticDelta, manipulationSpeed);
                     else if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.GLOBAL)
-                        manipulationVec = CalculateGlobalPosition(_currentSelectedSceneObject.transform.position, syntheticDelta, manipulationSpeed);
+                        manipulationVec = CalculateGlobalPosition(_currentSelectedSceneObject.transform.localPosition, parentRotation, syntheticDelta, manipulationSpeed);
                     else
-                        manipulationVec = CalculateCameraRelativePosition(_currentSelectedSceneObject.transform.position, syntheticDelta, Camera.main.transform, manipulationSpeed);
+                        manipulationVec = CalculateCameraRelativePosition(_currentSelectedSceneObject.transform.localPosition, parentRotation, syntheticDelta, Camera.main.transform, manipulationSpeed);
 
 
                     //pos.setValue(_currentSelectedSceneObject.transform.position + (Vector3)(manipulationVec * syntheticDelta * Time.deltaTime));
                     pos.setValue(manipulationVec);
                     break;
                 case ControllerModeEnum.Manip_Rotate:
+                    if (rawStickInput.magnitude < stickDeadzone)
+                        return;
+
                     manipulationSpeed = 10*Time.deltaTime;
                     // Rotate: Pitch / Roll
                     // -> either way, do like this for now (waiting for final ui/ux either way)
                     Parameter<Quaternion> rot = (Parameter<Quaternion>)_selectedAbstractParam;
                     syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime;
                     Quaternion manipulationRot;
+
+                    parentRotation = _currentSelectedSceneObject.transform.parent ? _currentSelectedSceneObject.transform.parent.rotation : Quaternion.identity;
+
                     if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                        manipulationRot = CalculateLocalRotation(_currentSelectedSceneObject.transform.rotation, syntheticDelta, manipulationSpeed);
+                        manipulationRot = CalculateLocalRotation(_currentSelectedSceneObject.transform.localRotation, syntheticDelta, manipulationSpeed);
                     else if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.GLOBAL)
-                        manipulationRot = CalculateGlobalRotation(_currentSelectedSceneObject.transform.rotation, syntheticDelta, manipulationSpeed);
+                        manipulationRot = CalculateGlobalRotation(_currentSelectedSceneObject.transform.localRotation, parentRotation, syntheticDelta, manipulationSpeed);
                     else
-                        manipulationRot = CalculateCameraRelativeRotation(_currentSelectedSceneObject.transform.rotation, syntheticDelta, Camera.main.transform, manipulationSpeed);
+                        manipulationRot = CalculateCameraRelativeRotation(_currentSelectedSceneObject.transform.localRotation, parentRotation, syntheticDelta, Camera.main.transform, manipulationSpeed);
 
                     rot.setValue(manipulationRot);
                     break;
                 case ControllerModeEnum.Manip_Scale:
+                    if (rawStickInput.magnitude < stickDeadzone)
+                        return;
+
                     Parameter<Vector3> scale = (Parameter<Vector3>)_selectedAbstractParam;
-                    syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime;
+                    syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime * manipulationSpeed;
                     Vector3 manipulationScale = _currentSelectedSceneObject.transform.localScale + (Vector3.one * syntheticDelta.y);
 
                     scale.setValue(manipulationScale);
                     break;
+                case ControllerModeEnum.Manip_Color:
+                    if (rawStickInput.magnitude < stickDeadzone || !_colorSelect)
+                        return;
+
+                    syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime * manipulationSpeed;
+                    _colorSelect.controllerManipulator(new Vector3(syntheticDelta.x, syntheticDelta.y, 0));
+                    break;
                 case ControllerModeEnum.Manipulation:
+                    if (rawStickInput.magnitude < stickDeadzone)
+                        return;
 
                     //SPECIFIC BEHAVIOUR
                     //- Translate: Moves Object Local X / Z (Floor plane)
@@ -655,17 +392,18 @@ namespace tracer{
         private void ProcessLeftTrigger(InputManager.InputTracker _tracker, float delta) {
             
             float manipulationSpeed = 10*Time.deltaTime;
+            Quaternion parentRotation;
             
             switch (controlMode) {
                 case ControllerModeEnum.Viewing:
                     if (Mathf.Abs(delta) > triggerDeadzone) {
                         Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
-                        
+                        float speed = 4f;
                         if (!_isLeftTriggerHold) {
                             _isLeftTriggerHold = true;
-                            FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, Vector2.up*delta);
+                            FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, Vector2.up*delta*speed);
                         }else {
-                            FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, Vector2.up*delta);
+                            FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, Vector2.up*delta*speed);
                         }
                     }else if (_isLeftTriggerHold) {
                         _isLeftTriggerHold = false;
@@ -679,14 +417,18 @@ namespace tracer{
                     if (Mathf.Abs(delta) <= triggerDeadzone) 
                         return;
 
+                    manipulationSpeed = 2*Time.deltaTime;
                     Parameter<Vector3> pos = (Parameter<Vector3>)_selectedAbstractParam;
                     Vector3 manipulationVec;
+
+                    parentRotation = _currentSelectedSceneObject.transform.parent ? _currentSelectedSceneObject.transform.parent.rotation : Quaternion.identity;
+
                     if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                        manipulationVec = CalculateLocalYPosition(_currentSelectedSceneObject.transform.position, _currentSelectedSceneObject.transform.rotation, -delta, manipulationSpeed);
+                        manipulationVec = CalculateLocalYPosition(_currentSelectedSceneObject.transform.localPosition, _currentSelectedSceneObject.transform.localRotation, -delta, manipulationSpeed);
                     else if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.GLOBAL)
-                        manipulationVec = CalculateGlobalYPosition(_currentSelectedSceneObject.transform.position, -delta, manipulationSpeed);
+                        manipulationVec = CalculateGlobalYPosition(_currentSelectedSceneObject.transform.localPosition, parentRotation, -delta, manipulationSpeed);
                     else
-                        manipulationVec = CalculateCameraRelativeYPosition(_currentSelectedSceneObject.transform.position, Camera.main.transform, -delta, manipulationSpeed);
+                        manipulationVec = CalculateCameraRelativeYPosition(_currentSelectedSceneObject.transform.localPosition, parentRotation, Camera.main.transform, -delta, manipulationSpeed);
 
 
                     pos.setValue(manipulationVec);
@@ -699,17 +441,24 @@ namespace tracer{
                     Parameter<Quaternion> rot = (Parameter<Quaternion>)_selectedAbstractParam;
                     Quaternion manipulationRot;
 
+                    parentRotation = _currentSelectedSceneObject.transform.parent ? _currentSelectedSceneObject.transform.parent.rotation : Quaternion.identity;
+
                     if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                        manipulationRot = CalculateLocalYaw(_currentSelectedSceneObject.transform.rotation, -delta, manipulationSpeed);
+                        manipulationRot = CalculateLocalYaw(_currentSelectedSceneObject.transform.localRotation, -delta, manipulationSpeed);
                     else if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.GLOBAL)
-                        manipulationRot = CalculateGlobalYaw(_currentSelectedSceneObject.transform.rotation, -delta, manipulationSpeed);
+                        manipulationRot = CalculateGlobalYaw(_currentSelectedSceneObject.transform.localRotation, parentRotation, -delta, manipulationSpeed);
                     else
-                        manipulationRot = CalculateCameraRelativeYaw(_currentSelectedSceneObject.transform.rotation, Camera.main.transform, -delta, manipulationSpeed);
+                        manipulationRot = CalculateCameraRelativeYaw(_currentSelectedSceneObject.transform.localRotation, parentRotation, Camera.main.transform, -delta, manipulationSpeed);
 
                     rot.setValue(manipulationRot);
                     break;
                 case ControllerModeEnum.Manip_Scale:
+                    break;
                 case ControllerModeEnum.Manip_Color:
+                    if (Mathf.Abs(delta) <= triggerDeadzone || !_colorSelect) 
+                        return;
+
+                    _colorSelect.controllerManipulator(new Vector3(0, 0, -delta));
                     break;
                 case ControllerModeEnum.Manipulation:
                 default:
@@ -717,6 +466,7 @@ namespace tracer{
                     if (Mathf.Abs(delta) <= triggerDeadzone) 
                         return;
 
+                    manipulationSpeed = 2*Time.deltaTime;
                     Parameter<float> val = (Parameter<float>)_selectedAbstractParam;
                     val.setValue(val.value - delta);
 
@@ -731,17 +481,18 @@ namespace tracer{
         private void ProcessRightTrigger(InputManager.InputTracker _tracker, float delta) {
             
             float manipulationSpeed = 10*Time.deltaTime;
+            Quaternion parentRotation;
             
             switch (controlMode) {
                 case ControllerModeEnum.Viewing:
                     if (Mathf.Abs(delta) > triggerDeadzone) {
                         Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
-                        
+                        float speed = 4f;
                         if (!_isRightTriggerHold) {
                             _isRightTriggerHold = true;
-                            FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, Vector2.down*delta);
+                            FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, Vector2.down*delta*speed);
                         }else {
-                            FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, Vector2.down*delta);
+                            FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, Vector2.down*delta*speed);
                         }
                     }else if (_isRightTriggerHold) {
                         _isRightTriggerHold = false;
@@ -755,14 +506,18 @@ namespace tracer{
                     if (Mathf.Abs(delta) <= triggerDeadzone) 
                         return;
 
+                    manipulationSpeed = 2*Time.deltaTime;
                     Parameter<Vector3> pos = (Parameter<Vector3>)_selectedAbstractParam;
                     Vector3 manipulationVec;
+
+                    parentRotation = _currentSelectedSceneObject.transform.parent ? _currentSelectedSceneObject.transform.parent.rotation : Quaternion.identity;
+
                     if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                        manipulationVec = CalculateLocalYPosition(_currentSelectedSceneObject.transform.position, _currentSelectedSceneObject.transform.rotation, delta, manipulationSpeed);
+                        manipulationVec = CalculateLocalYPosition(_currentSelectedSceneObject.transform.localPosition, _currentSelectedSceneObject.transform.localRotation, delta, manipulationSpeed);
                     else if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.GLOBAL)
-                        manipulationVec = CalculateGlobalYPosition(_currentSelectedSceneObject.transform.position, delta, manipulationSpeed);
+                        manipulationVec = CalculateGlobalYPosition(_currentSelectedSceneObject.transform.localPosition, parentRotation, delta, manipulationSpeed);
                     else
-                        manipulationVec = CalculateCameraRelativeYPosition(_currentSelectedSceneObject.transform.position, Camera.main.transform, delta, manipulationSpeed);
+                        manipulationVec = CalculateCameraRelativeYPosition(_currentSelectedSceneObject.transform.localPosition, parentRotation, Camera.main.transform, delta, manipulationSpeed);
 
 
                     pos.setValue(manipulationVec);
@@ -775,17 +530,23 @@ namespace tracer{
                     Parameter<Quaternion> rot = (Parameter<Quaternion>)_selectedAbstractParam;
                     Quaternion manipulationRot;
 
+                    parentRotation = _currentSelectedSceneObject.transform.parent ? _currentSelectedSceneObject.transform.parent.rotation : Quaternion.identity;
+
                     if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                        manipulationRot = CalculateLocalYaw(_currentSelectedSceneObject.transform.rotation, delta, manipulationSpeed);
+                        manipulationRot = CalculateLocalYaw(_currentSelectedSceneObject.transform.localRotation, delta, manipulationSpeed);
                     else if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.GLOBAL)
-                        manipulationRot = CalculateGlobalYaw(_currentSelectedSceneObject.transform.rotation, delta, manipulationSpeed);
+                        manipulationRot = CalculateGlobalYaw(_currentSelectedSceneObject.transform.localRotation, parentRotation, delta, manipulationSpeed);
                     else
-                        manipulationRot = CalculateCameraRelativeYaw(_currentSelectedSceneObject.transform.rotation, Camera.main.transform, delta, manipulationSpeed);
+                        manipulationRot = CalculateCameraRelativeYaw(_currentSelectedSceneObject.transform.localRotation, parentRotation, Camera.main.transform, delta, manipulationSpeed);
 
                     rot.setValue(manipulationRot);
                     break;
                 case ControllerModeEnum.Manip_Scale:
                 case ControllerModeEnum.Manip_Color:
+                    if (Mathf.Abs(delta) <= triggerDeadzone || !_colorSelect) 
+                        return;
+
+                    _colorSelect.controllerManipulator(new Vector3(0, 0, delta));
                     break;
                 case ControllerModeEnum.Manipulation:
                 default:
@@ -835,12 +596,13 @@ namespace tracer{
 
         #region BTN EVENTS
         private void PressConfirm(InputAction.CallbackContext ctx) {
+            //Debug.Log("PressConfirm<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
             if(_currentSelection != null) {
                 if(_currentSelection.GetComponent<SnapSelectElement>()){
-                    Debug.Log("Confirm selection as ControllerClick");
+                    //Debug.Log("Confirm selection as ControllerClick");
                     _currentSelection.GetComponent<SnapSelectElement>().ControllerClick();
                 }else{
-                    Debug.Log("Confirm selection as Selectable.OnSelect");
+                    //Debug.Log("Confirm selection as Selectable.OnSelect");
                     // lightweight base event payload
                     BaseEventData baseEvent = new BaseEventData(EventSystem.current);
                     
@@ -887,7 +649,7 @@ namespace tracer{
                     break;
                 default:
                     _uiManager.CycleManipulationMode();
-                    core.StartCoroutine(AnimateFloatingText("ManipulationLayer:"+_uiManager.ManipulationLayer, new Vector2(Screen.width / 2, Screen.height / 2)));
+                    core.StartCoroutine(AnimateFloatingText(""+_uiManager.ManipulationLayer, new Vector2(Screen.width / 2, Screen.height / 2)));
                     break;
             }
             
@@ -895,14 +657,9 @@ namespace tracer{
         #endregion
 
         private void CycleThroughSceneObjects(EvaluationHelper.NavDirection direction) {
-            //SceneObject currentSelectedSceneObject = um.SelectedObjects.Count > 0 ? core.getManager<UIManager>().SelectedObjects[0] : null;
-            SceneObject nextSceneObject = EvaluationHelper.Instance.FindNextVisibleObject(core.getManager<SceneManager>().getAllSceneObjects(), _currentSelectedSceneObject, Camera.main, direction);
+            //we do a check with role here too - ignore the overhead...
+            SceneObject nextSceneObject = EvaluationHelper.Instance.FindNextVisibleObject(core.getManager<SceneManager>().getAllSceneObjects(), _currentSelectedSceneObject, Camera.main, direction, _uiManager.activeRole);
             
-            /*if(_currentSelectedSceneObject != null)
-                _uiManager.clearSelectedObjects();
-            if(nextSceneObject != null)            
-                _uiManager.addSelectedObject(prevSceneObject);
-            */
             if (nextSceneObject != null){
                 if(_uiManager.isThisOurSelectedObject(nextSceneObject)){
                     return;
@@ -948,7 +705,7 @@ namespace tracer{
         //! called when destroying UI elements, or switching menus.
         //! ensures our current selection hasn't been disabled or destroyed.
         //!
-        public void RefreshUIElements(){
+        private void RevertUIElements(){
             Debug.Log("RefreshUIElements");
             // If our selected object was destroyed or turned off, clear it.
             if (_currentSelection != null && (!_currentSelection.gameObject.activeInHierarchy || !_currentSelection.interactable)){
@@ -1056,8 +813,8 @@ namespace tracer{
         //!
         private Quaternion CalculateLocalRotation(Quaternion currentRotation, Vector2 stickAxis, float speed) {
             // Positive X pitches forward. Negative Z rolls clockwise.
-            float pitchAngle = stickAxis.y * speed;
-            float rollAngle = -stickAxis.x * speed;
+            float pitchAngle = -stickAxis.x * speed;
+            float rollAngle =  stickAxis.y * speed;
             Quaternion localDelta = Quaternion.Euler(pitchAngle, 0f, rollAngle);
             // MULTIPLY ON THE RIGHT: Applies the rotation relative to the object's intrinsic axes.
             return currentRotation * localDelta;
@@ -1066,32 +823,37 @@ namespace tracer{
         //! 
         //! Pitches and rolls the object around the absolute world axes (World X and World Z).
         //!
-        private Quaternion CalculateGlobalRotation(Quaternion currentRotation, Vector2 stickAxis, float speed) {
-            float pitchAngle = stickAxis.y * speed;
-            float rollAngle = -stickAxis.x * speed;
+        private Quaternion CalculateGlobalRotation(Quaternion currentLocalRot, Quaternion parentRot, Vector2 stickAxis, float speed) {
+            float pitchAngle = -stickAxis.x * speed;
+            float rollAngle =  stickAxis.y * speed;
             Quaternion globalDelta = Quaternion.Euler(pitchAngle, 0f, rollAngle);
             // MULTIPLY ON THE LEFT: Applies the rotation relative to the absolute World space.
-            return globalDelta * currentRotation;
+            //return globalDelta * currentRotation;
+            // 2. THE FIX: Wrap the delta in the parent's space.
+            // Math Proof: TargetLocal = ParentInverse * WorldDelta * ParentRot * CurrentLocal
+            return Quaternion.Inverse(parentRot) * globalDelta * parentRot * currentLocalRot;
         }
 
         //!
         //! Pitches and rolls the object perfectly aligned with the screen, regardless of where the camera is looking.
         //!
-        private Quaternion CalculateCameraRelativeRotation(Quaternion currentRotation, Vector2 stickAxis, Transform cameraTransform, float speed) {
-            float pitchAngle = stickAxis.y * speed;
-            float rollAngle = -stickAxis.x * speed;
+        private Quaternion CalculateCameraRelativeRotation(Quaternion currentLocalRot, Quaternion parentRot, Vector2 stickAxis, Transform cameraTransform, float speed) {
+            float pitchAngle = -stickAxis.x * speed;
+            float rollAngle = stickAxis.y * speed;
 
             // Instead of Euler angles, we build absolute world-space rotations based on the Camera's current directional vectors.
             // Pitch rotates around the Camera's Right axis. Roll rotates around the Camera's Forward axis.
-            Quaternion pitchDelta = Quaternion.AngleAxis(pitchAngle, cameraTransform.right);
-            Quaternion rollDelta = Quaternion.AngleAxis(rollAngle, cameraTransform.forward);
+            Quaternion pitchDelta = Quaternion.AngleAxis(pitchAngle, cameraTransform.forward);
+            Quaternion rollDelta = Quaternion.AngleAxis(rollAngle, cameraTransform.right);
 
             // Combine the two camera-aligned deltas
             Quaternion cameraDelta = pitchDelta * rollDelta;
 
             // MULTIPLY ON THE LEFT: Because our cameraDelta was built using World-Space vectors (camera.right/forward), 
             // we must apply it globally to the object.
-            return cameraDelta * currentRotation;
+            //return cameraDelta * currentRotation;
+            // 2. THE FIX: Wrap the delta in the parent's space.
+            return Quaternion.Inverse(parentRot) * cameraDelta * parentRot * currentLocalRot;
         }
         
         /*private void RotateLocal(Transform target, Vector2 stickInput, float rotationSpeed){
@@ -1153,22 +915,26 @@ namespace tracer{
         //!
         //! Spins the object around the absolute world center axis (like a carousel).
         //!
-        public Quaternion CalculateGlobalYaw(Quaternion currentRotation, float axisInput, float speed) {
+        public Quaternion CalculateGlobalYaw(Quaternion currentRotation, Quaternion parentRot, float axisInput, float speed) {
             float yawAngle = axisInput * speed;
             Quaternion globalDelta = Quaternion.Euler(0f, yawAngle, 0f);
             // MULTIPLY ON LEFT: Extrinsic world rotation
-            return globalDelta * currentRotation;
+            //return globalDelta * currentRotation;
+            // bugfix: Wrap the world delta in the parent's space.
+            return Quaternion.Inverse(parentRot) * globalDelta * parentRot * currentRotation;
         }
 
         //!
         //! Spins the object perfectly upright relative to your screen view.
         //!
-        public Quaternion CalculateCameraRelativeYaw(Quaternion currentRotation, Transform cameraTransform, float axisInput, float speed) {
+        public Quaternion CalculateCameraRelativeYaw(Quaternion currentRotation, Quaternion parentRot, Transform cameraTransform, float axisInput, float speed) {
             float yawAngle = axisInput * speed;
             // Build an angle-axis delta using the Camera's Up vector as the pivot axle
             Quaternion cameraDelta = Quaternion.AngleAxis(yawAngle, cameraTransform.up);
             // MULTIPLY ON LEFT: Applied globally using the calculated camera axis
-            return cameraDelta * currentRotation;
+            //return cameraDelta * currentRotation;
+            // bugfix: Wrap the camera's world delta in the parent's space.
+            return Quaternion.Inverse(parentRot) * cameraDelta * parentRot * currentRotation;
         }
 
         #endregion
@@ -1192,17 +958,20 @@ namespace tracer{
         //!
         //! Moves the object along the absolute World X and World Z axes, ignoring how the object is rotated.
         //!
-        public Vector3 CalculateGlobalPosition(Vector3 currentPosition, Vector2 stickAxis, float speed) {
+        public Vector3 CalculateGlobalPosition(Vector3 currentPosition, Quaternion parentRot, Vector2 stickAxis, float speed) {
             // No rotation math required. We just directly map the stick to world coordinates.
-            Vector3 globalDelta = new Vector3(stickAxis.x, 0f, stickAxis.y) * speed;
+            Vector3 worldDelta = new Vector3(stickAxis.x, 0f, stickAxis.y) * speed;
 
-            return currentPosition + globalDelta;
+            // bugfix: Convert the World Delta into the Parent's Local Space (otherwise nested rotated objects moved wrongly!)
+            Vector3 localDelta = Quaternion.Inverse(parentRot) * worldDelta;
+
+            return currentPosition + localDelta;
         }
 
         //!
         //! Moves the object relative to the screen, but locks the movement to the X/Z floor plane.
         //!
-        public Vector3 CalculateCameraRelativePosition(Vector3 currentPosition, Vector2 stickAxis, Transform cameraTransform, float speed) {
+        public Vector3 CalculateCameraRelativePosition(Vector3 currentPosition, Quaternion parentRot, Vector2 stickAxis, Transform cameraTransform, float speed) {
             // the camera's raw directional vectors
             Vector3 camForward = cameraTransform.forward;
             Vector3 camRight = cameraTransform.right;
@@ -1218,7 +987,11 @@ namespace tracer{
             camRight.Normalize();
 
             Vector3 viewportDelta = (camRight * stickAxis.x + camForward * stickAxis.y) * speed;
-            return currentPosition + viewportDelta;
+
+            // bugfix: Convert the World Delta into the Parent's Local Space
+            Vector3 localDelta = Quaternion.Inverse(parentRot) * viewportDelta;
+
+            return currentPosition + localDelta;
         }
 
         //*********** ONE AXIS VIA BUMPER
@@ -1235,18 +1008,25 @@ namespace tracer{
         //!
         //! Moves the object strictly up toward the sky or down toward the world floor, ignoring object rotation.
         //!
-        public Vector3 CalculateGlobalYPosition(Vector3 currentPosition, float axisInput, float speed) {
+        public Vector3 CalculateGlobalYPosition(Vector3 currentPosition, Quaternion parentRot, float axisInput, float speed) {
             Vector3 globalDelta = new Vector3(0f, axisInput, 0f) * speed;
-            return currentPosition + globalDelta;
+            
+            // bugfix: Convert the World Delta into the Parent's Local Space
+            Vector3 localDelta = Quaternion.Inverse(parentRot) * globalDelta;
+
+            return currentPosition + localDelta;
         }
 
         //!
         //! Moves the object up or down relative to your monitor screen.
         //!
-        public Vector3 CalculateCameraRelativeYPosition(Vector3 currentPosition, Transform cameraTransform, float axisInput, float speed) {
+        public Vector3 CalculateCameraRelativeYPosition(Vector3 currentPosition, Quaternion parentRot, Transform cameraTransform, float axisInput, float speed) {
             // Use the camera's raw Up vector (no floor projection needed here, as we want vertical screen movement)
             Vector3 viewportDelta = cameraTransform.up * axisInput * speed;
-            return currentPosition + viewportDelta;
+            // bugfix: Convert the Camera's World Delta into the Parent's Local Space
+            Vector3 localDelta = Quaternion.Inverse(parentRot) * viewportDelta;
+
+            return currentPosition + localDelta;
         }
         #endregion
         
@@ -1268,80 +1048,12 @@ namespace tracer{
             //shoulder buttons as switch: orbit<>look, 
 
             ProcessDPad();
-            return;
             
-
-            if (_isCrosshairOn)
-            {
-                CrosshairChangeColor();
+            if(crosshairOffTimer > 0f) {
+                crosshairOffTimer -= Time.deltaTime;
+                if(crosshairOffTimer <= 0f)
+                    _controllerCrosshairCanvas.SetActive(false);
             }
-
-            if (controlMode != ControllerModeEnum.Viewing)
-            {
-                // Get the camera's forward and right vectors in world space
-                Vector3 cameraForward = _mainCamera.transform.forward;
-                Vector3 cameraRight = _mainCamera.transform.right;
-
-                // Normalize the vectors
-                cameraForward.Normalize();
-                cameraRight.Normalize();
-
-                // Calculate the movement direction based on the camera's orientation
-                Vector3 movementDirection = cameraForward * _leftStickValue.y + cameraRight * _leftStickValue.x;
-                movementDirection.y = _rightStickValue.y;
-
-                // Apply the movement
-                _result = movementDirection * (Speed * Time.deltaTime);
-
-                switch (_selectedAbstractParam.name)
-                {
-                    case "position":
-                    case "scale":
-                        Parameter<Vector3> paramVec3 = (Parameter<Vector3>)_selectedAbstractParam;
-                        Vector3 valVec3 = paramVec3.value;
-                        //_result = new Vector3(_leftStickValue.x, _rightStickValue.y, _leftStickValue.y) * (Speed * Time.deltaTime);
-                        if (paramVec3.value + _result != paramVec3.value)
-                        {
-                            paramVec3.setValue(paramVec3.value + _result);
-                        }
-                        //_selectedAbstractParam. = _result;
-                        break;
-                    case "rotation":
-                        Parameter<Quaternion> paramQuat = (Parameter<Quaternion>)_selectedAbstractParam;
-                        Quaternion rot = paramQuat.value;
-                        rot = Quaternion.Euler(_leftStickValue.x, _rightStickValue.y, _leftStickValue.y);
-                        if (paramQuat.value * rot != paramQuat.value)
-                        {
-                            paramQuat.setValue(paramQuat.value * rot);
-                        }
-                        break;
-                    case "sensorSize":
-                        Parameter<Vector2> paramVec2 = (Parameter<Vector2>)_selectedAbstractParam;
-                        //result = new Vector3(_leftStickValue.x, _rightStickValue.y, _leftStickValue.y) * (Speed * Time.deltaTime);
-                        Vector2 valVec2 = new Vector2(_result.x, _result.z);
-                        if (paramVec2.value + valVec2 != paramVec2.value)
-                        {
-                            paramVec2.setValue(paramVec2.value + valVec2);
-                        }
-                        break;
-                    case "color":
-                        _colorSelect.controllerManipulator(new Vector3(_leftStickValue.x, _leftStickValue.y, _rightStickValue.y));
-                        break;
-                    default:
-                        Parameter<float> paramFlo = (Parameter<float>)_selectedAbstractParam;
-                        paramFlo.setValue(paramFlo.value + _rightStickValue.y);
-                        paramFlo.setValue(paramFlo.value + _leftStickValue.y);
-                        break;
-                }
-            }
-            else
-            {
-                _result = new Vector3(_leftStickValue.x, _rightStickValue.y, _leftStickValue.y) * (Speed * Time.deltaTime);
-                float rotationAmount = _rightStickValue.x * RptationSpeed * Time.deltaTime;
-                _mainCamera.transform.Rotate(Vector3.up, rotationAmount);
-                _mainCamera.transform.Translate(_result);
-            }
-            //_selectedObject.transform.Translate(_result);
         }
         
         //!
@@ -1352,47 +1064,6 @@ namespace tracer{
             _colorSelect = go.GetComponent<ColorSelect>();
         }
 
-        
-        
-        #region Crosshair Logic
-        
-        //!
-        //! If the crosshair is off, it is created and displayed. If it's already on, it is destroyed.
-        //!
-        private void OnOrOffCrosshair()
-        {
-            if (!_isCrosshairOn)
-            {
-                _controllerCanvas = UnityEngine.Object.Instantiate(_controllerCanvasPrefab, _camera.transform);
-                _crossHairImg = _controllerCanvas.GetComponentInChildren<Image>();
-                _isCrosshairOn = true;
-            }
-            else
-            {
-                UnityEngine.Object.Destroy(_controllerCanvas);
-                _isCrosshairOn = false;
-            }
-        }
-
-        private void ShowCrosshair(){
-            if (!_isCrosshairOn){
-                _controllerCanvas = UnityEngine.Object.Instantiate(_controllerCanvasPrefab, _camera.transform);
-                _crossHairImg = _controllerCanvas.GetComponentInChildren<Image>();
-                _isCrosshairOn = true;
-            }
-        }
-        
-        //!
-        //! If the crosshair is on, it is immediately destroyed.
-        //!
-        private void OffCrosshair()
-        {
-            if (_isCrosshairOn)
-            {
-                UnityEngine.Object.Destroy(_controllerCanvas);
-                _isCrosshairOn = false;
-            }
-        }
         
         //!
         //! Turns off the crosshair, clears the selected object in the UI manager, and initiates controller selection.
@@ -1428,74 +1099,45 @@ namespace tracer{
                 _uiManager.clearSelectedObjects();
             }
         }
-        
-        //!
-        //! This method adjusts the color and scale of the crosshair based on raycasting and the object hit.
-        //!
-        private void CrosshairChangeColor(){
-            //TODO: change and utilize the selection via our current events (and the already done raycast etc)
-            _ray = _camera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-
-            if (Physics.Raycast(_ray, out _hit)){
-                if (_hit.transform.gameObject.GetComponent<SceneObject>() || _hit.transform.gameObject.GetComponent<IconUpdate>())
-                {
-                    _crossHairImg.color = _uiManager.uiAppearanceSettings.colors.ElementSelection_Highlight;
-                    _crossHairImg.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
-                }
-            }
-            else if (_uiManager.GetSelectableAtPixel(Screen.width / 2, Screen.height / 2))
-            {
-                _crossHairImg.color = _uiManager.uiAppearanceSettings.colors.ElementSelection_Highlight;
-                _crossHairImg.transform.localScale = new Vector3(0.15f, 0.15f, 0.15f);
-            }
-            else
-            {
-                _crossHairImg.color = Color.green;
-                _crossHairImg.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
-            }
-        }
-        
-        #endregion
-
+    
 
 
         #region Selection Logic
         
         //!
         //! This method responds to a change in the selected objects within the UI manager.
+        //! BUT ORDER IS NOT RELIABLE -> therefore put into UiCreationFinished
         //!
-        private void UiManagerSelectionChanged(object sender, List<SceneObject> sceneObjects){
-            //new!
-            RefreshUIElements();
-
-            OffCrosshair();
-            if (sceneObjects.Count > 0){
-                if (_controllerCanvas){
-                    UnityEngine.Object.Destroy(_controllerCanvas);
-                }
-
-                _currentSelectedSceneObject = sceneObjects[0];
-                Debug.Log("_currentSelectedSceneObject is "+_currentSelectedSceneObject.gameObject.name);
-
-                GetCurrentSelector();
-
-                controlMode = ControllerModeEnum.Manip_Translate;
-            }
-        }
+        //private void UiManagerSelectionChanged(object sender, List<SceneObject> sceneObjects){}
         
         //!
-        //! This method responds to the removal of selected objects in the UI manager.
+        //! This method responds to a change in the selected objects within the UI manager.´
+        //! beware that order of events is not fixed and we cannot rely on created ui here
         //!
-        private void UiManagerSelectionRemoved(object sender, SceneObject sceneObject){
-            //new!
-            RefreshUIElements();
+        private void UiManagerSelectionChanged(object sender, List<SceneObject> sceneObject){
+            RevertUIElements();
 
-            controlMode = ControllerModeEnum.Viewing;
+            if(_uiManager.SelectedObjects.Count == 0){
+                controlMode = ControllerModeEnum.Viewing;
+                _currentSelectedSceneObject = null;
+            }
+        }
 
-            OffCrosshair();
-            _selectedListObject = 0;
-            _currentSelectedSceneObject = null;
-            _isCrosshairOn = false;
+        // called when the ui has been (re)created
+        private void UiCreationFinished(object sender, UIBehaviour uib) {
+            // we have to call GetCurrentSelector here, because we instantly want to select something, but the order of events 
+            // from selection-changed is random!
+
+            if (uib != null && _uiManager.SelectedObjects.Count > 0){
+                _currentSelectedSceneObject = _uiManager.SelectedObjects[0];
+                //Debug.Log("_currentSelectedSceneObject is "+_currentSelectedSceneObject.gameObject.name);
+                GetCurrentSelector(uib);
+                controlMode = ControllerModeEnum.Manip_Translate;
+            } else {
+                controlMode = ControllerModeEnum.Viewing;
+                _currentSelectedSceneObject = null;
+            }
+            
         }
         #endregion
 
@@ -1505,8 +1147,9 @@ namespace tracer{
         //!
         //! This method retrieves the current selector when not in MAIN_VIEW_MODE.
         //!
-        private void GetCurrentSelector(){
-            _selectorSnapSelect = GameObject.Find("PRE_UI_AddSelector(Clone)").GetComponent<SnapSelect>();
+        private void GetCurrentSelector(UIBehaviour uib){
+            //_selectorSnapSelect = GameObject.Find("PRE_UI_AddSelector(Clone)").GetComponent<SnapSelect>();
+            _selectorSnapSelect = (SnapSelect)uib;
             _selectorSnapSelect.parameterChanged += ParamChange;
             
             // int because buttonID is int
