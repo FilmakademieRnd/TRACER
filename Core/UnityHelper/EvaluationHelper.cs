@@ -620,7 +620,6 @@ namespace tracer{
 
         public enum NavDirection { Left, Right }
 
-
         /// <summary>
         /// Finds the next visible object in the specified direction, or the center-closest if no selection exists.
         /// </summary>
@@ -684,13 +683,14 @@ namespace tracer{
                     if ((direction == NavDirection.Right && isRightwards) || 
                         (direction == NavDirection.Left && isLeftwards)){
                         
-                        float screenDistance = Vector2.Distance(currentVp, vp);
+                        // to catch ALL objects, simply cycle through them by their x screen-pos
+                        float score = Mathf.Abs(currentVp.x - vp.x);
 
+                        // float screenDistance = Vector2.Distance(currentVp, vp)
                         // Multiply the Y-difference to penalize objects that are technically closer diagonally, 
                         // but feel unnatural because they are way above or below the current object.
-                        float verticalPenalty = 0; //Mathf.Abs(vp.y - currentVp.y) * 2f; 
-                        
-                        float score = screenDistance + verticalPenalty;
+                        // float verticalPenalty = Mathf.Abs(vp.y - currentVp.y) * 2f; 
+                        // float score = screenDistance + verticalPenalty;
 
                         if (score < bestScore){
                             bestScore = score;

@@ -165,6 +165,15 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""initialStateCheck"": true
                 },
                 {
+                    ""name"": ""Controller_Right_Stick_Press"",
+                    ""type"": ""Button"",
+                    ""id"": ""7744ec77-60af-4aa3-9e59-163aa6298440"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": true
+                },
+                {
                     ""name"": ""Controller_Dpad"",
                     ""type"": ""Value"",
                     ""id"": ""b504901e-1da8-4252-b755-dbb192629a21"",
@@ -276,6 +285,15 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""name"": ""Controller_Right_Shoulder"",
                     ""type"": ""Button"",
                     ""id"": ""7ea99cd4-06e7-41e8-928c-02ab555c0689"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Controller_Select"",
+                    ""type"": ""Button"",
+                    ""id"": ""20b3c0c9-2474-4eb5-95f9-c53fc75a40dc"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
@@ -571,6 +589,28 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
+                    ""id"": ""6620c3d4-5647-4f6f-801a-4f4932fcf7bb"",
+                    ""path"": ""<Gamepad>/rightStickPress"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Right_Stick_Press"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f2cd2dd6-8b99-4a24-a920-b32c9149c3c8"",
+                    ""path"": ""<Keyboard>/m"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Right_Stick_Press"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
                     ""id"": ""cd19e369-9581-4712-81ab-66556866887e"",
                     ""path"": ""<Gamepad>/rightStick"",
                     ""interactions"": """",
@@ -766,6 +806,17 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""action"": ""OnPinch"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""045ebb1a-232c-4abc-b64e-c922c05fa65e"",
+                    ""path"": ""<Gamepad>/select"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Controller_Select"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -782,6 +833,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_Controller_Left_Stick = m_VPETMap.FindAction("Controller_Left_Stick", throwIfNotFound: true);
         m_VPETMap_Controller_Left_Stick_Press = m_VPETMap.FindAction("Controller_Left_Stick_Press", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Stick = m_VPETMap.FindAction("Controller_Right_Stick", throwIfNotFound: true);
+        m_VPETMap_Controller_Right_Stick_Press = m_VPETMap.FindAction("Controller_Right_Stick_Press", throwIfNotFound: true);
         m_VPETMap_Controller_Dpad = m_VPETMap.FindAction("Controller_Dpad", throwIfNotFound: true);
         m_VPETMap_Controller_Left_Trigger = m_VPETMap.FindAction("Controller_Left_Trigger", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Trigger = m_VPETMap.FindAction("Controller_Right_Trigger", throwIfNotFound: true);
@@ -795,6 +847,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_Controller_Right = m_VPETMap.FindAction("Controller_Right", throwIfNotFound: true);
         m_VPETMap_Controller_Left_Shoulder = m_VPETMap.FindAction("Controller_Left_Shoulder", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Shoulder = m_VPETMap.FindAction("Controller_Right_Shoulder", throwIfNotFound: true);
+        m_VPETMap_Controller_Select = m_VPETMap.FindAction("Controller_Select", throwIfNotFound: true);
     }
 
     ~@Inputs()
@@ -883,6 +936,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_Controller_Left_Stick;
     private readonly InputAction m_VPETMap_Controller_Left_Stick_Press;
     private readonly InputAction m_VPETMap_Controller_Right_Stick;
+    private readonly InputAction m_VPETMap_Controller_Right_Stick_Press;
     private readonly InputAction m_VPETMap_Controller_Dpad;
     private readonly InputAction m_VPETMap_Controller_Left_Trigger;
     private readonly InputAction m_VPETMap_Controller_Right_Trigger;
@@ -896,6 +950,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_Controller_Right;
     private readonly InputAction m_VPETMap_Controller_Left_Shoulder;
     private readonly InputAction m_VPETMap_Controller_Right_Shoulder;
+    private readonly InputAction m_VPETMap_Controller_Select;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
     /// </summary>
@@ -939,6 +994,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "VPETMap/Controller_Right_Stick".
         /// </summary>
         public InputAction @Controller_Right_Stick => m_Wrapper.m_VPETMap_Controller_Right_Stick;
+        /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_Right_Stick_Press".
+        /// </summary>
+        public InputAction @Controller_Right_Stick_Press => m_Wrapper.m_VPETMap_Controller_Right_Stick_Press;
         /// <summary>
         /// Provides access to the underlying input action "VPETMap/Controller_Dpad".
         /// </summary>
@@ -992,6 +1051,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @Controller_Right_Shoulder => m_Wrapper.m_VPETMap_Controller_Right_Shoulder;
         /// <summary>
+        /// Provides access to the underlying input action "VPETMap/Controller_Select".
+        /// </summary>
+        public InputAction @Controller_Select => m_Wrapper.m_VPETMap_Controller_Select;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_VPETMap; }
@@ -1041,6 +1104,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right_Stick.started += instance.OnController_Right_Stick;
             @Controller_Right_Stick.performed += instance.OnController_Right_Stick;
             @Controller_Right_Stick.canceled += instance.OnController_Right_Stick;
+            @Controller_Right_Stick_Press.started += instance.OnController_Right_Stick_Press;
+            @Controller_Right_Stick_Press.performed += instance.OnController_Right_Stick_Press;
+            @Controller_Right_Stick_Press.canceled += instance.OnController_Right_Stick_Press;
             @Controller_Dpad.started += instance.OnController_Dpad;
             @Controller_Dpad.performed += instance.OnController_Dpad;
             @Controller_Dpad.canceled += instance.OnController_Dpad;
@@ -1080,6 +1146,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right_Shoulder.started += instance.OnController_Right_Shoulder;
             @Controller_Right_Shoulder.performed += instance.OnController_Right_Shoulder;
             @Controller_Right_Shoulder.canceled += instance.OnController_Right_Shoulder;
+            @Controller_Select.started += instance.OnController_Select;
+            @Controller_Select.performed += instance.OnController_Select;
+            @Controller_Select.canceled += instance.OnController_Select;
         }
 
         /// <summary>
@@ -1115,6 +1184,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right_Stick.started -= instance.OnController_Right_Stick;
             @Controller_Right_Stick.performed -= instance.OnController_Right_Stick;
             @Controller_Right_Stick.canceled -= instance.OnController_Right_Stick;
+            @Controller_Right_Stick_Press.started -= instance.OnController_Right_Stick_Press;
+            @Controller_Right_Stick_Press.performed -= instance.OnController_Right_Stick_Press;
+            @Controller_Right_Stick_Press.canceled -= instance.OnController_Right_Stick_Press;
             @Controller_Dpad.started -= instance.OnController_Dpad;
             @Controller_Dpad.performed -= instance.OnController_Dpad;
             @Controller_Dpad.canceled -= instance.OnController_Dpad;
@@ -1154,6 +1226,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Right_Shoulder.started -= instance.OnController_Right_Shoulder;
             @Controller_Right_Shoulder.performed -= instance.OnController_Right_Shoulder;
             @Controller_Right_Shoulder.canceled -= instance.OnController_Right_Shoulder;
+            @Controller_Select.started -= instance.OnController_Select;
+            @Controller_Select.performed -= instance.OnController_Select;
+            @Controller_Select.canceled -= instance.OnController_Select;
         }
 
         /// <summary>
@@ -1251,6 +1326,13 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_Right_Stick(InputAction.CallbackContext context);
         /// <summary>
+        /// Method invoked when associated input action "Controller_Right_Stick_Press" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_Right_Stick_Press(InputAction.CallbackContext context);
+        /// <summary>
         /// Method invoked when associated input action "Controller_Dpad" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
         /// </summary>
         /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
@@ -1341,5 +1423,12 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_Right_Shoulder(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Controller_Select" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnController_Select(InputAction.CallbackContext context);
     }
 }

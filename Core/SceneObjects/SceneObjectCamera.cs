@@ -104,16 +104,20 @@ namespace tracer
         }
 
         // Start is called before the first frame update
-        public override void Awake()
-        {
+        public override void Awake(){
             base.Awake();
             _camera = this.GetComponent<Camera>();
 
-            if (_camera)
-            {
+            if (_camera){
+                // To use physical properties include the sensor size, lens shift, and focal length
+                // Ensure Physical Camera properties are enabled
+                // ... but it does f**k up standard settings of all cams
+                //_camera.usePhysicalProperties = true;
+
                 fov = new Parameter<float>(_camera.fieldOfView, "fov", this, true, UIManager.Roles.EXPERT);
                 fov.hasChanged += updateFov;
                 aspect = new Parameter<float>(_camera.aspect, "aspectRatio", this, true, UIManager.Roles.EXPERT);
+                aspect.hasChanged += updateAspect;
                 near = new Parameter<float>(_camera.nearClipPlane, "nearClipPlane", this, true, UIManager.Roles.EXPERT);
                 near.hasChanged += updateNearClipPlane;
                 far = new Parameter<float>(_camera.farClipPlane, "farClipPlane", this, true, UIManager.Roles.EXPERT);
@@ -142,8 +146,7 @@ namespace tracer
 
                 focalLengthPresets = new ListParameter(lensList, "FocalLengths", this, true, UIManager.Roles.DOP);
                 focalLengthPresets.hasChanged += updateFocalLengthSelection;
-            }
-            else
+            }else
                 Helpers.Log("no camera component found!");
         }
 

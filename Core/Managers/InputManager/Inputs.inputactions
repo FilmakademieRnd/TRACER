@@ -79,6 +79,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Controller_Right_Stick_Press",
+                    "type": "Button",
+                    "id": "7744ec77-60af-4aa3-9e59-163aa6298440",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
                     "name": "Controller_Dpad",
                     "type": "Value",
                     "id": "b504901e-1da8-4252-b755-dbb192629a21",
@@ -190,6 +199,15 @@
                     "name": "Controller_Right_Shoulder",
                     "type": "Button",
                     "id": "7ea99cd4-06e7-41e8-928c-02ab555c0689",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Controller_Select",
+                    "type": "Button",
+                    "id": "20b3c0c9-2474-4eb5-95f9-c53fc75a40dc",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -485,6 +503,28 @@
                 },
                 {
                     "name": "",
+                    "id": "6620c3d4-5647-4f6f-801a-4f4932fcf7bb",
+                    "path": "<Gamepad>/rightStickPress",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Right_Stick_Press",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f2cd2dd6-8b99-4a24-a920-b32c9149c3c8",
+                    "path": "<Keyboard>/m",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Right_Stick_Press",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "cd19e369-9581-4712-81ab-66556866887e",
                     "path": "<Gamepad>/rightStick",
                     "interactions": "",
@@ -678,6 +718,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "OnPinch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "045ebb1a-232c-4abc-b64e-c922c05fa65e",
+                    "path": "<Gamepad>/select",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Controller_Select",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

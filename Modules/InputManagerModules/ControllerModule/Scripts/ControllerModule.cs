@@ -53,7 +53,7 @@ namespace tracer{
         //!
         //! Reference to the currently selected scene object
         //!
-        private SceneObject _currentSelectedSceneObject;
+        private SceneObject _currentSelectedSceneObject, _previousSelectedSceneObject;
 
         //!
         //! Reference to the selector SnapSelect component
@@ -109,7 +109,9 @@ namespace tracer{
             Manip_Cam = 20,
             Manip_Light = 30,
             Manip_Color = 40,
-            Manip_SingleValue = 50  //hovered over e.g. the x value from position
+            Manip_SingleValue = 50,  //hovered over e.g. the x value from position
+            Manip_Vec2 = 53,    //e.g. sensorSize
+            Manip_ListParameter = 56    //e.g. SensorSizes
         }
         private ControllerModeEnum controlMode = ControllerModeEnum.Viewing;
         
@@ -132,10 +134,11 @@ namespace tracer{
         //! triggers
         private float triggerDeadzone = 0.1f;
         private bool _isLeftTriggerHold, _isRightTriggerHold = false;
+        private bool inOrbitMode = false;
         //! our input trackers for abstract utilization
         private InputManager.InputTracker _primary   = new InputManager.InputTracker(InputManager.InputLevel.Primary);
         private InputManager.InputTracker _secondary   = new InputManager.InputTracker(InputManager.InputLevel.Secondary);
-
+        private InputManager.InputTracker _tertiary   = new InputManager.InputTracker(InputManager.InputLevel.Tertiary);
         #endregion
 
 
@@ -168,11 +171,11 @@ namespace tracer{
             //doing this in the update!
             m_inputs.VPETMap.Controller_South.canceled   += PressConfirm;
             m_inputs.VPETMap.Controller_East.canceled    += PressCancel;
+            m_inputs.VPETMap.Controller_Select.canceled  += PressSelect;
             m_inputs.VPETMap.Controller_Left_Shoulder.canceled    += PressLeftShoulder;
             m_inputs.VPETMap.Controller_Right_Shoulder.canceled   += PressRightShoulder;
             m_inputs.VPETMap.Controller_Left_Stick_Press.canceled += PressLeftStick;
-
-            
+            m_inputs.VPETMap.Controller_Right_Stick_Press.canceled += PressRightStick;
 
             // Subscribe to UI manager events.
             _uiManager.selectionChanged += UiManagerSelectionChanged;
@@ -225,10 +228,10 @@ namespace tracer{
 
         #region PROCESSING
         private void ProcessRightStick(InputManager.InputTracker _tracker, Vector2 rawStickInput) {
-            // 2. Evaluate Deadzone
+            // Evaluate Deadzone
             if (rawStickInput.magnitude > stickDeadzone) {
                 
-                // 3. Synthesize the Touch Data
+                // Synthesize the Touch Data
                 // Multiply by deltaTime to make the panning frame-rate independent, 
                 // just like a smooth finger drag.
                 Vector2 syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime;
@@ -252,7 +255,7 @@ namespace tracer{
                     FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, syntheticDelta);
                 }
             }
-            // 4. Evaluate Stick Release
+            // Evaluate Stick Release
             else if (_isRightStickDragging) {
                 // --- ENDED PHASE ---
                 // The stick snapped back to the center (inside the deadzone)
@@ -276,7 +279,6 @@ namespace tracer{
 
             switch (controlMode) {
                 case ControllerModeEnum.Viewing:
-                    //MOVING AROUND (switch to orbit by pressing the right stick - AND show the orbit around viz)
                     if (rawStickInput.magnitude > stickDeadzone) {
                         syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime;
                         Vector2 horDragDelta = -syntheticDelta; horDragDelta.y = 0;
@@ -366,6 +368,23 @@ namespace tracer{
                     syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime * manipulationSpeed;
                     _colorSelect.controllerManipulator(new Vector3(syntheticDelta.x, syntheticDelta.y, 0));
                     break;
+                case ControllerModeEnum.Manip_Vec2:
+                    if (rawStickInput.magnitude < stickDeadzone)
+                        return;
+
+                    Parameter<Vector2> valueV2 = (Parameter<Vector2>)_selectedAbstractParam;
+                    syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime * manipulationSpeed;
+                    valueV2.setValue(valueV2.value + syntheticDelta);
+                    break;
+                case ControllerModeEnum.Manip_SingleValue:
+                    if (rawStickInput.magnitude < stickDeadzone)
+                        return;
+
+                    Parameter<float> val = (Parameter<float>)_selectedAbstractParam;
+                    syntheticDelta = rawStickInput * syntheticSensitivity * Time.deltaTime * manipulationSpeed;
+                    val.setValue(val.value + syntheticDelta.y);
+                    break;
+                case ControllerModeEnum.Manip_ListParameter:
                 case ControllerModeEnum.Manipulation:
                     if (rawStickInput.magnitude < stickDeadzone)
                         return;
@@ -382,120 +401,30 @@ namespace tracer{
             }
         }
 
-
-
         //!
-        //! similiar to ProcessLeftStick, but
-        //! going down
-        //! attention! the standard move/rotate should never hit an object for dragging! use start position workaround
+        //! left and right trigger, delta is inverse
         //!
-        private void ProcessLeftTrigger(InputManager.InputTracker _tracker, float delta) {
+        private void ProcessTrigger(InputManager.InputTracker _tracker, float delta) {
             
             float manipulationSpeed = 10*Time.deltaTime;
             Quaternion parentRotation;
             
             switch (controlMode) {
                 case ControllerModeEnum.Viewing:
+                    //left/right trigger decision
                     if (Mathf.Abs(delta) > triggerDeadzone) {
                         Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
                         float speed = 4f;
-                        if (!_isLeftTriggerHold) {
-                            _isLeftTriggerHold = true;
-                            FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, Vector2.up*delta*speed);
-                        }else {
-                            FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, Vector2.up*delta*speed);
-                        }
-                    }else if (_isLeftTriggerHold) {
-                        _isLeftTriggerHold = false;
-                        Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
-                        FireDragOtherEvent(_tracker, InputManager.InputState.Ended, screenCenter, Vector2.zero);
-                    }
-                    break;
+                        if ((delta < 0 && !_isLeftTriggerHold) || (delta > 0 && !_isRightTriggerHold)) {
+                            if(delta < 0) _isLeftTriggerHold = true; else _isRightTriggerHold = true;
 
-                case ControllerModeEnum.Manip_Translate:
-                    //Y up/down
-                    if (Mathf.Abs(delta) <= triggerDeadzone) 
-                        return;
-
-                    manipulationSpeed = 2*Time.deltaTime;
-                    Parameter<Vector3> pos = (Parameter<Vector3>)_selectedAbstractParam;
-                    Vector3 manipulationVec;
-
-                    parentRotation = _currentSelectedSceneObject.transform.parent ? _currentSelectedSceneObject.transform.parent.rotation : Quaternion.identity;
-
-                    if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                        manipulationVec = CalculateLocalYPosition(_currentSelectedSceneObject.transform.localPosition, _currentSelectedSceneObject.transform.localRotation, -delta, manipulationSpeed);
-                    else if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.GLOBAL)
-                        manipulationVec = CalculateGlobalYPosition(_currentSelectedSceneObject.transform.localPosition, parentRotation, -delta, manipulationSpeed);
-                    else
-                        manipulationVec = CalculateCameraRelativeYPosition(_currentSelectedSceneObject.transform.localPosition, parentRotation, Camera.main.transform, -delta, manipulationSpeed);
-
-
-                    pos.setValue(manipulationVec);
-                    break;
-                case ControllerModeEnum.Manip_Rotate:
-                    // spin left/right
-                    if (Mathf.Abs(delta) <= triggerDeadzone) 
-                        return;
-                    
-                    Parameter<Quaternion> rot = (Parameter<Quaternion>)_selectedAbstractParam;
-                    Quaternion manipulationRot;
-
-                    parentRotation = _currentSelectedSceneObject.transform.parent ? _currentSelectedSceneObject.transform.parent.rotation : Quaternion.identity;
-
-                    if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.LOCAL)
-                        manipulationRot = CalculateLocalYaw(_currentSelectedSceneObject.transform.localRotation, -delta, manipulationSpeed);
-                    else if(_uiManager.ManipulationLayer == UIManager.ManipulationLayerEnum.GLOBAL)
-                        manipulationRot = CalculateGlobalYaw(_currentSelectedSceneObject.transform.localRotation, parentRotation, -delta, manipulationSpeed);
-                    else
-                        manipulationRot = CalculateCameraRelativeYaw(_currentSelectedSceneObject.transform.localRotation, parentRotation, Camera.main.transform, -delta, manipulationSpeed);
-
-                    rot.setValue(manipulationRot);
-                    break;
-                case ControllerModeEnum.Manip_Scale:
-                    break;
-                case ControllerModeEnum.Manip_Color:
-                    if (Mathf.Abs(delta) <= triggerDeadzone || !_colorSelect) 
-                        return;
-
-                    _colorSelect.controllerManipulator(new Vector3(0, 0, -delta));
-                    break;
-                case ControllerModeEnum.Manipulation:
-                default:
-                    //values +-
-                    if (Mathf.Abs(delta) <= triggerDeadzone) 
-                        return;
-
-                    manipulationSpeed = 2*Time.deltaTime;
-                    Parameter<float> val = (Parameter<float>)_selectedAbstractParam;
-                    val.setValue(val.value - delta);
-
-                    //- Other Modes, vertical: increase/decrease, fields e.g. color: x/y axis
-                    break;
-            }
-        }
-        //!
-        //! similiar to ProcessLeftTrigger, but
-        //! going up
-        //!
-        private void ProcessRightTrigger(InputManager.InputTracker _tracker, float delta) {
-            
-            float manipulationSpeed = 10*Time.deltaTime;
-            Quaternion parentRotation;
-            
-            switch (controlMode) {
-                case ControllerModeEnum.Viewing:
-                    if (Mathf.Abs(delta) > triggerDeadzone) {
-                        Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
-                        float speed = 4f;
-                        if (!_isRightTriggerHold) {
-                            _isRightTriggerHold = true;
                             FireDragOtherEvent(_tracker, InputManager.InputState.Started, screenCenter, Vector2.down*delta*speed);
                         }else {
                             FireDragOtherEvent(_tracker, InputManager.InputState.Ongoing, screenCenter, Vector2.down*delta*speed);
                         }
-                    }else if (_isRightTriggerHold) {
-                        _isRightTriggerHold = false;
+                    }else if ((delta < 0 && _isLeftTriggerHold) || (delta > 0 && _isRightTriggerHold)) {
+                        if(delta < 0) _isLeftTriggerHold = false; else _isRightTriggerHold = false;
+
                         Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
                         FireDragOtherEvent(_tracker, InputManager.InputState.Ended, screenCenter, Vector2.zero);
                     }
@@ -542,11 +471,40 @@ namespace tracer{
                     rot.setValue(manipulationRot);
                     break;
                 case ControllerModeEnum.Manip_Scale:
+                    if (Mathf.Abs(delta) <= triggerDeadzone) 
+                        return;
+
+                    Parameter<Vector3> scale = (Parameter<Vector3>)_selectedAbstractParam;
+                    Vector3 manipulationScale = _currentSelectedSceneObject.transform.localScale + (Vector3.one * delta * Time.deltaTime * manipulationSpeed);
+
+                    scale.setValue(manipulationScale);
+                    break;
                 case ControllerModeEnum.Manip_Color:
                     if (Mathf.Abs(delta) <= triggerDeadzone || !_colorSelect) 
                         return;
 
                     _colorSelect.controllerManipulator(new Vector3(0, 0, delta));
+                    break;
+                case ControllerModeEnum.Manip_ListParameter:
+                    if (Mathf.Abs(delta) <= triggerDeadzone) 
+                        return;
+
+                    //only go one list up/down, not multiple by holding
+                    if ((delta < 0 && !_isLeftTriggerHold) || (delta > 0 && !_isRightTriggerHold)){
+                            if(delta < 0) _isLeftTriggerHold = true; else _isRightTriggerHold = true;
+
+                        ListParameter listPara = (ListParameter)_selectedAbstractParam;
+                        int newValue = listPara.value + (int)Mathf.Sign(delta);
+                        if(newValue < 0)
+                            newValue = listPara.parameterList.Count-1;
+                        else
+                            newValue = newValue % listPara.parameterList.Count;
+                        listPara.setValue(newValue);
+                    } else {
+                        if(delta < 0) _isLeftTriggerHold = false; else _isRightTriggerHold = false;
+                    }
+                    break;
+                case ControllerModeEnum.Manip_Vec2:
                     break;
                 case ControllerModeEnum.Manipulation:
                 default:
@@ -555,7 +513,7 @@ namespace tracer{
                         return;
 
                     Parameter<float> val = (Parameter<float>)_selectedAbstractParam;
-                    val.setValue(val.value + delta);
+                    val.setValue(val.value + delta * Time.deltaTime * manipulationSpeed);
 
                     //- Other Modes, vertical: increase/decrease, fields e.g. color: x/y axis
                     break;
@@ -632,6 +590,24 @@ namespace tracer{
             }
         }
 
+        //handles re-select (was Joystick Button 6)
+        private void PressSelect(InputAction.CallbackContext ctx) {
+            switch (controlMode) {
+                case ControllerModeEnum.Viewing:
+                    if(_currentSelection == null) {
+                        if(_previousSelectedSceneObject != null) {
+                            //this will also switch to Manipulation Mode
+                            core.getManager<UIManager>().addSelectedObject(_previousSelectedSceneObject);
+                        }
+                    }
+                    break;
+                default:
+                    
+                    break;
+            }
+            
+        }
+
         private void PressLeftShoulder(InputAction.CallbackContext ctx){
             //cycle through selectables all the time (no difference)
             CycleThroughSceneObjects(EvaluationHelper.NavDirection.Left);
@@ -653,6 +629,11 @@ namespace tracer{
                     break;
             }
             
+        }
+
+        private void PressRightStick(InputAction.CallbackContext ctx) {
+            inOrbitMode = !inOrbitMode;
+            core.StartCoroutine(AnimateFloatingText(inOrbitMode ? "Orbit View Mode" : "Standard View Mode", new Vector2(Screen.width / 2, Screen.height / 2)));
         }
         #endregion
 
@@ -1038,12 +1019,13 @@ namespace tracer{
             //FREE MODE (not in manipulating)
 
             //look around
-            ProcessRightStick(_primary, m_inputs.VPETMap.Controller_Right_Stick.ReadValue<Vector2>());
+            ProcessRightStick(inOrbitMode ? _tertiary : _primary, m_inputs.VPETMap.Controller_Right_Stick.ReadValue<Vector2>());
             //moving
             ProcessLeftStick(_secondary, m_inputs.VPETMap.Controller_Left_Stick.ReadValue<Vector2>());
             //shoulder trigger for going up/down
-            ProcessLeftTrigger(_secondary, m_inputs.VPETMap.Controller_Left_Trigger.ReadValue<float>());
-            ProcessRightTrigger(_secondary, m_inputs.VPETMap.Controller_Right_Trigger.ReadValue<float>());
+            ProcessTrigger(_secondary, -m_inputs.VPETMap.Controller_Left_Trigger.ReadValue<float>());
+            ProcessTrigger(_secondary, m_inputs.VPETMap.Controller_Right_Trigger.ReadValue<float>());
+            
             //shoulder buttons for combo: running (move faster)
             //shoulder buttons as switch: orbit<>look, 
 
@@ -1130,6 +1112,7 @@ namespace tracer{
 
             if (uib != null && _uiManager.SelectedObjects.Count > 0){
                 _currentSelectedSceneObject = _uiManager.SelectedObjects[0];
+                _previousSelectedSceneObject = _currentSelectedSceneObject;
                 //Debug.Log("_currentSelectedSceneObject is "+_currentSelectedSceneObject.gameObject.name);
                 GetCurrentSelector(uib);
                 controlMode = ControllerModeEnum.Manip_Translate;
@@ -1194,6 +1177,7 @@ namespace tracer{
 
         private void SetManipulationMode() {
             //see UICreator2DModule
+            Debug.Log("Set Manipulation Mode for name: "+_selectedAbstractParam.name);
             switch (_selectedAbstractParam.name){
                 case "position":
                     controlMode = ControllerModeEnum.Manip_Translate;
@@ -1207,9 +1191,6 @@ namespace tracer{
                 case "color":
                     controlMode = ControllerModeEnum.Manip_Color;
                     break; 
-                case "SensorSizes":
-                    controlMode = ControllerModeEnum.Manip_Cam;
-                    break;
                 case "pathPositions":   //was a button like TRS before:
                     //should be skipped as selection!
                     break;
@@ -1218,6 +1199,13 @@ namespace tracer{
                     break;
                 case "animHostGen":     //RPC we use to trigger the character animation for a given path (both above) in AnimHost
                                         //not visualized at all (beware that they still increase to index of these snap elements)
+                    break;
+                case "SensorSizes":
+                case "FocalLengths":
+                    controlMode = ControllerModeEnum.Manip_ListParameter;
+                    break;
+                case "sensorSize":
+                    controlMode = ControllerModeEnum.Manip_Vec2;
                     break;
                 case "intensity":
                 case "range":
@@ -1228,8 +1216,6 @@ namespace tracer{
                 case "farClipPlane":
                 case "nearClipPlane":
                 case "focalDistance":
-                case "FocalLengths":
-                case "sensorSize":
                 default:
                     controlMode = ControllerModeEnum.Manip_SingleValue;
                     break;
