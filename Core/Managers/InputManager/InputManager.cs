@@ -195,6 +195,10 @@ namespace tracer{
         public void SetUiInteraction(bool allow){ uiInteractionAllowed = allow; }
         public bool IsUiInteractionAllowed(){ return uiInteractionAllowed; }
 
+        private bool isMultiTouchGestureAllowed = true; //needs to be disabled when on-screen joysticks are hit!
+        public void SetMultiTouchGestures(bool allow){ isMultiTouchGestureAllowed = allow; }
+        public bool IsMultiTouchGestureAllowed(){ return isMultiTouchGestureAllowed; }
+
         //!
         //! Constructor initializing member variables.
         //!

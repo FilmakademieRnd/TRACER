@@ -415,7 +415,7 @@ namespace tracer{
 
         private void ProcessMultiTouchGestures() {
             // 1. Exit early
-            if (!IsTouch(out int nrOfTouches) || nrOfTouches <= 1) 
+            if (!IsTouch(out int nrOfTouches) || nrOfTouches <= 1 || !manager.IsMultiTouchGestureAllowed()) 
                 return; 
 
             bool pEval = _primary.State == InputManager.InteractionState.Evaluating   && !_primary.IsMuted;
@@ -611,7 +611,9 @@ namespace tracer{
                 float reqGrace = GetGracePeriod(thresholdIndex);
                 float reqHold = GetHoldThreshold(thresholdIndex);
 
-                if (!allowSimultaneousInteractions && (distanceFromStart > reqDistance || timeHeld > reqHold)) {
+                //if we disallow multitouchgesture, we allow simulataneous interactions!
+                //if (!allowSimultaneousInteractions && (distanceFromStart > reqDistance || timeHeld > reqHold)) {
+                if ((!allowSimultaneousInteractions && manager.IsMultiTouchGestureAllowed()) && (distanceFromStart > reqDistance || timeHeld > reqHold)) {
                     if (IsAnyOtherTrackerActive(tracker)) 
                         return; 
                 }
@@ -623,18 +625,31 @@ namespace tracer{
                     ExecuteGroupGesture(InputManager.InteractionState.Holding, tracker);
                 }
             }
-            
-            // 3. Ongoing Executions (Leader updates visuals and fires events for 1, 2, or 3 fingers)
-            if (tracker.State == InputManager.InteractionState.Dragging) {
-                Vector2 sharedCenter = GetSharedCenter(InputManager.InteractionState.Dragging);
-                UpdateDragActiveVisual(tracker.Level, sharedCenter);
-                FireDragEvent(tracker, InputManager.InputState.Ongoing, sharedCenter, GetSharedDelta(InputManager.InteractionState.Dragging));
-            } else if (tracker.State == InputManager.InteractionState.Holding) {
-                Vector2 sharedCenter = GetSharedCenter(InputManager.InteractionState.Holding);
-                // Note: The original start pos remains the tracker's own StartPosition to draw the hold line correctly
-                UpdateHoldActiveVisual(tracker.Level, tracker.StartPosition, sharedCenter);
-                FireHoldEvent(tracker, InputManager.InputState.Ongoing, sharedCenter);
+
+            if(allowSimultaneousInteractions || !manager.IsMultiTouchGestureAllowed()) {
+                //no shared center or stuff!
+                if (tracker.State == InputManager.InteractionState.Dragging) {
+                    UpdateDragActiveVisual(tracker.Level, tracker.CurrentPosition);
+                    FireDragEvent(tracker, InputManager.InputState.Ongoing, tracker.CurrentPosition, GetSharedDelta(InputManager.InteractionState.Dragging));
+                } else if (tracker.State == InputManager.InteractionState.Holding) {
+                    UpdateHoldActiveVisual(tracker.Level, tracker.StartPosition, tracker.CurrentPosition);
+                    FireHoldEvent(tracker, InputManager.InputState.Ongoing, tracker.CurrentPosition);
+                }
+            } else {
+                //standard behaviour as with touch gestures
+                // 3. Ongoing Executions (Leader updates visuals and fires events for 1, 2, or 3 fingers)
+                if (tracker.State == InputManager.InteractionState.Dragging) {
+                    Vector2 sharedCenter = GetSharedCenter(InputManager.InteractionState.Dragging);
+                    UpdateDragActiveVisual(tracker.Level, sharedCenter);
+                    FireDragEvent(tracker, InputManager.InputState.Ongoing, sharedCenter, GetSharedDelta(InputManager.InteractionState.Dragging));
+                } else if (tracker.State == InputManager.InteractionState.Holding) {
+                    Vector2 sharedCenter = GetSharedCenter(InputManager.InteractionState.Holding);
+                    // Note: The original start pos remains the tracker's own StartPosition to draw the hold line correctly
+                    UpdateHoldActiveVisual(tracker.Level, tracker.StartPosition, sharedCenter);
+                    FireHoldEvent(tracker, InputManager.InputState.Ongoing, sharedCenter);
+                }
             }
+            
             
         }
 
