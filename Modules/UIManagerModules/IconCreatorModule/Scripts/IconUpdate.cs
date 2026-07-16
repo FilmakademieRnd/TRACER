@@ -46,6 +46,7 @@ namespace tracer
 
         //!
         //! A reference to the _parent Scene Object.
+        //! TODO: make readonly from outside
         //!
         public SceneObject m_parentObject;
 
@@ -53,28 +54,36 @@ namespace tracer
         //! The lock image for lights and camera, since we cannot show an outline on these
         //!
         public GameObject m_lockImage;
+
+        private Transform ourTr;
+        private Transform mainCamTr;
         
         //!
         //! Start is called before the first frame update
         //!
-        void Start()
-        {
-            Core core = GameObject.Find("TRACER").GetComponent<Core>();
-            UIManager uiManager = core.getManager<UIManager>();
+        public void Init(UIManager uiManager, SceneObject _parentObject){
+            m_parentObject = _parentObject;
+
             uiManager.settings.uiScale.hasChanged += UpdateUIScale;
             m_iconScale = Vector3.one * uiManager.settings.uiScale.value;
             transform.right = Camera.main.transform.right;
+
+            ourTr = transform;
+            mainCamTr = Camera.main.transform;
+
             m_renderer = GetComponent<SpriteRenderer>();
+
+            CreateLockIcon();
         }
 
-        public void CreateLockIcon(){
+        private void CreateLockIcon(){
             if(m_parentObject.GetComponent<Camera>() || m_parentObject.GetComponent<Light>()){
                 m_lockImage = new GameObject("Lock Viz");
                 SpriteRenderer sr = m_lockImage.AddComponent<SpriteRenderer>();
                 sr.sprite = Resources.Load<Sprite>("Images/SceneObjectLocked");
                 sr.material = GetComponent<SpriteRenderer>().material;
-                m_lockImage.transform.parent = transform;
-                m_lockImage.transform.localPosition = new Vector3(transform.localScale.x/2f,-transform.localScale.y/2f,-0.1f);
+                m_lockImage.transform.parent = ourTr;
+                m_lockImage.transform.localPosition = new Vector3(ourTr.localScale.x/2f,-ourTr.localScale.y/2f,-0.1f);
                 m_lockImage.transform.localScale = Vector3.one * 0.5f;
                 HideLock();
             }
@@ -90,8 +99,7 @@ namespace tracer
         //!
         //! Function coupled to user UI scale changes to update the icon scale
         //!
-        private void UpdateUIScale(object sender, float e)
-        {
+        private void UpdateUIScale(object sender, float e){
             m_iconScale = Vector3.one * e;
         }
 
@@ -102,24 +110,20 @@ namespace tracer
         {
             if (m_renderer.isVisible)
             {
-                Transform camera = Camera.main.transform;
-                float depth = Vector3.Dot(camera.position - transform.position, camera.forward);
+                float depth = Vector3.Dot(mainCamTr.position - ourTr.position, mainCamTr.forward);
 
-                transform.position = m_parentObject.transform.position;
-                transform.rotation = camera.rotation;
-                transform.localScale = m_iconScale * Mathf.Abs(depth * 0.1f);
+                ourTr.position = m_parentObject.transform.position;
+                ourTr.rotation = mainCamTr.rotation;
+                ourTr.localScale = m_iconScale * Mathf.Abs(depth * 0.1f);
 
                 if (!m_lockImage)
                     return;
 
                 //TODO: only necessary to check, if icon is visible by any camera!
-                if (m_parentObject._lock)
-                {
+                if (m_parentObject._lock){
                     if (!m_lockImage.activeSelf)
                         ShowLock();
-                }
-                else
-                {
+                }else{
                     if (m_lockImage.activeSelf)
                         HideLock();
                 }

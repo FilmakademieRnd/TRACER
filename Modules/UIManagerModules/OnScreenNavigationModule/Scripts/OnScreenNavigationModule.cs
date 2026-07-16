@@ -209,12 +209,14 @@ namespace tracer{
                         if (_leftStick.IsDragging) {
                             _leftStick.BoundLevel = level;
                             _inputManager.SetMultiTouchGestures(false);
+                            _inputManager.SetAllowCamNavigation(false);
                         }
                     }else if(screenPos.x > Screen.width / 2f && !_rightStick.IsDragging){
                         TryStartStick(_rightStick, evt.StartPos);
                         if (_rightStick.IsDragging) {
                             _rightStick.BoundLevel = level; // Lock this finger to this stick
                             _inputManager.SetMultiTouchGestures(false);
+                            _inputManager.SetAllowCamNavigation(false);
                             InitializeCameraAngles();
                         }
                     }
@@ -236,13 +238,17 @@ namespace tracer{
                     if (_leftStick.IsDragging && _leftStick.BoundLevel == level){
                         _leftStick.Reset();
                         _leftStick.BoundLevel = null;
-                        if(!_rightStick.IsDragging)
+                        if(!_rightStick.IsDragging){
                             _inputManager.SetMultiTouchGestures(true);
+                            _inputManager.SetAllowCamNavigation(true);
+                        }
                     }else if (_rightStick.IsDragging && _rightStick.BoundLevel == level){
                         _rightStick.Reset();
                         _rightStick.BoundLevel = null;
-                        if(!_leftStick.IsDragging)
+                        if(!_leftStick.IsDragging){
                             _inputManager.SetMultiTouchGestures(true);
+                            _inputManager.SetAllowCamNavigation(true);
+                        }
                     }
                     break;
             }

@@ -32,7 +32,6 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace tracer
 {
@@ -414,22 +413,6 @@ namespace tracer
         #endregion
 
 
-        //!
-        //! Function that is called when a tap is triggered instead of a start/end event
-        //! @param sender m_callback sender
-        //! @param e event reference
-        //!
-        /*private void Tapped(object sender, Vector2 point){
-            if(!selObj || !CameraRaycast(point)){
-                return;
-             }
-
-            if(m_inputManager.WasDoubleClick()){
-                if(manager.LastClickedObject == selObj){  //works with locked objects as well!
-                    manager.focusOnLastClickedObject();
-                }
-            }
-        }*/
 
 
         //!
