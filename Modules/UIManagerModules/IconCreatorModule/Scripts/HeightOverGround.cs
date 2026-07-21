@@ -73,7 +73,7 @@ public class HeightOverGround : MonoBehaviour{
             CreateGraphics();
         
         rootObj.SetActive(true);
-        if(Time.time - lastShownTime < 5)
+        if(lastShownTime == 0 || Time.time - lastShownTime < 5)
             StartCoroutine(IntroRoutine());
 
          // In Unity's CompareFunction Enum:

@@ -134,8 +134,7 @@ namespace tracer
         //! @param name Name of this module
         //! @param core Reference to the VPET core
         //!
-        public ARModule(string name, Manager manager) : base(name, manager)
-        {
+        public ARModule(string name, Manager manager) : base(name, manager){
             arImgManager = null;
             sceneRoot = core.getManager<SceneManager>().scnRoot.transform;
             _arActive = false;
@@ -145,8 +144,11 @@ namespace tracer
             arSession = SceneObject.Instantiate(arSessionPrefab, Vector3.zero, Quaternion.identity)
                 .GetComponent<ARSession>();
 
-            switch (ARSession.state)
-            {
+            #if UNITY_EDITOR
+            return;
+            #endif
+
+            switch (ARSession.state){
                 case ARSessionState.CheckingAvailability:
                     // still checking AR state
                     Helpers.Log("ARModule: Checking availability...");
@@ -168,6 +170,7 @@ namespace tracer
             }
         }
 
+
         //!
         //! Destructor
         //!
@@ -186,12 +189,17 @@ namespace tracer
         //! @param sender event sender
         //! @param e event arguments
         //!
-        protected override void Init(object sender, EventArgs e)
-        {
+        protected override void Init(object sender, EventArgs e){
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.started += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.performed += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.canceled += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
             manager.Subscribe<InputManager.AttitudeInputEvent>(AttitudeInputFunction);
+
+            #if UNITY_EDITOR
+            //TEST WITHIN EDITOR
+            Helpers.Log("ARModule: Faking in editor");
+            initialize();
+            #endif
         }
 
         //!
@@ -223,15 +231,14 @@ namespace tracer
         //!
         //! initialize the AR environement in the scene, executed after veryfing AR support of device
         //!
-        private void initialize()
-        {
+        private void initialize(){
+
             //Instanciate XROrigin from Prefab
             GameObject arSessionOriginPrefab = Resources.Load<GameObject>("Prefabs/ARSessionOrigin");
-            m_arOrigin = SceneObject.Instantiate(arSessionOriginPrefab, Vector3.zero, Quaternion.identity)
-                .GetComponent<XROrigin>();
+            m_arOrigin = SceneObject.Instantiate(arSessionOriginPrefab, Vector3.zero, Quaternion.identity).GetComponent<XROrigin>();
+
             
             //mattGameObjectPrefab = Resources.Load<GameObject>("Prefabs/ARMattGameObject");
-
             //m_arOrigin.GetComponent<PlaceScene>().scene = core.getManager<SceneManager>().scnRoot;
 
             //place XROrigin as parent of main camera
@@ -241,6 +248,9 @@ namespace tracer
             m_arOrigin.GetComponent<XROrigin>().CameraFloorOffsetObject = sceneRoot.gameObject;
 
             //add required components to camera
+            if(!Camera.main.gameObject.GetComponent<TrackedPoseDriver>())
+                Camera.main.gameObject.AddComponent<TrackedPoseDriver>();
+
             Camera.main.gameObject.GetComponent<TrackedPoseDriver>().enabled = true;
             m_poseDriver = Camera.main.gameObject.GetComponent<TrackedPoseDriver>();
             m_camManager = Camera.main.gameObject.AddComponent<ARCameraManager>();
@@ -248,6 +258,7 @@ namespace tracer
             m_occlusionManager.requestedEnvironmentDepthMode = EnvironmentDepthMode.Best;
             m_cameraBg = Camera.main.gameObject.AddComponent<ARCameraBackground>();
 
+#if !UNITY_EDITOR
             //Add Marker Tracking
             arImgManager = arSession.gameObject.AddComponent<ARTrackedImageManager>();
             RuntimeReferenceImageLibrary imgLib =
@@ -256,6 +267,7 @@ namespace tracer
             arImgManager.requestedMaxNumberOfMovingImages = 1;
             arImgManager.trackedImagesChanged += MarkerTrackingChanged;
             arImgManager.enabled = true;
+#endif
 
             //prepare UI
             enableAR = new Parameter<bool>(false, "enableAR");
@@ -404,8 +416,7 @@ namespace tracer
                 if (b) m_occlusionManager.enabled = enableOcclusionMapping.value;
                 else m_occlusionManager.enabled = false;
 
-            if (b)
-            {
+            if (b){
                 m_arOrigin.transform.position = Camera.main.transform.position;
                 m_arOrigin.transform.rotation = Quaternion.AngleAxis(Camera.main.transform.rotation.eulerAngles.y,
                     new Vector3(0, 1f, 0));

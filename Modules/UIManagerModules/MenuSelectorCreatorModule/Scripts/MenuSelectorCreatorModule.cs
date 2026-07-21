@@ -219,7 +219,7 @@ namespace tracer
         //!
         private void buttonClicked(object sender, int id)
         {
-            MenuButton b = manager.getButtons()[id];
+            MenuButton b = manager.getButtons(id);//manager.getButtons()[id];
             if (!b.isToggle)
                 b.isHighlighted = !b.isHighlighted;
         }

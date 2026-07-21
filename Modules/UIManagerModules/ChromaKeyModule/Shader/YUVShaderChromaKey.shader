@@ -32,10 +32,10 @@
 
 			// throws an error on Windows and Web Build
 			// fix by commenting the CBUFFER ... (dont forget to revert)
-            CBUFFER_START(UnityPerFrame)
-            // Device display transform is provided by the AR Foundation camera background renderer.
+            // CBUFFER_START(UnityPerFrame)
+            // // Device display transform is provided by the AR Foundation camera background renderer.
             float4x4 _UnityDisplayTransform;
-            CBUFFER_END
+            // CBUFFER_END
 
 			// keying properties
 			fixed3 _KeyColor;

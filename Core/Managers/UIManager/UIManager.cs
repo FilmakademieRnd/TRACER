@@ -486,8 +486,6 @@ namespace tracer
             else
                 m_buttons.Add(button);
 
-            if(button.id != -1)
-                button.id = m_buttons.Count - 1;
             buttonsUpdated?.Invoke(this, EventArgs.Empty);
         }
 
@@ -512,6 +510,13 @@ namespace tracer
         public ref List<MenuButton> getButtons()
         {
             return ref m_buttons;
+        }
+
+        //!
+        //! Returns a reference to to list of menu buttons.
+        //!
+        public MenuButton getButtons(int buttonID){
+            return m_buttons.Find(x => x.id == buttonID);
         }
 
         //!

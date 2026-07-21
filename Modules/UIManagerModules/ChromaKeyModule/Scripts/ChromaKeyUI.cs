@@ -24,8 +24,11 @@ Syncronisation Server. They are licensed under the following terms:
 //! @file "ChromaKeyUI.cs"
 //! @brief Implementation of the ChromaKeyUI to modyfy the key colour
 //! @author Alexandru-Sebastian Tufis-Schwartz
-//! @version 0
-//! @date 21.06.2023
+//! @author Thomas Krüger
+//! @version 1
+//! @date 21.07.2026
+//! @note try to make it work again - in a meaningful way
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -83,10 +86,6 @@ namespace tracer
         //!
         private Parameter<Color> _materialColor;
         //!
-        //! Input manager for handling user interactions
-        //!
-        private InputManager _mInputManager;
-        //!
         //! UI button for Chroma Key Menue Button
         //!
         private MenuButton _chromaButton;
@@ -132,53 +131,30 @@ namespace tracer
         private static readonly int UnityDisplayTransform = Shader.PropertyToID("_UnityDisplayTransform");
 
         //!
-        //! Start method called when the script initializes
-        //! @param sender callback sender
-        //! @param e event reference
+        //! Constructor for the ChromaKeyUI class
         //!
-        protected override void Start(object sender, EventArgs e)
-        {
-            // Call the base class's start method
-            base.Start(sender, e);
+        public ChromaKeyUI(string name, Manager manager) : base(name, manager){
+            //load = false;
+        }
 
-            // Load necessary resources
-            LoadResources();
-
-            // Initialize input manager
-            _mInputManager = core.getManager<InputManager>();
-
-            // Create Chroma Key buttons
-            _chromaButton = new MenuButton("", ChromaKeyStart, new List<UIManager.Roles>() { UIManager.Roles.EXPERT });
-            _chromaButton.setIcon("Images/5c89a3f32d66c");
-
-            _chromaSettingsButton = new MenuButton("", ChromaKeySettings, new List<UIManager.Roles>() { UIManager.Roles.EXPERT });
-            _chromaSettingsButton.setIcon("Images/settings");
+        protected override void Init(object _sender, EventArgs _e){
+            base.Init(_sender, _e);
+            
+            // Load necessary resources for the UI
+            _chromaKeyCanvasPrefab = Resources.Load("Prefabs/ChromaKeyCanvas") as GameObject;
+            _uiColorPicker = Resources.Load<GameObject>("Prefabs/PRE_UI_ColorPicker");
+            _chromaKeyCanvasMaterial = Resources.Load<Material>("Materials/ChromaKey");
 
             // Initialize material color parameter
             _materialColor = new Parameter<Color>(_chromaKeyCanvasMaterial.GetColor(KeyColor), "matcol");
 
+            _chromaSettingsButtonIsOn = false;
+
             // Subscribe to events
-            _mInputManager.cameraControlChanged += UpdateChromaKeyButton;
+            manager.cameraControlChanged += UpdateChromaKeyButton;
             _materialColor.hasChanged += UpdateColor;
         }
 
-        #if UNITY_EDITOR
-        //ability to test this function in the editor
-        protected override void Init(object _sender, EventArgs _e){
-           Start(_sender, _e);
-           ChromaKeyStart();
-        }
-        #endif
-
-        //!
-        //! Load necessary resources for the UI
-        //!
-        private void LoadResources()
-        {
-            _chromaKeyCanvasPrefab = Resources.Load("Prefabs/ChromaKeyCanvas") as GameObject;
-            _uiColorPicker = Resources.Load<GameObject>("Prefabs/PRE_UI_ColorPicker");
-            _chromaKeyCanvasMaterial = Resources.Load<Material>("Materials/ChromaKey");
-        }
 
         //!
         //! Update the Chroma Key material color based on user input
@@ -195,55 +171,55 @@ namespace tracer
         //! @param sender callback sender
         //! @param e event reference
         //!
-        public override void Dispose()
-        {
+        public override void Dispose(){
+            
+            base.Dispose();
+
             // Unsubscribe from input manager events
-            _mInputManager.cameraControlChanged -= UpdateChromaKeyButton;
-            _materialColor.hasChanged -= UpdateColor;
+            manager.cameraControlChanged -= UpdateChromaKeyButton;
+            if(_materialColor != null)
+                _materialColor.hasChanged -= UpdateColor;
         }
 
-        //!
-        //! Constructor for the ChromaKeyUI class
-        //!
-        public ChromaKeyUI(string name, Manager manager) : base(name, manager)
-        {
-            
-        }
+       
 
         //!
         //! Method to handle Chroma Key start and stop
         //!
-        private void ChromaKeyStart()
-        {
-            if (_chromaButtonIsOn)
-            {
+        private void ChromaKeyStart(){
+            if (_chromaButtonIsOn){
                 // Turn off Chroma Key
                 _chromaButtonIsOn = false;
 
-                if (_chromaSettingsButtonIsOn)
-                {
+                if (_chromaSettingsButtonIsOn){
                     ChromaKeySettings();
                 }
                 // Disable custom material and remove UI
                 _mCameraBg.useCustomMaterial = false;
                 Object.DestroyImmediate(_chromaKeyCanvas);
-                core.getManager<UIManager>().removeButton(_chromaSettingsButton);
-            }
-            else
-            {
+                manager.removeButton(_chromaSettingsButton);
+            }else{
                 // Turn on Chroma Key
                 _chromaButtonIsOn = true;
-                core.getManager<UIManager>().addButton(_chromaSettingsButton);
+
+                _chromaSettingsButton = new MenuButton("", ChromaKeySettings, new List<UIManager.Roles>() { UIManager.Roles.EXPERT });
+                _chromaSettingsButton.setIcon("Images/settings");
+
+
+                manager.addButton(_chromaSettingsButton);
 
                 // Instantiate UI elements
                 if (Camera.main != null)  
                     _chromaKeyCanvas = Object.Instantiate(_chromaKeyCanvasPrefab);
                 
+                Debug.Log("GetChild(2)");
                 _chromaKeyCanvasSliders = _chromaKeyCanvas.transform.GetChild(2).gameObject;
                 _manipulatorPanel = _chromaKeyCanvas.transform.GetChild(1).gameObject;
 
                 // Configure ARCameraBackground and Chroma Key materials
-                if (Camera.main != null) _mCameraBg = Camera.main.gameObject.GetComponent<ARCameraBackground>();
+                if (Camera.main != null) 
+                    _mCameraBg = Camera.main.gameObject.GetComponent<ARCameraBackground>();
+                
                 #if UNITY_EDITOR
                 if(!_mCameraBg){
                     return;
@@ -252,6 +228,12 @@ namespace tracer
                 _mCameraBg.customMaterial = Resources.Load<Material>("Materials/ChromaKey");
                 _camMaterial = _mCameraBg.material;
                 _mCameraBg.useCustomMaterial = true;
+
+                #if UNITY_EDITOR
+                if(_chromaKeyCanvasMaterial != null){
+                    return;
+                }
+                #endif
 
                 _chromaKeyCanvasMaterial.SetTexture(TextureY, _camMaterial.GetTexture(TextureY));
                 _chromaKeyCanvasMaterial.SetTexture(TextureCbCr, _camMaterial.GetTexture(TextureCbCr));
@@ -321,29 +303,41 @@ namespace tracer
         //! @param sender callback sender
         //! @param c event reference
         //!
-        private void UpdateChromaKeyButton(object sender, InputManager.CameraControl c)
-        {
-            //test it in the editor
-            #if UNITY_EDITOR
-            if(true){
-            #else
-            if (c == InputManager.CameraControl.AR){
-            #endif
+        private void UpdateChromaKeyButton(object sender, UIManager.CameraControl c){
+            if (c == UIManager.CameraControl.AR){
                 // Show Chroma Key button
-                if (!core.getManager<UIManager>().getButtons().Contains(_chromaButton))
-                    core.getManager<UIManager>().addButton(_chromaButton);
-            }
-            else
-            {
+                if (!manager.getButtons().Contains(_chromaButton)){
+                    // Create Chroma Key buttons
+                    _chromaButton = new MenuButton("", ChromaKeyStart, new List<UIManager.Roles>() { UIManager.Roles.EXPERT }, "ChromaButton1");
+                    _chromaButton.setIcon("Images/5c89a3f32d66c");
+
+                    manager.addButton(_chromaButton);
+
+                    /*_chromaButton = new MenuButton("", ChromaKeyStart, new List<UIManager.Roles>() { UIManager.Roles.EXPERT }, "ChromaButton2");
+                    _chromaButton.setIcon("Images/5c89a3f32d66c");
+
+                    manager.addButton(_chromaButton);
+
+                    _chromaButton = new MenuButton("", ChromaKeyStart, new List<UIManager.Roles>() { UIManager.Roles.EXPERT }, "ChromaButton3");
+                    _chromaButton.setIcon("Images/5c89a3f32d66c");
+
+                    manager.addButton(_chromaButton);
+
+                    _chromaButton = new MenuButton("", ChromaKeyStart, new List<UIManager.Roles>() { UIManager.Roles.EXPERT }, "ChromaButton4");
+                    _chromaButton.setIcon("Images/5c89a3f32d66c");
+
+                    manager.addButton(_chromaButton);*/
+
+                }
+            }else{
                 // Hide Chroma Key button and clean up
                 _chromaButton.showHighlighted(false);
-                if (_chromaSettingsButtonIsOn)
-                {
+                if (_chromaSettingsButtonIsOn){
                     ChromaKeySettings();
                 }
-                core.getManager<UIManager>().removeButton(_chromaSettingsButton);
+                manager.removeButton(_chromaSettingsButton);
                 GameObject.DestroyImmediate(_chromaKeyCanvas, true);
-                core.getManager<UIManager>().removeButton(_chromaButton);
+                manager.removeButton(_chromaButton);
             }
         }
     }
