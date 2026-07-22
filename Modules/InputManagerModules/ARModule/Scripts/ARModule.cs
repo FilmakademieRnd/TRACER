@@ -261,7 +261,7 @@ namespace tracer
                 arImgManager.CreateRuntimeLibrary(Resources.Load<XRReferenceImageLibrary>("ReferenceImageLibrary"));
             arImgManager.referenceLibrary = imgLib;
             arImgManager.requestedMaxNumberOfMovingImages = 1;
-            arImgManager.trackedImagesChanged += MarkerTrackingChanged;
+            arImgManager.trackablesChanged.AddListener(MarkerTrackingChanged);
             arImgManager.enabled = true;
 #endif
 
