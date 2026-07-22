@@ -34,11 +34,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace tracer
-{
+namespace tracer{
 
-    public class IconCreatorModule : UIManagerModule
-    {
+    public class IconCreatorModule : UIManagerModule{
+
         //!
         //! Flag that defines whether icons are shown or not.
         //!
@@ -166,7 +165,8 @@ namespace tracer
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);
                             icon.GetComponent<IconUpdate>().Init(manager, sceneObject);
                             
-                            icon.AddComponent<HeightOverGround>().Initialize(sceneObject.transform);
+                            //add to other SceneObjectTypes to show as well
+                            icon.AddComponent<HeightOverGround>().Initialize(sceneObject.transform, manager);
 
                             renderer = icon.GetComponent<SpriteRenderer>();
                             renderer.sprite = m_cameraSprite;
@@ -200,6 +200,9 @@ namespace tracer
                 if (sceneObject.GetType().BaseType == typeof(SceneObjectLight)){
                     sceneObject.getParameter<Color>("color").hasChanged -= updateIconColor;
                 }
+                HeightOverGround hog = sceneObject.GetComponent<HeightOverGround>();
+                if(hog)
+                    hog.DestroyViz();
                 
                 UnityEngine.Object.Destroy(sceneObject._icon);
             }
@@ -212,20 +215,24 @@ namespace tracer
         //! @param sceneObjects a list of the currently selected objects.
         //!
         private void SelectionHasChanged(object sender, List<SceneObject> selectedSOs){
+            //Debug.Log("Icon Creator, SelectionHasChanged: "+selectedSOs.Count);
+            //Debug.Log("we have m_lightAndCamSceneObjects: "+m_lightAndCamSceneObjects.Count);
             //do the below via dict for performance reasons
             foreach(SceneObject lightOrCamSO in m_lightAndCamSceneObjects) {
                 if (!selectedSOs.Contains(lightOrCamSO)) {
-                    HeightOverGround hog = lightOrCamSO.GetComponent<HeightOverGround>();
+                    //Debug.Log("Hide HOG? At "+lightOrCamSO.gameObject.name);
+                    HeightOverGround hog = lightOrCamSO._icon?.GetComponent<HeightOverGround>();
                     if(hog)
                         hog.HideViz();
                 }
             }
 
             foreach(SceneObject selectedSO in selectedSOs) {
-                if (!m_lightAndCamSceneObjects.Contains(selectedSO)) {
-                    HeightOverGround hog = selectedSO.GetComponent<HeightOverGround>();
+                if (m_lightAndCamSceneObjects.Contains(selectedSO)) {
+                    //Debug.Log("Show HOG? At "+selectedSO.gameObject.name);
+                    HeightOverGround hog = selectedSO._icon?.GetComponent<HeightOverGround>();
                     if(hog)
-                        hog.ShowViz();
+                        hog.ShowViz(true);
                 }
             
             }

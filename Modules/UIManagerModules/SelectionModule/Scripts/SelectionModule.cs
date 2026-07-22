@@ -139,25 +139,6 @@ namespace tracer{
 
             return EvaluationHelper.Instance.EvaluateSceneObject(screenPos);
         }
-        
-        //!
-        //! Function to check for a double-click/tap to focus on an object
-        //! TODO: move into FocusObjectModule (which only listens to DoubleClick)
-        //!
-        /*private void CheckDoubleClick(SceneObject obj){
-            if(!obj){
-                manager.setLastClickedObject(null);
-                return;
-            }
-
-            //Double-Click on the same obj -> focus on it
-            if(m_inputManager.WasDoubleClick()){
-                if(manager.LastClickedObject == obj){  //works with locked objects as well!
-                    manager.focusOnLastClickedObject();
-                }
-            }
-            manager.setLastClickedObject(obj);
-        }*/
 
         //!
         //! Function to simulate Select

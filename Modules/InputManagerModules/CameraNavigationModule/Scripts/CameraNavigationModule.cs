@@ -90,12 +90,7 @@ namespace tracer
         //!
         //! do we focus an object? If so and we focus it again, lock to the view and follow it!
         //!
-        private SceneObject currentFocusedObject;
-
-        //!
-        //! Follow this focused object (not if we do any gizmo transformation)
-        //!
-        private SceneObject currentFollowObject;
+        private GameObject currentFocusedObject;
 
         //!
         //! A parameter defining how close to the edge an object can be and still act as center of interest
@@ -115,6 +110,7 @@ namespace tracer
         //!
         private bool attitudeValuesIncoming = false;
         private Quaternion cameraMainRotationOffset, attitudeOffset;
+        private Inputs m_inputs;
 
         #region Fly Variables
         //!
@@ -167,8 +163,6 @@ namespace tracer
             // Unsubscribe
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged -= SelectionUpdate;
-//            uiManager.selectionFocus -= FocusOnSelection;
-//            manager.updateCameraUICommand -= CameraUpdated;
 
             manager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
             manager.Unsubscribe<InputManager.HoldOtherEvent>(HoldFunction);
@@ -200,11 +194,10 @@ namespace tracer
             // Subscribe to selection change
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged += SelectionUpdate;
-            // Subscribe to focus event
-//            uiManager.selectionFocus += FocusOnSelection;   //change behaviour? subscribe to double click
-
-            // Subscribe to camera change
-//            manager.updateCameraUICommand += CameraUpdated;
+            
+            m_inputs = new Inputs();
+            m_inputs.VPETMap.FocusSelection.canceled += FocusOnSelection;
+            m_inputs.VPETMap.Enable();
 
             manager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
             manager.Subscribe<InputManager.HoldOtherEvent>(HoldFunction);
@@ -387,8 +380,24 @@ namespace tracer
 
             switch (evt.Data.Level) {
                 case InputManager.InputLevel.Primary:
+                    //SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(evt.Data.Position);
+                    
                     SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(evt.Data.Position);
-                    FocusOnSelection(hitSO);
+                    if (hitSO) {
+                        FocusOnGameObject(hitSO.gameObject);
+                        return;
+                    }
+                    GameObject hitGO = EvaluationHelper.Instance.EvaluateGameObject(evt.Data.Position);
+                    if (hitGO) {
+                        FocusOnGameObject(hitGO);
+                        return;
+                    }
+                    GameObject hitMP = EvaluationHelper.Instance.EvaluateManipulator(evt.Data.Position);
+                    if (hitGO) {
+                        FocusOnGameObject(hitMP);
+                        return;
+                    }
+                    
                     break;  
             }
         }
@@ -727,7 +736,7 @@ namespace tracer
         //! Function called when selection has changed.
         //!
         private void SelectionUpdate(object sender, List<SceneObject> sceneObjects){
-            currentFollowObject = null;
+            //currentFollowObject = null;
 
             if (sceneObjects.Count < 1){
                 m_hasSelection = false;
@@ -748,38 +757,44 @@ namespace tracer
             m_selectionCenter = averagePos;
         }
 
+        private void FocusOnSelection(UnityEngine.InputSystem.InputAction.CallbackContext ctx) {
+            List<SceneObject> selected = core.getManager<UIManager>().SelectedObjects;
+            if(selected.Count > 0) {
+                FocusOnGameObject(selected[0].gameObject);
+            }
+        }
+
         //!
         //! Focus on the current object (center it, move cam to it)
         //! [TODO] have closer/farther look at object as iteration
         //! [TODO] have "lock to object" via hold? (we may have a radial options menu for all this stuff)
         //!
-        private void FocusOnSelection(SceneObject sceneObject){
-            if(!sceneObject){
+        private void FocusOnGameObject(GameObject focusHere){
+            if(!focusHere){
                 currentFocusedObject = null;
-                currentFollowObject = null;     //we follow this object, but not if we do any gizmo transformation!
                 return;
             }
-            if(currentFocusedObject == sceneObject){
-                currentFollowObject = currentFocusedObject;
+            if(currentFocusedObject == focusHere){
                 //Start coroutine to follow? Only if locked? another module?
                 //return; //focus again!
             }else{
-                currentFocusedObject = sceneObject;
+                currentFocusedObject = focusHere;
             }
 
-            GameObject go = sceneObject.gameObject;
+            //different behaviour for cam/light, because of encapsulation!
+            List<SceneObject> selected = core.getManager<UIManager>().SelectedObjects;
+            if(selected.Count > 0 && selected[0].gameObject == focusHere) {
+                if(selected[0].GetType() == typeof(SceneObjectCamera) || selected[0].GetType() == typeof(SceneObjectLight)) {
+                    core.StartCoroutine(SmoothCameraFocus(10, focusHere.transform.position, focusHere.transform.position - camTransform.forward * 5));
+                    return;
+                }
+            }
+
             //calculate bounds
-            Bounds b = new Bounds(go.transform.position, Vector3.zero);
-            switch(sceneObject){
-                case SceneObjectCamera:
-                case SceneObjectLight:
-                    break;
-                default:
-                    UnityEngine.Object[] rList = go.GetComponentsInChildren(typeof(Renderer));
-                    foreach (Renderer r in rList){
-                        b.Encapsulate(r.bounds);
-                    }
-                    break;
+            Bounds b = new Bounds(focusHere.transform.position, Vector3.zero);
+            UnityEngine.Object[] rList = focusHere.GetComponentsInChildren(typeof(Renderer));
+            foreach (Renderer r in rList){
+                b.Encapsulate(r.bounds);
             }
 
             Vector3 max = b.size;
@@ -794,14 +809,12 @@ namespace tracer
             //Debug.Log("Radius = " + radius + " dist = " + dist);
 
             //never go away if dist is bigger, instead keep the distance?
-            dist = Mathf.Min(dist, Vector3.Distance(go.transform.position, camTransform.position));
+            dist = Mathf.Min(dist, Vector3.Distance(focusHere.transform.position, camTransform.position));
 
             //Smooth transition
-            sceneObject.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - camTransform.forward * dist));
+            core.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - camTransform.forward * dist));
 
-            //TODO: add another function to lock view on a locked object!
-            //AND update its position smoothly (update function?!)
-            //right 
+
         }
 
         //!

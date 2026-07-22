@@ -28,9 +28,20 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 16.07.2026
 
 using System.Collections;
+using tracer;
 using UnityEngine;
 
 public class HeightOverGround : MonoBehaviour{
+
+    private const bool SHOW_ONLY_SELECTED = true;
+    private const bool SHOW_ONLY_AT_TRANSLATE_GIZMO = true;
+
+    private static Texture2D generatedMarkerTexture;
+
+    private UIManager manager;
+    private AbstractParameter selectedAbstractParam;
+    private SnapSelect selectorSnapSelect;
+    private int selectorCurrentSelectedSnapSelectElement = 0;
 
     private float groundY = 0f;
     
@@ -54,38 +65,84 @@ public class HeightOverGround : MonoBehaviour{
     private GameObject marker;
     private Material lineMat;
     private Material markerMat;
+    private Material textMat;
+    private Color materialColor = new Color(0.2f, 0.6f, 1f, 0.8f) ;
 
     /// <summary>
     /// Call this to initialize the visualization on a specific transform.
     /// </summary>
-    public void Initialize(Transform targetTransform){
+    public void Initialize(Transform targetTransform, UIManager _manager){
+        manager = _manager;
         target = targetTransform;
         cam = Camera.main;
         lastTargetY = target.position.y;
+
+        if (manager.GetStaticMashQuadTree() != null){
+            groundY = manager.GetStaticMashQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
+        }
         lastGroundY = groundY;
 
         //variable to show only "on selection" or "show all"
-        ShowViz();
+        if(!SHOW_ONLY_SELECTED)
+            ShowViz();
     }
 
+    /*********** LÖSUNG FOR 3DGS ****************
+
+    Die Lösung für Splats (und komplexe Geometrie allgemein): Der Depth-Buffer Ansatz!
+
+    Wenn ihr wisst, dass ihr später Gaussian Splats, extrem dichte Punktwolken oder hochkomplexe prozedurale Geometrie 
+    (die für mathematisches Raycasting zu teuer ist) unterstützen wollt, solltet ihr das Paradigma wechseln:
+        - Anstatt mathematische Linien durch den RAM zu ziehen, nutzt ihr die GPU!
+        - Erstelle eine winzige, unsichtbare Orthographic-Camera (1x1 Pixel), die vom Objekt strikt nach unten schaut.
+        - Lass diese Kamera in eine RenderTexture (Format: Depth) rendern.
+        - Lies den einzigen Pixel dieser Depth-Texture aus.
+        - Wandle den Depth-Wert (0.0 bis 1.0) über die Near/Far-Clip-Plane der Kamera wieder in Weltkoordinaten um.
+
+    Der massive Vorteil: 
+    Die Kamera rendert genau das, was visuell da ist. 
+    Wenn ein Gaussian Splat in der Szene sichtbar ist, schreibt er automatisch in den Z-Buffer (Depth-Buffer) der GPU. 
+    Die GPU rechnet dir die absolute, pixelperfekte Kollision mit der Splat-Wolke aus – 
+    und das in Bruchteilen einer Millisekunde, völlig unabhängig davon, ob es ein Mesh, ein Splat oder ein Terrain ist.
+
+    *********************************************/
+
     public void ShowViz(bool isSelected = false) {
+        if(SHOW_ONLY_SELECTED && !isSelected)
+            return;
+
+        Debug.Log("SHOW VIZ");
+
         if(!isCreated)
-            CreateGraphics();
+            CreateGraphics(isSelected);
+
+        if (isSelected) {
+            if (manager.GetStaticMashQuadTree() != null){
+                groundY = manager.GetStaticMashQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
+            }
+        }
+
         
         rootObj.SetActive(true);
         if(lastShownTime == 0 || Time.time - lastShownTime < 5)
             StartCoroutine(IntroRoutine());
 
-         // In Unity's CompareFunction Enum:
-        // 8 = Always (Renders through walls and clutter)
-        // 4 = LessEqual (Normal 3D behavior, hidden by walls/objects in front of it)
-        float zTestValue = isSelected ? 8f : 4f;
-        markerMat.SetFloat("_ZTest", zTestValue);
+        UpdateDepthViz(isSelected);
         
         //line mat would not be transparent
         //lineMat.SetFloat("_ZTest", zTestValue);
 
         isShown = true;
+    }
+
+    private void UpdateDepthViz(bool isSelected) {
+        Debug.Log("UPDATE DEPTH VIZ");
+        // In Unity's CompareFunction Enum:
+        // 8 = Always (Renders through walls and clutter)
+        // 4 = LessEqual (Normal 3D behavior, hidden by walls/objects in front of it)
+        float zTestValue = isSelected ? 8f : 4f;
+        markerMat.SetFloat("_ZTest", zTestValue);
+        textMat.SetFloat("_ZTest", zTestValue);
     }
 
     public void HideViz() {
@@ -105,6 +162,12 @@ public class HeightOverGround : MonoBehaviour{
         UpdateAlignments(groundY);
 
         if (updateOngoing){
+            //for now, just assume we ware selected
+            if (SHOW_ONLY_SELECTED) {
+                if (manager.GetStaticMashQuadTree() != null){
+                    groundY = manager.GetStaticMashQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
+                }   
+            }
             // Only update the line math and text value if the heights physically changed
             if (Mathf.Abs(target.position.y - lastTargetY) > 0.001f || Mathf.Abs(groundY - lastGroundY) > 0.001f){
                 lastTargetY = target.position.y;
@@ -147,7 +210,7 @@ public class HeightOverGround : MonoBehaviour{
         textMesh.text = "0.00m";
 
         // 2. Animate Marker (Scale with bounce and fade in)
-        float markerDuration = 0.6f;
+        /*float markerDuration = 0.6f;
         for (float t = 0; t < 1f; t += Time.deltaTime / markerDuration){
             // Bouncy overshoot formula
             float scale = 1f - Mathf.Cos(t * Mathf.PI * 2.5f) * Mathf.Exp(-t * 4f);
@@ -164,7 +227,7 @@ public class HeightOverGround : MonoBehaviour{
         for (float t = 0; t < 1f; t += Time.deltaTime / descendDuration){
             // Smooth ease-out
             float easeT = 1f - Mathf.Pow(1f - t, 3f);
-            float currentY = Mathf.Lerp(0, groundY, easeT);
+            float currentY = Mathf.Lerp(worldTop.y, groundY, easeT);
             
             line.SetPosition(1, line.transform.InverseTransformPoint(new Vector3(worldTop.x, currentY, worldTop.z)));
             UpdateLineTiling();
@@ -175,7 +238,32 @@ public class HeightOverGround : MonoBehaviour{
             UpdateAlignments(currentY);
 
             yield return null;
+        }*/
+
+        // combined duration
+        float duration = 1.0f;
+        for (float t = 0; t < 1f; t += Time.deltaTime / duration){
+            // Animate Marker (Scale with bounce and fade in)
+            // Bouncy overshoot formula
+            float scale = 1f - Mathf.Cos(t * Mathf.PI * 2.5f) * Mathf.Exp(-t * 4f);
+            marker.transform.localScale = Vector3.one * scale;
+            mColor.a = Mathf.Lerp(0f, 0.8f, t);
+            markerMat.color = mColor;
+
+            // Animate Line descending and Text counting up
+            // Smooth ease-out
+            float easeT = 1f - Mathf.Pow(1f - t, 3f);
+            float currentY = Mathf.Lerp(worldTop.y, groundY, easeT);
+            line.SetPosition(1, line.transform.InverseTransformPoint(new Vector3(worldTop.x, currentY, worldTop.z)));
+            UpdateLineTiling();
+            // Text visual updates
+            textMesh.transform.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, easeT * 2f); // Pops in early
+            textMesh.text = (worldTop.y - currentY).ToString("F2") + "m";
+            UpdateAlignments(currentY);
+
+            yield return null;
         }
+        marker.transform.localScale = Vector3.one;
 
         // Snap to exact finals
         line.SetPosition(1, line.transform.InverseTransformPoint(worldBottom));
@@ -246,7 +334,7 @@ public class HeightOverGround : MonoBehaviour{
     // PROCEDURAL GRAPHICS GENERATION
     // ==========================================
 
-    private void CreateGraphics(){
+    private void CreateGraphics(bool isSelected){
         rootObj = new GameObject("HeightOverGround_Viz");
         rootObj.transform.SetParent(target); // Attach to keep hierarchy clean
 
@@ -259,8 +347,11 @@ public class HeightOverGround : MonoBehaviour{
         line.endWidth = 0.01f;
         line.positionCount = 2;
         line.textureMode = LineTextureMode.Tile; // Crucial for non-stretching dashed lines
+        line.startColor = materialColor;
+        line.endColor = materialColor;
 
         lineMat = new Material(Shader.Find("Unlit/Transparent")) { mainTexture = GenerateDashedTexture() };
+        ConfigureParticleLineMaterial(lineMat);
         lineMat.SetFloat("_ZTest", 4f);
         line.material = lineMat;
 
@@ -272,7 +363,12 @@ public class HeightOverGround : MonoBehaviour{
         textMesh.alignment = TextAlignment.Left;
         textMesh.fontSize = 100;
         textMesh.characterSize = 0.015f; // Keeps it sharp
-        textMesh.color = Color.white;
+        textMesh.color = materialColor;
+
+        textMat = new Material(Shader.Find("Custom/TextZTest")) {
+            mainTexture = textMesh.GetComponent<MeshRenderer>().sharedMaterial.mainTexture
+        };
+        textMat.SetFloat("_ZTest", 4f); // Standard-Tiefe aktivieren
 
         // 3. Setup Ground Marker
         marker = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -284,12 +380,16 @@ public class HeightOverGround : MonoBehaviour{
 
         markerMat = new Material(Shader.Find("Custom/HeightMarker")) {
             mainTexture = GenerateMarkerTexture(),
-            color = new Color(0.2f, 0.6f, 1f, 0.8f) // Light blue
+            color = materialColor // Light blue
         };
         // Ensure it starts in standard depth mode (4 = LEqual)
         markerMat.SetFloat("_ZTest", 4f);
 
         marker.GetComponent<MeshRenderer>().material = markerMat;
+
+        if(isSelected && SHOW_ONLY_AT_TRANSLATE_GIZMO) {
+            manager.UI2DCreated += UiCreationFinished;
+        }
 
         rootObj.transform.localPosition = Vector3.zero;
         rootObj.SetActive(false);
@@ -308,9 +408,12 @@ public class HeightOverGround : MonoBehaviour{
         return tex;
     }
 
-    private Texture2D GenerateMarkerTexture(){
+    private static Texture2D GenerateMarkerTexture(){
+        if(generatedMarkerTexture)
+            return generatedMarkerTexture;
+
         int size = 128;
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        generatedMarkerTexture = new Texture2D(size, size, TextureFormat.RGBA32, false);
         Vector2 center = new Vector2(size / 2f, size / 2f);
         
         for (int x = 0; x < size; x++){
@@ -324,13 +427,72 @@ public class HeightOverGround : MonoBehaviour{
                 bool isX = (Mathf.Abs(x - y) < 4f || Mathf.Abs(x - (size - y)) < 4f) && dist < (size * 0.3f);
 
                 if (isCircle || isX)
-                    tex.SetPixel(x, y, Color.white);
+                    generatedMarkerTexture.SetPixel(x, y, Color.white);
                 else
-                    tex.SetPixel(x, y, Color.clear);
+                    generatedMarkerTexture.SetPixel(x, y, Color.clear);
             }
         }
-        tex.filterMode = FilterMode.Trilinear;
-        tex.Apply();
-        return tex;
+        generatedMarkerTexture.filterMode = FilterMode.Trilinear;
+        generatedMarkerTexture.Apply();
+        return generatedMarkerTexture;
+    }
+
+    public void ConfigureParticleLineMaterial(Material mat){
+        if (mat == null) return;
+
+        // 1. Assign the standard particle unlit shader
+        mat.shader = Shader.Find("Particles/Standard Unlit");
+
+        // 2. Set Rendering Mode to "Fade" (Index 2 in the dropdown)
+        mat.SetFloat("_Mode", 2f);
+
+        // 3. Manually apply the under-the-hood blend math for "Fade"
+        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetInt("_ZWrite", 0);
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+        // 4. Toggle the correct Shader Keywords for Fade
+        mat.DisableKeyword("_ALPHATEST_ON");
+        mat.EnableKeyword("_ALPHABLEND_ON");
+        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        mat.DisableKeyword("_ALPHAMODULATE_ON");
+
+        // 5. Set Color Mode to "Multiply" (Index 0 in the dropdown)
+        // This allows the LineRenderer's Start/End gradient vertex colors to multiply properly
+        mat.SetFloat("_ColorMode", 0f);
+    }
+
+    //only important to check for current selector if we have SHOW_ONLY_AT_TRANSLATE_GIZMO = true
+    private void UiCreationFinished(object sender, UnityEngine.EventSystems.UIBehaviour uib) {
+        if(selectorSnapSelect)
+            selectorSnapSelect.parameterChanged -= ParamChange;
+
+        if (uib != null && manager.SelectedObjects.Count > 0){
+            selectorSnapSelect = (SnapSelect)uib;
+            selectorSnapSelect.parameterChanged += ParamChange;
+            
+            selectorCurrentSelectedSnapSelectElement = 0;
+            selectedAbstractParam = manager.SelectedObjects[0].parameterList[selectorCurrentSelectedSnapSelectElement];
+            if(selectedAbstractParam.name != "position") {
+                HideViz();
+            }
+        }
+    }
+    private void ParamChange(object sender, int manipulatorMode){
+        selectorCurrentSelectedSnapSelectElement = manipulatorMode;
+        selectedAbstractParam = manager.SelectedObjects[0].parameterList[selectorCurrentSelectedSnapSelectElement];
+        if(selectedAbstractParam.name != "position") {
+            HideViz();
+        } else {
+            ShowViz(true);
+        }
+    }
+
+    public void DestroyViz() {
+        Destroy(generatedMarkerTexture);
+        generatedMarkerTexture = null;
+        Destroy(rootObj);
+        Destroy(this);
     }
 }

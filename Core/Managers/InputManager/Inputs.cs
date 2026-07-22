@@ -298,6 +298,15 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""FocusSelection"",
+                    ""type"": ""Button"",
+                    ""id"": ""d844b326-3ce6-406d-ac3d-bffefe1a1f9d"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -677,6 +686,17 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
                 },
                 {
                     ""name"": """",
+                    ""id"": ""0b480c88-ec29-49f5-bee1-eccaf75b309f"",
+                    ""path"": ""<Keyboard>/f"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""FocusSelection"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
                     ""id"": ""15bc72fe-8434-4af3-a596-d3551db1d9db"",
                     ""path"": ""<Gamepad>/rightShoulder"",
                     ""interactions"": """",
@@ -848,6 +868,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         m_VPETMap_Controller_Left_Shoulder = m_VPETMap.FindAction("Controller_Left_Shoulder", throwIfNotFound: true);
         m_VPETMap_Controller_Right_Shoulder = m_VPETMap.FindAction("Controller_Right_Shoulder", throwIfNotFound: true);
         m_VPETMap_Controller_Select = m_VPETMap.FindAction("Controller_Select", throwIfNotFound: true);
+        m_VPETMap_FocusSelection = m_VPETMap.FindAction("FocusSelection", throwIfNotFound: true);
     }
 
     ~@Inputs()
@@ -951,6 +972,7 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
     private readonly InputAction m_VPETMap_Controller_Left_Shoulder;
     private readonly InputAction m_VPETMap_Controller_Right_Shoulder;
     private readonly InputAction m_VPETMap_Controller_Select;
+    private readonly InputAction m_VPETMap_FocusSelection;
     /// <summary>
     /// Provides access to input actions defined in input action map "VPETMap".
     /// </summary>
@@ -1055,6 +1077,10 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @Controller_Select => m_Wrapper.m_VPETMap_Controller_Select;
         /// <summary>
+        /// Provides access to the underlying input action "VPETMap/FocusSelection".
+        /// </summary>
+        public InputAction @FocusSelection => m_Wrapper.m_VPETMap_FocusSelection;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_VPETMap; }
@@ -1149,6 +1175,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Select.started += instance.OnController_Select;
             @Controller_Select.performed += instance.OnController_Select;
             @Controller_Select.canceled += instance.OnController_Select;
+            @FocusSelection.started += instance.OnFocusSelection;
+            @FocusSelection.performed += instance.OnFocusSelection;
+            @FocusSelection.canceled += instance.OnFocusSelection;
         }
 
         /// <summary>
@@ -1229,6 +1258,9 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
             @Controller_Select.started -= instance.OnController_Select;
             @Controller_Select.performed -= instance.OnController_Select;
             @Controller_Select.canceled -= instance.OnController_Select;
+            @FocusSelection.started -= instance.OnFocusSelection;
+            @FocusSelection.performed -= instance.OnFocusSelection;
+            @FocusSelection.canceled -= instance.OnFocusSelection;
         }
 
         /// <summary>
@@ -1430,5 +1462,12 @@ public partial class @Inputs: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnController_Select(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "FocusSelection" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnFocusSelection(InputAction.CallbackContext context);
     }
 }

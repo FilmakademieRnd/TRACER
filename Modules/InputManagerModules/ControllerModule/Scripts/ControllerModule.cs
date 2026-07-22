@@ -152,6 +152,7 @@ namespace tracer{
             // Get the UI manager from the _core.
             _uiManager = core.getManager<UIManager>();
 
+            // TODO: ban module references!
             // Subscribe to the ControllerdoneEditing event.
             ControllerdoneEditing += _sceneManager.getModule<UndoRedoModule>().addHistoryStep;
 
@@ -167,7 +168,6 @@ namespace tracer{
 
             //enable input
             m_inputs = new Inputs();
-            m_inputs.VPETMap.Enable();
             //doing this in the update!
             m_inputs.VPETMap.Controller_South.canceled   += PressConfirm;
             m_inputs.VPETMap.Controller_East.canceled    += PressCancel;
@@ -176,6 +176,7 @@ namespace tracer{
             m_inputs.VPETMap.Controller_Right_Shoulder.canceled   += PressRightShoulder;
             m_inputs.VPETMap.Controller_Left_Stick_Press.canceled += PressLeftStick;
             m_inputs.VPETMap.Controller_Right_Stick_Press.canceled += PressRightStick;
+            m_inputs.VPETMap.Enable();
 
             // Subscribe to UI manager events.
             _uiManager.selectionChanged += UiManagerSelectionChanged;
@@ -207,6 +208,9 @@ namespace tracer{
             manager.rightControllerStick -= MoveRightStick;
             manager.ControllerStickCanceled -= DoneEditing;
 */
+            if(_selectorSnapSelect)
+                _selectorSnapSelect.parameterChanged -= ParamChange;
+
             // Unsubscribe from the _core update event.
             core.updateEvent -= TracerUpdate;
 
@@ -1131,6 +1135,10 @@ namespace tracer{
         //! This method retrieves the current selector when not in MAIN_VIEW_MODE.
         //!
         private void GetCurrentSelector(UIBehaviour uib){
+            //remove if already available!
+            if(_selectorSnapSelect)
+                _selectorSnapSelect.parameterChanged -= ParamChange;
+
             //_selectorSnapSelect = GameObject.Find("PRE_UI_AddSelector(Clone)").GetComponent<SnapSelect>();
             _selectorSnapSelect = (SnapSelect)uib;
             _selectorSnapSelect.parameterChanged += ParamChange;

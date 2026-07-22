@@ -106,6 +106,14 @@ namespace tracer
             return ManipulationLayer;
         }
 
+        //! 
+        //! holds all (static) renderers for other evaluations
+        //! e.g. the HeightOverGround check
+        //!
+        private StaticMeshQuadtree meshQuadtree;
+
+        public StaticMeshQuadtree GetStaticMashQuadTree(){ return meshQuadtree;}
+
         //!
         //! Areference to the About Menu prefab.
         //!
@@ -316,6 +324,8 @@ namespace tracer
 
             settings.roles.hasChanged += changeActiveRole;
 
+            core.getManager<SceneManager>().sceneReady += SceneReadyEvent;
+
             CreateSettingsMenu();
             createStartMenu();
 
@@ -324,6 +334,11 @@ namespace tracer
                     .Add("Role")
                     .Add(settings.roles)
                 .End();
+        }
+
+        private void SceneReadyEvent(object sender, EventArgs e) {
+            meshQuadtree = new StaticMeshQuadtree();
+            meshQuadtree.BuildTree();
         }
 
         public void ColorGameObjectActive(GameObject go)
@@ -341,6 +356,7 @@ namespace tracer
         public override void Cleanup()
         {
             base.Cleanup();
+            core.getManager<SceneManager>().sceneReady -= SceneReadyEvent;
             settings.uiScale.hasChanged -= updateCanvasScales;
             core.orientationChangedEvent -= updateCanvasScales;
             settings.roles.hasChanged -= changeActiveRole;
@@ -351,8 +367,7 @@ namespace tracer
         //!
         //! Unity's Start callback, used for Late initialization.
         //!
-        protected override void Start(object sender, EventArgs e)
-        {
+        protected override void Start(object sender, EventArgs e){
             base.Start(sender, e);
             
             updateCanvasScales(this,0f);

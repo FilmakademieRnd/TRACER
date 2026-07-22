@@ -212,6 +212,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "FocusSelection",
+                    "type": "Button",
+                    "id": "d844b326-3ce6-406d-ac3d-bffefe1a1f9d",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -586,6 +595,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "Controller_Left_Shoulder",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "0b480c88-ec29-49f5-bee1-eccaf75b309f",
+                    "path": "<Keyboard>/f",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "FocusSelection",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
