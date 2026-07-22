@@ -49,6 +49,7 @@ namespace tracer{
         private bool isActive = false;
         
         private InputManager _inputManager;
+        private MenuButton onScreenNavigationMenuButton;
         
         //**** UI Configuration (Prozente 0.0 - 1.0)
         //0.2 = 20% der Bildschirmhöhe
@@ -102,12 +103,17 @@ namespace tracer{
         //!
         protected override void Init(object _sender, EventArgs _e){
             Debug.Log("<color=orange>Init OnScreenNavigation Module</color>");
-            MenuButton onScreenNavigationMenuButton = new MenuButton("", ToggleOnScreenNavigation, new List<UIManager.Roles>() { UIManager.Roles.SET });
+            onScreenNavigationMenuButton = new MenuButton("", ToggleOnScreenNavigation, new List<UIManager.Roles>() { UIManager.Roles.SET });
             onScreenNavigationMenuButton.setIcon("Images/button_onScreenNav_off");
             manager.addButton(onScreenNavigationMenuButton);
 
             _mainCamera = Camera.main.transform;
             _inputManager = core.getManager<InputManager>();
+
+            core.getManager<UIManager>().cameraControlChanged += CameraControlBehaviourChanged;
+
+            //TODO: add listener for AR/ATTITUDE MODULE
+            //only show when standard/ar
 
             CreateOnScreenNavUI();
             DisableOnScreenNavUI();
@@ -122,6 +128,38 @@ namespace tracer{
         //! 
         public override void Dispose(){
             base.Dispose();
+
+            core.getManager<UIManager>().cameraControlChanged -= CameraControlBehaviourChanged;
+        }
+
+        //!
+        //! Method to update menu button based on camera control
+        //! @param sender callback sender
+        //! @param c event reference
+        //!
+        private void CameraControlBehaviourChanged(object sender, UIManager.CameraControl c) {
+            switch (c) {
+                case UIManager.CameraControl.AR:
+                    //deactivate all virtual sticks
+                    if(isActive)
+                        DisableOnScreenNavUI();
+
+                    manager.removeButton(onScreenNavigationMenuButton);
+                    break;
+                case UIManager.CameraControl.ATTITUDE:
+                    //deactivate look around (right) stick
+                    if(isActive && _rightStick != null)
+                        _rightStick.Show(false);
+                    break;
+                case UIManager.CameraControl.STANDARD:
+                    if(!manager.getButtons().Contains(onScreenNavigationMenuButton))
+                        manager.addButton(onScreenNavigationMenuButton);
+
+                    //may enable it again
+                    if(isActive && _rightStick != null)
+                        _rightStick.Show(true);
+                    break;
+            }
         }
 
 
@@ -146,6 +184,9 @@ namespace tracer{
             _leftStick?.Reset();
             _rightStick?.Reset();
 
+            if(manager.cameraControl == UIManager.CameraControl.ATTITUDE && _rightStick != null)
+                _rightStick.Show(false);
+
             core.getManager<InputManager>().Subscribe<InputManager.DragUIEvent>(DragFunction);
         }
 
@@ -153,6 +194,15 @@ namespace tracer{
             if (_navCanvas == null)
                 return;
         
+            //if we are in the process, end them!
+            if(_rightStick != null && !_rightStick.IsDragging){
+                _inputManager.SetMultiTouchGestures(true);
+                _inputManager.SetAllowCamNavigation(true);
+            }else if(_leftStick != null && !_leftStick.IsDragging){
+                _inputManager.SetMultiTouchGestures(true);
+                _inputManager.SetAllowCamNavigation(true);
+            }
+
             _navCanvas.gameObject.SetActive(false);
             core.getManager<InputManager>().Unsubscribe<InputManager.DragUIEvent>(DragFunction);
 
@@ -255,6 +305,9 @@ namespace tracer{
         }
 
         private void TryStartStick(VirtualStick stick, Vector2 dragStartPos){
+            if(stick.IsDisabled())
+                return;
+
             // null bei Overlay-Canvas
             RectTransformUtility.ScreenPointToLocalPointInRectangle(stick.BaseRect, dragStartPos, null, out Vector2 touchRelativeToBaseCenter);
 
@@ -388,6 +441,7 @@ namespace tracer{
             public bool IsDragging;
             
             private Color _idleColor;
+            private bool isDisabled = false;
 
             public VirtualStick(RectTransform baseRect, Image baseImage, RectTransform knobRect, Image knobImage, Vector2 defaultPos, float radius, Color idleColor){    BaseRect = baseRect;
                 BaseRect = baseRect;
@@ -397,7 +451,29 @@ namespace tracer{
                 DefaultAnchoredPos = defaultPos;
                 Radius = radius;
                 _idleColor = idleColor;
+                isDisabled = false;
             }
+
+            public void Show(bool show) {
+                //hide if we are e.g. in attitude
+                if (!show) {
+                    if(isDisabled)
+                        return;
+
+                    isDisabled = true;
+                    BaseImage.enabled = false;
+                    KnobImage.enabled = false;
+                } else {
+                    if(!isDisabled)
+                        return;
+
+                    isDisabled = false;
+                    BaseImage.enabled = true;
+                    KnobImage.enabled = true;
+                }
+            }
+
+            public bool IsDisabled(){ return isDisabled; }
 
             public void Reset(){
                 IsDragging = false;
@@ -406,6 +482,7 @@ namespace tracer{
                 KnobRect.anchoredPosition = Vector2.zero; // Center knob in base
                 BaseImage.color = _idleColor;
                 KnobImage.color = _idleColor;
+                isDisabled = false;
             }
         }
     }
