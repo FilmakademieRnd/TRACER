@@ -19,6 +19,10 @@ Shader "Custom/ColorPickerShader"
             float4 _InputColor;
             float4 _InputPos;
 
+            //just added because of errors on iOS
+			//shader does not have property _MainTex, which is caused by unitys internal UI.Image.get_mainTexture()
+			sampler2D _MainTex;
+
             struct vertexInput 
             {
                 float4 vertex : POSITION;

@@ -48,6 +48,10 @@
             sampler2D _textureY;
             sampler2D _textureCbCr;
 
+			//just added because of errors on iOS
+			//shader does not have property _MainTex, which is caused by unitys internal UI.Image.get_mainTexture()
+			sampler2D _MainTex;
+
 			struct Vertex
 			{
 				float4 position : POSITION;
