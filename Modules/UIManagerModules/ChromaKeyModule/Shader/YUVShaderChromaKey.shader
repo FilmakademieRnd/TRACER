@@ -1,8 +1,8 @@
-﻿Shader "TRACER/ARCameraShaderChromaKey"
-{
-
-	Properties
-	{
+﻿Shader "TRACER/ARCameraShaderChromaKey"{
+	Properties{
+		//just added because of errors on iOS
+		//shader does not have property _MainTex, which is caused by unitys internal UI.Image.get_mainTexture()
+		[HideInInspector] _MainTex ("Base (RGB)", 2D) = "white" {}
     	_textureY ("TextureY", 2D) = "white" {}
         _textureCbCr ("TextureCbCr", 2D) = "black" {}
 		[Header(Keying Settings)]
@@ -12,8 +12,8 @@
 		_Softrange("SoftRange", Range(0, 1)) = 0.1
 		_Depth("Depth", Float) = 100.0
 	}
-	SubShader
-	{
+
+	SubShader{
 		Cull Off
 		Tags { "Queue" = "Transparent" "RenderType" = "Transparent" }		
 		LOD 100

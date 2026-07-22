@@ -1,14 +1,13 @@
-Shader "Custom/ColorPickerShader"
-{
-    Properties
-    {
+Shader "Custom/ColorPickerShader"{
+    Properties{
+        //just added because of errors on iOS
+        //shader does not have property _MainTex, which is caused by unitys internal UI.Image.get_mainTexture()
+        [HideInInspector] _MainTex ("Base (RGB)", 2D) = "white" {}
         _InputColor("InputColor", Color) = (1, 1, 1, 1)
         _InputPos("ColorPosition", Vector) = (0, 0, 0, 0)
     }
-        SubShader
-    {
-        Pass
-        {
+    SubShader{
+        Pass{
             CGPROGRAM
 
             #pragma vertex vert
