@@ -312,22 +312,6 @@ namespace tracer
                     _chromaButton.setIcon("Images/5c89a3f32d66c");
 
                     manager.addButton(_chromaButton);
-
-                    /*_chromaButton = new MenuButton("", ChromaKeyStart, new List<UIManager.Roles>() { UIManager.Roles.EXPERT }, "ChromaButton2");
-                    _chromaButton.setIcon("Images/5c89a3f32d66c");
-
-                    manager.addButton(_chromaButton);
-
-                    _chromaButton = new MenuButton("", ChromaKeyStart, new List<UIManager.Roles>() { UIManager.Roles.EXPERT }, "ChromaButton3");
-                    _chromaButton.setIcon("Images/5c89a3f32d66c");
-
-                    manager.addButton(_chromaButton);
-
-                    _chromaButton = new MenuButton("", ChromaKeyStart, new List<UIManager.Roles>() { UIManager.Roles.EXPERT }, "ChromaButton4");
-                    _chromaButton.setIcon("Images/5c89a3f32d66c");
-
-                    manager.addButton(_chromaButton);*/
-
                 }
             }else{
                 // Hide Chroma Key button and clean up
@@ -336,8 +320,8 @@ namespace tracer
                     ChromaKeySettings();
                 }
                 manager.removeButton(_chromaSettingsButton);
-                GameObject.DestroyImmediate(_chromaKeyCanvas, true);
                 manager.removeButton(_chromaButton);
+                GameObject.DestroyImmediate(_chromaKeyCanvas, true);
             }
         }
     }

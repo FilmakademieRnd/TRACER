@@ -51,8 +51,9 @@ namespace tracer{
         //!
         public override void Dispose(){
             base.Dispose();
-            m_manager.core.updateEvent -= OnCoreUpdateEvent;
-            manager.Unsubscribe<InputManager.ARInputEvent>(ARInputFunction);
+            core.updateEvent -= OnCoreUpdateEvent;
+            core.getManager<UIManager>().cameraControlChanged -= CameraControlBehaviourChanged;
+            //manager.Unsubscribe<InputManager.ARInputEvent>(ARInputFunction);
         }
 
         //!
@@ -80,64 +81,40 @@ namespace tracer{
         //! 
         protected override void Init(object sender, EventArgs e){
 
-            m_manager.core.updateEvent += OnCoreUpdateEvent;
-
             // listening to functionality that should dissallow activating this behaviour
-            // (ar-module for example - without having a direct reference!)
-            // ((would only work independent via an arbitrary priority management))
+            core.getManager<UIManager>().cameraControlChanged += CameraControlBehaviourChanged;
 
             //-> subscribe to InputManager AR Event and handle ourself to be deactivated if other mode is on
-            manager.Subscribe<InputManager.ARInputEvent>(ARInputFunction);
+            //manager.Subscribe<InputManager.ARInputEvent>(ARInputFunction);
 
             EnableAttitudeSensor();
         }
 
-        //!
-        //! Function to disable ourself, if AR functionality got active
-        //!
-        //! @param evt the InputData
-        //!
-        private void ARInputFunction(InputManager.ARInputEvent evt){
-
-            switch (evt.Data.Level) {
-                case InputManager.InputLevel.Primary:
-                    switch (evt.Data.State){
-                        case InputManager.InputState.Started:
-                            StopAttitude();
-                            SetAttitudeUI(false);
-                            break;
-                        case InputManager.InputState.Ongoing:
-                            break;
-                        case InputManager.InputState.Canceled:
-                        case InputManager.InputState.Ended:
-                            SetAttitudeUI(true);
-                            break;
-                    }
-                    break; 
-            } 
-        }
-
         private void EnableAttitudeSensor(){
             if (AttitudeSensor.current != null){
-                SetAttitudeUI(true);
+                ShowAttitudeUI(true);
                 SetupAttitudeInputAction();
+                core.updateEvent += OnCoreUpdateEvent;
             }else
                 Helpers.Log("No attitude sensor found, feature will not be available.", Helpers.logMsgType.WARNING);
         }
 
-        private void SetAttitudeUI(bool show){
+        private void ShowAttitudeUI(bool show){
             if (AttitudeSensor.current == null)
                 return;
 
-            if (!show && m_attitudeButton != null){
-                //should be greyed out, instead of removing it!
-                core.getManager<UIManager>().removeButton(m_attitudeButton);
+            if (!show){
+                if(m_attitudeButton != null){
+                    //should be greyed out, instead of removing it(?)
+                    core.getManager<UIManager>().removeButton(m_attitudeButton);
+                    m_attitudeButton = null;
+                }
             }else if (show) {
                 if(m_attitudeButton == null) {
-                    m_attitudeButton = new MenuButton("", SwitchAttitudeCamControl);
+                    m_attitudeButton = new MenuButton("", Event_SwitchAttitudeButton);
                     m_attitudeButton.setIcon("Images/button_attitude"); //how is the order set up?
+                    core.getManager<UIManager>().addButton(m_attitudeButton);
                 }
-                core.getManager<UIManager>().addButton(m_attitudeButton);
             }
         }
 
@@ -165,7 +142,7 @@ namespace tracer{
         //!
         //! Button callback that toggles the main camera rotation overwrite by attitude sensor.
         //!
-        private void SwitchAttitudeCamControl(){
+        private void Event_SwitchAttitudeButton(){
             if (AttitudeSensor.current == null) return;
 
             if (!sensorIsReading){
@@ -228,6 +205,28 @@ namespace tracer{
                 // depending on your device orientation, often requiring a 90-degree rotation adjustment).
                 // transform.rotation = currentAttitude;
                 manager.Publish(new InputManager.AttitudeInputEvent { Data = attitudeInputData, Rotation = currentAttitude });
+            }
+        }
+
+        //!
+        //! Method to update menu button based on camera control
+        //! @param sender callback sender
+        //! @param c event reference
+        //!
+        private void CameraControlBehaviourChanged(object sender, UIManager.CameraControl c) {
+            switch (c) {
+                case UIManager.CameraControl.AR:
+                    //remove button!
+                    StopAttitude();
+                    ShowAttitudeUI(false);
+                    break;
+                case UIManager.CameraControl.ATTITUDE:
+                    //nothing to do
+                    break;
+                case UIManager.CameraControl.STANDARD:
+                    //add button if button not available (and attitude available)
+                    ShowAttitudeUI(true);
+                    break;
             }
         }
     }
