@@ -213,7 +213,6 @@ namespace tracer
             m_hasSelection = false;
         }
 
-
         //!
         //! Function to connect input managers input event for dragging a sceneObjects gizmo
         //!

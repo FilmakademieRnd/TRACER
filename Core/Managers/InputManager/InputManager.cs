@@ -139,9 +139,20 @@ namespace tracer{
         // public struct ThumbstickRightOtherEvent              : IInputEvent { public InputData Data; }
         //... other specifics (GController-Trigger, ...)
 
+        #region Specific Events
+
         public struct AttitudeInputEvent                    : IInputEvent { public InputData Data; public UnityEngine.Quaternion Rotation;}
         //from AR module, subscribe for switch also ui stuff on start/end!
         public struct ARInputEvent                          : IInputEvent { public InputData Data; }
+        
+        // GPS
+        // Consumers fire this to ask for GPS (so we do not run GPS all the time)
+        public static event Action<GPSDemandType> OnGPSDemandChanged;
+        public static void FireGPSDemand(GPSDemandType type) => OnGPSDemandChanged?.Invoke(type);
+        // The GPSModule fires this when it has fresh data
+        public struct GPSInputEvent                          : IInputEvent { public InputData Data; public GPSDataStruct GPSData;}
+
+        #endregion
 
         // Special "shortcut" inputs (e.g. controller), that would normally be done via ui
         
@@ -199,6 +210,8 @@ namespace tracer{
         public void SetMultiTouchGestures(bool allow){ isMultiTouchGestureAllowed = allow; }
         public bool IsMultiTouchGestureAllowed(){ return isMultiTouchGestureAllowed; }
 
+        public void TriggerGPSOutput(bool continously = false){}
+
         //!
         //! Constructor initializing member variables.
         //!
@@ -217,5 +230,62 @@ namespace tracer{
             };
         }
 
+        #region Specific Data
+
+        public enum GPSDemandType { OneShot, StartContinuous, StopContinuous }
+
+        public struct GPSDataStruct {
+            public GPSDataStruct(float _lat, float _long, float _alt, float _accuracy, bool _valid, double _gpsTimestamp = 0) {
+                latitude = _lat;
+                longitude = _long;
+                altitude = _alt;
+                accuracy = _accuracy;
+                valid = _valid;
+                
+                // Initialize variables before assigning via function
+                minute = 0;
+                hour = 0;
+                day = 0;
+                month = 0;
+
+                // Populate the time fields
+                CalculateTime(_gpsTimestamp);
+            }
+            public float latitude;
+            public float longitude;
+            public float altitude;
+            public float accuracy;
+            public bool valid;
+            public int minute;
+            public int hour;
+            public int day;
+            public int month;
+
+            /// <summary>
+            /// Populates hour, minute, day, and month. 
+            /// Uses UTC time by default to ensure astronomical/solar math remains accurate across time zones.
+            /// </summary>
+            private void CalculateTime(double rawGpsTimestamp = 0) {
+                DateTime targetTime;
+
+                if (rawGpsTimestamp > 0) {
+                    // 1. BEST PRACTICE: Convert Unity's hardware GPS timestamp (Unix Epoch seconds since 1970)
+                    // This represents the exact moment the satellite sent the coordinate, regardless of delays.
+                    DateTime epochStart = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                    targetTime = epochStart.AddSeconds(rawGpsTimestamp);
+                }else {
+                    // 2. FALLBACK: Use the device's current clock.
+                    // We use UtcNow instead of Now so your solar formulas don't break due to Daylight Savings or Time Zones!
+                    targetTime = DateTime.UtcNow; 
+                }
+
+                minute = targetTime.Minute;
+                hour = targetTime.Hour;
+                day = targetTime.Day;
+                month = targetTime.Month;
+            }
+        }
+
+        #endregion
     }
 }
