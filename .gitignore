@@ -24,7 +24,9 @@
 
 # Mac
 .DS_Store
-iOS
+
+# Unity iOS build export folder (root only — do not ignore Plugins/iOS)
+/iOS/
 
 # Gradle cache directory
 .gradle/
