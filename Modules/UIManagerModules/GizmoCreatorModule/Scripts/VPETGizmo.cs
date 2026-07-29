@@ -65,14 +65,12 @@ namespace tracer
 
             if (parent != null)
             {
-                
-                m_root.transform.position = parent.transform.position;
-                m_root.transform.rotation = parent.transform.rotation; ;
-                m_root.transform.localScale = parent.transform.localScale;
-                
-                m_root.transform.parent = parent;
 
-                
+                m_root.transform.position = parent.transform.position;
+                m_root.transform.rotation = parent.transform.rotation;
+                m_root.transform.localScale = parent.transform.localScale;
+
+                m_root.transform.parent = parent;
             }
         }
 
@@ -94,7 +92,7 @@ namespace tracer
         //! @param color The color for the new element.
         //! @param loop Flag determining if the element is a loop (default is false).
         //!
-        public Transform addElement(ref Vector3[] positions, Color color, bool loop = false)
+        public Transform addElement(ref Vector3[] positions, Color color, bool loop = false, bool lineScale = true)
         {
             GameObject gizmoElement = GameObject.Instantiate(m_GizmoElementPrefab, m_root.transform);
             LineRenderer lineRenderer = gizmoElement.GetComponent<LineRenderer>();
@@ -104,9 +102,23 @@ namespace tracer
             lineRenderer.startColor = color;
             lineRenderer.endColor = color;
             lineRenderer.SetPositions(positions);
+            if (!lineScale)
+            {
+                gizmoElement.transform.localScale = Vector3.one *100;
+                lineRenderer.startWidth = 1;
+                lineRenderer.endWidth = 1;
+                gizmoElement.GetComponent<GizmoElementUpdate>().isSun = true;
+            }
             m_GizmoElements.Add(gizmoElement);
 
             return gizmoElement.transform;
+        }
+
+        public void updateElement(int element, ref Vector3[] positions)
+        {
+            LineRenderer lineRendere = m_GizmoElements[element].GetComponent<LineRenderer>();
+            lineRendere.positionCount = positions.Length;
+            lineRendere.SetPositions(positions);
         }
 
         //!

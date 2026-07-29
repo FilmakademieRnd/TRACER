@@ -48,12 +48,15 @@ namespace tracer
         //! The gizmos line renderer. 
         //!
         private LineRenderer m_lineRenderer;
+        private Transform m_cameraTransform;
+        public bool isSun = false;
 
         //!
         //! Start is called before the first frame update
         //!
         void Start()
         {
+            m_cameraTransform = Camera.main.transform;
             m_lineRenderer = transform.gameObject.GetComponent<LineRenderer>();
             m_lineWidth = m_lineRenderer.startWidth;
         }
@@ -63,7 +66,13 @@ namespace tracer
         //!
         void Update()
         {
-            Transform camera = Camera.main.transform;
+            Transform camera = m_cameraTransform;
+            if (isSun)
+            {
+                transform.rotation = Quaternion.identity;
+                transform.position = camera.position;
+                return;
+            }
             float depth = Vector3.Dot(camera.position - transform.position, camera.forward);
 
             if (m_oldDepth != depth)

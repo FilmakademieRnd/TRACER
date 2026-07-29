@@ -392,7 +392,8 @@ namespace tracer
         //!
         public void showMenu(MenuTree menu)
         {
-            menuSelected?.Invoke(this, menu);
+            if (!menu.visible)
+                menuSelected?.Invoke(this, menu);
         }
 
         //!
@@ -402,6 +403,7 @@ namespace tracer
         {
             menuDeselected?.Invoke(this, EventArgs.Empty);
         }
+
 
         //!
         //! Adds a given button to the buttonlist.

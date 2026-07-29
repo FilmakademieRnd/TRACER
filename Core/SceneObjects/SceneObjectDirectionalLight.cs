@@ -28,8 +28,6 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 03.02.2022
 
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace tracer

@@ -82,6 +82,10 @@ namespace tracer
         //!
         private static Vector3[] m_circlePos;
         //!
+        //! Stored positions for a circle.
+        //!
+        private static Vector3[] m_eclipticPos;
+        //!
         //! List storing event connections for releasing them before gizmos will be deleted.
         //!
         private List<Tuple<SceneObject, EventHandler<AbstractParameter>>> m_ParameterEventHandlers;
@@ -103,12 +107,15 @@ namespace tracer
             m_eventHandlersColor = new List<Tuple<Parameter<Color>, EventHandler<Color>>>();
             m_gizmos = new List<VPETGizmo>();
             m_circlePos = new Vector3[32];
+            m_eclipticPos = new Vector3[32];
 
             // creating points for a circle
             for (int i=0; i<m_circlePos.Length; i++)
             {
                 float step = (Mathf.PI * 2.0f * i) / m_circlePos.Length;
-                m_circlePos[i] = new Vector3(Mathf.Sin(step)/2f, Mathf.Cos(step)/2f, 0f);
+                float x = Mathf.Sin(step);
+                float y = Mathf.Cos(step);
+                m_circlePos[i] = new Vector3(x * 0.5f, y * 0.5f, 0f);
             }
 
         }
@@ -181,7 +188,7 @@ namespace tracer
                                         sphere.localScale = new Vector3(2, 2, 2);
                                         sphere.localRotation = Quaternion.Euler(new Vector3(90, 0, 0));
 
-                                        sceneObject._gizmo = gizmo.root;
+                                        sceneObject._gizmo = gizmo.root.transform;
                                         updateScalePoint(sceneObject, null);
                                         sceneObject.hasChanged += updateScalePoint;
                                         m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<AbstractParameter>>(sceneObject, updateScalePoint));
@@ -189,9 +196,20 @@ namespace tracer
                                     }
                                 case SceneObjectDirectionalLight:
                                     {
-                                        gizmo.addElement(ref m_circlePos, lightColor, true);
-                                        gizmo.addElement(ref m_linePos, lightColor);
-                                        sceneObject._gizmo = gizmo.root;
+                                        switch (sceneObject)
+                                        {
+                                            case SceneObjectSunLight:
+                                                calculateEclipticPos((SceneObjectSunLight)sceneObject);
+                                                gizmo.addElement(ref m_eclipticPos, lightColor, true, false);
+                                                sceneObject.hasChanged += updateEclipticPos;
+                                                sceneObject._gizmo = gizmo.root.transform;
+                                                break;
+                                            default:
+                                                gizmo.addElement(ref m_circlePos, lightColor, true);
+                                                gizmo.addElement(ref m_linePos, lightColor);
+                                                sceneObject._gizmo = gizmo.root.transform;
+                                                break;
+                                        }
                                         break;
                                     }
                                 case SceneObjectSpotLight:
@@ -199,7 +217,7 @@ namespace tracer
                                         gizmo.addElement(ref m_conePos, lightColor).localScale = new Vector3(0.7071f, 0.7071f, 1f);
                                         gizmo.addElement(ref m_circlePos, lightColor, true).localPosition = new Vector3(0,0,1);
 
-                                        sceneObject._gizmo = gizmo.root;
+                                        sceneObject._gizmo = gizmo.root.transform;
                                         updateScaleSpot(sceneObject, null);
                                         sceneObject.hasChanged += updateScaleSpot;
                                         m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<AbstractParameter>>(sceneObject, updateScaleSpot));
@@ -215,7 +233,7 @@ namespace tracer
                             gizmo.addElement(ref m_conePos, Color.yellow, false);
                             gizmo.addElement(ref m_rectPos, Color.yellow, true).localPosition = new Vector3(0,0,1);
 
-                            sceneObject._gizmo = gizmo.root;
+                            sceneObject._gizmo = gizmo.root.transform;
                             updateScaleCamera(sceneObject, null);
                             sceneObject.hasChanged += updateScaleCamera;
                             m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<AbstractParameter>>(sceneObject, updateScaleCamera));
@@ -249,13 +267,13 @@ namespace tracer
             SceneObjectPointLight sceneObject = (SceneObjectPointLight) sender;
 
             float range = sceneObject.range.value;
-            if (!_negative)
+            if (_negative)
             {
-                sceneObject._gizmo.transform.localScale = new Vector3(range, range, range);
+                sceneObject._gizmo.localScale = new Vector3(range, range, -range);
             }
             else
             {
-                sceneObject._gizmo.transform.localScale = new Vector3(range, range, -range);
+                sceneObject._gizmo.localScale = new Vector3(range, range, range);
             }
         }
 
@@ -272,11 +290,11 @@ namespace tracer
             float dia = 2f * range * MathF.Tan(angle / 180f * Mathf.PI * 0.5f);
             if (!_negative)
             {
-                sceneObject._gizmo.transform.localScale = new Vector3(dia, dia, range);
+                sceneObject._gizmo.localScale = new Vector3(dia, dia, range);
             }
             else
             {
-                sceneObject._gizmo.transform.localScale = new Vector3(dia, dia, -range);
+                sceneObject._gizmo.localScale = new Vector3(dia, dia, -range);
 
             }
         }
@@ -296,12 +314,55 @@ namespace tracer
 
             if (!_negative)
             {
-                sceneObject._gizmo.transform.localScale = new Vector3(dia * aspect, dia, far);
+                sceneObject._gizmo.localScale = new Vector3(dia * aspect, dia, far);
             }
             else
             {
-                sceneObject._gizmo.transform.localScale = new Vector3(dia * aspect, dia, -far);
+                sceneObject._gizmo.localScale = new Vector3(dia * aspect, dia, -far);
             }
+        }
+
+        //!
+        //! Function updating the gizmo representing the suns ecliptic.
+        //!
+        private void calculateEclipticPos(SceneObjectSunLight sun)
+        {
+            try
+            {
+                float declination = -23.45f * Mathf.Deg2Rad * Mathf.Cos(0.9863f * Mathf.Deg2Rad * (sun.m_date.DayOfYear + 10));
+                float floatMinute = 60f * (-0.171f * Mathf.Sin(0.0337f * sun.m_date.DayOfYear + 0.465f) - 0.1299f * Mathf.Sin(0.01787f * sun.m_date.DayOfYear - 0.168f));
+                float sinLatitute = Mathf.Sin(sun.m_latitude.value * Mathf.Deg2Rad); // breite
+                float sinDeclination = Mathf.Sin(declination);
+                float cosLatitute = Mathf.Cos(sun.m_latitude.value * Mathf.Deg2Rad);
+                float cosDeclination = Mathf.Cos(declination);
+
+                for (int i = 0; i < m_eclipticPos.Length; i++)
+                {
+                    float hourAngle = 15f * (((float)i) / m_eclipticPos.Length * 24f - (15f - sun.m_longitude.value) / 15.0f - 12f + floatMinute / 60f);
+                    float cosHourAngle = Mathf.Cos(hourAngle * Mathf.Deg2Rad);
+                    float sinSunHeight = sinLatitute * sinDeclination + cosLatitute * cosDeclination * cosHourAngle;
+                    float sunHeight = Mathf.Asin(sinSunHeight) * Mathf.Rad2Deg;
+                    float sunDirection = Mathf.Acos(-(sinLatitute * sinSunHeight - sinDeclination) / (cosLatitute * Mathf.Sin(Mathf.Acos(sinSunHeight)))) * Mathf.Rad2Deg;
+
+                    if (hourAngle > 0)
+                        sunDirection = 360f - sunDirection;
+
+                    Quaternion rotation = Quaternion.Euler(sunHeight, sunDirection, 0.0f);
+                    m_eclipticPos[i] = rotation * -Vector3.forward;
+                }
+            }
+            catch (Exception e)
+            {
+                Helpers.Log(e.ToString(), Helpers.logMsgType.WARNING);
+            }
+        }
+
+        private void updateEclipticPos(object sender, AbstractParameter parameter)
+        {
+            SceneObjectSunLight sun = sender as SceneObjectSunLight;
+            calculateEclipticPos(sun);
+            VPETGizmo gizmo = m_gizmos.Find(g => g.root == sun._gizmo.gameObject);
+            gizmo?.updateElement(0, ref m_eclipticPos);
         }
 
         //!

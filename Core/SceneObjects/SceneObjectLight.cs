@@ -54,12 +54,12 @@ namespace tracer
         //!
         //! the color of the light
         //!
-        private Parameter<Color> color;
+        public Parameter<Color> color;
 
         //!
         //! the intensity of the light
         //!
-        private Parameter<float> intensity;
+        public Parameter<float> intensity;
 
         //!
         //! the reference to the light component

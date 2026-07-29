@@ -91,7 +91,7 @@ namespace tracer
         //!
         //! A reference to the scene objects gizmo.
         //!
-        public GameObject _gizmo = null;
+        public Transform _gizmo = null;
         //!
         //! A reference to the scene objects icon.
         //!
@@ -212,7 +212,7 @@ namespace tracer
         private void updatePosition(object sender, Vector3 a)
         {
             transform.localPosition = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -223,7 +223,7 @@ namespace tracer
         private void updateRotation(object sender, Quaternion a)
         {
             transform.localRotation = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -234,7 +234,7 @@ namespace tracer
         private void updateScale(object sender, Vector3 a)
         {
             transform.localScale = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!

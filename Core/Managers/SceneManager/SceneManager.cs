@@ -247,6 +247,11 @@ namespace tracer
         public event EventHandler<EventArgs> sceneReady;
 
         //!
+        //! Event emitted when scene has updated.
+        //!
+        public event EventHandler<EventArgs> sceneUpdated;
+
+        //!
         //! Event emitted when a scene has been parsed.
         //!
         public event EventHandler<EventArgs> sceneParsed;
@@ -321,6 +326,17 @@ namespace tracer
             }
         }
 
+        //!
+        //! Function that emits the scene update event. 
+        //!
+        public void emitSceneUpdated()
+        {
+            sceneUpdated?.Invoke(this, new EventArgs());
+        }
+
+        //!
+        //! Function that emits the scene parsing event. 
+        //!
         public void emitParseScene(bool emitSceneReady)
         {
             parseScene?.Invoke(this, emitSceneReady);
@@ -379,8 +395,9 @@ namespace tracer
             // remove all Unity GameObjects
             if (m_scnRoot != null)
             {
-                for (int i=0; i<m_scnRoot.transform.childCount; i++)
-                    GameObject.Destroy(m_scnRoot.transform.GetChild(i).gameObject);
+                Transform rootTransform = m_scnRoot.transform;
+                for (int i=0; i< rootTransform.childCount; i++)
+                    GameObject.Destroy(rootTransform.GetChild(i).gameObject);
             }
 
             // remove all Tracer SceneObjects
@@ -405,8 +422,9 @@ namespace tracer
             // remove all Unity GameObjects
             if (m_scnRoot != null)
             {
-                for (int i = 0; i < m_scnRoot.transform.childCount; i++)
-                    GameObject.Destroy(m_scnRoot.transform.GetChild(i).gameObject);
+                Transform rootTransform = m_scnRoot.transform;
+                for (int i = 0; i < rootTransform.childCount; i++)
+                    GameObject.Destroy(rootTransform.GetChild(i).gameObject);
             }
 
             // remove all Tracer SceneObjects

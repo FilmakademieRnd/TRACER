@@ -206,9 +206,9 @@ namespace tracer
                 {
                     m_cameraIndex = m_sceneManager.sceneCameraList.FindIndex(x => x.Equals((SceneObjectCamera)m_selectedObject));
                 }
-
                 if (selectionType == typeof(SceneObjectCamera) ||
                     selectionType == typeof(SceneObjectDirectionalLight) ||
+                    selectionType == typeof(SceneObjectSunLight) ||
                     selectionType == typeof(SceneObjectSpotLight))
                 {
                     m_cameraSelectButton = new MenuButton("", LockOnLookThrough, null, "CameraSelectionButton");
@@ -220,7 +220,6 @@ namespace tracer
                     m_cameraSelectButton.setIcon("Images/button_lockToCamera");
                 }
                 m_uiManager.addButton(m_cameraSelectButton);
-
             }
             else
             {
@@ -266,7 +265,9 @@ namespace tracer
                 {
                     copyCamera();
                 }
-                else if (selectionType == typeof(SceneObjectDirectionalLight) || (selectionType == typeof(SceneObjectSpotLight))){
+                else if (selectionType == typeof(SceneObjectDirectionalLight) || 
+                         selectionType == typeof(SceneObjectSpotLight) 
+                        ){
                     
                 }
 

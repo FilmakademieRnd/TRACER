@@ -21,7 +21,7 @@ if not go to https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------------
 */
 
-//! @file "MenuCreatorModule.cs"
+//! @file "IconCreatorModule.cs"
 //! @brief Implementation of the IconCreatorModule, creating icons for scene objects without geometry.
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
@@ -58,6 +58,10 @@ namespace tracer
         //!
         private Sprite m_lightSprite;
         //!
+        //! Sprite for the light icon.
+        //!
+        private Sprite m_sunSprite;
+        //!
         //! Sprite for the camera icon.
         //!
         private Sprite m_cameraSprite;
@@ -79,6 +83,7 @@ namespace tracer
             m_sceneObjects = new List<SceneObject>();
             m_Icon = Resources.Load("Prefabs/Icon") as GameObject;
             m_lightSprite = Resources.Load<Sprite>("Images/LightIcon");
+            m_sunSprite = Resources.Load<Sprite>("Images/button_sun");
             m_cameraSprite = Resources.Load<Sprite>("Images/CameraIcon");
 
             m_IconRoot = new GameObject("Icons");
@@ -89,11 +94,18 @@ namespace tracer
 
             SceneManager sceneManager = core.getManager<SceneManager>();
             sceneManager.sceneReady += createIcons;
+            sceneManager.sceneUpdated += recreateIcons;
             sceneManager.sceneReset += disposeIcons;
             manager.settings.roles.hasChanged += recreateIcons;
         }
 
         private void recreateIcons(object sender, int selectedIndex)
+        {
+            disposeIcons(this, EventArgs.Empty);
+            createIcons(core.getManager<SceneManager>(), EventArgs.Empty);
+        }
+
+        private void recreateIcons(object sender, EventArgs e)
         {
             disposeIcons(this, EventArgs.Empty);
             createIcons(core.getManager<SceneManager>(), EventArgs.Empty);
@@ -139,11 +151,24 @@ namespace tracer
                             manager.activeRole == UIManager.Roles.DOP ||
                             manager.activeRole == UIManager.Roles.SET)
                         {
+                            
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);
-                            icon.GetComponent<IconUpdate>().m_parentObject = sceneObject;
-                            icon.GetComponent<IconUpdate>().CreateLockIcon();
+                            IconUpdate iconUpdate = icon.GetComponent<IconUpdate>();
+                            iconUpdate.m_parentObject = sceneObject;
+                            iconUpdate.CreateLockIcon();
                             renderer = icon.GetComponent<SpriteRenderer>();
-                            renderer.sprite = m_lightSprite;
+
+                            switch (sceneObject)
+                            {
+                                case SceneObjectSunLight:
+                                    renderer.sprite = m_sunSprite;
+                                    iconUpdate.setSun();
+                                    break;
+                                default:
+                                    renderer.sprite = m_lightSprite;
+                                    break;
+                            }
+                            
                             Parameter<Color> colorParameter = sceneObject.getParameter<Color>("color");
                             renderer.color = colorParameter.value;
                             colorParameter.hasChanged += updateIconColor;

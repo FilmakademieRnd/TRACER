@@ -34,6 +34,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace tracer
 {
@@ -231,7 +232,7 @@ namespace tracer
         {
             // Sync framerate to monitors refresh rate
             QualitySettings.vSyncCount = settings.vSyncCount;
-            Application.targetFrameRate = settings.framerate;
+            Application.targetFrameRate = 10;
 
             m_orientation = Input.deviceOrientation;
 
@@ -266,6 +267,22 @@ namespace tracer
         {
             //QualitySettings.vSyncCount = 1;
             updateEvent?.Invoke(this, EventArgs.Empty);
+        }
+
+        private Task fpsTask;
+
+        public async Task speedUpFPS()
+        {
+            if (Application.targetFrameRate != settings.framerate)
+                Application.targetFrameRate = settings.framerate;
+
+            if (fpsTask == null || fpsTask.IsCompleted)
+            {
+                fpsTask = Task.Delay(TimeSpan.FromSeconds(10));
+                await fpsTask;
+            
+                Application.targetFrameRate = 10;
+            }
         }
 
         private void checkDeviceOrientation()
@@ -372,6 +389,8 @@ namespace tracer
             // check ParameterObject
             if (!sceneObjects.TryAdd(poID, parameterObject))
                 Helpers.Log("Parameter object List in scene ID: " + sceneID.ToString() + " already contains the Parameter Object.", Helpers.logMsgType.WARNING);
+
+            //Helpers.Log("Parameter Objects in Database: " + m_parameterObjectList[sceneID].Count());
         }
 
         public void removeParameterObject(ParameterObject parameterObject)
@@ -429,6 +448,35 @@ namespace tracer
                 }
             }
             return returnvalue;
+        }
+
+        public short getNextFreeID(byte sceneID)
+        {
+            Dictionary<short, ParameterObject> sceneObjects;
+            short nextFreeID = 0;
+            // check scene
+            if (!m_parameterObjectList.TryGetValue(sceneID, out sceneObjects))
+            {
+                foreach (var id in sceneObjects)
+                {
+                    if (id.Key > nextFreeID)
+                        return nextFreeID;
+
+                    if (id.Key == nextFreeID)
+                    {
+                        if (nextFreeID == short.MaxValue)
+                            Helpers.Log("No free ID's available!", Helpers.logMsgType.ERROR);
+
+                        nextFreeID++;
+                    }
+                }
+            }
+            else
+            {
+                return 0;
+            }
+
+                return nextFreeID;
         }
     }
 }

@@ -356,6 +356,8 @@ namespace tracer
                                     numberInputField.textComponent.font = manager.uiAppearanceSettings.defaultFont;
                                     numberInputField.textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
                                     numberInputField.caretPosition = numberInputField.text.Length;
+                                    NumberInputFieldUpdate numberInputFieldUpdate = newObjects[0].GetComponent<NumberInputFieldUpdate>();
+                                    numberInputFieldUpdate.m_int = true;
                                 }
                             }
                             break;
@@ -618,9 +620,8 @@ namespace tracer
 
         private void updateItem(object sender, AbstractParameter parameter)
         {
-            List<GameObject> gameObjects = m_parameterMapping[parameter];
-
-            if (gameObjects != null)
+            List<GameObject> gameObjects;
+            if (m_parameterMapping.TryGetValue(parameter, out gameObjects))
             {
                 switch (parameter.tracerType)
                 {

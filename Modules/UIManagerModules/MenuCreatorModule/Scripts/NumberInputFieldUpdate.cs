@@ -41,6 +41,10 @@ public class NumberInputFieldUpdate : MonoBehaviour, IPointerDownHandler, IPoint
     //!
     public bool m_unsigned = true;
     //!
+    //! Flag that detiermines if the input fields number can be nagative.
+    //!
+    public bool m_int = false;
+    //!
     //! Variable defining the number of screen sections for value scaling.
     //!
     private static readonly int m_sections = 3;
@@ -130,7 +134,9 @@ public class NumberInputFieldUpdate : MonoBehaviour, IPointerDownHandler, IPoint
         if (newValue < 0)
             if (m_unsigned)
                 newValue = 0;
-        
-        m_inputField.text = (newValue).ToString("#.00");
+        if (m_int)
+            m_inputField.text = (newValue).ToString("#");
+        else
+            m_inputField.text = (newValue).ToString("#.00");
     }
 }

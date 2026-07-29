@@ -29,12 +29,9 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 03.08.2022
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Text;
-using UnityEditor;
 
-//using UnityEditor.Animations;
 using UnityEngine;
 using static tracer.AbstractParameter;
 
@@ -548,213 +545,198 @@ namespace tracer
 
             //if(true){
             //if (!parentTransform.Find(Encoding.ASCII.GetString(node.name))){
-                // set up object basics
-                objMain = new GameObject();
-                objMain.name = Encoding.ASCII.GetString(node.name);
+            // set up object basics
+            objMain = new GameObject();
+            objMain.name = Encoding.ASCII.GetString(node.name);
 
-                //place object
-                objMain.transform.parent = parentTransform; // GameObject.Find( "Scene" ).transform;
-                objMain.transform.localPosition = pos;
-                objMain.transform.localRotation = rot;
-                objMain.transform.localScale = scl;
+            //place object
+            objMain.transform.parent = parentTransform; // GameObject.Find( "Scene" ).transform;
+            objMain.transform.localPosition = pos;
+            objMain.transform.localRotation = rot;
+            objMain.transform.localScale = scl;
 
 
-                if (node.GetType() == typeof(SceneManager.SceneNodeGeo) || node.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
+            if (node.GetType() == typeof(SceneManager.SceneNodeGeo) || node.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
+            {
+                SceneManager.SceneNodeGeo nodeGeo = (SceneManager.SceneNodeGeo)node;
+                // Material Properties and Textures
+                Material mat;
+                // assign material from material list
+                if (nodeGeo.materialId > -1 && nodeGeo.materialId < SceneMaterialList.Count)
                 {
-                    SceneManager.SceneNodeGeo nodeGeo = (SceneManager.SceneNodeGeo)node;
-                    // Material Properties and Textures
-                    Material mat;
-                    // assign material from material list
-                    if (nodeGeo.materialId > -1 && nodeGeo.materialId < SceneMaterialList.Count)
-                    {
-                        mat = SceneMaterialList[nodeGeo.materialId];
-                    }
-                    else // or set standard
-                    {
-                        mat = new Material(Shader.Find("Standard"));
-                        mat.color = new Color(nodeGeo.color[0], nodeGeo.color[1], nodeGeo.color[2], nodeGeo.color[3]);
-                    }
-
-                    // Add Material
-                    Renderer renderer;
-                    if (nodeGeo.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
-                        renderer = objMain.AddComponent<SkinnedMeshRenderer>();
-                    else
-                        renderer = objMain.AddComponent<MeshRenderer>();
-
-                    renderer.material = mat;
-
-                    // Add Mesh
-                    if (nodeGeo.geoId > -1 && nodeGeo.geoId < SceneMeshList.Count)
-                    {
-                        Mesh mesh = SceneMeshList[nodeGeo.geoId];
-
-                        manager.sceneBoundsMax = Vector3.Max(manager.sceneBoundsMax, renderer.bounds.max);
-                        manager.sceneBoundsMin = Vector3.Min(manager.sceneBoundsMin, renderer.bounds.min);
-
-                        if (node.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
-                        {
-                            SkinnedMeshRenderer sRenderer = (SkinnedMeshRenderer)renderer;
-                            SceneManager.SceneNodeSkinnedGeo sNodeGeo = (SceneManager.SceneNodeSkinnedGeo)node;
-                            Bounds bounds = new Bounds(new Vector3(sNodeGeo.boundCenter[0], sNodeGeo.boundCenter[1], sNodeGeo.boundCenter[2]),
-                                                   new Vector3(sNodeGeo.boundExtents[0] * 2f, sNodeGeo.boundExtents[1] * 2f, sNodeGeo.boundExtents[2] * 2f));
-                            sRenderer.localBounds = bounds;
-                            Matrix4x4[] bindposes = new Matrix4x4[sNodeGeo.bindPoseLength];
-                            for (int i = 0; i < sNodeGeo.bindPoseLength; i++)
-                            {
-                                bindposes[i] = new Matrix4x4();
-                                bindposes[i][0, 0] = sNodeGeo.bindPoses[i * 16];
-                                bindposes[i][0, 1] = sNodeGeo.bindPoses[i * 16 + 1];
-                                bindposes[i][0, 2] = sNodeGeo.bindPoses[i * 16 + 2];
-                                bindposes[i][0, 3] = sNodeGeo.bindPoses[i * 16 + 3];
-                                bindposes[i][1, 0] = sNodeGeo.bindPoses[i * 16 + 4];
-                                bindposes[i][1, 1] = sNodeGeo.bindPoses[i * 16 + 5];
-                                bindposes[i][1, 2] = sNodeGeo.bindPoses[i * 16 + 6];
-                                bindposes[i][1, 3] = sNodeGeo.bindPoses[i * 16 + 7];
-                                bindposes[i][2, 0] = sNodeGeo.bindPoses[i * 16 + 8];
-                                bindposes[i][2, 1] = sNodeGeo.bindPoses[i * 16 + 9];
-                                bindposes[i][2, 2] = sNodeGeo.bindPoses[i * 16 + 10];
-                                bindposes[i][2, 3] = sNodeGeo.bindPoses[i * 16 + 11];
-                                bindposes[i][3, 0] = sNodeGeo.bindPoses[i * 16 + 12];
-                                bindposes[i][3, 1] = sNodeGeo.bindPoses[i * 16 + 13];
-                                bindposes[i][3, 2] = sNodeGeo.bindPoses[i * 16 + 14];
-                                bindposes[i][3, 3] = sNodeGeo.bindPoses[i * 16 + 15];
-
-                                bindposes[i] = Matrix4x4.Scale(parentTransform.localScale) * Matrix4x4.Rotate(parentTransform.localRotation) * bindposes[i];
-                            }
-                            
-                            mesh.bindposes = bindposes;
-                            sRenderer.sharedMesh = mesh;
-                            
-                        }
-                        else
-                        {
-                            objMain.AddComponent<MeshFilter>();
-                            objMain.GetComponent<MeshFilter>().mesh = mesh;
-                        }
-                    }
-
-                    if (nodeGeo.editable)
-                    {
-                        objMain.tag = "editable";
-                        SceneObject sco = SceneObject.Attach(objMain, m_senderID);
-                        manager.simpleSceneObjectList.Add(sco);
-                    }
+                    mat = SceneMaterialList[nodeGeo.materialId];
                 }
-                else if (node.GetType() == typeof(SceneManager.SceneNodeLight))
+                else // or set standard
                 {
-                    SceneManager.SceneNodeLight nodeLight = (SceneManager.SceneNodeLight)node;
-
-                    Light lightComponent = objMain.AddComponent<Light>();
-
-                    lightComponent.type = nodeLight.lightType;
-                    lightComponent.color = new Color(nodeLight.color[0], nodeLight.color[1], nodeLight.color[2]);
-                    lightComponent.intensity = nodeLight.intensity * m_LightScale;
-                    lightComponent.spotAngle = nodeLight.angle;
-                    if (lightComponent.type == LightType.Directional)
-                    {
-                        lightComponent.shadows = LightShadows.Soft;
-                        lightComponent.shadowStrength = 0.8f;
-                    }
-                    else
-                        lightComponent.shadows = LightShadows.None;
-                    lightComponent.shadowBias = 0f;
-                    lightComponent.shadowNormalBias = 1f;
-                    lightComponent.range = nodeLight.range * manager.settings.sceneScale;
-
-                    // Debug.Log("Create Light: " + nodeLight.name + " of type: " + nodeLight.lightType.ToString() + " Intensity: " + nodeLight.intensity + " Pos: " + pos);
-
-                    // Add light specific settings
-                    if (nodeLight.lightType == LightType.Directional)
-                    {
-                    }
-                    else if (nodeLight.lightType == LightType.Spot)
-                    {
-                        lightComponent.range *= 2;
-                        //objMain.transform.Rotate(new Vector3(0, 180f, 0), Space.Self);
-                    }
-                    else if (nodeLight.lightType == LightType.Area)
-                    {
-                        lightComponent.spotAngle = 170;
-                        lightComponent.range *= 4;
-                    }
-                    else if (nodeLight.lightType == LightType.Point)
-                    {
-                    }
-                    else
-                    {
-                        Debug.Log("Unknown Light Type " + nodeLight.lightType.ToString() + " in NodeBuilderBasic::CreateLight");
-                    }
-
-                    if (nodeLight.editable)
-                    {
-                        objMain.tag = "editable";
-                        SceneObjectLight sco;
-                        switch (lightComponent.type)
-                        {
-                            case LightType.Point:
-                                sco = SceneObjectPointLight.Attach(objMain, m_senderID);
-                                break;
-                            case LightType.Directional:
-                                sco = SceneObjectDirectionalLight.Attach(objMain, m_senderID);
-                                break;
-                            case LightType.Spot:
-                                sco = SceneObjectSpotLight.Attach(objMain, m_senderID);
-                                break;
-                            case LightType.Area:
-                                sco = SceneObjectAreaLight.Attach(objMain, m_senderID);
-                                break;
-                            default:
-                                sco = SceneObjectLight.Attach(objMain, m_senderID);
-                                break;
-                        }
-                        manager.sceneLightList.Add(sco);
-                    }
+                    mat = new Material(Shader.Find("Standard"));
+                    mat.color = new Color(nodeGeo.color[0], nodeGeo.color[1], nodeGeo.color[2], nodeGeo.color[3]);
                 }
-                else if (node.GetType() == typeof(SceneManager.SceneNodeCam))
-                {
-                    SceneManager.SceneNodeCam nodeCam = (SceneManager.SceneNodeCam)node;
 
-                    Camera camera = objMain.AddComponent<Camera>();
-
-                    camera.fieldOfView = nodeCam.fov;
-                    camera.aspect = nodeCam.aspect;
-                    camera.nearClipPlane = nodeCam.near;
-                    camera.farClipPlane = nodeCam.far;
-                    //camera.focalDistance = nodeCam.focalDist;     // not available in unity
-                    //camera.aperture = nodeCam.aperture;           // not available in unity
-                    //disable the component, because its only used for its value and to modify them
-                    camera.enabled = false;
-
-                    if (nodeCam.editable)
-                    {
-                        objMain.tag = "editable";
-                        SceneObjectCamera sco = SceneObjectCamera.Attach(objMain, m_senderID);
-                        manager.sceneCameraList.Add(sco);
-                    }
-                }
-                else if (node.GetType() == typeof(SceneManager.SceneNodeCharacter))
-                {
-                    if (node.editable)
-                    {
-                        objMain.tag = "editable";
-                        SceneObject sdo = SceneCharacterObject.Attach(objMain, m_senderID);
-                    }
-                }
-                //ADD SCENE OBJECT PATH
+                // Add Material
+                Renderer renderer;
+                if (nodeGeo.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
+                    renderer = objMain.AddComponent<SkinnedMeshRenderer>();
                 else
-                {
-                    if (node.editable)
-                    {
-                        objMain.tag = "editable";
+                    renderer = objMain.AddComponent<MeshRenderer>();
 
-                        SceneObject sdo = SceneObject.Attach(objMain, m_senderID);
-                        manager.simpleSceneObjectList.Add(sdo);
+                renderer.material = mat;
+
+                // Add Mesh
+                if (nodeGeo.geoId > -1 && nodeGeo.geoId < SceneMeshList.Count)
+                {
+                    Mesh mesh = SceneMeshList[nodeGeo.geoId];
+
+                    manager.sceneBoundsMax = Vector3.Max(manager.sceneBoundsMax, renderer.bounds.max);
+                    manager.sceneBoundsMin = Vector3.Min(manager.sceneBoundsMin, renderer.bounds.min);
+
+                    if (node.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
+                    {
+                        SkinnedMeshRenderer sRenderer = (SkinnedMeshRenderer)renderer;
+                        SceneManager.SceneNodeSkinnedGeo sNodeGeo = (SceneManager.SceneNodeSkinnedGeo)node;
+                        Bounds bounds = new Bounds(new Vector3(sNodeGeo.boundCenter[0], sNodeGeo.boundCenter[1], sNodeGeo.boundCenter[2]),
+                                                new Vector3(sNodeGeo.boundExtents[0] * 2f, sNodeGeo.boundExtents[1] * 2f, sNodeGeo.boundExtents[2] * 2f));
+                        sRenderer.localBounds = bounds;
+                        Matrix4x4[] bindposes = new Matrix4x4[sNodeGeo.bindPoseLength];
+                        for (int i = 0; i < sNodeGeo.bindPoseLength; i++)
+                        {
+                            bindposes[i] = new Matrix4x4();
+                            bindposes[i][0, 0] = sNodeGeo.bindPoses[i * 16];
+                            bindposes[i][0, 1] = sNodeGeo.bindPoses[i * 16 + 1];
+                            bindposes[i][0, 2] = sNodeGeo.bindPoses[i * 16 + 2];
+                            bindposes[i][0, 3] = sNodeGeo.bindPoses[i * 16 + 3];
+                            bindposes[i][1, 0] = sNodeGeo.bindPoses[i * 16 + 4];
+                            bindposes[i][1, 1] = sNodeGeo.bindPoses[i * 16 + 5];
+                            bindposes[i][1, 2] = sNodeGeo.bindPoses[i * 16 + 6];
+                            bindposes[i][1, 3] = sNodeGeo.bindPoses[i * 16 + 7];
+                            bindposes[i][2, 0] = sNodeGeo.bindPoses[i * 16 + 8];
+                            bindposes[i][2, 1] = sNodeGeo.bindPoses[i * 16 + 9];
+                            bindposes[i][2, 2] = sNodeGeo.bindPoses[i * 16 + 10];
+                            bindposes[i][2, 3] = sNodeGeo.bindPoses[i * 16 + 11];
+                            bindposes[i][3, 0] = sNodeGeo.bindPoses[i * 16 + 12];
+                            bindposes[i][3, 1] = sNodeGeo.bindPoses[i * 16 + 13];
+                            bindposes[i][3, 2] = sNodeGeo.bindPoses[i * 16 + 14];
+                            bindposes[i][3, 3] = sNodeGeo.bindPoses[i * 16 + 15];
+
+                            bindposes[i] = Matrix4x4.Scale(parentTransform.localScale) * Matrix4x4.Rotate(parentTransform.localRotation) * bindposes[i];
+                        }
+                            
+                        mesh.bindposes = bindposes;
+                        sRenderer.sharedMesh = mesh;
+                            
+                    }
+                    else
+                    {
+                        objMain.AddComponent<MeshFilter>();
+                        objMain.GetComponent<MeshFilter>().mesh = mesh;
                     }
                 }
 
-                Vector3 sceneExtends = manager.sceneBoundsMax - manager.sceneBoundsMin;
-                manager.maxExtend = Mathf.Max(Mathf.Max(sceneExtends.x, sceneExtends.y), sceneExtends.z);
+                if (nodeGeo.editable)
+                {
+                    objMain.tag = "editable";
+                    SceneObject sco = SceneObject.Attach(objMain, m_senderID);
+                    manager.simpleSceneObjectList.Add(sco);
+                }
+            }
+            else if (node.GetType() == typeof(SceneManager.SceneNodeLight))
+            {
+                SceneManager.SceneNodeLight nodeLight = (SceneManager.SceneNodeLight)node;
+
+                Light lightComponent = objMain.AddComponent<Light>();
+                   
+                lightComponent.type = (UnityEngine.LightType) nodeLight.lightType;
+                lightComponent.color = new Color(nodeLight.color[0], nodeLight.color[1], nodeLight.color[2]);
+                lightComponent.intensity = nodeLight.intensity * m_LightScale;
+                lightComponent.spotAngle = nodeLight.angle;
+                lightComponent.shadowBias = 0f;
+                lightComponent.shadowNormalBias = 1f;
+                lightComponent.range = nodeLight.range * manager.settings.sceneScale;
+
+                // Debug.Log("Create Light: " + nodeLight.name + " of type: " + nodeLight.lightType.ToString() + " Intensity: " + nodeLight.intensity + " Pos: " + pos);
+
+                if (nodeLight.editable)
+                {
+                    objMain.tag = "editable";
+                    SceneObjectLight sco;
+                    switch (nodeLight.lightType)
+                    {
+                        case SceneManager.LightType.POINT:
+                            sco = SceneObjectPointLight.Attach(objMain, m_senderID);
+                            lightComponent.shadows = LightShadows.None;
+                            break;
+                        case SceneManager.LightType.DIRECTIONAL:
+                            lightComponent.shadows = LightShadows.Soft;
+                            lightComponent.shadowStrength = 0.8f;
+                            sco = SceneObjectDirectionalLight.Attach(objMain, m_senderID);
+                            break;
+                        case SceneManager.LightType.SUN:
+                            lightComponent.shadows = LightShadows.Soft;
+                            lightComponent.shadowStrength = 0.8f;
+                            sco = SceneObjectSunLight.Attach(objMain, m_senderID);
+                            break;
+                        case SceneManager.LightType.SPOT:
+                            lightComponent.range *= 2;
+                            lightComponent.shadows = LightShadows.None;
+                            sco = SceneObjectSpotLight.Attach(objMain, m_senderID);
+                            break;
+                        case SceneManager.LightType.AREA:
+                            lightComponent.spotAngle = 170;
+                            lightComponent.range *= 4;
+                            lightComponent.shadows = LightShadows.None;
+                            sco = SceneObjectAreaLight.Attach(objMain, m_senderID);
+                            break;
+                        default:
+                            sco = SceneObjectLight.Attach(objMain, m_senderID);
+                            Debug.Log("Unknown Light Type " + nodeLight.lightType.ToString() + " in NodeBuilderBasic::CreateLight");
+                        break;
+                    }
+                    manager.sceneLightList.Add(sco);
+                }
+            }
+            else if (node.GetType() == typeof(SceneManager.SceneNodeCam))
+            {
+                SceneManager.SceneNodeCam nodeCam = (SceneManager.SceneNodeCam)node;
+
+                Camera camera = objMain.AddComponent<Camera>();
+
+                camera.fieldOfView = nodeCam.fov;
+                camera.aspect = nodeCam.aspect;
+                camera.nearClipPlane = nodeCam.near;
+                camera.farClipPlane = nodeCam.far;
+                //camera.focalDistance = nodeCam.focalDist;     // not available in unity
+                //camera.aperture = nodeCam.aperture;           // not available in unity
+                //disable the component, because its only used for its value and to modify them
+                camera.enabled = false;
+
+                if (nodeCam.editable)
+                {
+                    objMain.tag = "editable";
+                    SceneObjectCamera sco = SceneObjectCamera.Attach(objMain, m_senderID);
+                    manager.sceneCameraList.Add(sco);
+                }
+            }
+            else if (node.GetType() == typeof(SceneManager.SceneNodeCharacter))
+            {
+                if (node.editable)
+                {
+                    objMain.tag = "editable";
+                    SceneObject sdo = SceneCharacterObject.Attach(objMain, m_senderID);
+                }
+            }
+            //ADD SCENE OBJECT PATH
+            else
+            {
+                if (node.editable)
+                {
+                    objMain.tag = "editable";
+
+                    SceneObject sdo = SceneObject.Attach(objMain, m_senderID);
+                    manager.simpleSceneObjectList.Add(sdo);
+                }
+            }
+
+            Vector3 sceneExtends = manager.sceneBoundsMax - manager.sceneBoundsMin;
+            manager.maxExtend = Mathf.Max(Mathf.Max(sceneExtends.x, sceneExtends.y), sceneExtends.z);
             //}
             //else
             //{

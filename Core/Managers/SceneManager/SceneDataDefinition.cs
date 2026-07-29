@@ -41,6 +41,11 @@ namespace tracer
         public enum NodeType { GROUP, GEO, LIGHT, CAMERA, SKINNEDMESH, CHARACTER }
 
         //!
+        //! Enumeration defining TRACER light Types.
+        //!
+        public enum LightType { SPOT, DIRECTIONAL, POINT, AREA, DISC, SUN }
+
+        //!
         //! Data structure for serialising basic SceneNodes.
         //! The struct layout and array size for marshaling has to be fixed
         //! to be compatible with unmanaged code.

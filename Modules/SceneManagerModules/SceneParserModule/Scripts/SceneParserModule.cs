@@ -234,7 +234,7 @@ namespace tracer
 
             nodeLight.intensity = light.intensity;
             nodeLight.color = new float[3] { light.color.r, light.color.g, light.color.b };
-            nodeLight.lightType = light.type;
+            nodeLight.lightType = (SceneManager.LightType) light.type;
             nodeLight.angle = light.spotAngle;
             nodeLight.range = light.range;
             return nodeLight;
