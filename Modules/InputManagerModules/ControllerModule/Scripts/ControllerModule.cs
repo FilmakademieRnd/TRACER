@@ -136,9 +136,9 @@ namespace tracer{
         private bool _isLeftTriggerHold, _isRightTriggerHold = false;
         private bool inOrbitMode = false;
         //! our input trackers for abstract utilization
-        private InputManager.InputTracker _primary   = new InputManager.InputTracker(InputManager.InputLevel.Primary);
-        private InputManager.InputTracker _secondary   = new InputManager.InputTracker(InputManager.InputLevel.Secondary);
-        private InputManager.InputTracker _tertiary   = new InputManager.InputTracker(InputManager.InputLevel.Tertiary);
+        private InputTracker _primary   = new InputTracker(InputManager.InputLevel.Primary);
+        private InputTracker _secondary   = new InputTracker(InputManager.InputLevel.Secondary);
+        private InputTracker _tertiary   = new InputTracker(InputManager.InputLevel.Tertiary);
         #endregion
 
 
@@ -231,7 +231,7 @@ namespace tracer{
         public ControllerModule(string name, Manager manager) : base(name, manager){}
 
         #region PROCESSING
-        private void ProcessRightStick(InputManager.InputTracker _tracker, Vector2 rawStickInput) {
+        private void ProcessRightStick(InputTracker _tracker, Vector2 rawStickInput) {
             // Evaluate Deadzone
             if (rawStickInput.magnitude > stickDeadzone) {
                 
@@ -276,7 +276,7 @@ namespace tracer{
         //! similiar to ProcessLeftStick, but
         //! hor input is left/right move, ver is fwd/back (pinch)
         //!
-        private void ProcessLeftStick(InputManager.InputTracker _tracker, Vector2 rawStickInput) {
+        private void ProcessLeftStick(InputTracker _tracker, Vector2 rawStickInput) {
             Vector2 syntheticDelta;
             Quaternion parentRotation;
             float manipulationSpeed = Time.deltaTime;
@@ -408,7 +408,7 @@ namespace tracer{
         //!
         //! left and right trigger, delta is inverse
         //!
-        private void ProcessTrigger(InputManager.InputTracker _tracker, float delta) {
+        private void ProcessTrigger(InputTracker _tracker, float delta) {
             
             float manipulationSpeed = 10*Time.deltaTime;
             Quaternion parentRotation;
@@ -660,7 +660,7 @@ namespace tracer{
 
         #region CALLBACK EVENTS
 
-        private void FireDragOtherEvent(InputManager.InputTracker tracker, InputManager.InputState state, Vector2 position, Vector2 delta) {
+        private void FireDragOtherEvent(InputTracker tracker, InputManager.InputState state, Vector2 position, Vector2 delta) {
             // Construct your InputData payload exactly as you do in the UnityInputModule
             tracker.CurrentPosition = position;
             tracker.CurrentDelta = delta;
@@ -672,7 +672,7 @@ namespace tracer{
             InputManager.InputData data = InputManager.CreateData(tracker, state);
             manager.Publish(new InputManager.DragOtherEvent { Data = data, StartPos = tracker.StartPosition });
         }
-        private void FirePinchOtherEvent(InputManager.InputTracker tracker, InputManager.InputState state, Vector2 position, float delta) {
+        private void FirePinchOtherEvent(InputTracker tracker, InputManager.InputState state, Vector2 position, float delta) {
             // Construct your InputData payload exactly as you do in the UnityInputModule
             tracker.CurrentPosition = position;
 
@@ -1242,6 +1242,9 @@ namespace tracer{
             }
         }
         #endregion
+
+        // --- HELPER METHODS FOR FIRING EVENTS ---
+        
 
         #region DEBUGGING
         private GameObject mainUIContainer;

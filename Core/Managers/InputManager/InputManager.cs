@@ -58,44 +58,6 @@ namespace tracer{
             public UnityEngine.Vector2 Delta;       //has to be replaced by own v2 implementation
         }
 
-        // TODO: remove Unity dependency, so other modules could utilize it without referencing to other module
-        public class InputTracker{
-            public InputLevel Level;   //primary, secondary, tertiary
-            public InteractionState State = InteractionState.Idle;  //see above
-            /*
-                Leader & Muted - Pattern - The Rules:
-                - on multi-touch, identify the "Highest Level" tracker (e.g., Secondary) -> becomes Leader
-                - set all involved trackers to the same state (e.g., Dragging), but mute on the lower-level trackers
-                - ProcessTracker/OnPointerUp: if tracker == IsMuted, it discards itself completely
-                - Lead Tracker processes normally, but it calculates its position by averaging all trackers that share its current state.
-            */
-            public bool IsMuted = false;
-            public UnityEngine.Vector2 CurrentPosition; //necessary for multitouch and for correct oop approach
-            public UnityEngine.Vector2 CurrentDelta;
-            public float TimeDown;
-            public UnityEngine.Vector2 StartPosition;
-            public float LastClickTime = -100f; // Tracked for Double Click
-
-            public InputTracker(InputLevel level){ Level = level; }
-            public void Reset(){ 
-                State = InteractionState.Idle; 
-                IsMuted = false; 
-                CurrentPosition = UnityEngine.Vector2.zero;
-                CurrentDelta = UnityEngine.Vector2.zero; 
-                TimeDown = 0f;
-                StartPosition = UnityEngine.Vector2.zero;
-            }
-        }
-
-        public enum InteractionState { 
-            Idle,           // Nothing is happening
-            Evaluating,     // Pointer is down, waiting to see if it becomes Click, Drag, or Hold
-            Dragging,       // Surpassed distance threshold (Holds are now denied)
-            Holding,        // Surpassed time threshold (Drags are now denied)
-            Pinching,       // Surpassed pinch delta (Drags/Holds denied)
-            Rotating       // Surpassed rotation delta (Drags/Holds denied)
-        }
-
         // --- INTERFACE ---
         public interface IInputEvent { }
 
@@ -218,17 +180,6 @@ namespace tracer{
         public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore){
         }
 
-        // --- HELPER METHODS FOR FIRING EVENTS ---
-        public static InputData CreateData(InputTracker tracker, InputManager.InputState state) {
-            return new InputData {
-                Level = tracker.Level,
-                State = state,
-                // Device = InputDeviceType.Touch, // no differentiation yet
-                Position = tracker.CurrentPosition,
-                Delta = tracker.CurrentDelta
-                // could also add rotation? or utilize pos+delta for performance?
-            };
-        }
 
         #region Specific Data
 
@@ -287,5 +238,60 @@ namespace tracer{
         }
 
         #endregion
+    
+        //used by UnityInputModule and ControllerModule
+        public static InputData CreateData(InputTracker tracker, InputManager.InputState state) {
+            return new InputData {
+                Level = tracker.Level,
+                State = state,
+                // Device = InputDeviceType.Touch, // no differentiation yet
+                Position = tracker.CurrentPosition,
+                Delta = tracker.CurrentDelta
+                // could also add rotation? or utilize pos+delta for performance?
+            };
+        }
     }
+
+    #region Tracking Input Data
+
+    //used by UnityInputModule and ControllerModule
+    //could be put elsewhere + remove UnityDependency!
+    public class InputTracker{
+        public InputManager.InputLevel Level;   //primary, secondary, tertiary
+        public InteractionState State = InteractionState.Idle;  //see above
+        /*
+            Leader & Muted - Pattern - The Rules:
+            - on multi-touch, identify the "Highest Level" tracker (e.g., Secondary) -> becomes Leader
+            - set all involved trackers to the same state (e.g., Dragging), but mute on the lower-level trackers
+            - ProcessTracker/OnPointerUp: if tracker == IsMuted, it discards itself completely
+            - Lead Tracker processes normally, but it calculates its position by averaging all trackers that share its current state.
+        */
+        public bool IsMuted = false;
+        public UnityEngine.Vector2 CurrentPosition; //necessary for multitouch and for correct oop approach
+        public UnityEngine.Vector2 CurrentDelta;
+        public float TimeDown;
+        public UnityEngine.Vector2 StartPosition;
+        public float LastClickTime = -100f; // Tracked for Double Click
+
+        public InputTracker(InputManager.InputLevel level){ Level = level; }
+        public void Reset(){ 
+            State = InteractionState.Idle; 
+            IsMuted = false; 
+            CurrentPosition = UnityEngine.Vector2.zero;
+            CurrentDelta = UnityEngine.Vector2.zero; 
+            TimeDown = 0f;
+            StartPosition = UnityEngine.Vector2.zero;
+        }
+    }
+
+    public enum InteractionState { 
+        Idle,           // Nothing is happening
+        Evaluating,     // Pointer is down, waiting to see if it becomes Click, Drag, or Hold
+        Dragging,       // Surpassed distance threshold (Holds are now denied)
+        Holding,        // Surpassed time threshold (Drags are now denied)
+        Pinching,       // Surpassed pinch delta (Drags/Holds denied)
+        Rotating       // Surpassed rotation delta (Drags/Holds denied)
+    }
+
+    #endregion
 }
