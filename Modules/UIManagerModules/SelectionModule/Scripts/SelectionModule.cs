@@ -68,7 +68,8 @@ namespace tracer{
             // m_inputManager.onPrimaryInteract3dUI += SelectViaIconFunction;
             // m_inputManager.onPrimaryInteractSelectable += SelectFunction;
             // m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
-            m_inputManager.Subscribe<InputManager.ClickOtherEvent>(SelectFunction);
+            // m_inputManager.Subscribe<InputManager.ClickOtherEvent>(SelectFunction);
+            m_inputManager.clickOtherEvent += SelectFunction;
             //add DoubleClick
             //add drag in terms of drawing a rectangle for multi-selection with different function
             
@@ -84,7 +85,8 @@ namespace tracer{
             // m_inputManager.onPrimaryInteract3dUI        -= SelectViaIconFunction;
             // m_inputManager.onPrimaryInteractSelectable  -= SelectFunction;
             // m_inputManager.onPrimaryInteractWorld += DeSelectFunction;
-            m_inputManager.Unsubscribe<InputManager.ClickOtherEvent>(SelectFunction);
+            // m_inputManager.Unsubscribe<InputManager.ClickOtherEvent>(SelectFunction);
+            m_inputManager.clickOtherEvent -= SelectFunction;
         }
 
         //!
@@ -92,12 +94,12 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void SelectFunction(InputManager.ClickOtherEvent evt){
+        private void SelectFunction(object sender, InputManager.ClickEventArgs evt){
 
-            if (evt.Data.Level != InputManager.InputLevel.Primary) return;
+            if (evt.Level != InputManager.InputLevel.Primary) return;
 
             // check phase
-            switch (evt.Data.State){
+            switch (evt.State){
                 case InputManager.InputState.Started:
                 case InputManager.InputState.Ongoing:
                 case InputManager.InputState.Canceled:
@@ -109,7 +111,7 @@ namespace tracer{
                     break;
             }
 
-            SceneObject sceneObject = GetSceneObjectAtPosition(evt.Data.Position);
+            SceneObject sceneObject = GetSceneObjectAtPosition(evt.Position);
 
             if (sceneObject != null){
                 

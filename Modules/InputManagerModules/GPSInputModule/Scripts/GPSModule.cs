@@ -56,7 +56,7 @@ namespace tracer{
         private int _continuousDemandCount = 0;
         private bool _isLocating = false;
         private Coroutine _gpsLoopRoutine;
-        private InputManager.InputData gpsInputData;
+        private InputManager.GPSEventArgs gpsInputData;
         private InputManager.GPSDataStruct gpsData;
 
         //!
@@ -75,12 +75,12 @@ namespace tracer{
         //! 
         protected override void Init(object sender, EventArgs e){
             //created once, only the state will ever change here!
-            gpsInputData = new InputManager.InputData {
-                Level = InputManager.InputLevel.Primary,
-                State = InputManager.InputState.Started,
-                Position = Vector2.zero,
-                Delta = Vector2.zero
-            };
+            gpsInputData = InputTracker.ToArgs<InputManager.GPSEventArgs>(
+                InputManager.InputLevel.Primary,
+                InputManager.InputState.Started,
+                Vector2.zero,
+                Vector2.zero
+            );
 
             InputManager.OnGPSDemandChanged += HandleGPSDemandEvent;
         }
@@ -192,8 +192,9 @@ namespace tracer{
                 // Hardware failed or timed out: Broadcast fallback coordinates so the app doesn't break
                 gpsData = new InputManager.GPSDataStruct(DEFAULT_LAT, DEFAULT_LON, DESIRED_ACCURACY_M, 0f, false, 0){};
             }
+            gpsInputData.GPSData = gpsData;
 
-            manager.Publish(new InputManager.GPSInputEvent { Data = gpsInputData, GPSData = gpsData });
+            manager.RaiseGPS(this, gpsInputData);
         }
     }
 

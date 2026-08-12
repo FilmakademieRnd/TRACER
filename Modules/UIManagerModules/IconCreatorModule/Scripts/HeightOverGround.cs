@@ -349,6 +349,8 @@ public class HeightOverGround : MonoBehaviour{
         line.textureMode = LineTextureMode.Tile; // Crucial for non-stretching dashed lines
         line.startColor = materialColor;
         line.endColor = materialColor;
+        line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        line.receiveShadows = false;
 
         lineMat = new Material(Shader.Find("Unlit/Transparent")) { mainTexture = GenerateDashedTexture() };
         ConfigureParticleLineMaterial(lineMat);
@@ -461,6 +463,7 @@ public class HeightOverGround : MonoBehaviour{
         // 5. Set Color Mode to "Multiply" (Index 0 in the dropdown)
         // This allows the LineRenderer's Start/End gradient vertex colors to multiply properly
         mat.SetFloat("_ColorMode", 0f);
+
     }
 
     //only important to check for current selector if we have SHOW_ONLY_AT_TRANSLATE_GIZMO = true

@@ -129,7 +129,7 @@ namespace tracer
         }
 
         //! used as data for the inputmanager event as in the UnityInputModule
-        private InputManager.InputData arInputData;
+        private InputManager.AREventArgs arInputData;
 
         //!
         //! Constructor
@@ -229,6 +229,14 @@ namespace tracer
         //! initialize the AR environement in the scene, executed after veryfing AR support of device
         //!
         private void initialize(){
+            
+            //creating class once, reduce Garbage Collection
+            arInputData = InputTracker.ToArgs<InputManager.AREventArgs>(
+                InputManager.InputLevel.Primary,
+                InputManager.InputState.Canceled,
+                Vector2.zero,
+                Vector2.zero
+            );
 
             //Instanciate XROrigin from Prefab
             GameObject arSessionOriginPrefab = Resources.Load<GameObject>("Prefabs/ARSessionOrigin");
@@ -370,13 +378,8 @@ namespace tracer
                 Camera.main.transform.parent = m_arOrigin.transform;
                 core.getManager<UIManager>().cameraControl = UIManager.CameraControl.AR;
                 
-                arInputData = new InputManager.InputData {
-                    Level = InputManager.InputLevel.Primary,
-                    State = InputManager.InputState.Started,
-                    Position = Vector2.zero,
-                    Delta = Vector2.zero
-                };
-                manager.Publish(new InputManager.ARInputEvent { Data = arInputData });
+                arInputData.State = InputManager.InputState.Started;
+                manager.RaiseAR(this, arInputData);
             }else{
                 Camera.main.transform.parent = m_arOrigin.transform.parent;
                 m_arOrigin.transform.position = Vector3.zero;
@@ -384,13 +387,8 @@ namespace tracer
                 
                 core.getManager<UIManager>().cameraControl = UIManager.CameraControl.STANDARD;
 
-                arInputData = new InputManager.InputData {
-                    Level = InputManager.InputLevel.Primary,
-                    State = InputManager.InputState.Ended,
-                    Position = Vector2.zero,
-                    Delta = Vector2.zero
-                };
-                manager.Publish(new InputManager.ARInputEvent { Data = arInputData });
+                arInputData.State = InputManager.InputState.Ended;
+                manager.RaiseAR(this, arInputData);
             }
 
             if (arSession)

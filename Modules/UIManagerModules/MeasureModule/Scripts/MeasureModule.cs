@@ -258,8 +258,7 @@ namespace tracer{
                 manager.selectionChanged += OnSelectionChanged;
             }else{
                 manager.selectionChanged -= OnSelectionChanged;
-                
-                core.getManager<InputManager>().Unsubscribe<InputManager.ClickOtherEvent>(ClickFunction);
+                core.getManager<InputManager>().clickOtherEvent -= ClickFunction;
             }
         }
 
@@ -449,7 +448,7 @@ namespace tracer{
             manager.clearSelectedObjects();
             
             //add event to input manager
-            core.getManager<InputManager>().Subscribe<InputManager.ClickOtherEvent>(ClickFunction);
+            core.getManager<InputManager>().clickOtherEvent += ClickFunction;
 
             //use the below for testing ongoing alignment
                 // did not work properly
@@ -467,7 +466,7 @@ namespace tracer{
             //revert color
             sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
             
-            core.getManager<InputManager>().Unsubscribe<InputManager.ClickOtherEvent>(ClickFunction);
+            core.getManager<InputManager>().clickOtherEvent -= ClickFunction;
 
             //re-enable gizmos by simulate a "reselection"
             manager.clearSelectedObjects();
@@ -570,19 +569,19 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void ClickFunction(InputManager.ClickOtherEvent evt){
+        private void ClickFunction(object sender, InputManager.ClickEventArgs evt){
 
-            if (evt.Data.Level != InputManager.InputLevel.Primary) return;
+            if (evt.Level != InputManager.InputLevel.Primary) return;
 
             // check phase
-            switch (evt.Data.State){
+            switch (evt.State){
                 case InputManager.InputState.Started:
                 case InputManager.InputState.Ongoing:
                 case InputManager.InputState.Canceled:
                     //nothing to do
                     break;
                 case InputManager.InputState.Ended:
-                    PlaceMeasurement(evt.Data.Position);
+                    PlaceMeasurement(evt.Position);
                     break;
             }
         }

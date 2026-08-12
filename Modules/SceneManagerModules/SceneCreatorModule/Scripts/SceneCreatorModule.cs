@@ -673,7 +673,7 @@ namespace tracer
                         lightComponent.range *= 2;
                         //objMain.transform.Rotate(new Vector3(0, 180f, 0), Space.Self);
                     }
-                    else if (nodeLight.lightType == LightType.Area)
+                    else if (nodeLight.lightType == LightType.Rectangle)
                     {
                         lightComponent.spotAngle = 170;
                         lightComponent.range *= 4;
@@ -701,7 +701,7 @@ namespace tracer
                             case LightType.Spot:
                                 sco = SceneObjectSpotLight.Attach(objMain, m_senderID);
                                 break;
-                            case LightType.Area:
+                            case LightType.Rectangle:
                                 sco = SceneObjectAreaLight.Attach(objMain, m_senderID);
                                 break;
                             default:

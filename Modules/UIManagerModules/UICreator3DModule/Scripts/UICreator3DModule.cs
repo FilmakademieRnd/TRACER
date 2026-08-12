@@ -272,7 +272,7 @@ namespace tracer
             manager.settings.uiScale.hasChanged -= updateUIScale;
 
             // NEW INPUT EVENTS
-            m_inputManager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
+            m_inputManager.dragOtherEvent -= DragFunction;
 
             /*m_inputManager.fingerGestureEvent -= updateGizmoScale;
             m_inputManager.updateCameraUICommand -= updateGizmoScale;*/
@@ -318,7 +318,7 @@ namespace tracer
             m_inputManager = core.getManager<InputManager>();
 
             // NEW INPUT EVENTS
-            m_inputManager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
+            m_inputManager.dragOtherEvent += DragFunction;
 
             // Hookup to input events
             /*m_inputManager.fingerGestureEvent += updateGizmoScale;
@@ -375,7 +375,7 @@ namespace tracer
         //!
         //! @param evt the InputData
         //!
-        private void DragFunction(InputManager.DragOtherEvent evt){
+        private void DragFunction(object sender, InputManager.DragEventArgs evt){
 
             // [REVIEW]
             // if no specific gizmo is shown, use prim - move, sec - rot, tert - scale
@@ -383,26 +383,26 @@ namespace tracer
             // update viz accordingly? 
 
             // right now, only Primary
-            if (evt.Data.Level != InputManager.InputLevel.Primary) return;
+            if (evt.Level != InputManager.InputLevel.Primary) return;
 
             // check phase
-            switch (evt.Data.State){
+            switch (evt.State){
                 case InputManager.InputState.Started:
                     //Debug.Log("Primary Drag Started");
-                    SetupManipulatorForTransformations(evt.StartPos);
-                    CalculateStartOffset(evt.StartPos);
+                    SetupManipulatorForTransformations(evt.StartPosition);
+                    CalculateStartOffset(evt.StartPosition);
                     //better for viz?
                     //HideGizmo();
                     break;
                 case InputManager.InputState.Ongoing:
                     //Debug.Log("Primary Drag ongoing");
-                    ExecuteManipulatorTransformation(evt.Data.Position);
+                    ExecuteManipulatorTransformation(evt.Position);
                     break;
                 case InputManager.InputState.Canceled:
                 case InputManager.InputState.Ended:
                     //Debug.Log("Primary Drag ended");
                     //TODO: dont execute via controller-right-stick drag, since we only every rotate the cam with it
-                    FinalizeManipulatorTransformation(evt.Data.Position);
+                    FinalizeManipulatorTransformation(evt.Position);
                     //better for viz?
                     //ShowGizmo();
                     break;

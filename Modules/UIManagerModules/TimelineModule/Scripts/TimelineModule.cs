@@ -355,11 +355,12 @@ namespace tracer{
                 m_removeKeyButton.onClick.              AddListener(RemoveKey);
                 m_removeAllKeysButton.onClick.          AddListener(RemoveAllKeys);
 
-                m_inputManager.Subscribe<InputManager.ClickUIEvent>(ClickFunction);
-                m_inputManager.Subscribe<InputManager.DoubleClickUIEvent>(DoubleClickFunction);
-                m_inputManager.Subscribe<InputManager.DragUIEvent>(DragFunction);
-                m_inputManager.Subscribe<InputManager.HoldUIEvent>(HoldFunction);
-                m_inputManager.Subscribe<InputManager.PinchUIEvent>(EvaluatePinchFunction);
+                m_inputManager.clickUIEvent         += ClickFunction;
+                m_inputManager.doubleClickUIEvent   += DoubleClickFunction;
+                m_inputManager.dragUIEvent          += DragFunction;
+                m_inputManager.holdUIEvent          += HoldFunction;
+                m_inputManager.pinchUIEvent         += EvaluatePinchFunction;
+
 
                 /*m_inputManager.inputPressStartedUI      += OnPointerDown; //OnBeginDrag;
                 m_inputManager.inputPressEnd            += OnPointerEnd;
@@ -383,11 +384,11 @@ namespace tracer{
                 m_removeKeyButton.onClick.              RemoveListener(RemoveKey);
                 m_removeAllKeysButton.onClick.          RemoveListener(RemoveAllKeys);
 
-                m_inputManager.Unsubscribe<InputManager.ClickUIEvent>(ClickFunction);
-                m_inputManager.Unsubscribe<InputManager.DoubleClickUIEvent>(DoubleClickFunction);
-                m_inputManager.Unsubscribe<InputManager.DragUIEvent>(DragFunction);
-                m_inputManager.Unsubscribe<InputManager.HoldUIEvent>(HoldFunction);
-                m_inputManager.Unsubscribe<InputManager.PinchUIEvent>(EvaluatePinchFunction);
+                m_inputManager.clickUIEvent         -= ClickFunction;
+                m_inputManager.doubleClickUIEvent   -= DoubleClickFunction;
+                m_inputManager.dragUIEvent          -= DragFunction;
+                m_inputManager.holdUIEvent          -= HoldFunction;
+                m_inputManager.pinchUIEvent         -= EvaluatePinchFunction;
 
                 /*m_inputManager.inputPressStartedUI      -= OnPointerDown; //OnBeginDrag;
                 m_inputManager.inputPressEnd            -= OnPointerEnd;
@@ -413,19 +414,19 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void ClickFunction(InputManager.ClickUIEvent evt){
+        private void ClickFunction(object sender, InputManager.ClickEventArgs evt){
 
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 //UPDATE TIME (red line within the keyframe)
                 case InputManager.InputLevel.Primary:
                     
-                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Position);
                     
                     // check phase
-                    switch (evt.Data.State){
+                    switch (evt.State){
                         case InputManager.InputState.Started:
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
@@ -435,7 +436,7 @@ namespace tracer{
                             //set time instantly on click with no special action
                             // [REVISE] do we have to lock objects and unlock instantly?
                             if (hitUIGameObject == m_timeLine){
-                                UpdateTime(m_timelineRect.InverseTransformPoint(evt.Data.Position).x);
+                                UpdateTime(m_timelineRect.InverseTransformPoint(evt.Position).x);
                                 deselectKeyframe();
                             }else if (HitKeyFrame(hitUIGameObject, out KeyFrame kf)) {
                                 SelectKeyFrame(kf, true);
@@ -456,18 +457,18 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void DoubleClickFunction(InputManager.DoubleClickUIEvent evt){
+        private void DoubleClickFunction(object sender, InputManager.ClickEventArgs evt){
 
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 case InputManager.InputLevel.Primary:
-                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                    GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Position);
                     if (HitKeyFrame(hitUIGameObject, out KeyFrame kf)) {
                         //...
                     }else if (hitUIGameObject == m_timeLine){
-                        EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position, true);
+                        EvaluateCreateKeyframeFunction(evt.State, evt.Position, true);
                     }
                     break;  
             }
@@ -478,33 +479,33 @@ namespace tracer{
         //!
         //! @param evt the InputData, startPos for exactly checking what to drag
         //!
-        private void DragFunction(InputManager.DragUIEvent evt){
+        private void DragFunction(object sender, InputManager.DragEventArgs evt){
 
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 case InputManager.InputLevel.Primary:
-                    if(evt.Data.State == InputManager.InputState.Started){
+                    if(evt.State == InputManager.InputState.Started){
                         //changed to multiple values, so we can have the samer function for hold!
-                        EvaluateDragKeyframeFunction(evt.Data.State, evt.Data.Position, evt.StartPos);
+                        EvaluateDragKeyframeFunction(evt.State, evt.Position, evt.StartPosition);
                         if(!dragginKeyframe)
-                            EvaluateSetTimeFunction(evt.Data.State, evt.Data.Position, evt.StartPos);
+                            EvaluateSetTimeFunction(evt.State, evt.Position, evt.StartPosition);
                     } else {
                         if(m_isSelected)
-                            EvaluateSetTimeFunction(evt.Data.State, evt.Data.Position, evt.StartPos);
+                            EvaluateSetTimeFunction(evt.State, evt.Position, evt.StartPosition);
                         else if(dragginKeyframe)
-                            EvaluateDragKeyframeFunction(evt.Data.State, evt.Data.Position, evt.StartPos);
+                            EvaluateDragKeyframeFunction(evt.State, evt.Position, evt.StartPosition);
                     }                    
                     break;  
                 case InputManager.InputLevel.Secondary:
-                    if(evt.Data.State == InputManager.InputState.Started || m_isSelected)
-                        EvaluateDragTimelineFunction(evt.Data.State, evt.Data.Delta, evt.StartPos);
+                    if(evt.State == InputManager.InputState.Started || m_isSelected)
+                        EvaluateDragTimelineFunction(evt.State, evt.Delta, evt.StartPosition);
                     break;    
             }
         }
 
-        private void HoldFunction(InputManager.HoldUIEvent evt){
+        private void HoldFunction(object sender, InputManager.HoldEventArgs evt){
 
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;
@@ -517,54 +518,54 @@ namespace tracer{
             //      instead trigger scrubbing or dragging kf as well?!
             
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 case InputManager.InputLevel.Primary:
                     //moved to secondary click
                     //EvaluateCreateKeyframeFunction(evt.Data.State, evt.Data.Position, true);
 
                     //new: similiar to DragFunction
-                    if(evt.Data.State == InputManager.InputState.Started){
-                        EvaluateDragKeyframeFunction(evt.Data.State, evt.Data.Position, evt.Data.Position);
+                    if(evt.State == InputManager.InputState.Started){
+                        EvaluateDragKeyframeFunction(evt.State, evt.Position, evt.Position);
                         if(!dragginKeyframe)
-                            EvaluateSetTimeFunction(evt.Data.State, evt.Data.Position, evt.Data.Position);
+                            EvaluateSetTimeFunction(evt.State, evt.Position, evt.Position);
                     } else {
                         if(m_isSelected)
-                            EvaluateSetTimeFunction(evt.Data.State, evt.Data.Position, evt.Data.Position);
+                            EvaluateSetTimeFunction(evt.State, evt.Position, evt.Position);
                         else if(dragginKeyframe)
-                            EvaluateDragKeyframeFunction(evt.Data.State, evt.Data.Position, evt.Data.Position);
+                            EvaluateDragKeyframeFunction(evt.State, evt.Position, evt.Position);
                     }  
                     break;  
                 case InputManager.InputLevel.Secondary:
                     //new: similiar to DragFunction
-                    if(evt.Data.State == InputManager.InputState.Started || m_isSelected)
-                        EvaluateDragTimelineFunction(evt.Data.State, evt.Data.Delta, evt.Data.Position);
+                    if(evt.State == InputManager.InputState.Started || m_isSelected)
+                        EvaluateDragTimelineFunction(evt.State, evt.Delta, evt.Position);
                     break;    
             }
         }
 
-        private void EvaluatePinchFunction(InputManager.PinchUIEvent evt) {
+        private void EvaluatePinchFunction(object sender, InputManager.PinchEventArgs evt) {
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;
 
             //if we did not select the timeline within the InputState.Started, either way of the InputLevel: stop here
-            if(evt.Data.State > InputManager.InputState.Started && !m_isSelected)
+            if(evt.State > InputManager.InputState.Started && !m_isSelected)
                 return;
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 //right now allow all levels, since touch could be secondary or tertiary!
                 case InputManager.InputLevel.Primary:
                 case InputManager.InputLevel.Secondary:
                 case InputManager.InputLevel.Tertiary:
-                     switch (evt.Data.State){
+                     switch (evt.State){
                         case InputManager.InputState.Started:
-                            GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Data.Position);
+                            GameObject hitUIGameObject = EvaluationHelper.Instance.EvaluateUIGameObject(evt.Position);
                             if (hitUIGameObject != m_timeLine && !HitKeyFrame(hitUIGameObject, out KeyFrame kf)) 
                                 return;
                             
                             m_isSelected = true;
                             break;
                         case InputManager.InputState.Ongoing:
-                            ZoomTimeline(evt.Data.Position, evt.PinchDistance);
+                            ZoomTimeline(evt.Position, evt.PinchDelta);
                             break;
                         case InputManager.InputState.Canceled:
                         case InputManager.InputState.Ended:

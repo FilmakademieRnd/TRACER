@@ -164,12 +164,11 @@ namespace tracer
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged -= SelectionUpdate;
 
-            manager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
-            manager.Unsubscribe<InputManager.HoldOtherEvent>(HoldFunction);
-            manager.Unsubscribe<InputManager.PinchOtherEvent>(PinchFunction);
-            manager.Unsubscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
-            manager.Unsubscribe<InputManager.DoubleClickOtherEvent>(DoubleClickFunction);
-            
+            manager.dragOtherEvent          -= DragFunction;
+            manager.holdOtherEvent          -= HoldFunction;
+            manager.pinchOtherEvent         -= PinchFunction;
+            manager.doubleClickOtherEvent   -= DoubleClickFunction;
+            manager.attitudeEvent           -= AttitudeFunction;
 
             if (circleSprite != null){
                 if (circleSprite.texture != null) 
@@ -199,11 +198,19 @@ namespace tracer
             m_inputs.VPETMap.FocusSelection.canceled += FocusOnSelection;
             m_inputs.VPETMap.Enable();
 
-            manager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
-            manager.Subscribe<InputManager.HoldOtherEvent>(HoldFunction);
-            manager.Subscribe<InputManager.PinchOtherEvent>(PinchFunction);
-            manager.Subscribe<InputManager.AttitudeInputEvent>(AttitudeFunction);
-            manager.Subscribe<InputManager.DoubleClickOtherEvent>(DoubleClickFunction);
+            // als "übersichtliche" Deklaration:
+            // manager.DeclareInputRole<InputManager.DragOtherEvent>(this, InputManager.InputLevel.Primary,   "Camera look around");
+            // manager.DeclareInputRole<InputManager.DragOtherEvent>(this, InputManager.InputLevel.Secondary, "Camera pedestal/truck");
+            // manager.DeclareInputRole<InputManager.DragOtherEvent>(this, InputManager.InputLevel.Tertiary,  "Orbit around selection");
+            // > switch in DragFunction bleibt, Dict im IM bleibt, keine neue Unsubscribe-Fehlerquelle (3x)
+            // > DebugOverlay zur Runtime möglich
+            // (8ung Deklaration kann von tatsächlicher Umsetzung abweichen)
+
+            manager.dragOtherEvent          += DragFunction;
+            manager.holdOtherEvent          += HoldFunction;
+            manager.pinchOtherEvent         += PinchFunction;
+            manager.doubleClickOtherEvent   += DoubleClickFunction;
+            manager.attitudeEvent           += AttitudeFunction;
 
             // Instantiate once
             _orbitViz = new OrbitImpactPin(core);
@@ -218,24 +225,24 @@ namespace tracer
         //!
         //! @param evt the InputData
         //!
-        private void DragFunction(InputManager.DragOtherEvent evt){
+        private void DragFunction(object sender, InputManager.DragEventArgs evt){
             
             if(!manager.IsCamNavigationAllowed())
                 return;
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 //ROTATE CAMERA
                 case InputManager.InputLevel.Primary:
                     if(attitudeValuesIncoming)
                         return;
                     // check phase
-                    switch (evt.Data.State){
+                    switch (evt.State){
                         case InputManager.InputState.Started:
                             InitializeCameraAngles();
                             break;
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
-                            CameraLookAround(evt.Data.Delta);
+                            CameraLookAround(evt.Delta);
                             break;
                         case InputManager.InputState.Ended:
                             break;
@@ -244,12 +251,12 @@ namespace tracer
                 //MOVE CAMERA
                 case InputManager.InputLevel.Secondary:
                     // check phase
-                    switch (evt.Data.State){
+                    switch (evt.State){
                         case InputManager.InputState.Started:
                             break;
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
-                            CameraPedestalTruck(evt.Data.Delta);
+                            CameraPedestalTruck(evt.Delta);
                             break;
                         case InputManager.InputState.Ended:
                             break;
@@ -258,7 +265,7 @@ namespace tracer
                 //Rotate Around center of selected object(s)
                 case InputManager.InputLevel.Tertiary:
                     // check phase
-                    switch (evt.Data.State){
+                    switch (evt.State){
                         case InputManager.InputState.Started:
                             InitializeCameraAngles();
                             if(!m_hasSelection){
@@ -270,9 +277,9 @@ namespace tracer
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
                             if(m_hasSelection)
-                                CameraLookAroundObject(evt.Data.Delta, m_selectionCenter);
+                                CameraLookAroundObject(evt.Delta, m_selectionCenter);
                             else{
-                                CameraLookAroundObject(evt.Data.Delta, evaluatedNonSelectionCenterForOrbit);
+                                CameraLookAroundObject(evt.Delta, evaluatedNonSelectionCenterForOrbit);
                                 // Dynamically fills the ground arc as the camera swings around
                                 _orbitViz.UpdateOrbit(camTransform.position);
                             }
@@ -286,27 +293,27 @@ namespace tracer
             } 
         }
 
-        private void HoldFunction(InputManager.HoldOtherEvent evt){
+        private void HoldFunction(object sender, InputManager.HoldEventArgs evt){
             
             if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
                 return;
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 //Fly around?
                 //fwd/bck
                 case InputManager.InputLevel.Tertiary:
                     // check phase
-                    switch (evt.Data.State){
+                    switch (evt.State){
                         case InputManager.InputState.Started:
-                            StartFlightInteraction(evt.Data.Position);
+                            StartFlightInteraction(evt.Position);
                             InitializeCameraAngles();
-                            screenStartPos = evt.Data.Position;
+                            screenStartPos = evt.Position;
                             break;
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
                             //float fwdSpeedByDistance = evt.Data.Position.y - screenStartPos.y;
                             //CameraFlying(fwdSpeedByDistance, evt.Data.Delta.x);
-                            ProcessContinuousFlight(screenStartPos, evt.Data.Position, evt.Data.Delta);
+                            ProcessContinuousFlight(screenStartPos, evt.Position, evt.Delta);
                             break;
                         case InputManager.InputState.Ended:
                             StopFlightInteraction();
@@ -316,21 +323,21 @@ namespace tracer
             }
         }
 
-        private void PinchFunction(InputManager.PinchOtherEvent evt){
+        private void PinchFunction(object sender, InputManager.PinchEventArgs evt){
             
             if(!manager.IsCamNavigationAllowed()) // || attitudeValuesIncoming)
                 return;
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 //allow all levels
                 case InputManager.InputLevel.Primary:
                 case InputManager.InputLevel.Secondary:
                 case InputManager.InputLevel.Tertiary:
                     // check phase
-                    switch (evt.Data.State){
+                    switch (evt.State){
                         case InputManager.InputState.Started:
                         case InputManager.InputState.Ongoing:
-                            camTransform.Translate(0f, 0f, evt.PinchDistance * s_dollySpeed);
+                            camTransform.Translate(0f, 0f, evt.PinchDelta * s_dollySpeed);
                             break;
                         case InputManager.InputState.Canceled:
                         case InputManager.InputState.Ended:
@@ -345,12 +352,12 @@ namespace tracer
         //!
         //! @param evt the InputData
         //!
-        private void AttitudeFunction(InputManager.AttitudeInputEvent evt){
+        private void AttitudeFunction(object sender, InputManager.AttitudeEventArgs evt){
             
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 //ROTATE CAMERA
                 case InputManager.InputLevel.Primary:
-                    switch (evt.Data.State){
+                    switch (evt.State){
                         case InputManager.InputState.Started:
                             attitudeValuesIncoming = true;
                             InitializeAttitudeValues(evt.Rotation);
@@ -375,23 +382,23 @@ namespace tracer
         //!
         //! @param evt the InputData
         //!
-        private void DoubleClickFunction(InputManager.DoubleClickOtherEvent evt){
+        private void DoubleClickFunction(object sender, InputManager.ClickEventArgs evt){
 
-            switch (evt.Data.Level) {
+            switch (evt.Level) {
                 case InputManager.InputLevel.Primary:
                     //SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(evt.Data.Position);
                     
-                    SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(evt.Data.Position);
+                    SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(evt.Position);
                     if (hitSO) {
                         FocusOnGameObject(hitSO.gameObject);
                         return;
                     }
-                    GameObject hitGO = EvaluationHelper.Instance.EvaluateGameObject(evt.Data.Position);
+                    GameObject hitGO = EvaluationHelper.Instance.EvaluateGameObject(evt.Position);
                     if (hitGO) {
                         FocusOnGameObject(hitGO);
                         return;
                     }
-                    GameObject hitMP = EvaluationHelper.Instance.EvaluateManipulator(evt.Data.Position);
+                    GameObject hitMP = EvaluationHelper.Instance.EvaluateManipulator(evt.Position);
                     if (hitGO) {
                         FocusOnGameObject(hitMP);
                         return;

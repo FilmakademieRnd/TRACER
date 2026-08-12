@@ -70,7 +70,7 @@ namespace tracer{
         private bool sensorIsReading = false;
 
         //! used as data for the inputmanager event as in the UnityInputModule
-        private InputManager.InputData attitudeInputData;
+        private InputManager.AttitudeEventArgs attitudeInputData;
         private int discardedFudgeValues = 0;
         private const int StartFramesToDiscard = 5;
         //! 
@@ -86,6 +86,14 @@ namespace tracer{
 
             //-> subscribe to InputManager AR Event and handle ourself to be deactivated if other mode is on
             //manager.Subscribe<InputManager.ARInputEvent>(ARInputFunction);
+
+            //creating class once, reduce Garbage Collection
+            attitudeInputData = InputTracker.ToArgs<InputManager.AttitudeEventArgs>(
+                InputManager.InputLevel.Primary,
+                InputManager.InputState.Canceled,
+                Vector2.zero,
+                Vector2.zero
+            );
 
             EnableAttitudeSensor();
         }
@@ -159,25 +167,14 @@ namespace tracer{
         }
 
         private void StartAttitudeEvent() {
-            attitudeInputData = new InputManager.InputData {
-                Level = InputManager.InputLevel.Primary,
-                State = InputManager.InputState.Started,
-                Position = Vector2.zero,
-                Delta = Vector2.zero
-            };
+            attitudeInputData.State = InputManager.InputState.Started;
             discardedFudgeValues = 0;
             sensorIsReading = true;
         }
 
         private void StopAttitudeEvent() {
-            attitudeInputData = new InputManager.InputData {
-                Level = InputManager.InputLevel.Primary,
-                State = InputManager.InputState.Ended,
-                Position = Vector2.zero,
-                Delta = Vector2.zero
-            };
-
-            manager.Publish(new InputManager.AttitudeInputEvent { Data = attitudeInputData, Rotation = Quaternion.identity });
+            attitudeInputData.State = InputManager.InputState.Ended;
+            manager.RaiseAttitude(this, attitudeInputData);
         }
 
         //!
@@ -198,13 +195,15 @@ namespace tracer{
 
             if(attitudeInputData.State == InputManager.InputState.Started) {
                 //if still started, publish here started and go to ongoing then (do not distribute started with zero value)
-                manager.Publish(new InputManager.AttitudeInputEvent { Data = attitudeInputData, Rotation = currentAttitude });
+                attitudeInputData.Rotation = currentAttitude;
+                manager.RaiseAttitude(this, attitudeInputData);
                 attitudeInputData.State = InputManager.InputState.Ongoing;
             }else{
                 // Example: Apply to camera or object (Note: You may need to adapt the coordinate system 
                 // depending on your device orientation, often requiring a 90-degree rotation adjustment).
                 // transform.rotation = currentAttitude;
-                manager.Publish(new InputManager.AttitudeInputEvent { Data = attitudeInputData, Rotation = currentAttitude });
+                attitudeInputData.Rotation = currentAttitude;
+                manager.RaiseAttitude(this, attitudeInputData);
             }
         }
 

@@ -437,14 +437,10 @@ namespace tracer{
         //! which is currently used to execute IDExtractorModule
         //!
         private void ProcessAnyInput(InputAction.CallbackContext obj) {
-            //manager.ProcessInputDetected(m_pos);
-            InputManager.InputData anyInputData = new() {
-                Level = InputManager.InputLevel.Primary,
-                State = InputManager.InputState.Ended,
-                Position = _primary.CurrentPosition,
-                Delta = _primary.CurrentDelta
-            };
-            manager.Publish(new InputManager.AnyInputEvent { Data = anyInputData });
+            var anyInputData = InputTracker.ToArgs<InputManager.AnyEventArgs>(
+                InputManager.InputLevel.Primary, InputManager.InputState.Ended, _primary.CurrentPosition, _primary.CurrentDelta);
+            
+            manager.RaiseAnyInput(this, anyInputData);
         }
 
         //!
@@ -728,8 +724,11 @@ namespace tracer{
             return scrollDelta;
         }
 
+        //!
+        //! TODO: implement for scroll wheel within certain action or key modifier
+        //!
         private void ProcessRotateInput(InputAction.CallbackContext ctx) {
-             //this is only called via scroll-wheel / specific input event
+            //this is only called via scroll-wheel / specific input event
             //thats why we handle start, ongoing here BUT have to 
             //handle the end state within OnPointerUp (removed cancel-listener)
             float rotateDelta = ctx.ReadValue<float>();
@@ -757,7 +756,9 @@ namespace tracer{
         #endregion
 
         #region UP/DOWN-PHASES
-
+        //!
+        //! 
+        //!
         private void OnPointerDown(InputTracker tracker) {
             // If we are currently pinching or rotating, deny starting a new click/drag evaluation
             if (tracker.State == InteractionState.Pinching || tracker.State == InteractionState.Rotating) { return; }
@@ -778,6 +779,9 @@ namespace tracer{
             tracker.CurrentDelta    = Vector2.zero; // Explicitly zero out the delta
         }
 
+        //!
+        //! 
+        //!
         private void OnPointerUp(InputTracker tracker) {
             Debug.Log("<color=yellow>OnPointerUp "+tracker.Level+" / "+tracker.State+"</color>");
 
@@ -835,17 +839,20 @@ namespace tracer{
 
         // --- HELPER METHODS FOR FIRING EVENTS ---
 
+        //!
+        //! 
+        //!
         private void FireClickEvent(InputTracker tracker) {
-            InputManager.InputData data = InputManager.CreateData(tracker, InputManager.InputState.Ended);
+            var data = InputTracker.ToArgs<InputManager.ClickEventArgs>(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
             
             switch (EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition)){
                 case EvaluationHelper.OperationLayer.UI2D:
-                    manager.Publish(new InputManager.ClickUIEvent { Data = data });
+                    manager.RaiseClickUI(this, data);
                     break;
                 case EvaluationHelper.OperationLayer.UI3D:
                 case EvaluationHelper.OperationLayer.SCENEOBJECT:
                 case EvaluationHelper.OperationLayer.OTHER:
-                    manager.Publish(new InputManager.ClickOtherEvent { Data = data });
+                    manager.RaiseClickOther(this, data);
                     // possible further investigation for outcome "other"
                     // if (RayMeshUtility.GetHitPointPrecise(mainCam.ScreenPointToRay(m_pos), m_worldGameObjectWeHit, RayMeshUtility.Accuracy.ExactMesh, out m_worldHitPos)){
                     //     UnityHitVisualizerHelper.Spawn(m_worldHitPos, Color.green, 0.15f);
@@ -856,50 +863,55 @@ namespace tracer{
             SpawnClickVisual(tracker.Level, tracker.CurrentPosition, isDouble: false);
         }
 
+        //!
+        //! 
+        //!
         private void FireDoubleClickEvent(InputTracker tracker) {
-            InputManager.InputData data = InputManager.CreateData(tracker, InputManager.InputState.Ended);
+            var data = InputTracker.ToArgs<InputManager.ClickEventArgs>(
+                tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
             
             switch (EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition)){
                 case EvaluationHelper.OperationLayer.UI2D:
-                    manager.Publish(new InputManager.DoubleClickUIEvent { Data = data });
+                    manager.RaiseDoubleClickUI(this, data);
                     break;
                 case EvaluationHelper.OperationLayer.UI3D:
                 case EvaluationHelper.OperationLayer.SCENEOBJECT:
                 case EvaluationHelper.OperationLayer.OTHER:
-                    manager.Publish(new InputManager.DoubleClickOtherEvent { Data = data });
+                    manager.RaiseDoubleClickOther(this, data);
                     break;
             }
             SpawnClickVisual(tracker.Level, tracker.CurrentPosition, isDouble: true);
         }
 
+        //!
+        //! 
+        //!
         private void FireDragEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, Vector2 avgDelta) {
-            InputManager.InputData data = InputManager.CreateData(tracker, state);
-            data.Position = centerPos;
-            data.Delta = avgDelta;
+            var data = InputTracker.ToArgs<InputManager.DragEventArgs>(tracker.Level, state, centerPos, avgDelta);
+            data.StartPosition = tracker.StartPosition;
 
-            //[!REVISE] do we need to have "initial click pos"? (for evaluation for the correct thing we hit - that we want to drag)
-            //Debug.Log("DRAG EVENT "+data.ToString());
-
+            // only ever set in started, because afterwards THIS input event stays on its OperationLayer!
             if(state == InputManager.InputState.Started) {
                 layerDrag = EvaluationHelper.Instance.EvaluateOperationLayer(tracker.StartPosition);
             }
 
             switch (layerDrag){
                 case EvaluationHelper.OperationLayer.UI2D:
-                    manager.Publish(new InputManager.DragUIEvent { Data = data, StartPos = tracker.StartPosition });
+                    manager.RaiseDragUI(this, data);
                     break;
                 case EvaluationHelper.OperationLayer.UI3D:
                 case EvaluationHelper.OperationLayer.SCENEOBJECT:
                 case EvaluationHelper.OperationLayer.OTHER:
-                    manager.Publish(new InputManager.DragOtherEvent { Data = data, StartPos = tracker.StartPosition });
+                    manager.RaiseDragOther(this, data);
                     break;
             }
         }
 
-
+        //!
+        //! 
+        //!
         private void FireHoldEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos) {
-            InputManager.InputData data = InputManager.CreateData(tracker, state);
-            data.Position = centerPos;
+            var data = InputTracker.ToArgs<InputManager.HoldEventArgs>(tracker.Level, state, tracker.CurrentPosition);
 
             if(state == InputManager.InputState.Started) {
                 layerHold = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
@@ -907,19 +919,22 @@ namespace tracer{
 
             switch (layerHold){
                 case EvaluationHelper.OperationLayer.UI2D:
-                    manager.Publish(new InputManager.HoldUIEvent { Data = data });
+                    manager.RaiseHoldUI(this, data);
                     break;
                 case EvaluationHelper.OperationLayer.UI3D:
                 case EvaluationHelper.OperationLayer.SCENEOBJECT:
                 case EvaluationHelper.OperationLayer.OTHER:
-                    manager.Publish(new InputManager.HoldOtherEvent { Data = data });
+                    manager.RaiseHoldOther(this, data);
                     break;
             }
         }
 
+        //!
+        //! 
+        //!
         private void FirePinchEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float pinchDelta) {
-            InputManager.InputData data = InputManager.CreateData(tracker, state);
-            data.Position = centerPos;
+            var data = InputTracker.ToArgs<InputManager.PinchEventArgs>(tracker.Level, state, centerPos);
+            data.PinchDelta = pinchDelta;
             
             if(state == InputManager.InputState.Started) {
                 layerPinch = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
@@ -927,19 +942,22 @@ namespace tracer{
 
             switch (layerPinch){
                 case EvaluationHelper.OperationLayer.UI2D:
-                    manager.Publish(new InputManager.PinchUIEvent { Data = data, PinchDistance = pinchDelta });
+                    manager.RaisePinchUI(this, data);
                     break;
                 case EvaluationHelper.OperationLayer.UI3D:
                 case EvaluationHelper.OperationLayer.SCENEOBJECT:
                 case EvaluationHelper.OperationLayer.OTHER:
-                    manager.Publish(new InputManager.PinchOtherEvent { Data = data, PinchDistance = pinchDelta });
+                    manager.RaisePinchOther(this, data);
                     break;
             }
         }
 
+        //!
+        //! 
+        //!
         private void FireRotateEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float rotateDelta) {
-            InputManager.InputData data = InputManager.CreateData(tracker, state);
-            data.Position = centerPos;
+            var data = InputTracker.ToArgs<InputManager.RotateEventArgs>(tracker.Level, state, centerPos);
+            data.RotationDelta = rotateDelta;
             
             if(state == InputManager.InputState.Started) {
                 layerRotate = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
@@ -947,17 +965,19 @@ namespace tracer{
 
             switch (layerRotate){
                 case EvaluationHelper.OperationLayer.UI2D:
-                    manager.Publish(new InputManager.TouchRotateUIEvent { Data = data, RotationAngle = rotateDelta });
+                    manager.RaiseRotateUI(this, data);
                     break;
                 case EvaluationHelper.OperationLayer.UI3D:
                 case EvaluationHelper.OperationLayer.SCENEOBJECT:
                 case EvaluationHelper.OperationLayer.OTHER:
-                    manager.Publish(new InputManager.TouchRotateOtherEvent { Data = data, RotationAngle = rotateDelta });
+                    manager.RaiseRotateOther(this, data);
                     break;
             }
         }
 
         #endregion
+
+
 
         #region UI DEBUGGING
         // --- ONE-SHOT VISUALS (Click & Text) ---

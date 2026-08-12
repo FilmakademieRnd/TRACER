@@ -84,8 +84,8 @@ namespace tracer{
 
             // Grabbing from the input manager directly
             m_inputManager = core.getManager<InputManager>();
-            m_inputManager.Subscribe<InputManager.ClickOtherEvent>(ClickFunction);
-            m_inputManager.Subscribe<InputManager.DragOtherEvent>(DragFunction);
+            m_inputManager.clickOtherEvent  += ClickFunction;
+            m_inputManager.dragOtherEvent   += DragFunction;
 
             // Instantiate widget
             InstantiateModifier();
@@ -103,8 +103,8 @@ namespace tracer{
             if(load || m_inputManager == null)
                 return;
 
-            m_inputManager.Unsubscribe<InputManager.ClickOtherEvent>(ClickFunction);
-            m_inputManager.Unsubscribe<InputManager.DragOtherEvent>(DragFunction);
+            m_inputManager.clickOtherEvent  -= ClickFunction;
+            m_inputManager.dragOtherEvent   -= DragFunction;
         }
 
         //!
@@ -112,22 +112,22 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void ClickFunction(InputManager.ClickOtherEvent evt){  
+        private void ClickFunction(object sender, InputManager.ClickEventArgs evt){  
             if (selObj == null)
                 return;
 
-            if(evt.Data.Level != InputManager.InputLevel.Primary)
+            if(evt.Level != InputManager.InputLevel.Primary)
                 return;
             
             // TODO: utilize EvaluationHelper!
 
             //MOVE OBJECT TO DESTINATION
-            Ray ray = Camera.main.ScreenPointToRay(evt.Data.Position);
+            Ray ray = Camera.main.ScreenPointToRay(evt.Position);
             if (!helperPlane.Raycast(ray, out float enter))
                 return;
 
             // check phase
-            switch (evt.Data.State){
+            switch (evt.State){
                 case InputManager.InputState.Started:
                 case InputManager.InputState.Ongoing:
                 case InputManager.InputState.Canceled:
@@ -147,24 +147,24 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void DragFunction(InputManager.DragOtherEvent evt){  
+        private void DragFunction(object sender, InputManager.DragEventArgs evt){  
             if (selObj == null)
                 return;
 
-            if(evt.Data.Level != InputManager.InputLevel.Primary)
+            if(evt.Level != InputManager.InputLevel.Primary)
                 return;
             
             // TODO: utilize EvaluationHelper!
 
             //MOVE OBJECT TO DESTINATION
-            Ray ray = Camera.main.ScreenPointToRay(evt.Data.Position);
+            Ray ray = Camera.main.ScreenPointToRay(evt.Position);
             if (!helperPlane.Raycast(ray, out float enter))
                 return;
 
             //Get the point that is clicked
             Vector3 hitPoint = ray.GetPoint(enter);
             // check phase
-            switch (evt.Data.State){
+            switch (evt.State){
                 case InputManager.InputState.Started:
                     // show gizmo
                     pointToMoveModifier.transform.position = hitPoint;

@@ -669,8 +669,9 @@ namespace tracer{
                 tracker.StartPosition = position;
             }
 
-            InputManager.InputData data = InputManager.CreateData(tracker, state);
-            manager.Publish(new InputManager.DragOtherEvent { Data = data, StartPos = tracker.StartPosition });
+            var data = InputTracker.ToArgs<InputManager.DragEventArgs>(tracker.Level, state, position, delta);
+            data.StartPosition = tracker.StartPosition;
+            manager.RaiseDragOther(this, data); 
         }
         private void FirePinchOtherEvent(InputTracker tracker, InputManager.InputState state, Vector2 position, float delta) {
             // Construct your InputData payload exactly as you do in the UnityInputModule
@@ -680,8 +681,9 @@ namespace tracer{
                 tracker.StartPosition = position;
             }
 
-            InputManager.InputData data = InputManager.CreateData(tracker, state);
-            manager.Publish(new InputManager.PinchOtherEvent { Data = data, PinchDistance = delta });
+            var data = InputTracker.ToArgs<InputManager.PinchEventArgs>(tracker.Level, state, position);
+            data.PinchDelta = delta;
+            manager.RaisePinchOther(this, data); 
         }
         #endregion
 

@@ -187,7 +187,7 @@ namespace tracer{
             if(manager.cameraControl == UIManager.CameraControl.ATTITUDE && _rightStick != null)
                 _rightStick.Show(false);
 
-            core.getManager<InputManager>().Subscribe<InputManager.DragUIEvent>(DragFunction);
+            core.getManager<InputManager>().dragUIEvent += DragFunction;
         }
 
         private void DisableOnScreenNavUI(){
@@ -204,7 +204,7 @@ namespace tracer{
             }
 
             _navCanvas.gameObject.SetActive(false);
-            core.getManager<InputManager>().Unsubscribe<InputManager.DragUIEvent>(DragFunction);
+            core.getManager<InputManager>().dragUIEvent -= DragFunction;
 
             // Ensure sticks reset if disabled while holding
             _leftStick?.Reset();
@@ -243,26 +243,26 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void DragFunction(InputManager.DragUIEvent evt){
+        private void DragFunction(object sender, InputManager.DragEventArgs evt){
 
-            InputManager.InputLevel level = evt.Data.Level;
-            if (evt.Data.Level == InputManager.InputLevel.Tertiary) return;
+            InputManager.InputLevel level = evt.Level;
+            if (evt.Level == InputManager.InputLevel.Tertiary) return;
 
-            Vector2 screenPos = evt.Data.Position;
+            Vector2 screenPos = evt.Position;
 
             // check phase
-            switch (evt.Data.State){
+            switch (evt.State){
                 case InputManager.InputState.Started:
                     // Determine which stick to bind this touch to (Split screen down the middle)
                     if (screenPos.x < Screen.width / 2f && !_leftStick.IsDragging){
-                        TryStartStick(_leftStick, evt.StartPos);
+                        TryStartStick(_leftStick, evt.StartPosition);
                         if (_leftStick.IsDragging) {
                             _leftStick.BoundLevel = level;
                             _inputManager.SetMultiTouchGestures(false);
                             _inputManager.SetAllowCamNavigation(false);
                         }
                     }else if(screenPos.x > Screen.width / 2f && !_rightStick.IsDragging){
-                        TryStartStick(_rightStick, evt.StartPos);
+                        TryStartStick(_rightStick, evt.StartPosition);
                         if (_rightStick.IsDragging) {
                             _rightStick.BoundLevel = level; // Lock this finger to this stick
                             _inputManager.SetMultiTouchGestures(false);

@@ -81,12 +81,12 @@ Material:
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.02
-    - _Radius: 0.021035537
+    - _Radius: 0.62169194
     - _SmoothnessTextureChannel: 0
     - _Softrange: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _Threshold: 0
+    - _Threshold: 0.89144003
     - _UVSec: 0
     - _ZWrite: 1
     - _cropScaleX: 0.25
@@ -94,5 +94,6 @@ Material:
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _KeyColor: {r: 0.3698131, g: 0.36712185, b: 0.55902874, a: 1}
+    - _KeyColor: {r: 0.5442757, g: 0.2279727, b: 0.5688033, a: 1}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1

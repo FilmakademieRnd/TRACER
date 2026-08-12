@@ -118,7 +118,7 @@ namespace tracer{
                 case CalculationBehaviourEnum.onInput:
                 case CalculationBehaviourEnum.onInputAndCamChange:
                     //core.getManager<InputManager>().onAnyInputDetection += RenderUpdate;
-                    core.getManager<InputManager>().Subscribe<InputManager.AnyInputEvent>(OnAnyInputEvent);
+                    core.getManager<InputManager>().anyInputEvent += OnAnyInputEvent;
                     break;
             }
 
@@ -141,7 +141,7 @@ namespace tracer{
                 case CalculationBehaviourEnum.onInput:
                 case CalculationBehaviourEnum.onInputAndCamChange:
                     //core.getManager<InputManager>().onAnyInputDetection -= RenderUpdate;
-                    core.getManager<InputManager>().Unsubscribe<InputManager.AnyInputEvent>(OnAnyInputEvent);
+                    core.getManager<InputManager>().anyInputEvent -= OnAnyInputEvent;
                     break;
             }
 
@@ -334,7 +334,7 @@ namespace tracer{
         //! so we can tell the gpu fast enough to create a rtx to use
         //! check if it would be valid to use only for portion of screen, if input pos matters
         //!
-        private void OnAnyInputEvent(InputManager.AnyInputEvent data){
+        private void OnAnyInputEvent(object sender, InputManager.AnyEventArgs data){
             UpdateIDTexture();
         }
 
