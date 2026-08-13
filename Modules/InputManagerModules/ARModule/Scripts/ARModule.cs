@@ -231,12 +231,7 @@ namespace tracer
         private void initialize(){
             
             //creating class once, reduce Garbage Collection
-            arInputData = InputTracker.ToArgs<InputManager.AREventArgs>(
-                InputManager.InputLevel.Primary,
-                InputManager.InputState.Canceled,
-                Vector2.zero,
-                Vector2.zero
-            );
+            arInputData = new InputManager.AREventArgs();
 
             //Instanciate XROrigin from Prefab
             GameObject arSessionOriginPrefab = Resources.Load<GameObject>("Prefabs/ARSessionOrigin");

@@ -437,8 +437,8 @@ namespace tracer{
         //! which is currently used to execute IDExtractorModule
         //!
         private void ProcessAnyInput(InputAction.CallbackContext obj) {
-            var anyInputData = InputTracker.ToArgs<InputManager.AnyEventArgs>(
-                InputManager.InputLevel.Primary, InputManager.InputState.Ended, _primary.CurrentPosition, _primary.CurrentDelta);
+            var anyInputData = new InputManager.AnyEventArgs();
+            //InputTracker.ToArgs<InputManager.AnyEventArgs>(InputManager.InputLevel.Primary, InputManager.InputState.Ended, _primary.CurrentPosition, _primary.CurrentDelta);
             
             manager.RaiseAnyInput(this, anyInputData);
         }
@@ -843,7 +843,7 @@ namespace tracer{
         //! 
         //!
         private void FireClickEvent(InputTracker tracker) {
-            var data = InputTracker.ToArgs<InputManager.ClickEventArgs>(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
+            var data = new InputManager.ClickEventArgs(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
             
             switch (EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition)){
                 case EvaluationHelper.OperationLayer.UI2D:
@@ -867,8 +867,7 @@ namespace tracer{
         //! 
         //!
         private void FireDoubleClickEvent(InputTracker tracker) {
-            var data = InputTracker.ToArgs<InputManager.ClickEventArgs>(
-                tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
+            var data = new InputManager.ClickEventArgs(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
             
             switch (EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition)){
                 case EvaluationHelper.OperationLayer.UI2D:
@@ -887,8 +886,7 @@ namespace tracer{
         //! 
         //!
         private void FireDragEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, Vector2 avgDelta) {
-            var data = InputTracker.ToArgs<InputManager.DragEventArgs>(tracker.Level, state, centerPos, avgDelta);
-            data.StartPosition = tracker.StartPosition;
+            var data = new InputManager.DragEventArgs(tracker.Level, state, centerPos, avgDelta, tracker.StartPosition);
 
             // only ever set in started, because afterwards THIS input event stays on its OperationLayer!
             if(state == InputManager.InputState.Started) {
@@ -911,7 +909,7 @@ namespace tracer{
         //! 
         //!
         private void FireHoldEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos) {
-            var data = InputTracker.ToArgs<InputManager.HoldEventArgs>(tracker.Level, state, tracker.CurrentPosition);
+            var data = new InputManager.HoldEventArgs(tracker.Level, state, tracker.CurrentPosition);
 
             if(state == InputManager.InputState.Started) {
                 layerHold = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
@@ -933,8 +931,7 @@ namespace tracer{
         //! 
         //!
         private void FirePinchEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float pinchDelta) {
-            var data = InputTracker.ToArgs<InputManager.PinchEventArgs>(tracker.Level, state, centerPos);
-            data.PinchDelta = pinchDelta;
+            var data = new InputManager.PinchEventArgs(tracker.Level, state, centerPos, default, pinchDelta);
             
             if(state == InputManager.InputState.Started) {
                 layerPinch = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
@@ -956,8 +953,7 @@ namespace tracer{
         //! 
         //!
         private void FireRotateEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float rotateDelta) {
-            var data = InputTracker.ToArgs<InputManager.RotateEventArgs>(tracker.Level, state, centerPos);
-            data.RotationDelta = rotateDelta;
+            var data = new InputManager.RotateEventArgs(tracker.Level, state, centerPos, default, rotateDelta);
             
             if(state == InputManager.InputState.Started) {
                 layerRotate = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);

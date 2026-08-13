@@ -41,7 +41,6 @@ namespace tracer{
     public class InputManager : Manager{
 
         #region INPUT EVENT ARGS
-
         //!
         //! what level of input is addressed within the raising module
         //!
@@ -66,43 +65,89 @@ namespace tracer{
             public InputState State;
             public UnityEngine.Vector2 Position;
             public UnityEngine.Vector2 Delta;
+
+            
         }
         //!
         //! used as paylopad for AnyInputEvent
         //!        
-        public class AnyEventArgs     : InputEventArgs{}
+        public class AnyEventArgs     : InputEventArgs {
+            public AnyEventArgs() {
+                // no data needed
+            }
+        }
         //!
         //! click and double click need no extra data, also used for as Payload for AnyInputEvent
         //!        
-        public class ClickEventArgs     : InputEventArgs{}
+        public class ClickEventArgs     : InputEventArgs {
+            public ClickEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta = default) {
+                Level = _level; State = _state; Position = _position; Delta = _delta;
+            }
+        }
         //!
         //! drag additionally reports where the gesture originally started
         //!
-        public class DragEventArgs      : InputEventArgs{ public UnityEngine.Vector2 StartPosition; }
+        public class DragEventArgs      : InputEventArgs{ 
+            public UnityEngine.Vector2 StartPosition; 
+            public DragEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Vector2 _startPosition) {
+                Level = _level; State = _state; Position = _position; Delta = _delta;
+                StartPosition = _startPosition;
+            }    
+        }
         //!
         //! hold needs no extra data, but for understandings-sake we have this as an extra definition
         //!
-        public class HoldEventArgs      : InputEventArgs{}
+        public class HoldEventArgs      : InputEventArgs {
+            public HoldEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta = default) {
+                Level = _level; State = _state; Position = _position; Delta = _delta;
+            }
+        }
         //!
         //! signed distance change of this frame (positive = fingers spread)
         //!
-        public class PinchEventArgs     : InputEventArgs{ public float PinchDelta; }
+        public class PinchEventArgs     : InputEventArgs{ 
+            public float PinchDelta; 
+            public PinchEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, float _pinchDelta) {
+                Level = _level; State = _state; Position = _position; Delta = _delta;
+                PinchDelta = _pinchDelta;
+            } 
+        }
         //!
         //! signed angle change of this frame in degrees, used only within multitouch gesture for now
         //!
-        public class RotateEventArgs    : InputEventArgs{ public float RotationDelta; }
+        public class RotateEventArgs    : InputEventArgs{ 
+            public float RotationDelta; 
+            public RotateEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, float _rotationDelta) {
+                Level = _level; State = _state; Position = _position; Delta = _delta;
+                RotationDelta = _rotationDelta;
+            }
+        }
         //!
         //! input data of the device's rotation
         //!
-        public class AttitudeEventArgs  : InputEventArgs{ public UnityEngine.Quaternion Rotation; }
+        public class AttitudeEventArgs  : InputEventArgs{ 
+            public UnityEngine.Quaternion Rotation; 
+            public AttitudeEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Quaternion _rotation) {
+                Level = _level; State = _state; Position = _position; Delta = _delta;
+                Rotation = _rotation;
+            }
+        }
         //!
         //! gps data from the module, only send if it gets asked for data via OnGPSDemandChanged
         //!
-        public class GPSEventArgs       : InputEventArgs{ public GPSDataStruct GPSData; }
+        public class GPSEventArgs       : InputEventArgs{ 
+            public GPSDataStruct GPSData; 
+            public GPSEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, GPSDataStruct _gpsData) {
+                Level = _level; State = _state; Position = _position; Delta = _delta;
+                GPSData = _gpsData;
+            }
+        }
         //!
         //! from AR module, subscribe for example switching ui-modes in start/end, has no data as well, see `HoldEventArgs`
         //! 
-        public class AREventArgs        : InputEventArgs {}
+        public class AREventArgs        : InputEventArgs {
+            public AREventArgs() {}
+        }
 
         #endregion
 
@@ -180,66 +225,88 @@ namespace tracer{
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseAnyInput   (object sender, AnyEventArgs e)   { anyInputEvent?.Invoke(sender, e); }
         //!
         //! raise clickUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseClickUI    (object sender, ClickEventArgs e)   { clickUIEvent?.Invoke(sender, e); }
         //!
         //! raise clickOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseClickOther (object sender, ClickEventArgs e)   { clickOtherEvent?.Invoke(sender, e); }
         //!
         //! raise dragUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseDragUI     (object sender, DragEventArgs e)    { dragUIEvent?.Invoke(sender, e); }
         //!
         //! raise dragOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseDragOther  (object sender, DragEventArgs e)    { dragOtherEvent?.Invoke(sender, e); }
         //!
         //! raise holdUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseHoldUI     (object sender, HoldEventArgs e)    { holdUIEvent?.Invoke(sender, e); }
         //!
         //! raise holdOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseHoldOther  (object sender, HoldEventArgs e)    { holdOtherEvent?.Invoke(sender, e); }
         //!
         //! raise doubleClickUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseDoubleClickUI     (object sender, ClickEventArgs e)    { doubleClickUIEvent?.Invoke(sender, e); }
         //!
         //! raise doubleClickOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseDoubleClickOther  (object sender, ClickEventArgs e)    { doubleClickOtherEvent?.Invoke(sender, e); }
         //!
         //! raise pinchUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaisePinchUI    (object sender, PinchEventArgs e)    { pinchUIEvent?.Invoke(sender, e); }
         //!
         //! raise pinchOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaisePinchOther (object sender, PinchEventArgs e)    { pinchOtherEvent?.Invoke(sender, e); }
         //!
         //! raise rotateUIEvent
@@ -252,62 +319,106 @@ namespace tracer{
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseRotateOther(object sender, RotateEventArgs e)    { rotateOtherEvent?.Invoke(sender, e); }
         //!
         //! raise attitudeEvent, layer independent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseAttitude   (object sender, AttitudeEventArgs e){ attitudeEvent?.Invoke(sender, e); }
         //!
         //! raise gpsEvent, layer independent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseGPS        (object sender, GPSEventArgs e)     { gpsEvent?.Invoke(sender, e); }
         //!
         //! raise arEvent, layer independent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
         public void RaiseAR        (object sender, AREventArgs e)     { arEvent?.Invoke(sender, e); }
         #endregion
 
 
-        // TODO: has to be reverted/set via prio, so that not some "low" modules reset it, if its overwritten by something higher!
+        // TODO: has to be reverted, maybe set via prio, so that not some "low" modules reset it, if its overwritten by something higher!
+
+        //!
+        //! do we currently allow camera navigation via input events?
+        //!
         private bool camNavigationAllowed = true;
+        //!
+        //! allow/deny camera navigation via input events 
+        //!
+        //! @param allow sets `camNavigationAllowed` to its value
         public void SetAllowCamNavigation(bool allow){ camNavigationAllowed = allow; }
+        //!
+        //! check if camera navigation via input events are currently allowed
+        //!
+        //! @return `camNavigationAllowed`
         public bool IsCamNavigationAllowed(){ return camNavigationAllowed; }
 
+        //!
+        //! do we currently allow ui-interaction via input events?
+        //!
         private bool uiInteractionAllowed = true;
+        //!
+        //! allow/deny ui-interaction via input events 
+        //!
+        //! @param allow sets `uiInteractionAllowed` to its value
         public void SetUiInteraction(bool allow){ uiInteractionAllowed = allow; }
+        //!
+        //! check if ui-interaction via input events are currently allowed
+        //!
+        //! @return `uiInteractionAllowed`
         public bool IsUiInteractionAllowed(){ return uiInteractionAllowed; }
 
-        private bool isMultiTouchGestureAllowed = true; //needs to be disabled when on-screen joysticks are hit!
+        //!
+        //! do we currently allow multi-touch-gestures via input events?
+        //!
+        //! @remark isMultiTouchGestureAllowed have to be false, when on-screen joysticks are hit!
+        //!
+        private bool isMultiTouchGestureAllowed = true;
+        //!
+        //! allow/deny multi-touch-gestures where they are checked
+        //!
+        //! @param allow sets `isMultiTouchGestureAllowed` to its value
         public void SetMultiTouchGestures(bool allow){ isMultiTouchGestureAllowed = allow; }
+        //!
+        //! check if multi-touch-gestures are allowed
+        //!
+        //! @return `isMultiTouchGestureAllowed`
         public bool IsMultiTouchGestureAllowed(){ return isMultiTouchGestureAllowed; }
 
-        public void TriggerGPSOutput(bool continously = false){}
+
+        #region SPECIFIC GPS
 
         //!
-        //! Constructor initializing member variables.
+        //! enum as Payloads to set what kind of gps demand we have
         //!
-        public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore){
-        }
-
-
-        #region Specific Data
-
         public enum GPSDemandType { OneShot, StartContinuous, StopContinuous }
 
-        // GPS
-        // Consumers fire this to ask for GPS (so we do not run GPS all the time)
-        public static event Action<GPSDemandType> OnGPSDemandChanged;
+        //! 
+        //! Consumers that want GPS Data fire this via `onGPSDemandChangedEvent` to ask for GPS (so we do not run GPS all the time)
+        //!
+        public event EventHandler<GPSDemandType> onGPSDemandChangedEvent;
         //!
         //! call this from any module to trigger (if available) the RaiseGPS function here from the GPSModule
         //!
-        public static void FireGPSDemand(GPSDemandType type) => OnGPSDemandChanged?.Invoke(type);
+        public void RaiseGPSDemand(object sender, GPSDemandType gpsDemanyType){ onGPSDemandChangedEvent?.Invoke(sender, gpsDemanyType); }
 
+        //!
+        //! the gps data we use as payload for events. defined here - without module reference!
+        //! struct so we don't allocate garbage
+        //!
         public struct GPSDataStruct {
             public GPSDataStruct(float _lat, float _long, float _alt, float _accuracy, bool _valid, double _gpsTimestamp = 0) {
                 latitude = _lat;
@@ -335,10 +446,12 @@ namespace tracer{
             public int day;
             public int month;
 
-            /// <summary>
-            /// Populates hour, minute, day, and month. 
-            /// Uses UTC time by default to ensure astronomical/solar math remains accurate across time zones.
-            /// </summary>
+            //!
+            //! Populates hour, minute, day, and month. 
+            //! Uses UTC time by default to ensure astronomical/solar math remains accurate across time zones.
+            //!
+            //! @param rawGpsTimestamp in ms from 1970
+            //!
             private void CalculateTime(double rawGpsTimestamp = 0) {
                 DateTime targetTime;
 
@@ -359,8 +472,17 @@ namespace tracer{
                 month = targetTime.Month;
             }
         }
-
         #endregion
+
+        //!
+        //! Constructor initializing member variables.
+        //!
+        //! @param  moduleType  type of modules to be loaded by this manager
+        //! @param tracerCore A reference to the TRACER _core.
+        //!
+        public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore){
+        }
+
     }
 
     #region Tracking Input Data
@@ -392,15 +514,6 @@ namespace tracer{
             CurrentDelta = UnityEngine.Vector2.zero; 
             TimeDown = 0f;
             StartPosition = UnityEngine.Vector2.zero;
-        }
-
-        //!
-        //! creates event args of the requested type and fills everything all inputs have in common
-        //! type specific fields (StartPosition, PinchDelta, ...) are set by the caller afterwards
-        //! helper method to increase readability in UnityInputModule and ControllerModule - because both need it, we put it here
-        //!
-        public static T ToArgs<T>(InputManager.InputLevel level, InputManager.InputState state, UnityEngine.Vector2 position, UnityEngine.Vector2 delta = default) where T : InputManager.InputEventArgs, new(){
-            return new T{ Level = level, State = state, Position = position, Delta = delta };
         }
     }
 

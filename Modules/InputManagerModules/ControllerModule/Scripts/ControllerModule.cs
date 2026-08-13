@@ -669,8 +669,7 @@ namespace tracer{
                 tracker.StartPosition = position;
             }
 
-            var data = InputTracker.ToArgs<InputManager.DragEventArgs>(tracker.Level, state, position, delta);
-            data.StartPosition = tracker.StartPosition;
+            var data = new InputManager.DragEventArgs(tracker.Level, state, position, delta, tracker.StartPosition);
             manager.RaiseDragOther(this, data); 
         }
         private void FirePinchOtherEvent(InputTracker tracker, InputManager.InputState state, Vector2 position, float delta) {
@@ -681,8 +680,7 @@ namespace tracer{
                 tracker.StartPosition = position;
             }
 
-            var data = InputTracker.ToArgs<InputManager.PinchEventArgs>(tracker.Level, state, position);
-            data.PinchDelta = delta;
+            var data = new InputManager.PinchEventArgs(tracker.Level, state, position, default, delta);
             manager.RaisePinchOther(this, data); 
         }
         #endregion

@@ -88,11 +88,12 @@ namespace tracer{
             //manager.Subscribe<InputManager.ARInputEvent>(ARInputFunction);
 
             //creating class once, reduce Garbage Collection
-            attitudeInputData = InputTracker.ToArgs<InputManager.AttitudeEventArgs>(
+            attitudeInputData = new InputManager.AttitudeEventArgs(
                 InputManager.InputLevel.Primary,
                 InputManager.InputState.Canceled,
                 Vector2.zero,
-                Vector2.zero
+                Vector2.zero,
+                default
             );
 
             EnableAttitudeSensor();

@@ -75,14 +75,15 @@ namespace tracer{
         //! 
         protected override void Init(object sender, EventArgs e){
             //created once, only the state will ever change here!
-            gpsInputData = InputTracker.ToArgs<InputManager.GPSEventArgs>(
+            gpsInputData = new InputManager.GPSEventArgs(
                 InputManager.InputLevel.Primary,
                 InputManager.InputState.Started,
                 Vector2.zero,
-                Vector2.zero
+                Vector2.zero,
+                default
             );
 
-            InputManager.OnGPSDemandChanged += HandleGPSDemandEvent;
+            manager.onGPSDemandChangedEvent += HandleGPSDemandEvent;
         }
 
         //!
@@ -90,13 +91,13 @@ namespace tracer{
         //!
         public override void Dispose(){
             base.Dispose();
-            InputManager.OnGPSDemandChanged -= HandleGPSDemandEvent;
+            manager.onGPSDemandChangedEvent -= HandleGPSDemandEvent;
             StopGPSHardware(false);
         }
 
         
 
-        private void HandleGPSDemandEvent(InputManager.GPSDemandType demandType){
+        private void HandleGPSDemandEvent(object sender, InputManager.GPSDemandType demandType){
             switch (demandType){
                 case InputManager.GPSDemandType.OneShot:
                     // If we are already running continuous, just reply immediately with current data!
