@@ -66,7 +66,10 @@ namespace tracer{
             public UnityEngine.Vector2 Position;
             public UnityEngine.Vector2 Delta;
 
-            
+            public InputEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta = default)
+            { Level = _level; State = _state; Position = _position; Delta = _delta; }
+
+            public InputEventArgs() { }
         }
         //!
         //! used as paylopad for AnyInputEvent
@@ -80,67 +83,55 @@ namespace tracer{
         //! click and double click need no extra data, also used for as Payload for AnyInputEvent
         //!        
         public class ClickEventArgs     : InputEventArgs {
-            public ClickEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta = default) {
-                Level = _level; State = _state; Position = _position; Delta = _delta;
-            }
+            public ClickEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta) : 
+                base(_level, _state, _position, _delta) { }
         }
         //!
         //! drag additionally reports where the gesture originally started
         //!
         public class DragEventArgs      : InputEventArgs{ 
             public UnityEngine.Vector2 StartPosition; 
-            public DragEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Vector2 _startPosition) {
-                Level = _level; State = _state; Position = _position; Delta = _delta;
-                StartPosition = _startPosition;
-            }    
+            public DragEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Vector2 _startPosition) :
+                base(_level, _state, _position, _delta) { StartPosition = _startPosition; }    
         }
         //!
         //! hold needs no extra data, but for understandings-sake we have this as an extra definition
         //!
         public class HoldEventArgs      : InputEventArgs {
-            public HoldEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta = default) {
-                Level = _level; State = _state; Position = _position; Delta = _delta;
-            }
+            public HoldEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta) :
+                base(_level, _state, _position, _delta) { }
         }
         //!
         //! signed distance change of this frame (positive = fingers spread)
         //!
         public class PinchEventArgs     : InputEventArgs{ 
             public float PinchDelta; 
-            public PinchEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, float _pinchDelta) {
-                Level = _level; State = _state; Position = _position; Delta = _delta;
-                PinchDelta = _pinchDelta;
-            } 
+            public PinchEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, float _pinchDelta) :
+                base(_level, _state, _position, _delta) { PinchDelta = _pinchDelta; } 
         }
         //!
         //! signed angle change of this frame in degrees, used only within multitouch gesture for now
         //!
         public class RotateEventArgs    : InputEventArgs{ 
             public float RotationDelta; 
-            public RotateEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, float _rotationDelta) {
-                Level = _level; State = _state; Position = _position; Delta = _delta;
-                RotationDelta = _rotationDelta;
-            }
+            public RotateEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, float _rotationDelta) :
+                base(_level, _state, _position, _delta) { RotationDelta = _rotationDelta; }
         }
         //!
         //! input data of the device's rotation
         //!
         public class AttitudeEventArgs  : InputEventArgs{ 
             public UnityEngine.Quaternion Rotation; 
-            public AttitudeEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Quaternion _rotation) {
-                Level = _level; State = _state; Position = _position; Delta = _delta;
-                Rotation = _rotation;
-            }
+            public AttitudeEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Quaternion _rotation) :
+                base(_level, _state, _position, _delta) { Rotation = _rotation; }
         }
         //!
         //! gps data from the module, only send if it gets asked for data via OnGPSDemandChanged
         //!
         public class GPSEventArgs       : InputEventArgs{ 
             public GPSDataStruct GPSData; 
-            public GPSEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, GPSDataStruct _gpsData) {
-                Level = _level; State = _state; Position = _position; Delta = _delta;
-                GPSData = _gpsData;
-            }
+            public GPSEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, GPSDataStruct _gpsData) :
+                base(_level, _state, _position, _delta) { GPSData = _gpsData; }
         }
         //!
         //! from AR module, subscribe for example switching ui-modes in start/end, has no data as well, see `HoldEventArgs`

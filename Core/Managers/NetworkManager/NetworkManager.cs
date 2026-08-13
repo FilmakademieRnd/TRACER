@@ -163,7 +163,7 @@ namespace tracer
         }
 
         //!
-        //! Function for creating a new pleudo random MAC address.
+        //! Function for creating a new pseudo random MAC address.
         //!
         private byte[] createVID()
         {

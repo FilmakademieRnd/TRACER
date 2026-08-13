@@ -170,12 +170,12 @@ namespace tracer
         //! @tparam T The type of module to be requested.
         //! @return requested module or null if no module of this type is registered.
         //!
-        public T getModule<T>()
+        public T getModule<T>() where T : Module
         {
             Module module;
             if (!m_modules.TryGetValue(typeof(T), out module))
                 Helpers.Log(this.GetType().ToString() + " no module of type " + typeof(T).ToString() + " registered.", Helpers.logMsgType.WARNING);
-            return (T)(object) module;
+            return (T) module;
         }
 
         //!

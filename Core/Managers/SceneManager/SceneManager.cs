@@ -122,7 +122,7 @@ namespace tracer
         //!
         //! Function that returns a list containing all objects of a specific scene.
         //!
-        //! @param The scne ID to define the scene to gather all scene objects from.
+        //! @param sceneID The scne ID to define the scene to gather all scene objects from.
         //!
         //! @return The list containing all scene objects.
         //!
