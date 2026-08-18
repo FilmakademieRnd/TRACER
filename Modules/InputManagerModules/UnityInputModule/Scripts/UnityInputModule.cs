@@ -55,9 +55,9 @@ namespace tracer{
         private InputAction anyInputAction;
 
         //!
-        //! a reference to the mainCam to not search by tag via Camera.main
+        //! helper for checking and triggering different states of "any input"
         //!
-        private Camera mainCam;
+        private bool isAnyInputActive = false;
 
         //!
         //! Interaction Rules
@@ -277,8 +277,6 @@ namespace tracer{
         //! 
         protected override void Init(object sender, EventArgs e){
             
-            mainCam = Camera.main;
-
             m_manager.core.updateEvent += OnCoreUpdateEvent;
 
             //enable input
@@ -316,27 +314,22 @@ namespace tracer{
         //! setup the unity input action via code
         //!
         private void SetupAnyInputAction() {
-            // anyInputAction = new InputAction(type: InputActionType.Button);
-            // //error on Android!
-            // anyInputAction.AddBinding("/*/<button>");       // 1. Catch every keyboard key, gamepad button, or joystick button
-            // anyInputAction.AddBinding("<Pointer>/press");   // 2. Catch mouse clicks, pen taps, and touchscreen presses
-            // //maybe also add joystick/mouse movement?
-            // anyInputAction.Enable();                        // The action must be enabled to start listening to the hardware
-
-            InputAction anyAction = new InputAction("AnyInput", InputActionType.Button);
+            anyInputAction = new InputAction("AnyInput", InputActionType.Button);
             // 1. Catches any touch on the screen (or mouse click/pen tap)
-            anyAction.AddBinding("<Pointer>/press");
+            anyInputAction.AddBinding("<Pointer>/press");
 
             // 2. Catches any button on a Bluetooth/USB Gamepad
-            anyAction.AddBinding("<Gamepad>/<button>");
+            anyInputAction.AddBinding("<Gamepad>/<button>");
 
             // 3. Catches any physical keyboard key connected via USB/Bluetooth
-            anyAction.AddBinding("<Keyboard>/anyKey");
+            anyInputAction.AddBinding("<Keyboard>/anyKey");
 
             // Subscribe to your events
-            anyAction.performed += ProcessAnyInput;
+            // anyAction.performed += ProcessAnyInput;
+            // no more subscription, we poll manually from the update event to trigger different states
+            // without the need of started/performed - they may behave differently
             
-            anyAction.Enable();
+            anyInputAction.Enable();
         }
 
         //!
@@ -364,7 +357,7 @@ namespace tracer{
             //clean the unity any-input action
             // Always clean up dynamic actions to prevent memory leaks
             if (anyInputAction != null){
-                anyInputAction.performed                    -= ProcessAnyInput;
+                //anyInputAction.performed                    -= ProcessAnyInput;
                 anyInputAction.Disable();
                 anyInputAction.Dispose();
             }
@@ -373,6 +366,25 @@ namespace tracer{
         #endregion
 
         #region PROCESSION
+
+        //!
+        //! check if any input was detected and keep track of its state
+        //!
+        private void ProcessManualAnyInput() {
+            if(anyInputAction == null) return;
+
+            bool isCurrentlyAnyInputDectected = anyInputAction.IsPressed();
+
+            if(isCurrentlyAnyInputDectected && !isAnyInputActive) {
+                isAnyInputActive = true;
+                FireAnyInputEvent(InputManager.InputState.Started);
+            }else if(isCurrentlyAnyInputDectected && isAnyInputActive) {
+                FireAnyInputEvent(InputManager.InputState.Ongoing);
+            }else if(!isCurrentlyAnyInputDectected && isAnyInputActive) {
+                isAnyInputActive = false;
+                FireAnyInputEvent(InputManager.InputState.Ended);
+            }
+        }
 
         //! obsolete - the event driven approach is not good for continous values
         //! tracks the positions of our primary input (primary touch, mouse pos)
@@ -432,16 +444,6 @@ namespace tracer{
             return false;
         }
 
-        //!
-        //! call ProcessInputDetected in the manager
-        //! which is currently used to execute IDExtractorModule
-        //!
-        private void ProcessAnyInput(InputAction.CallbackContext obj) {
-            var anyInputData = new InputManager.AnyEventArgs();
-            //InputTracker.ToArgs<InputManager.AnyEventArgs>(InputManager.InputLevel.Primary, InputManager.InputState.Ended, _primary.CurrentPosition, _primary.CurrentDelta);
-            
-            manager.RaiseAnyInput(this, anyInputData);
-        }
 
         //!
         //! verifying that scroll input via the mouse wheel
@@ -501,6 +503,8 @@ namespace tracer{
         //!
         private void OnCoreUpdateEvent(object sender, EventArgs e){
             
+            ProcessManualAnyInput();
+
             ProcessPositionInput();
 
             ProcessMultiTouchGestures();
@@ -838,6 +842,19 @@ namespace tracer{
         #region FIRE EVENTS
 
         // --- HELPER METHODS FOR FIRING EVENTS ---
+
+        
+        //! 
+        //! fire the event of the `anyInputAction`
+        //! @param state the state of the `anyInputAction` we check manually
+        //!
+        private void FireAnyInputEvent(InputManager.InputState state) {
+            var anyInputData = new InputManager.AnyEventArgs {
+                State = state
+            };
+            
+            manager.RaiseAnyInput(this, anyInputData);
+        }
 
         //!
         //! 

@@ -335,7 +335,9 @@ namespace tracer{
         //! check if it would be valid to use only for portion of screen, if input pos matters
         //!
         private void OnAnyInputEvent(object sender, InputManager.AnyEventArgs data){
-            UpdateIDTexture();
+            //only do so on start
+            if(data.State == InputManager.InputState.Started)
+                UpdateIDTexture();
         }
 
         //!

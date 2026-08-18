@@ -171,11 +171,16 @@ namespace tracer{
             attitudeInputData.State = InputManager.InputState.Started;
             discardedFudgeValues = 0;
             sensorIsReading = true;
+            core.getManager<UIManager>().cameraControl = UIManager.CameraControl.ATTITUDE;
         }
 
         private void StopAttitudeEvent() {
             attitudeInputData.State = InputManager.InputState.Ended;
             manager.RaiseAttitude(this, attitudeInputData);
+            UIManager uim = core.getManager<UIManager>();
+            //dont change to standard if we quit attitude behaviour by activating ar!
+            if(uim.cameraControl == UIManager.CameraControl.ATTITUDE)
+                uim.cameraControl = UIManager.CameraControl.STANDARD;
         }
 
         //!

@@ -279,13 +279,12 @@ namespace tracer
             core.updateEvent -= OnCoreUpdateEvent;
 
             UICreator2DModule UI2DModule = manager.getModule<UICreator2DModule>();
-            CameraSelectionModule CamModule = manager.getModule<CameraSelectionModule>();
             UIManager m_UIManager = core.getManager<UIManager>();
-            if (UI2DModule != null && CamModule != null)
+            if (UI2DModule != null)
             {
                 UI2DModule.parameterChanged -= SetManipulatorMode;
-                CamModule.uiCameraOperation -= SetCameraManipulator;
             }
+            manager.uiCameraLockChanged -= SetCameraManipulator;
 
             // [REVIEW]
             // Direct access to a module should be prevented!
@@ -310,9 +309,8 @@ namespace tracer
             UI2DModule.parameterChanged += SetManipulatorMode;
 
             // Subscribe to camera change?
-            CameraSelectionModule CamModule = manager.getModule<CameraSelectionModule>();
-            if (CamModule != null)
-                CamModule.uiCameraOperation += SetCameraManipulator;
+            // manager.uiCameraLockChanged += SetCameraManipulator;
+            // subscribe only within SelectionUpdate
 
             // Grabbing from the input manager directly
             m_inputManager = core.getManager<InputManager>();
@@ -744,14 +742,12 @@ namespace tracer
         //! Function that does nothing.
         //! Being called when selection has changed.
         //!
-        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects)
-        {
+        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects){
 
             // Log
             //Debug.Log("<i>UICreator3DModule.SelectionUpdate()</i> "+sceneObjects.Count);
 
-            if (sceneObjects.Count > 0)
-            {
+            if (sceneObjects.Count > 0){
                 // Grab object
                 selObj = sceneObjects[0];
                 // by reference
@@ -792,9 +788,10 @@ namespace tracer
                 if (sceneObjects.Count > 1)
                     SetMultiManipulatorMode(null, 0);
 
-            }
-            else // empty selection
-            {
+                // Subscribe to possible change selection via camera (lock look through or in camera space)
+                manager.uiCameraLockChanged += SetCameraManipulator;
+
+            }else{ // empty selection
                 // Clean selection
                 selObj = null;
                 selObjs.Clear();
@@ -802,6 +799,8 @@ namespace tracer
                 //HideAxes();
                 //modeTRS = -1;
                 SetManipulatorMode(null, -1);
+
+                manager.uiCameraLockChanged -= SetCameraManipulator;
             }
 
             camMathValues = Screen.dpi / (Screen.width + Screen.height);

@@ -105,6 +105,10 @@ namespace tracer
         //!
         private float m_pitch, m_yaw, m_roll = 0f;
         //!
+        //! if our selection (center) is too close for orbit, we overwrite the "hasSelection" behaviour by setting it to true
+        //!
+        private bool centerIsToClose = false;
+        //!
         //! if we receive that sensors values via input manager, refrain from allowing other rotation input!
         //! comment out if this bevhaiour is not   intended
         //!
@@ -268,7 +272,7 @@ namespace tracer
                     switch (evt.State){
                         case InputManager.InputState.Started:
                             InitializeCameraAngles();
-                            if(!m_hasSelection){
+                            if(!m_hasSelection || centerIsToClose){
                                 EvaluateObjectForOrbit(new Vector2(Screen.width/2f, Screen.height/2f));
                                 // Drops the pin and spawns the expanding ground ring
                                 _orbitViz.StartPin(evaluatedNonSelectionCenterForOrbit, camTransform.position);
@@ -276,17 +280,18 @@ namespace tracer
                             break;
                         case InputManager.InputState.Ongoing:
                         case InputManager.InputState.Canceled:
-                            if(m_hasSelection)
-                                CameraLookAroundObject(evt.Delta, m_selectionCenter);
-                            else{
+                            if(!m_hasSelection || centerIsToClose){
                                 CameraLookAroundObject(evt.Delta, evaluatedNonSelectionCenterForOrbit);
                                 // Dynamically fills the ground arc as the camera swings around
                                 _orbitViz.UpdateOrbit(camTransform.position);
+                            } else {
+                                CameraLookAroundObject(evt.Delta, m_selectionCenter);
                             }
                             break;
                         case InputManager.InputState.Ended:
                             // Gracefully shrinks and fades away, even if it was interrupted mid-drop
                             _orbitViz.Dismiss();
+                            centerIsToClose = false;
                             break;
                     }
                     break;  
@@ -742,7 +747,7 @@ namespace tracer
         //! Function called when selection has changed.
         //!
         private void SelectionUpdate(object sender, List<SceneObject> sceneObjects){
-            //currentFollowObject = null;
+            centerIsToClose = false;
 
             if (sceneObjects.Count < 1){
                 m_hasSelection = false;
@@ -761,6 +766,13 @@ namespace tracer
             averagePos /= sceneObjects.Count;
 
             m_selectionCenter = averagePos;
+
+            // [BEWARE] if we look through a camera and want to drag/orbit, our pos is the same
+            // as selected object pos and does not work
+            if(Vector3.Distance(m_selectionCenter, camTransform.position) < 0.25f){
+                //if so, use evaluation to calc center
+                centerIsToClose = true;
+            }    
         }
 
         private void FocusOnSelection(UnityEngine.InputSystem.InputAction.CallbackContext ctx) {

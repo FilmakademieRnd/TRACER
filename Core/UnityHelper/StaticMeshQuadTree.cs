@@ -165,7 +165,7 @@ public class StaticMeshQuadtree{
             }
         }
 
-        Debug.Log("Found any? "+foundAny+ " _ highestGroundY:"+highestGroundY);
+        //Debug.Log("Found any? "+foundAny+ " _ highestGroundY:"+highestGroundY);
 
         return foundAny ? highestGroundY : defaultGroundY;
     }

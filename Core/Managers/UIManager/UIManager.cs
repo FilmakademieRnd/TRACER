@@ -196,6 +196,11 @@ namespace tracer
         //!
         public event EventHandler<UIBehaviour> UI2DCreated;
         //!
+        //! Event emitted when we change if object(s) are modified via lock to camera
+        //! used when looking through camera or lock to camera space
+        //!
+        public event EventHandler<bool> uiCameraLockChanged;
+        //!
         //! A list storing references to the menus (MenuTrees) created by the UI-Modules.
         //!
         private List<MenuTree> m_menus;
@@ -769,6 +774,10 @@ namespace tracer
         public void emitUI2DCreated(UIBehaviour ui)
         {
             UI2DCreated?.Invoke(this, ui);
+        }
+
+        public void emitCameraLockObjectChanged(object sender, bool locked) {
+            uiCameraLockChanged?.Invoke(sender, locked);
         }
 
         //!
