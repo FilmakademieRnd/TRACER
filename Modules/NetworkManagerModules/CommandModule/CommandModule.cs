@@ -32,8 +32,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System;
 using System.Threading;
-using NetMQ;
-using NetMQ.Sockets;
 using UnityEngine;
 using System.Linq;
 using System.Threading.Tasks;
@@ -222,64 +220,83 @@ namespace tracer
         //! Function, sending control messages and parameter update messages (executed in separate thread).
         //! Thread execution is locked after every loop and unlocked by sendParameterMessages every global tick.
         //!
-        protected override void run()
+        //!
+        //! Buffer for the responses received by a single transceive call, reused to
+        //! avoid an allocation per message.
+        //!
+        private List<byte[]> m_responses = new List<byte[]>();
+
+        //!
+        //! Function creating and connecting the request socket of the command channel.
+        //!
+        protected override void createSocket()
         {
-            m_isRunning = true;
-            AsyncIO.ForceDotNet.Force();
-            RequestSocket requester = new RequestSocket();
-            m_socket = requester;
-            List<byte[]> responses = new List<byte[]>();
+            m_socket = TracerTransport.current.CreateSocket(TracerSocketType.Request);
 
-            requester.Connect("tcp://" + m_ip + ":" + m_port);
-            Helpers.Log("Command Module connected: " + "tcp://" + m_ip + ":" + m_port);
-            while (m_isRunning)
-            {
+            string address = TracerTransport.endpoint(m_ip, m_port);
+            m_socket.Connect(address);
+            Helpers.Log("Command Module connected: " + address);
+        }
+
+        //!
+        //! Function, sending the queued command request and receiving its reply.
+        //! Request and reply sockets are strictly alternating, therefore only one
+        //! request is outstanding at a time.
+        //!
+        protected override void transceive()
+        {
+            // on a thread this waits until the next global tick releases it,
+            // otherwise transceive is already called once per tick and waiting
+            // would block the frame forever
+            if (threaded)
                 m_mre.WaitOne();
-                if (m_commandRequest != null)
-                {
-                    lock (m_lock)
-                    {
-                        try 
-                        {
-                            if (requester.HasOut)
-                                requester.TrySendFrame(m_commandRequest);
-                            //else
-                                //Helpers.Log("Command responses not send, no DataHub reachable!", Helpers.logMsgType.WARNING);
 
-                            if (!requester.TryReceiveMultipartBytes(TimeSpan.FromSeconds(1.0), ref responses))
-                            {
-                                //Helpers.Log("Command responses reply not received, no DataHub reachable!", Helpers.logMsgType.WARNING);
+            if (m_commandRequest != null)
+            {
+                lock (m_lock)
+                {
+                    try
+                    {
+                        if (m_socket.hasOut)
+                            m_socket.TrySend(m_commandRequest);
+                        //else
+                            //Helpers.Log("Command responses not send, no DataHub reachable!", Helpers.logMsgType.WARNING);
+
+                        if (!m_socket.TryReceive(ref m_responses, receiveTimeout))
+                        {
+                            //Helpers.Log("Command responses reply not received, no DataHub reachable!", Helpers.logMsgType.WARNING);
+                            if (threaded)
                                 m_mre.Reset();
 
-                                continue;
-                            }
-                        } catch { requester.Dispose(); }
-                        if (responses.Count > 0)
-                        {
-                            byte[] header = responses[0];
-                            if (header[0] != manager.cID)
-                            {
-
-                                switch ((DataHubMessageType)header[2])
-                                {
-                                    case DataHubMessageType.PING:
-                                        decodePongMessage(header);
-                                        break;
-                                    default:
-                                        decodeReplyMessage(responses);
-                                        break;
-                                }
-                                m_commandRequest = null;
-                            }
-                            responses.Clear();
+                            return;
                         }
                     }
+                    catch { m_socket.Dispose(); }
+
+                    if (m_responses.Count > 0)
+                    {
+                        byte[] header = m_responses[0];
+                        if (header[0] != manager.cID)
+                        {
+                            switch ((DataHubMessageType)header[2])
+                            {
+                                case DataHubMessageType.PING:
+                                    decodePongMessage(header);
+                                    break;
+                                default:
+                                    decodeReplyMessage(m_responses);
+                                    break;
+                            }
+                            m_commandRequest = null;
+                        }
+                        m_responses.Clear();
+                    }
                 }
-                // reset to stop the thread after one loop is done
-                m_mre.Reset();
-                Thread.Yield();
             }
-            m_thredEnded.TrySetResult(true);
+
+            // reset to stop the thread after one loop is done
+            if (threaded)
+                m_mre.Reset();
         }
     }
 }

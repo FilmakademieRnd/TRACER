@@ -28,8 +28,6 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 11.03.2022
 
-using NetMQ;
-using NetMQ.Sockets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -98,26 +96,26 @@ namespace tracer
         protected override void run()
         {
             m_isRunning = true;
-            AsyncIO.ForceDotNet.Force();
-            var sceneSender = new RequestSocket();
-            m_socket = sceneSender;
+            m_socket = TracerTransport.current.CreateSocket(TracerSocketType.Request);
 
-            sceneSender.Connect("tcp://" + m_ip + ":" + m_port);
-            Debug.Log("Scene sender started: " + "tcp://" + m_ip + ":" + m_port);
+            string address = TracerTransport.endpoint(m_ip, m_port);
+            m_socket.Connect(address);
+            Debug.Log("Scene sender started: " + address);
 
-            NetMQMessage sendMessages = new NetMQMessage(2);
-            string received = "0";
+            List<byte[]> sendMessages = new List<byte[]>(2);
 
             foreach (KeyValuePair<string, byte[]> package in m_responses)
             {
-                sendMessages.Append(package.Key);
-                sendMessages.Append(package.Value);
+                sendMessages.Add(System.Text.Encoding.ASCII.GetBytes(package.Key));
+                sendMessages.Add(package.Value);
 
-                sceneSender.SendMultipartMessage(sendMessages);
+                m_socket.SendMultipart(sendMessages);
                 Helpers.Log(package.Key + " send bytes: " + package.Value.Length);
 
-                if (sceneSender.TryReceiveFrameString(TimeSpan.FromSeconds(20), out received))
+                byte[] reply = receiveFrame(20000);
+                if (reply != null)
                 {
+                    string received = System.Text.Encoding.ASCII.GetString(reply);
                     if (received == "1")
                         Debug.Log(package.Key + " stored on server: " + m_ip);
                     else
@@ -128,9 +126,8 @@ namespace tracer
                     Debug.Log("Timeout, server: " + m_ip + " not responding!");
                     break;
                 }
-                
+
                 sendMessages.Clear();
-                received = "0";
             }
 
             m_responses.Clear();

@@ -28,10 +28,13 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 13.10.2021
 
-using NetMQ;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+#if !UNITY_IOS && !UNITY_ANDROID && !UNITY_WEBGL
+using System.Net;
+using System.Net.NetworkInformation;
+#endif
 
 namespace tracer
 {
@@ -220,7 +223,9 @@ namespace tracer
                 //var hostName = Dns.GetHostName();
                 //var host = Dns.GetHostEntry(hostName);
 
-#if UNITY_IOS || UNITY_ANDROID
+#if UNITY_IOS || UNITY_ANDROID || UNITY_WEBGL
+                // A browser cannot read a hardware address, so it uses the same
+                // pseudo-random identifier the mobile platforms already use.
                 byte[] mac = createVID();
                 Helpers.Log("Requesting ID for MAC: " + BitConverter.ToString(mac));
 
@@ -283,27 +288,28 @@ namespace tracer
         public override void Cleanup()
         {
             base.Cleanup();
-            NetMQCleanup();
+            transportCleanup();
         }
 
         //!
-        //! Clean up the NetMQ COntext
+        //! Clean up the transport's global state (the NetMQ context on Desktop and
+        //! Mobile; nothing in WebGL).
         //!
-        public void NetMQCleanup()
+        public void transportCleanup()
         {
             if (threadCount == 0)
             {
                 try
                 {
-                    NetMQConfig.Cleanup(false);
+                    TracerTransport.current.cleanup();
                 }
                 catch { }
                 finally
                 {
-                    Helpers.Log("netMQ cleaned up.");
+                    Helpers.Log("network transport cleaned up.");
                 }
             }
-            else Helpers.Log("netMQ cleanup error! Thread count is: " + threadCount, Helpers.logMsgType.ERROR);
+            else Helpers.Log("transport cleanup error! Thread count is: " + threadCount, Helpers.logMsgType.ERROR);
         }
 
         //!

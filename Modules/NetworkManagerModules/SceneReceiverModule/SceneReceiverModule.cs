@@ -31,8 +31,6 @@ using System.Collections.Generic;
 using System.Collections;
 using System;
 using System.Threading;
-using NetMQ;
-using NetMQ.Sockets;
 using UnityEngine;
 
 namespace tracer
@@ -169,6 +167,16 @@ namespace tracer
         //!
         private IEnumerator startReceive(bool emitSceneReady)
         {
+            if (!threaded)
+            {
+                // The request sequence below is seven blocking round trips on a worker
+                // thread. Platforms without threads need it rewritten as a coroutine
+                // driven state machine, which is not done yet.
+                Helpers.Log("Scene receive is not yet supported on this platform.",
+                            Helpers.logMsgType.ERROR);
+                yield break;
+            }
+
             Dialog statusDialog = new Dialog("Receive Scene", "", Dialog.DTypes.BAR);
             statusDialog.destroyEvent = stop;
             UIManager uiManager = core.getManager<UIManager>();
@@ -203,15 +211,18 @@ namespace tracer
         //! Function, requesting scene packages and receiving package data (executed in separate thread).
         //! As soon as all requested packages are received, a signal is emited that triggers the scene cration.
         //!
+        //! How long to wait for one scene package. Textures and character data can be
+        //! several megabytes, so this is deliberately generous.
+        private const int m_packageTimeout = 30000;
+
         protected override void run()
         {
-            AsyncIO.ForceDotNet.Force();
-            RequestSocket sceneReceiver = new RequestSocket();
-            m_socket = sceneReceiver;
+            m_socket = TracerTransport.current.CreateSocket(TracerSocketType.Request);
 
             SceneManager sceneManager = core.getManager<SceneManager>();
-            sceneReceiver.Connect("tcp://" + m_ip + ":" + m_port);
-            Helpers.Log("Scene receiver started: " + "tcp://" + m_ip + ":" + m_port);
+            string address = TracerTransport.endpoint(m_ip, m_port);
+            m_socket.Connect(address);
+            Helpers.Log("Scene receiver started: " + address);
             SceneManager.SceneDataHandler sceneDataHandler = sceneManager.sceneDataHandler;
 
             // because no loop we set m_threadEnded already at the beginning
@@ -221,41 +232,51 @@ namespace tracer
             {
                 foreach (string request in m_requests)
                 {
-                    sceneReceiver.SendFrame(request);
+                    m_socket.Send(System.Text.Encoding.ASCII.GetBytes(request));
+
+                    // Scene packages are large; allow generously for the transfer.
+                    byte[] payload = receiveFrame(m_packageTimeout);
+                    if (payload == null)
+                    {
+                        Helpers.Log("SceneReceiver timed out waiting for " + request,
+                                    Helpers.logMsgType.WARNING);
+                        break;
+                    }
+
                     switch (request)
                     {
                         case "header":
-                            sceneDataHandler.headerByteData = sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.headerByteData = payload;
                             Debug.Log(request + " received with " + sceneDataHandler.headerByteData.Length + " bytes.");
                             m_loadProgress += 10;
                             break;
                         case "nodes":
-                            sceneDataHandler.nodesByteData = sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.nodesByteData = payload;
                             Debug.Log(request + " received with " + sceneDataHandler.nodesByteDataRef.Length + " bytes.");
                             m_loadProgress += 20;
                             break;
                         case "parameterobjects":
-                            sceneDataHandler.parameterObjectsByteData = sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.parameterObjectsByteData = payload;
                             Debug.Log(request + " received with " + sceneDataHandler.parameterObjectsByteDataRef.Length + " bytes.");
                             m_loadProgress += 10;
                             break;
                         case "objects":
-                            sceneDataHandler.objectsByteData = sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.objectsByteData = payload;
                             Debug.Log(request + " received with " + sceneDataHandler.objectsByteDataRef.Length + " bytes.");
                             m_loadProgress += 20;
                             break;
                         case "characters":
-                            sceneDataHandler.characterByteData = sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.characterByteData = payload;
                             Debug.Log(request + " received with " + sceneDataHandler.characterByteDataRef.Length + " bytes.");
                             m_loadProgress += 10;
                             break;
                         case "textures":
-                            sceneDataHandler.texturesByteData = sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.texturesByteData = payload;
                             Debug.Log(request + " received with " + sceneDataHandler.texturesByteDataRef.Length + " bytes.");
                             m_loadProgress += 20;
                             break;
                         case "materials":
-                            sceneDataHandler.materialsByteData = sceneReceiver.ReceiveFrameBytes();
+                            sceneDataHandler.materialsByteData = payload;
                             Debug.Log(request + " received with " + sceneDataHandler.materialsByteDataRef.Length + " bytes.");
 
                             m_loadProgress += 10;

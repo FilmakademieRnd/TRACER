@@ -32,8 +32,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Threading;
 using System;
-using NetMQ;
-using NetMQ.Sockets;
 
 namespace tracer
 {
@@ -139,29 +137,36 @@ namespace tracer
         protected override void run()
         {
             m_isRunning = true;
-            AsyncIO.ForceDotNet.Force();
-            var dataSender = new ResponseSocket();
-            m_socket = dataSender;
 
-            dataSender.Bind("tcp://" + m_ip + ":" + m_port);
+            if (!TracerTransport.current.supportsBind)
+            {
+                // A browser cannot listen for inbound connections, so this module can
+                // never serve a scene there. It is also load-gated on core.isServer.
+                Helpers.Log("Scene server is not available on this platform.", Helpers.logMsgType.WARNING);
+                m_thredEnded.TrySetResult(true);
+                return;
+            }
+
+            m_socket = TracerTransport.current.CreateSocket(TracerSocketType.Response);
+            m_socket.Bind(TracerTransport.endpoint(m_ip, m_port));
             Debug.Log("Enter while.. ");
-
-            string message;
 
             while (m_isRunning)
             {
-                dataSender.TryReceiveFrameString(out message);       // TryReceiveFrameString returns null if no message has been received!
-                if (message != null)
+                // Returns null when nothing has been received.
+                byte[] request = receiveFrame(0);
+                if (request != null)
                 {
+                    string message = System.Text.Encoding.ASCII.GetString(request);
                     try
                     {
                         if (m_responses.ContainsKey(message))
                         {
-                            dataSender.SendFrame(m_responses[message]);
+                            m_socket.Send(m_responses[message]);
                             Helpers.Log(message + " send bytes: " + m_responses[message].Length);
                         }
                         else
-                            dataSender.SendFrame(new byte[0]);
+                            m_socket.Send(new byte[0]);
                     }
                     catch { }
 

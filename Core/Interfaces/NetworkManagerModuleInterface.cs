@@ -21,17 +21,16 @@ if not go to https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------------
 */
 
-//! @file "SceneManagerModule.cs"
-//! @brief base implementation for scene manager modules
+//! @file "NetworkManagerModuleInterface.cs"
+//! @brief base implementation for network manager modules
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @version 0
 //! @date 28.10.2021
 
-using NetMQ;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -91,20 +90,113 @@ namespace tracer
 
         //!
         //! The Thread used for receiving or sending messages.
+        //! Null if the transport has no threads, in which case transceive is called
+        //! from the main thread with every global tick instead.
         //!
         protected Thread m_transceiverThread;
-        
-        //!
-        //! Function, listening for messages and adds them to m_messageQueue (executed in separate thread).
-        //!
-        protected abstract void run();
 
         //!
         //! Reset event for stopping and resetting the run thread.
         //!
         protected ManualResetEvent m_mre;
 
-        protected NetMQSocket m_socket;
+        //!
+        //! The socket, created by the transport this build was compiled with.
+        //!
+        protected ITracerSocket m_socket;
+
+        //!
+        //! Whether this build runs the transceiver on its own thread.
+        //! False for WebGL, which is single threaded.
+        //!
+        protected static bool threaded
+        {
+            get => TracerTransport.current.supportsThreads;
+        }
+
+        //!
+        //! The time in milliseconds a receive is allowed to block.
+        //! Threaded builds wait on the socket, single threaded builds must return
+        //! immediately so that the current frame can continue.
+        //!
+        protected static int receiveTimeout
+        {
+            get => threaded ? 1000 : 0;
+        }
+
+        //!
+        //! Function creating and connecting the module's socket.
+        //! Called once before the first call to transceive.
+        //!
+        protected virtual void createSocket() { }
+
+        //!
+        //! Function performing a single, non blocking send and receive step.
+        //! Called repeatedly by run on the transceiver thread, or once per global
+        //! tick on the main thread if the transport has no threads.
+        //!
+        protected virtual void transceive() { }
+
+        //!
+        //! Function, sending and receiving messages until the module is stopped
+        //! (executed in a separate thread).
+        //! Modules that perform a one time sequence instead of a loop, like the
+        //! scene receiver, override this function completely.
+        //!
+        protected virtual void run()
+        {
+            m_isRunning = true;
+            createSocket();
+
+            while (m_isRunning)
+            {
+                transceive();
+                Thread.Yield();
+            }
+
+            m_thredEnded.TrySetResult(true);
+        }
+
+        //!
+        //! Function receiving a single frame, discarding any further frames of the
+        //! same message. Used by the scene modules, that exchange one frame at a time.
+        //!
+        //! @param timeoutMilliseconds The time to wait for a frame. 0 does not block.
+        //! @return The received frame, or null if no frame arrived in time.
+        //!
+        protected byte[] receiveFrame(int timeoutMilliseconds)
+        {
+            if (m_socket == null)
+                return null;
+
+            List<byte[]> frames = new List<byte[]>();
+            if (m_socket.TryReceive(ref frames, timeoutMilliseconds) && frames.Count > 0)
+                return frames[0];
+
+            return null;
+        }
+
+        //!
+        //! Function calling transceive with every global tick, used if the transport
+        //! has no threads.
+        //!
+        //! @param sender The TRACER core.
+        //! @param args Empty.
+        //!
+        private void transceiveOnTick(object sender, EventArgs args)
+        {
+            if (!m_isRunning)
+                return;
+
+            try
+            {
+                transceive();
+            }
+            catch (Exception e)
+            {
+                Helpers.Log(name + " transceive failed: " + e.Message, Helpers.logMsgType.WARNING);
+            }
+        }
 
         //!
         //! Ret the manager of this module.
@@ -143,7 +235,8 @@ namespace tracer
         }
 
         //!
-        //! Function to start a new thread.
+        //! Function to start the tranceiver, on a new thread if the transport
+        //! supports threads, otherwise on the main thread.
         //!
         //! @param ip IP address of the network interface.
         //! @param port Port number to be used.
@@ -156,10 +249,19 @@ namespace tracer
             m_ip = ip;
             m_port = port;
 
-            ThreadStart transeiver = new ThreadStart(run);
-            m_transceiverThread = new Thread(transeiver);
-            m_transceiverThread.Start();
-            NetworkManager.threadCount++;
+            if (threaded)
+            {
+                ThreadStart transeiver = new ThreadStart(run);
+                m_transceiverThread = new Thread(transeiver);
+                m_transceiverThread.Start();
+                NetworkManager.threadCount++;
+            }
+            else
+            {
+                m_isRunning = true;
+                createSocket();
+                core.timeEvent += transceiveOnTick;
+            }
         }
 
         //!
@@ -167,17 +269,33 @@ namespace tracer
         //!
         public void stop()
         {
+            bool wasRunning = m_isRunning;
             m_isRunning = false;
             m_mre.Set();
-            
+
+            if (!threaded)
+            {
+                if (wasRunning)
+                    core.timeEvent -= transceiveOnTick;
+
+                if (m_socket != null)
+                {
+                    m_socket.Dispose();
+                    Helpers.Log(this.name + " disposed.");
+                    m_socket = null;
+                }
+                return;
+            }
+
             if (m_socket != null)
             {
+                // waiting on a task would never return without a second thread,
+                // so this branch is only reached if the transport has threads
                 while (m_thredEnded.Task.Result != true)
                     Thread.Yield();
 
                 //m_socket.Disconnect("tcp://" + m_ip + ":" + m_port);
                 m_socket.Dispose();
-                m_socket.Close();
                 Helpers.Log(this.name + " disposed.");
                 m_socket = null;
             }

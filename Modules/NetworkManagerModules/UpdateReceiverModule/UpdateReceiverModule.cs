@@ -32,8 +32,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System;
 using System.Threading;
-using NetMQ;
-using NetMQ.Sockets;
 using UnityEngine;
 using System.Runtime.InteropServices;
 
@@ -131,76 +129,84 @@ namespace tracer
         }
 
         //!
-        //! Function, waiting for incoming message (executed in separate thread).
-        //! Control message are executed immediately, parameter update message are buffered
-        //! and executed later to obtain synchronicity.
+        //! Buffer for the frames received by a single transceive call, reused to
+        //! avoid an allocation per message.
         //!
-        protected override void run()
+        private List<byte[]> m_receivedMessages = new List<byte[]>();
+
+        //!
+        //! Function creating and connecting the subscriber socket.
+        //! The DataHub does not use topic frames, therefore all topics are subscribed.
+        //!
+        protected override void createSocket()
         {
-            m_isRunning = true;
-            AsyncIO.ForceDotNet.Force();
-            var receiver = new SubscriberSocket();
-            m_socket = receiver;
-            receiver.SubscribeToAnyTopic();
-            receiver.Connect("tcp://" + m_ip + ":" + m_port);
-            Helpers.Log("Update receiver connected: " + "tcp://" + m_ip + ":" + m_port);
-            byte[] message = null;
-            List<byte[]> messages = new List<byte[]>();
-           
-            while (m_isRunning)
+            m_socket = TracerTransport.current.CreateSocket(TracerSocketType.Subscriber);
+            m_socket.SubscribeToAnyTopic();
+
+            string address = TracerTransport.endpoint(m_ip, m_port);
+            m_socket.Connect(address);
+            Helpers.Log("Update receiver connected: " + address);
+        }
+
+        //!
+        //! Function, receiving all messages that have arrived since the last call.
+        //! Control messages are executed immediately, parameter update messages are
+        //! buffered by their time byte and executed later by consumeMessages to
+        //! obtain synchronicity.
+        //!
+        protected override void transceive()
+        {
+            try
             {
-                try
+                if (!m_socket.TryReceive(ref m_receivedMessages, receiveTimeout))
+                    return;
+
+                for (int i = 0; i < m_receivedMessages.Count; i++)
                 {
-                    if (receiver.TryReceiveMultipartBytes(System.TimeSpan.FromSeconds(1), ref messages))
+                    byte[] message = m_receivedMessages[i];
+                    if (message == null)
+                        continue;
+
+                    // DataHub's PUB echoes our own messages back to us.
+                    if (message[0] == manager.cID)
+                        continue;
+
+                    lock (_lock)
                     {
-                        for (int i = 0; i < messages.Count; i++)
+                        switch ((MessageType)message[2])
                         {
-                            message = messages[i];
-                            if (message != null)
-                            {
-                                if (message[0] != manager.cID)
-                                {
-                                    lock (_lock)
-                                    {
-                                        switch ((MessageType)message[2])
-                                        {
-                                            case MessageType.LOCK:
-                                                decodeLockMessage(message);
-                                                break;
-                                            case MessageType.SYNC:
-                                                decodeSyncMessage(message);
-                                                break;
-                                            case MessageType.RESETOBJECT:
-                                                decodeResetMessage(message);
-                                                break;
-                                            case MessageType.UNDOREDOADD:
-                                                decodeUndoRedoMessage(message);
-                                                break;
-                                            case MessageType.DATAHUB:
-                                                decodeDataHubMessage(message);
-                                                break;
-                                            case MessageType.RPC:
-                                            case MessageType.PARAMETERUPDATE:
-                                                // make sure that producer and consumer exclude eachother
-                                                // message[1] is time
-                                                //int time = (message[1] + (Mathf.RoundToInt((float)manager.pingRTT * 0.5f))) % core.timesteps;
-                                                //m_messageBuffer[time].Add(message);
-                                                m_messageBuffer[message[1]].Add(message);
-                                                break;
-                                            default:
-                                                break;
-                                        }
-                                    }
-                                }
-                            }
+                            case MessageType.LOCK:
+                                decodeLockMessage(message);
+                                break;
+                            case MessageType.SYNC:
+                                decodeSyncMessage(message);
+                                break;
+                            case MessageType.RESETOBJECT:
+                                decodeResetMessage(message);
+                                break;
+                            case MessageType.UNDOREDOADD:
+                                decodeUndoRedoMessage(message);
+                                break;
+                            case MessageType.DATAHUB:
+                                decodeDataHubMessage(message);
+                                break;
+                            case MessageType.RPC:
+                            case MessageType.PARAMETERUPDATE:
+                                // make sure that producer and consumer exclude eachother
+                                // message[1] is time
+                                //int time = (message[1] + (Mathf.RoundToInt((float)manager.pingRTT * 0.5f))) % core.timesteps;
+                                //m_messageBuffer[time].Add(message);
+                                m_messageBuffer[message[1]].Add(message);
+                                break;
+                            default:
+                                break;
                         }
-                        messages.Clear();
                     }
                 }
-                catch (Exception e) { Helpers.Log(e.Message, Helpers.logMsgType.WARNING); }
-                Thread.Yield();
+
+                m_receivedMessages.Clear();
             }
-            m_thredEnded.TrySetResult(true);
+            catch (Exception e) { Helpers.Log(e.Message, Helpers.logMsgType.WARNING); }
         }
 
         //! 

@@ -1,0 +1,19 @@
+{
+    "name": "TracerWebGL",
+    "rootNamespace": "",
+    "references": [
+        "Core",
+        "HelperAssembly"
+    ],
+    "includePlatforms": [
+        "WebGL"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

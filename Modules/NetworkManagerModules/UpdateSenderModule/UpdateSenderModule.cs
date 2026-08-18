@@ -32,8 +32,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System;
 using System.Threading;
-using NetMQ;
-using NetMQ.Sockets;
 using UnityEngine;
 
 namespace tracer
@@ -56,12 +54,12 @@ namespace tracer
         //!
         //! List of control messages, containing all tracer messages besides parameter updates.
         //!
-        private NetMQMessage m_controlMessages;
+        private List<byte[]> m_controlMessages;
 
         //!
         //! List of parameter messages, containing all tracer parameter updat messages.
         //!
-        private NetMQMessage m_parameterMessages;
+        private List<byte[]> m_parameterMessages;
 
         //!
         //! Constructor
@@ -115,8 +113,8 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             m_modifiedParameters = new List<AbstractParameter>();
-            m_controlMessages = new NetMQMessage(3);
-            m_parameterMessages = new NetMQMessage(6);
+            m_controlMessages = new List<byte[]>(3);
+            m_parameterMessages = new List<byte[]>(6);
 
             SceneManager sceneManager = core.getManager<SceneManager>();
             sceneManager.sceneReady += connectAndStart;
@@ -216,7 +214,7 @@ namespace tracer
                 Helpers.copyArray(BitConverter.GetBytes(sceneId), 0, message, 3, 1);           // SceneID
                 Helpers.copyArray(BitConverter.GetBytes(sceneObjectId), 0, message, 4, 2);     // SceneObjectID
                 message[6] = Convert.ToByte(true);
-                m_controlMessages.Append(message);
+                m_controlMessages.Add(message);
             }
 
             m_mre.Set();
@@ -251,7 +249,7 @@ namespace tracer
                 Helpers.copyArray(BitConverter.GetBytes(sceneId), 0, message, 3, 1);           // SceneID
                 Helpers.copyArray(BitConverter.GetBytes(sceneObjectId), 0, message, 4, 2);     // SceneObjectID
                 message[6] = Convert.ToByte(false);
-                m_controlMessages.Append(message);
+                m_controlMessages.Add(message);
             }
 
             m_mre.Set();
@@ -286,7 +284,7 @@ namespace tracer
                 Helpers.copyArray(BitConverter.GetBytes(parameter._parent._id), 0, message, 4, 2);  // SceneObjectID
                 Helpers.copyArray(BitConverter.GetBytes(parameter._id), 0, message, 6, 2);  // ParameterID
                 message[8] = (byte)parameter.tracerType;  // ParameterType
-                m_controlMessages.Append(message);
+                m_controlMessages.Add(message);
             }
 
             m_mre.Set();
@@ -315,7 +313,7 @@ namespace tracer
                 // parameter
                 Helpers.copyArray(BitConverter.GetBytes(sceneObject._sceneID), 0, message, 3, 1);  // SceneID
                 Helpers.copyArray(BitConverter.GetBytes(sceneObject._id), 0, message, 4, 2);  // SceneObjectID
-                m_controlMessages.Append(message);
+                m_controlMessages.Add(message);
             }
 
             m_mre.Set();
@@ -351,7 +349,7 @@ namespace tracer
             BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);  // Parameter message length
             parameter.Serialize(newSpan.Slice(10)); // Parameter data
 
-            m_controlMessages.Append(message);
+            m_controlMessages.Add(message);
             //m_mre.Set();
         }
 
@@ -438,51 +436,68 @@ namespace tracer
         //! Function, sending control messages and parameter update messages (executed in separate thread).
         //! Thread execution is locked after every loop and unlocked by sendParameterMessages every global tick.
         //!
-        protected override void run()
-        {
-            m_isRunning = true;
-            AsyncIO.ForceDotNet.Force();
-            var sender = new PublisherSocket();
-            sender.Options.Linger = TimeSpan.FromMilliseconds(0);
-            sender.Options.Backlog = 10;
-            const int packageSize = 0;  // change these numer to > 0 (4) to enable framewise message bundling
-            int i = 0;
-            m_socket = sender;
+        //!
+        //! Change this number to > 0 (4) to enable framewise message bundling.
+        //!
+        private const int m_packageSize = 0;
 
-            sender.Connect("tcp://" + m_ip + ":" + m_port);
-            Helpers.Log("Update sender connected: " + "tcp://" + m_ip + ":" + m_port);
-            while (m_isRunning)
-            {
+        //!
+        //! Counter of transceive calls since the last parameter message was sent,
+        //! used by the message bundling above.
+        //!
+        private int m_sendCounter = 0;
+
+        //!
+        //! Function creating and connecting the publisher socket.
+        //!
+        protected override void createSocket()
+        {
+            m_socket = TracerTransport.current.CreateSocket(TracerSocketType.Publisher);
+
+            string address = TracerTransport.endpoint(m_ip, m_port);
+            m_socket.Connect(address);
+            Helpers.Log("Update sender connected: " + address);
+        }
+
+        //!
+        //! Function, sending the queued control messages, packing all modified
+        //! parameters into a parameter message and sending the parameter queue.
+        //!
+        protected override void transceive()
+        {
+            // on a thread this waits until sendParameterMessages releases it with
+            // the next global tick, otherwise transceive is already called once per tick
+            if (threaded)
                 m_mre.WaitOne();
-                lock (m_lock)
+
+            lock (m_lock)
+            {
+                // send controm messages
+                if (m_controlMessages.Count > 0)
                 {
-                    // send controm messages
-                    if (!m_controlMessages.IsEmpty)
-                    {
-                        try { sender.SendMultipartMessage(m_controlMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:controlMsg:SendFrame</color> " + e.ToString()); } // true not wait 
-                        m_controlMessages.Clear();
-                    }
-                    // add parameter message to message buffer
-                    if (m_modifiedParameters.Count > 0)
-                    {
-                        m_parameterMessages.Append(createParameterMessage());
-                        m_modifiedParameters.Clear();
-                        m_modifiedParametersDataSize = 0;
-                    }
-                    // send message buffer if cout > packageSize or time is over
-                    int frameCount = m_parameterMessages.FrameCount;
-                    if (frameCount > packageSize || (i++ > packageSize && frameCount > 0))
-                    {
-                        try { sender.SendMultipartMessage(m_parameterMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:modifiedParameter:SendFrame</color> " + e.ToString()); } // true not wait
-                        m_parameterMessages.Clear();
-                        i = 0;
-                    }
+                    try { m_socket.SendMultipart(m_controlMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:controlMsg:SendFrame</color> " + e.ToString()); } // true not wait
+                    m_controlMessages.Clear();
                 }
-                // reset to stop the thread after one loop is done
-                m_mre.Reset();
-                Thread.Yield();
+                // add parameter message to message buffer
+                if (m_modifiedParameters.Count > 0)
+                {
+                    m_parameterMessages.Add(createParameterMessage());
+                    m_modifiedParameters.Clear();
+                    m_modifiedParametersDataSize = 0;
+                }
+                // send message buffer if cout > packageSize or time is over
+                int frameCount = m_parameterMessages.Count;
+                if (frameCount > m_packageSize || (m_sendCounter++ > m_packageSize && frameCount > 0))
+                {
+                    try { m_socket.SendMultipart(m_parameterMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:modifiedParameter:SendFrame</color> " + e.ToString()); } // true not wait
+                    m_parameterMessages.Clear();
+                    m_sendCounter = 0;
+                }
             }
-            m_thredEnded.TrySetResult(true);
+
+            // reset to stop the thread after one loop is done
+            if (threaded)
+                m_mre.Reset();
         }
 
         //!
