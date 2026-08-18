@@ -140,7 +140,7 @@ namespace tracer{
         //! fired when any input has started
         //! for example rendering the view into an rtx once (beforehand)
         //!
-        public event EventHandler<EventArgs> anyInputEvent;
+        public event EventHandler<InputEventArgs> anyInputEvent;
         //!
         //! fired when a click interaction ended on top of 2D UI
         //!
@@ -211,7 +211,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseAnyInput   (object sender, EventArgs e)   { anyInputEvent?.Invoke(sender, e); }
+        public void RaiseAnyInput   (object sender, InputEventArgs e)   { anyInputEvent?.Invoke(sender, e); }
         //!
         //! raise clickUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these

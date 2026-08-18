@@ -173,7 +173,7 @@ namespace tracer{
         }
 
         private void StopAttitudeEvent() {
-            attitudeInputData.State = InputManager.InputState.Ended;
+            attitudeInputState = InputManager.InputState.Ended;
             manager.RaiseAttitude(this, new InputManager.AttitudeEventArgs(attitudeInputLevel, attitudeInputState, attitudeInputRotation));
             UIManager uim = core.getManager<UIManager>();
             //dont change to standard if we quit attitude behaviour by activating ar!

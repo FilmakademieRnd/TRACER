@@ -849,9 +849,7 @@ namespace tracer{
         //! @param state the state of the `anyInputAction` we check manually
         //!
         private void FireAnyInputEvent(InputManager.InputState state) {
-            var anyInputData = new InputManager.AnyEventArgs {
-                State = state
-            };
+            var anyInputData = new InputManager.InputEventArgs(InputManager.InputLevel.Primary, state, default, default);
             
             manager.RaiseAnyInput(this, anyInputData);
         }

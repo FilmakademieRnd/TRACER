@@ -334,7 +334,7 @@ namespace tracer{
         //! so we can tell the gpu fast enough to create a rtx to use
         //! check if it would be valid to use only for portion of screen, if input pos matters
         //!
-        private void OnAnyInputEvent(object sender, InputManager.AnyEventArgs data){
+        private void OnAnyInputEvent(object sender, InputManager.InputEventArgs data){
             //only do so on start
             if(data.State == InputManager.InputState.Started)
                 UpdateIDTexture();
