@@ -56,8 +56,39 @@ namespace tracer{
         private int _continuousDemandCount = 0;
         private bool _isLocating = false;
         private Coroutine _gpsLoopRoutine;
-        private InputManager.GPSEventArgs gpsInputData;
-        private InputManager.GPSDataStruct gpsData;
+
+        private struct TimeDataStruct
+        {
+            public readonly int minute;
+            public readonly int hour;
+            public readonly int day;
+            public readonly int month;
+            
+            public TimeDataStruct(double _gpsTimestamp = 0)
+            {
+                // Populate the time fields
+                DateTime targetTime;
+
+                if (_gpsTimestamp > 0)
+                {
+                    // 1. BEST PRACTICE: Convert Unity's hardware GPS timestamp (Unix Epoch seconds since 1970)
+                    // This represents the exact moment the satellite sent the coordinate, regardless of delays.
+                    DateTime epochStart = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                    targetTime = epochStart.AddSeconds(_gpsTimestamp);
+                }
+                else
+                {
+                    // 2. FALLBACK: Use the device's current clock.
+                    // We use UtcNow instead of Now so your solar formulas don't break due to Daylight Savings or Time Zones!
+                    targetTime = DateTime.UtcNow;
+                }
+
+                minute = targetTime.Minute;
+                hour = targetTime.Hour;
+                day = targetTime.Day;
+                month = targetTime.Month;
+            }
+        }
 
         //!
         //! Constructor.
@@ -74,15 +105,6 @@ namespace tracer{
         //! @param e Arguments for these event. 
         //! 
         protected override void Init(object sender, EventArgs e){
-            //created once, only the state will ever change here!
-            gpsInputData = new InputManager.GPSEventArgs(
-                InputManager.InputLevel.Primary,
-                InputManager.InputState.Started,
-                Vector2.zero,
-                Vector2.zero,
-                default
-            );
-
             manager.onGPSDemandChangedEvent += HandleGPSDemandEvent;
         }
 
@@ -94,8 +116,6 @@ namespace tracer{
             manager.onGPSDemandChangedEvent -= HandleGPSDemandEvent;
             StopGPSHardware(false);
         }
-
-        
 
         private void HandleGPSDemandEvent(object sender, InputManager.GPSDemandType demandType){
             switch (demandType){
@@ -169,6 +189,7 @@ namespace tracer{
             while (_continuousDemandCount > 0){
                 BroadcastCurrentLocation(InputManager.InputState.Ongoing);
                 yield return new WaitForSeconds(Mathf.Max(LOCATION_UPDATE_EVERY, Time.deltaTime));
+
             }
             StopGPSHardware(true);
         }
@@ -185,17 +206,22 @@ namespace tracer{
         }
 
         private void BroadcastCurrentLocation(InputManager.InputState _state){
-            gpsInputData.State = _state;
             if (Input.location.status == LocationServiceStatus.Running){
                 var info = Input.location.lastData;
-                gpsData = new InputManager.GPSDataStruct(info.latitude, info.longitude, info.altitude, info.horizontalAccuracy, true, info.timestamp){};
-            }else{
-                // Hardware failed or timed out: Broadcast fallback coordinates so the app doesn't break
-                gpsData = new InputManager.GPSDataStruct(DEFAULT_LAT, DEFAULT_LON, DESIRED_ACCURACY_M, 0f, false, 0){};
+                TimeDataStruct timeData = new TimeDataStruct(info.timestamp);
+                manager.RaiseGPS(this, new InputManager.GPSEventArgs(
+                    InputManager.InputLevel.Primary, _state, 
+                    info.latitude, info.longitude, info.altitude, info.horizontalAccuracy, true, 
+                    timeData.minute, timeData.hour, timeData.day, timeData.month));
             }
-            gpsInputData.GPSData = gpsData;
-
-            manager.RaiseGPS(this, gpsInputData);
+            else{
+                // Hardware failed or timed out: Broadcast fallback coordinates so the app doesn't break
+                TimeDataStruct timeData = new TimeDataStruct(0);
+                manager.RaiseGPS(this, new InputManager.GPSEventArgs(
+                    InputManager.InputLevel.Primary, _state,
+                    DEFAULT_LAT, DEFAULT_LON, 0, DESIRED_ACCURACY_M, false,
+                    timeData.minute, timeData.hour, timeData.day, timeData.month));
+            }
         }
     }
 

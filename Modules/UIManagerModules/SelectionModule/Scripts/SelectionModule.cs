@@ -94,7 +94,7 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void SelectFunction(object sender, InputManager.ClickEventArgs evt){
+        private void SelectFunction(object sender, InputManager.InputEventArgs evt){
 
             if (evt.Level != InputManager.InputLevel.Primary) return;
 

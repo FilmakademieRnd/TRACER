@@ -414,7 +414,7 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void ClickFunction(object sender, InputManager.ClickEventArgs evt){
+        private void ClickFunction(object sender, InputManager.InputEventArgs evt){
 
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;
@@ -457,7 +457,7 @@ namespace tracer{
         //!
         //! @param evt the InputData
         //!
-        private void DoubleClickFunction(object sender, InputManager.ClickEventArgs evt){
+        private void DoubleClickFunction(object sender, InputManager.InputEventArgs evt){
 
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;
@@ -505,7 +505,7 @@ namespace tracer{
             }
         }
 
-        private void HoldFunction(object sender, InputManager.HoldEventArgs evt){
+        private void HoldFunction(object sender, InputManager.InputEventArgs evt){
 
             if(!m_inputManager.IsUiInteractionAllowed())
                 return;

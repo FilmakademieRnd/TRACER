@@ -53,91 +53,84 @@ namespace tracer{
         //!
         //! base payload of every input event - holds what all inputs have in common
         //!
-        //! Achtung: Unterschied Class im Vgl. zu vorherigem Struct!
-        //! InputData-Struct (Stack, keine GC-Last). //! 
-        //! Nun: jedes Event allokiert Objekt auf Heap. 
-        //! Worst Case (FireDragEvent Ongoing) 3 Tracker × 60 fps ≈ 180 Allokationen/Sekunde à ~40 Byte, 
-        //! also grob 5–10 KB/s. Unitys Gen0-GC steckt das normalerweise problemlos weg 
-        //! – auf Mobile mit IL2CPP aber messbar (lange Drag Sessions),
-        //! --> jetzt ignorieren, später: wiederverwendete Instanz pro Event-Typ je Modul - nur befüllen, nicht erzeugen
-        public class InputEventArgs : EventArgs{
-            public InputLevel Level;
-            public InputState State;
-            public UnityEngine.Vector2 Position;
-            public UnityEngine.Vector2 Delta;
+        public struct InputEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public readonly UnityEngine.Vector2 Position;
+            public readonly UnityEngine.Vector2 Delta;
 
             public InputEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta = default)
             { Level = _level; State = _state; Position = _position; Delta = _delta; }
-
-            public InputEventArgs() { }
-        }
-        //!
-        //! used as paylopad for AnyInputEvent
-        //!        
-        public class AnyEventArgs     : InputEventArgs {
-            public AnyEventArgs() {
-                // no data needed
-            }
-        }
-        //!
-        //! click and double click need no extra data, also used for as Payload for AnyInputEvent
-        //!        
-        public class ClickEventArgs     : InputEventArgs {
-            public ClickEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta) : 
-                base(_level, _state, _position, _delta) { }
         }
         //!
         //! drag additionally reports where the gesture originally started
         //!
-        public class DragEventArgs      : InputEventArgs{ 
-            public UnityEngine.Vector2 StartPosition; 
-            public DragEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Vector2 _startPosition) :
-                base(_level, _state, _position, _delta) { StartPosition = _startPosition; }    
+        public struct DragEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public readonly UnityEngine.Vector2 Position;
+            public readonly UnityEngine.Vector2 Delta;
+            public readonly UnityEngine.Vector2 StartPosition; 
+            public DragEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Vector2 _startPosition)
+            { Level = _level; State = _state; Position = _position; Delta = _delta; StartPosition = _startPosition; }    
         }
         //!
         //! hold needs no extra data, but for understandings-sake we have this as an extra definition
         //!
-        public class HoldEventArgs      : InputEventArgs {
-            public HoldEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta) :
-                base(_level, _state, _position, _delta) { }
-        }
-        //!
-        //! signed distance change of this frame (positive = fingers spread)
-        //!
-        public class PinchEventArgs     : InputEventArgs{ 
-            public float PinchDelta; 
-            public PinchEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, float _pinchDelta) :
-                base(_level, _state, _position, _delta) { PinchDelta = _pinchDelta; } 
+        public struct PinchEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public readonly UnityEngine.Vector2 Position;
+            public readonly float PinchDelta;
+            public PinchEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, float _pinchDelta) 
+                { Level = _level; State = _state; Position = _position; PinchDelta = _pinchDelta; } 
         }
         //!
         //! signed angle change of this frame in degrees, used only within multitouch gesture for now
         //!
-        public class RotateEventArgs    : InputEventArgs{ 
-            public float RotationDelta; 
-            public RotateEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, float _rotationDelta) :
-                base(_level, _state, _position, _delta) { RotationDelta = _rotationDelta; }
+        public struct RotateEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public readonly UnityEngine.Vector2 Position;
+            public readonly float RotationDelta;
+            public RotateEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, float _rotationDelta) 
+                { Level = _level; State = _state; Position = _position; RotationDelta = _rotationDelta; }
         }
         //!
         //! input data of the device's rotation
         //!
-        public class AttitudeEventArgs  : InputEventArgs{ 
-            public UnityEngine.Quaternion Rotation; 
-            public AttitudeEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Quaternion _rotation) :
-                base(_level, _state, _position, _delta) { Rotation = _rotation; }
+        public struct AttitudeEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public UnityEngine.Quaternion Rotation;
+            public AttitudeEventArgs(InputLevel _level, InputState _state, UnityEngine.Quaternion _rotation)
+                { Level = _level; State = _state; Rotation = _rotation; }
         }
         //!
         //! gps data from the module, only send if it gets asked for data via OnGPSDemandChanged
         //!
-        public class GPSEventArgs       : InputEventArgs{ 
-            public GPSDataStruct GPSData; 
-            public GPSEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, GPSDataStruct _gpsData) :
-                base(_level, _state, _position, _delta) { GPSData = _gpsData; }
-        }
-        //!
-        //! from AR module, subscribe for example switching ui-modes in start/end, has no data as well, see `HoldEventArgs`
-        //! 
-        public class AREventArgs        : InputEventArgs {
-            public AREventArgs() {}
+        public class GPSEventArgs
+        {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            private readonly float latitude;
+            private readonly float longitude;
+            private readonly float altitude;
+            private readonly float accuracy;
+            private readonly bool valid;
+            private readonly int minute;
+            private readonly int hour;
+            private readonly int day;
+            private readonly int month;
+            public GPSEventArgs(InputLevel _level, InputState _state,
+                float _lat, float _long, float _alt, float _accuracy, bool _valid,
+                int _minute, int _hour, int _day, int _month)
+            {
+                Level = _level; State = _state;
+                latitude = _lat; longitude = _long; altitude = _alt;
+                accuracy = _accuracy; valid = _valid;
+                minute = _minute; hour = _hour; day = _day; month = _month;
+            }
         }
 
         #endregion
@@ -147,15 +140,15 @@ namespace tracer{
         //! fired when any input has started
         //! for example rendering the view into an rtx once (beforehand)
         //!
-        public event EventHandler<AnyEventArgs> anyInputEvent;
+        public event EventHandler<EventArgs> anyInputEvent;
         //!
         //! fired when a click interaction ended on top of 2D UI
         //!
-        public event EventHandler<ClickEventArgs> clickUIEvent;
+        public event EventHandler<InputEventArgs> clickUIEvent;
         //!
         //! fired when a click interaction ended on a 3D UI, a scene object or nothing at all
         //!
-        public event EventHandler<ClickEventArgs> clickOtherEvent;
+        public event EventHandler<InputEventArgs> clickOtherEvent;
         //!
         //! fired when a drag interaction happens on top of 2D UI
         //!
@@ -167,19 +160,19 @@ namespace tracer{
         //!
         //! fired when a hold interaction happens on top of 2D UI
         //!
-        public event EventHandler<HoldEventArgs> holdUIEvent;
+        public event EventHandler<InputEventArgs> holdUIEvent;
         //!
         //! fired when a hold interaction happens on a 3D UI, a scene object or nothing at all
         //!
-        public event EventHandler<HoldEventArgs> holdOtherEvent;
+        public event EventHandler<InputEventArgs> holdOtherEvent;
          //!
         //! fired when a double-click interaction ended on top of 2D UI
         //!
-        public event EventHandler<ClickEventArgs> doubleClickUIEvent;
+        public event EventHandler<InputEventArgs> doubleClickUIEvent;
         //!
         //! fired when a double-click interaction ended on a 3D UI, a scene object or nothing at all
         //!
-        public event EventHandler<ClickEventArgs> doubleClickOtherEvent;
+        public event EventHandler<InputEventArgs> doubleClickOtherEvent;
         //!
         //! fired when a pinch interaction happens on top of 2D UI
         //!
@@ -207,7 +200,7 @@ namespace tracer{
         //!
         //! fires an ar event, device sensors are never layer dependent
         //!
-        public event EventHandler<AREventArgs> arEvent;
+        public event EventHandler<InputEventArgs> arEvent;
         #endregion
 
         #region EVENT RAISERS
@@ -218,7 +211,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseAnyInput   (object sender, AnyEventArgs e)   { anyInputEvent?.Invoke(sender, e); }
+        public void RaiseAnyInput   (object sender, EventArgs e)   { anyInputEvent?.Invoke(sender, e); }
         //!
         //! raise clickUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -226,7 +219,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseClickUI    (object sender, ClickEventArgs e)   { clickUIEvent?.Invoke(sender, e); }
+        public void RaiseClickUI    (object sender, InputEventArgs e)   { clickUIEvent?.Invoke(sender, e); }
         //!
         //! raise clickOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -234,7 +227,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseClickOther (object sender, ClickEventArgs e)   { clickOtherEvent?.Invoke(sender, e); }
+        public void RaiseClickOther (object sender, InputEventArgs e)   { clickOtherEvent?.Invoke(sender, e); }
         //!
         //! raise dragUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -258,7 +251,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseHoldUI     (object sender, HoldEventArgs e)    { holdUIEvent?.Invoke(sender, e); }
+        public void RaiseHoldUI     (object sender, InputEventArgs e)    { holdUIEvent?.Invoke(sender, e); }
         //!
         //! raise holdOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -266,7 +259,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseHoldOther  (object sender, HoldEventArgs e)    { holdOtherEvent?.Invoke(sender, e); }
+        public void RaiseHoldOther  (object sender, InputEventArgs e)    { holdOtherEvent?.Invoke(sender, e); }
         //!
         //! raise doubleClickUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -274,7 +267,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseDoubleClickUI     (object sender, ClickEventArgs e)    { doubleClickUIEvent?.Invoke(sender, e); }
+        public void RaiseDoubleClickUI     (object sender, InputEventArgs e)    { doubleClickUIEvent?.Invoke(sender, e); }
         //!
         //! raise doubleClickOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -282,7 +275,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseDoubleClickOther  (object sender, ClickEventArgs e)    { doubleClickOtherEvent?.Invoke(sender, e); }
+        public void RaiseDoubleClickOther  (object sender, InputEventArgs e)    { doubleClickOtherEvent?.Invoke(sender, e); }
         //!
         //! raise pinchUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -336,7 +329,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseAR        (object sender, AREventArgs e)     { arEvent?.Invoke(sender, e); }
+        public void RaiseAR        (object sender, InputEventArgs e)     { arEvent?.Invoke(sender, e); }
         #endregion
 
 
@@ -406,63 +399,6 @@ namespace tracer{
         //!
         public void RaiseGPSDemand(object sender, GPSDemandType gpsDemanyType){ onGPSDemandChangedEvent?.Invoke(sender, gpsDemanyType); }
 
-        //!
-        //! the gps data we use as payload for events. defined here - without module reference!
-        //! struct so we don't allocate garbage
-        //!
-        public struct GPSDataStruct {
-            public GPSDataStruct(float _lat, float _long, float _alt, float _accuracy, bool _valid, double _gpsTimestamp = 0) {
-                latitude = _lat;
-                longitude = _long;
-                altitude = _alt;
-                accuracy = _accuracy;
-                valid = _valid;
-                
-                // Initialize variables before assigning via function
-                minute = 0;
-                hour = 0;
-                day = 0;
-                month = 0;
-
-                // Populate the time fields
-                CalculateTime(_gpsTimestamp);
-            }
-            public float latitude;
-            public float longitude;
-            public float altitude;
-            public float accuracy;
-            public bool valid;
-            public int minute;
-            public int hour;
-            public int day;
-            public int month;
-
-            //!
-            //! Populates hour, minute, day, and month. 
-            //! Uses UTC time by default to ensure astronomical/solar math remains accurate across time zones.
-            //!
-            //! @param rawGpsTimestamp in ms from 1970
-            //!
-            private void CalculateTime(double rawGpsTimestamp = 0) {
-                DateTime targetTime;
-
-                if (rawGpsTimestamp > 0) {
-                    // 1. BEST PRACTICE: Convert Unity's hardware GPS timestamp (Unix Epoch seconds since 1970)
-                    // This represents the exact moment the satellite sent the coordinate, regardless of delays.
-                    DateTime epochStart = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                    targetTime = epochStart.AddSeconds(rawGpsTimestamp);
-                }else {
-                    // 2. FALLBACK: Use the device's current clock.
-                    // We use UtcNow instead of Now so your solar formulas don't break due to Daylight Savings or Time Zones!
-                    targetTime = DateTime.UtcNow; 
-                }
-
-                minute = targetTime.Minute;
-                hour = targetTime.Hour;
-                day = targetTime.Day;
-                month = targetTime.Month;
-            }
-        }
         #endregion
 
         //!

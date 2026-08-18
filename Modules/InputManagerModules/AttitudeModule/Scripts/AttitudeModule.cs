@@ -70,7 +70,9 @@ namespace tracer{
         private bool sensorIsReading = false;
 
         //! used as data for the inputmanager event as in the UnityInputModule
-        private InputManager.AttitudeEventArgs attitudeInputData;
+        private InputManager.InputLevel attitudeInputLevel;
+        private InputManager.InputState attitudeInputState;
+        private Quaternion attitudeInputRotation;
         private int discardedFudgeValues = 0;
         private const int StartFramesToDiscard = 5;
         //! 
@@ -87,14 +89,10 @@ namespace tracer{
             //-> subscribe to InputManager AR Event and handle ourself to be deactivated if other mode is on
             //manager.Subscribe<InputManager.ARInputEvent>(ARInputFunction);
 
-            //creating class once, reduce Garbage Collection
-            attitudeInputData = new InputManager.AttitudeEventArgs(
-                InputManager.InputLevel.Primary,
-                InputManager.InputState.Canceled,
-                Vector2.zero,
-                Vector2.zero,
-                default
-            );
+            attitudeInputLevel = InputManager.InputLevel.Primary;
+            attitudeInputState = InputManager.InputState.Canceled;
+            attitudeInputRotation = Quaternion.identity;
+
 
             EnableAttitudeSensor();
         }
@@ -168,7 +166,7 @@ namespace tracer{
         }
 
         private void StartAttitudeEvent() {
-            attitudeInputData.State = InputManager.InputState.Started;
+            attitudeInputState = InputManager.InputState.Started;
             discardedFudgeValues = 0;
             sensorIsReading = true;
             core.getManager<UIManager>().cameraControl = UIManager.CameraControl.ATTITUDE;
@@ -176,7 +174,7 @@ namespace tracer{
 
         private void StopAttitudeEvent() {
             attitudeInputData.State = InputManager.InputState.Ended;
-            manager.RaiseAttitude(this, attitudeInputData);
+            manager.RaiseAttitude(this, new InputManager.AttitudeEventArgs(attitudeInputLevel, attitudeInputState, attitudeInputRotation));
             UIManager uim = core.getManager<UIManager>();
             //dont change to standard if we quit attitude behaviour by activating ar!
             if(uim.cameraControl == UIManager.CameraControl.ATTITUDE)
@@ -199,17 +197,17 @@ namespace tracer{
                 return;
             }
 
-            if(attitudeInputData.State == InputManager.InputState.Started) {
+            if(attitudeInputState == InputManager.InputState.Started) {
                 //if still started, publish here started and go to ongoing then (do not distribute started with zero value)
-                attitudeInputData.Rotation = currentAttitude;
-                manager.RaiseAttitude(this, attitudeInputData);
-                attitudeInputData.State = InputManager.InputState.Ongoing;
+                attitudeInputRotation = currentAttitude;
+                manager.RaiseAttitude(this, new InputManager.AttitudeEventArgs(attitudeInputLevel, attitudeInputState, attitudeInputRotation));
+                attitudeInputState = InputManager.InputState.Ongoing;
             }else{
                 // Example: Apply to camera or object (Note: You may need to adapt the coordinate system 
                 // depending on your device orientation, often requiring a 90-degree rotation adjustment).
                 // transform.rotation = currentAttitude;
-                attitudeInputData.Rotation = currentAttitude;
-                manager.RaiseAttitude(this, attitudeInputData);
+                attitudeInputRotation = currentAttitude;
+                manager.RaiseAttitude(this, new InputManager.AttitudeEventArgs(attitudeInputLevel, attitudeInputState, attitudeInputRotation));
             }
         }
 

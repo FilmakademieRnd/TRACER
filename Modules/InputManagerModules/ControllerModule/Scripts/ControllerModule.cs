@@ -680,7 +680,7 @@ namespace tracer{
                 tracker.StartPosition = position;
             }
 
-            var data = new InputManager.PinchEventArgs(tracker.Level, state, position, default, delta);
+            var data = new InputManager.PinchEventArgs(tracker.Level, state, position, delta);
             manager.RaisePinchOther(this, data); 
         }
         #endregion

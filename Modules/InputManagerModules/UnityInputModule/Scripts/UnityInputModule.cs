@@ -860,7 +860,7 @@ namespace tracer{
         //! 
         //!
         private void FireClickEvent(InputTracker tracker) {
-            var data = new InputManager.ClickEventArgs(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
+            var data = new InputManager.InputEventArgs(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
             
             switch (EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition)){
                 case EvaluationHelper.OperationLayer.UI2D:
@@ -884,7 +884,7 @@ namespace tracer{
         //! 
         //!
         private void FireDoubleClickEvent(InputTracker tracker) {
-            var data = new InputManager.ClickEventArgs(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
+            var data = new InputManager.InputEventArgs(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
             
             switch (EvaluationHelper.Instance.EvaluateOperationLayer(tracker.CurrentPosition)){
                 case EvaluationHelper.OperationLayer.UI2D:
@@ -926,7 +926,7 @@ namespace tracer{
         //! 
         //!
         private void FireHoldEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos) {
-            var data = new InputManager.HoldEventArgs(tracker.Level, state, tracker.CurrentPosition);
+            var data = new InputManager.InputEventArgs(tracker.Level, state, tracker.CurrentPosition);
 
             if(state == InputManager.InputState.Started) {
                 layerHold = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
@@ -948,7 +948,7 @@ namespace tracer{
         //! 
         //!
         private void FirePinchEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float pinchDelta) {
-            var data = new InputManager.PinchEventArgs(tracker.Level, state, centerPos, default, pinchDelta);
+            var data = new InputManager.PinchEventArgs(tracker.Level, state, centerPos, pinchDelta);
             
             if(state == InputManager.InputState.Started) {
                 layerPinch = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
@@ -970,7 +970,7 @@ namespace tracer{
         //! 
         //!
         private void FireRotateEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float rotateDelta) {
-            var data = new InputManager.RotateEventArgs(tracker.Level, state, centerPos, default, rotateDelta);
+            var data = new InputManager.RotateEventArgs(tracker.Level, state, centerPos, rotateDelta);
             
             if(state == InputManager.InputState.Started) {
                 layerRotate = EvaluationHelper.Instance.EvaluateOperationLayer(centerPos);
