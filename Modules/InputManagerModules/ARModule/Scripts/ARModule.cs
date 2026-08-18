@@ -129,7 +129,7 @@ namespace tracer
         }
 
         //! used as data for the inputmanager event as in the UnityInputModule
-        private InputManager.AREventArgs arInputData;
+        private InputManager.InputEventArgs arInputData;
 
         //!
         //! Constructor
@@ -231,7 +231,7 @@ namespace tracer
         private void initialize(){
             
             //creating class once, reduce Garbage Collection
-            arInputData = new InputManager.AREventArgs();
+            arInputData = new InputManager.InputEventArgs();
 
             //Instanciate XROrigin from Prefab
             GameObject arSessionOriginPrefab = Resources.Load<GameObject>("Prefabs/ARSessionOrigin");

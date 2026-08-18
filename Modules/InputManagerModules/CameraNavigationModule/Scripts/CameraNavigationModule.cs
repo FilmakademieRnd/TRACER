@@ -293,7 +293,7 @@ namespace tracer
             } 
         }
 
-        private void HoldFunction(object sender, InputManager.HoldEventArgs evt){
+        private void HoldFunction(object sender, InputManager.InputEventArgs evt){
             
             if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
                 return;
@@ -382,7 +382,7 @@ namespace tracer
         //!
         //! @param evt the InputData
         //!
-        private void DoubleClickFunction(object sender, InputManager.ClickEventArgs evt){
+        private void DoubleClickFunction(object sender, InputManager.InputEventArgs evt){
 
             switch (evt.Level) {
                 case InputManager.InputLevel.Primary:
