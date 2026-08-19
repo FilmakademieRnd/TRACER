@@ -629,7 +629,6 @@ namespace tracer{
                     break;
                 default:
                     _uiManager.CycleManipulationMode();
-                    core.StartCoroutine(AnimateFloatingText(""+_uiManager.ManipulationLayer, new Vector2(Screen.width / 2, Screen.height / 2)));
                     break;
             }
             

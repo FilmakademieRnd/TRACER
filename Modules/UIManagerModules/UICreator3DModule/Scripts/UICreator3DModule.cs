@@ -32,6 +32,7 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace tracer
 {
@@ -273,6 +274,7 @@ namespace tracer
 
             // NEW INPUT EVENTS
             m_inputManager.dragOtherEvent -= DragFunction;
+            m_inputManager.clickOtherEvent -= ClickFunction;
 
             /*m_inputManager.fingerGestureEvent -= updateGizmoScale;
             m_inputManager.updateCameraUICommand -= updateGizmoScale;*/
@@ -317,6 +319,8 @@ namespace tracer
 
             // NEW INPUT EVENTS
             m_inputManager.dragOtherEvent += DragFunction;
+            // [TEST] implementation to change axis manipulation via right-click too
+            m_inputManager.clickOtherEvent += ClickFunction;
 
             // Hookup to input events
             /*m_inputManager.fingerGestureEvent += updateGizmoScale;
@@ -405,7 +409,26 @@ namespace tracer
                     //ShowGizmo();
                     break;
             }
+        }
 
+        //!
+        //! helper to cycle through axis manipuation modes with click, not only controller or keyboard
+        //!
+        private void ClickFunction(object sender, InputManager.InputEventArgs evt){
+
+            // right now, only Primary
+            if (evt.Level != InputManager.InputLevel.Secondary) return;
+
+            // check phase
+            switch (evt.State){
+                case InputManager.InputState.Started:
+                case InputManager.InputState.Ongoing:
+                case InputManager.InputState.Canceled:
+                    break;
+                case InputManager.InputState.Ended:
+                    manager.CycleManipulationMode();
+                    break;
+            }
         }
 
         #endregion
@@ -791,6 +814,9 @@ namespace tracer
                 // Subscribe to possible change selection via camera (lock look through or in camera space)
                 manager.uiCameraLockChanged += SetCameraManipulator;
 
+                Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(Camera.main, selObj.transform.position);
+                core.StartCoroutine(AnimateFloatingText(""+manager.ManipulationLayer, screenPoint));
+
             }else{ // empty selection
                 // Clean selection
                 selObj = null;
@@ -806,7 +832,7 @@ namespace tracer
             camMathValues = Screen.dpi / (Screen.width + Screen.height);
         }
         private void ManipulationLayerChanged(object sender, UIManager.ManipulationLayerEnum newManipulationLayer) {
-            if(lastActiveManip)
+            if(lastActiveManip){
                 switch ((TRSModeEnum)savedTrsMode) {
                     case TRSModeEnum.SCALE:     newManipulationLayer = UIManager.ManipulationLayerEnum.LOCAL; break;
                     case TRSModeEnum.TRANSLATE:
@@ -814,7 +840,14 @@ namespace tracer
                     default:
                         break;
                 }
-                UpdateGizmoAxisLayer(lastActiveManip.transform, selObjs[0].transform, Camera.main.transform, newManipulationLayer);
+            }
+            if(modeTRS > -1 && selObj){
+                Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(Camera.main, selObj.transform.position);
+                core.StartCoroutine(AnimateFloatingText(""+manager.ManipulationLayer, screenPoint));
+            }
+            
+            if(lastActiveManip && selObj)
+                UpdateGizmoAxisLayer(lastActiveManip.transform, selObj.transform, Camera.main.transform, newManipulationLayer);
         }
 
 
@@ -1185,5 +1218,55 @@ namespace tracer
         {
             UpdateManipScale();
         }
+
+        // --- HELPER METHODS FOR FIRING EVENTS ---
+        
+
+        #region DEBUGGING
+        private GameObject mainUIContainer;
+        // Ensures we always have a canvas to draw on
+        private void EnsureMainCanvasExists(){
+            if (mainUIContainer != null) return;
+            mainUIContainer = new GameObject("ControllerModuleUI");
+            Canvas canvas = mainUIContainer.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 999;
+        }
+        private System.Collections.IEnumerator AnimateFloatingText(string message, Vector2 startPos){
+            EnsureMainCanvasExists();
+            GameObject textGO = new GameObject("InputText");
+            textGO.transform.SetParent(mainUIContainer.transform);
+            
+            Text txt = textGO.AddComponent<Text>();
+            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); // Default Unity font fallback
+            txt.text = message;
+            txt.fontSize = 24;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.color = Color.white;
+            txt.rectTransform.position = startPos;
+            
+            // Add shadow for readability
+            Outline outline = textGO.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(1, -1);
+
+            float duration = 2f;
+            float elapsed = 0f;
+
+            while (elapsed < duration){
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                
+                // Float up and fade out
+                txt.rectTransform.position = startPos + new Vector2(0, t * 20f);
+                txt.color = new Color(1f, 1f, 1f, 1f - Mathf.Pow(t, 2f));
+                outline.effectColor = new Color(0, 0, 0, 1f - Mathf.Pow(t, 2f));
+                
+                yield return null;
+            }
+            UnityEngine.GameObject.Destroy(textGO);
+        }
+        #endregion   
     }
 }
