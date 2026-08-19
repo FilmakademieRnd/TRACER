@@ -28,8 +28,6 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 03.03.2022
 
 using UnityEngine;
-using UnityEngine.Experimental.GlobalIllumination;
-using UnityEngine.UIElements;
 
 namespace tracer
 {
@@ -67,27 +65,27 @@ namespace tracer
         //!
         //! Start is called before the first frame update
         //!
-        public void Init(UIManager uiManager, SceneObject parentObject)
+        public void Init(UIManager uiManager, SceneObject parentObject, Sprite iconSprite, Parameter<Color> colorParam = null, bool isSun = false)
         {
-            m_camTransform = Camera.main.transform;
-            m_parentObject = parentObject;
-            m_parentTransform = parentObject.transform;
-            Core core = GameObject.Find("TRACER").GetComponent<Core>();
             uiManager.settings.uiScale.hasChanged += UpdateUIScale;
             m_iconScale = Vector3.one * uiManager.settings.uiScale.value;
-            transform.right = m_camTransform.right;
 
-            ourTr = transform;
             m_camTransform = Camera.main.transform;
+            m_parentObject = parentObject;
+            m_parentObject._icon = gameObject;
+            m_parentTransform = parentObject.transform;
+            ourTr = transform;
+
+            ourTr.right = m_camTransform.right;
 
             m_renderer = GetComponent<SpriteRenderer>();
+            m_renderer.sprite = iconSprite;
+
+            m_isSun = isSun;
+
+            UpdateTRS();
 
             CreateLockIcon();
-        }
-
-        public void setSun()
-        { 
-            m_isSun = true; 
         }
 
         //!
@@ -125,24 +123,10 @@ namespace tracer
         //!
         void Update()
         {
-            Transform camera = m_camTransform;
+            if (!m_renderer.isVisible)
+                return;
 
-            if (m_isSun)
-            {
-                transform.position = m_camTransform.position - m_parentTransform.rotation * Vector3.forward;
-                transform.localScale = m_iconScale * 0.05f;
-            }
-            else
-            {
-                if (!m_renderer.isVisible)
-                    return;
-
-                float depth = Vector3.Dot(camera.position - transform.position, camera.forward);
-                transform.position = m_parentTransform.position;
-                transform.localScale = m_iconScale * Mathf.Abs(depth * 0.1f);
-                ourTr.rotation = m_camTransform.rotation;
-            }
-            transform.rotation = m_camTransform.rotation;
+            UpdateTRS();
 
             if (!m_lockImage)
                 return;
@@ -158,6 +142,22 @@ namespace tracer
                 if (m_lockImage.activeSelf)
                     HideLock();
             }
+        }
+
+        //!
+        //! update the position, rotation and scale
+        //!
+        private void UpdateTRS() {
+            if (m_isSun){
+                ourTr.position = m_camTransform.position - m_parentTransform.rotation * Vector3.forward;
+                ourTr.localScale = m_iconScale * 0.05f;
+            }else{
+
+                ourTr.position = m_parentTransform.position;
+                float depth = Vector3.Dot(m_camTransform.position - ourTr.position, m_camTransform.forward);
+                ourTr.localScale = m_iconScale * Mathf.Abs(depth * 0.1f);
+            }
+            ourTr.rotation = m_camTransform.rotation;
         }
     }
 }

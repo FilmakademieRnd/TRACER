@@ -208,9 +208,9 @@ namespace tracer
         int modeTRS = -1;
 
         //!
-        //! store mode to restore when unhiding
+        //! store previous mode to restore when unhiding
         //!
-        private int savedTrsMode = -1;
+        private int previousTrsMode = -1;
 
         //!
         //! Auxiliary preconstructed vector - XY plane
@@ -833,7 +833,7 @@ namespace tracer
         }
         private void ManipulationLayerChanged(object sender, UIManager.ManipulationLayerEnum newManipulationLayer) {
             if(lastActiveManip){
-                switch ((TRSModeEnum)savedTrsMode) {
+                switch ((TRSModeEnum)previousTrsMode) {
                     case TRSModeEnum.SCALE:     newManipulationLayer = UIManager.ManipulationLayerEnum.LOCAL; break;
                     case TRSModeEnum.TRANSLATE:
                     case TRSModeEnum.ROTATE:
@@ -920,7 +920,7 @@ namespace tracer
             lastActiveManip.SetActive(true);
             //also update scale!
             lastActiveManip.transform.localScale = GetModifierScale();
-            modeTRS = savedTrsMode;
+            modeTRS = previousTrsMode;
         }
 
         //!
@@ -987,7 +987,7 @@ namespace tracer
                         gizmoRoot.rotation = Quaternion.LookRotation(flatCamUp.normalized, Vector3.up);
                     }
 
-                    if((TRSModeEnum)savedTrsMode == TRSModeEnum.ROTATE){
+                    if((TRSModeEnum)previousTrsMode == TRSModeEnum.ROTATE){
                         // Multiplies the current rotation by a local 90-degree spin on the Y-axis, swapping X and Z visually.
                         gizmoRoot.rotation *= Quaternion.Euler(0f, 90f, 0f);
                     }
@@ -1032,7 +1032,7 @@ namespace tracer
             manipT.transform.rotation = Quaternion.identity;
             manipT.transform.localScale = GetModifierScale();
             modeTRS = 0;
-            savedTrsMode = modeTRS;
+            previousTrsMode = modeTRS;
             // Incomplete function - lacking manipulator mode
         }
 
@@ -1095,7 +1095,7 @@ namespace tracer
                 manipR.transform.localRotation = q;
                 manipS.transform.localRotation = q;
 
-                switch ((TRSModeEnum)savedTrsMode) {
+                switch ((TRSModeEnum)previousTrsMode) {
                     case TRSModeEnum.ROTATE:
                         //global/viewport: does not rotate the gizmo...
                         UpdateGizmoAxisLayer(manipR.transform, selObj.transform, Camera.main.transform, manager.ManipulationLayer);
@@ -1198,7 +1198,7 @@ namespace tracer
                 UpdateGizmoAxisLayer(manipulator.transform, selObj.transform, Camera.main.transform, manipLayer);
 
                 modeTRS = (int)mode;
-                savedTrsMode = modeTRS;
+                previousTrsMode = modeTRS;
             }
         }
 

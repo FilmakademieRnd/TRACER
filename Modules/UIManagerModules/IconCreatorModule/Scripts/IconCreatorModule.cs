@@ -93,8 +93,10 @@ namespace tracer{
             manager.addButton(hideIconButton);
 
             SceneManager sceneManager = core.getManager<SceneManager>();
-            core.getManager<SceneManager>().sceneReset += disposeIcons;
+            sceneManager.sceneCreated += recreateIcons;
             sceneManager.sceneUpdated += recreateIcons;
+            sceneManager.sceneReset += disposeIcons;
+
             manager.settings.roles.hasChanged += recreateIcons;
 
             core.getManager<UIManager>().selectionChanged += SelectionHasChanged;
@@ -109,8 +111,11 @@ namespace tracer{
         public override void Dispose(){
             base.Dispose();
 
-            core.getManager<SceneManager>().sceneReady -= createIcons;
-            core.getManager<SceneManager>().sceneReset -= disposeIcons;
+            SceneManager sceneManager = core.getManager<SceneManager>();
+            sceneManager.sceneCreated -= recreateIcons;
+            sceneManager.sceneUpdated -= recreateIcons;
+            sceneManager.sceneReset -= disposeIcons;
+
             manager.settings.roles.hasChanged -= recreateIcons;
 
             core.getManager<UIManager>().selectionChanged -= SelectionHasChanged;
@@ -152,7 +157,7 @@ namespace tracer{
 
             foreach (SceneObject sceneObject in sceneManager.getAllSceneObjects()){
                 GameObject icon = null;
-                SpriteRenderer renderer = null;
+                //SpriteRenderer renderer = null;
                 switch (sceneObject){
                     case SceneObjectLight:
                         if (manager.activeRole == UIManager.Roles.EXPERT ||
@@ -161,24 +166,20 @@ namespace tracer{
                             manager.activeRole == UIManager.Roles.SET)
                         {
                             
+                            Parameter<Color> colorParameter = sceneObject.getParameter<Color>("color");
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);
                             IconUpdate iconUpdate = icon.GetComponent<IconUpdate>();
-                            iconUpdate.Init(manager, sceneObject);
-                            renderer = icon.GetComponent<SpriteRenderer>();
-
-                            switch (sceneObject)
-                            {
+                    
+                            switch (sceneObject){
                                 case SceneObjectSunLight:
-                                    renderer.sprite = m_sunSprite;
-                                    iconUpdate.setSun();
+                                    iconUpdate.Init(manager, sceneObject, m_sunSprite, colorParameter, true);
                                     break;
                                 default:
-                                    renderer.sprite = m_lightSprite;
+                                    iconUpdate.Init(manager, sceneObject, m_lightSprite, colorParameter);
                                     break;
                             }
                             
-                            Parameter<Color> colorParameter = sceneObject.getParameter<Color>("color");
-                            renderer.color = colorParameter.value;
+                            
                             colorParameter.hasChanged += updateIconColor;
                             m_lightAndCamSceneObjects.Add(sceneObject);
                         }
@@ -188,20 +189,15 @@ namespace tracer{
                             manager.activeRole == UIManager.Roles.DOP)
                         {
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);
-                            icon.GetComponent<IconUpdate>().Init(manager, sceneObject);
+                            icon.GetComponent<IconUpdate>().Init(manager, sceneObject, m_cameraSprite);
                             
                             //add to other SceneObjectTypes to show as well
                             icon.AddComponent<HeightOverGround>().Initialize(sceneObject.transform, manager);
 
-                            renderer = icon.GetComponent<SpriteRenderer>();
-                            renderer.sprite = m_cameraSprite;
                             m_lightAndCamSceneObjects.Add(sceneObject);
                         }
                         break;
                 }
-
-                if (icon)
-                    sceneObject._icon = icon;
             }
         }
 
@@ -225,9 +221,7 @@ namespace tracer{
                 if (sceneObject.GetType().BaseType == typeof(SceneObjectLight)){
                     sceneObject.getParameter<Color>("color").hasChanged -= updateIconColor;
                 }
-                HeightOverGround hog = sceneObject.GetComponent<HeightOverGround>();
-                if(hog)
-                    hog.DestroyViz();
+                sceneObject.GetComponent<HeightOverGround>()?.DestroyViz();
                 
                 UnityEngine.Object.Destroy(sceneObject._icon);
             }
@@ -246,18 +240,16 @@ namespace tracer{
             foreach(SceneObject lightOrCamSO in m_lightAndCamSceneObjects) {
                 if (!selectedSOs.Contains(lightOrCamSO)) {
                     //Debug.Log("Hide HOG? At "+lightOrCamSO.gameObject.name);
-                    HeightOverGround hog = lightOrCamSO._icon?.GetComponent<HeightOverGround>();
-                    if(hog)
-                        hog.HideViz();
+                    if (lightOrCamSO._icon != null)
+                        lightOrCamSO._icon.GetComponent<HeightOverGround>()?.HideViz();
                 }
             }
 
             foreach(SceneObject selectedSO in selectedSOs) {
                 if (m_lightAndCamSceneObjects.Contains(selectedSO)) {
                     //Debug.Log("Show HOG? At "+selectedSO.gameObject.name);
-                    HeightOverGround hog = selectedSO._icon?.GetComponent<HeightOverGround>();
-                    if(hog)
-                        hog.ShowViz(true);
+                    if (selectedSO._icon != null)
+                        selectedSO._icon.GetComponent<HeightOverGround>()?.ShowViz(true);
                 }
             
             }
