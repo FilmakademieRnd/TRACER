@@ -24,13 +24,16 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "CameraNavigationModule.cs"
 //! @brief implementation of TRACER camera navigation features
 //! @author Paulo Scatena
-//! @version 0
-//! @date 23.03.2022
+//! @author Thomas Krüger
+//! @version 1
+//! @date 08.07.2026
+//! @note adapt to InputManager, new navigation modes
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace tracer
 {
@@ -47,7 +50,7 @@ namespace tracer
         //!
         //! A reference to the main camera transform.
         //!
-        private Transform m_camXform;
+        private Transform camTransform;
 
         //!
         //! Flag to specify if there are objects selected. 
@@ -58,6 +61,10 @@ namespace tracer
         //! The average position of the selected objects.
         //!
         private Vector3 m_selectionCenter;
+        //!
+        //! An evaluated position to orbit around if we have no object selected
+        //!
+        private Vector3 evaluatedNonSelectionCenterForOrbit;
 
         // TODO: maybe promote these variables to configuration options
         //!
@@ -81,29 +88,9 @@ namespace tracer
         private static readonly float s_focusDistance = 1.5f;
 
         //!
-        //! The camera center of interest point
-        //!
-        private Vector3 centerOfInterest;
-
-        //!
         //! do we focus an object? If so and we focus it again, lock to the view and follow it!
         //!
-        private SceneObject currentFocusedObject;
-
-        //!
-        //! Follow this focused object (not if we do any gizmo transformation)
-        //!
-        private SceneObject currentFollowObject;
-
-        //!
-        //! A buffer vector storing the position offset between camera and center of interest
-        //!
-        private Vector3 coiOffset;
-
-        //!
-        //! A control variable for orbiting operation
-        //!
-        private bool stickToOrbit = false;
+        private GameObject currentFocusedObject;
 
         //!
         //! A parameter defining how close to the edge an object can be and still act as center of interest
@@ -113,6 +100,54 @@ namespace tracer
         //! dont run the coroutine to focus on an object via double click twice
         //!
         private int m_smoothCameraFocusIsRunning = 0;
+        //!
+        //! storage variables for camera rotation, to not become weird angled, but take into account starting values
+        //!
+        private float m_pitch, m_yaw, m_roll = 0f;
+        //!
+        //! if our selection (center) is too close for orbit, we overwrite the "hasSelection" behaviour by setting it to true
+        //!
+        private bool centerIsToClose = false;
+        //!
+        //! if we receive that sensors values via input manager, refrain from allowing other rotation input!
+        //! comment out if this bevhaiour is not   intended
+        //!
+        private bool attitudeValuesIncoming = false;
+        private Quaternion cameraMainRotationOffset, attitudeOffset;
+        private Inputs m_inputs;
+
+        #region Fly Variables
+        //!
+        //! storage variables for camera fly around (distance from starting point for speed)
+        //!
+        private Vector2 screenStartPos;
+        private float maxSpeed = 5f;
+        private float acceleration = 1f;
+        private float deceleration = 2f;
+        
+        //Timers & Thresholds
+        private float bootDelay = 2.0f;
+        private float lookRecoveryDelay = 0.5f;
+        //public float lookDeadzone = 50f; // Pixels distance from startPos
+
+        //UI Resources
+        private Sprite circleSprite;
+
+        // State tracking
+        private float currentSpeed = 0f;
+        private float bootTimer = 0f;
+        private float lookRecoveryTimer = 0f;
+        private bool isBooted = false;
+        private bool isFlying = false;
+
+        // UI Tracking
+        private GameObject uiContainer;
+        private Image smallCircleFill;
+        private RectTransform largeCircleRect;
+        private Image largeCircleProgress;
+        private float largeCircleAnimTimer = 0f;
+
+        #endregion
 
         //!
         //! Constructor.
@@ -120,26 +155,30 @@ namespace tracer
         //! @param name Name of this module.
         //! @param _core Reference to the TRACER _core.
         //!
-        public CameraNavigationModule(string name, Manager manager) : base(name, manager)
-        {
-
+        public CameraNavigationModule(string name, Manager manager) : base(name, manager){
         }
 
         //!
         //! Destructor, cleaning up event registrations. 
         //!
-        public override void Dispose()
-        {
+        public override void Dispose(){
             base.Dispose();
 
             // Unsubscribe
-            manager.pinchEvent -= CameraDolly;
-            manager.twoDragEvent -= CameraOrbit;
-            manager.threeDragEvent -= CameraPedestalTruck;
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged -= SelectionUpdate;
-            uiManager.selectionFocus -= FocusOnSelection;
-            manager.updateCameraUICommand -= CameraUpdated;
+
+            manager.dragOtherEvent          -= DragFunction;
+            manager.holdOtherEvent          -= HoldFunction;
+            manager.pinchOtherEvent         -= PinchFunction;
+            manager.doubleClickOtherEvent   -= DoubleClickFunction;
+            manager.attitudeEvent           -= AttitudeFunction;
+
+            if (circleSprite != null){
+                if (circleSprite.texture != null) 
+                    UnityEngine.GameObject.Destroy(circleSprite.texture);
+                UnityEngine.GameObject.Destroy(circleSprite);
+            }
         }
 
         //! 
@@ -151,170 +190,575 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             m_cam = Camera.main;
-            m_camXform = m_cam.transform;
+            camTransform = m_cam.transform;
 
             // Subscription to input events
-            manager.pinchEvent += CameraDolly;
-            manager.twoDragEvent += CameraOrbit;
-            manager.threeDragEvent += CameraPedestalTruck;
 
             // Subscribe to selection change
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged += SelectionUpdate;
-            // Subscribe to focus event
-            uiManager.selectionFocus += FocusOnSelection;
+            
+            m_inputs = new Inputs();
+            m_inputs.VPETMap.FocusSelection.canceled += FocusOnSelection;
+            m_inputs.VPETMap.Enable();
 
-            // Subscribe to camera change
-            manager.updateCameraUICommand += CameraUpdated;
+            // als "übersichtliche" Deklaration:
+            // manager.DeclareInputRole<InputManager.DragOtherEvent>(this, InputManager.InputLevel.Primary,   "Camera look around");
+            // manager.DeclareInputRole<InputManager.DragOtherEvent>(this, InputManager.InputLevel.Secondary, "Camera pedestal/truck");
+            // manager.DeclareInputRole<InputManager.DragOtherEvent>(this, InputManager.InputLevel.Tertiary,  "Orbit around selection");
+            // > switch in DragFunction bleibt, Dict im IM bleibt, keine neue Unsubscribe-Fehlerquelle (3x)
+            // > DebugOverlay zur Runtime möglich
+            // (8ung Deklaration kann von tatsächlicher Umsetzung abweichen)
+
+            manager.dragOtherEvent          += DragFunction;
+            manager.holdOtherEvent          += HoldFunction;
+            manager.pinchOtherEvent         += PinchFunction;
+            manager.doubleClickOtherEvent   += DoubleClickFunction;
+            manager.attitudeEvent           += AttitudeFunction;
+
+            // Instantiate once
+            _orbitViz = new OrbitImpactPin(core);
 
             // Initialize control variables
             m_selectionCenter = Vector3.zero;
             m_hasSelection = false;
         }
 
-        //! 
-        //! Function that updates the camera center of interest for new camera selection.
-        //! 
-        //! @param sender The input manager.
-        //! @param e Not used.
         //!
-        private void CameraUpdated(object sender, bool e)
-        {
-            // Assign arbitrary center of interest
-            centerOfInterest = m_camXform.TransformPoint(Vector3.forward * 6f);
-
-            // Store positional offset
-            coiOffset = m_camXform.position - centerOfInterest;
-        }
-
-
-        //! 
-        //! Dolly function: moves the camera forward.
-        //! 
-        //! @param sender The input manager.
-        //! @param e The distance between the touch gesture triggering the movement.
+        //! Function to connect input managers input event for dragging a sceneObjects gizmo
         //!
-        private void CameraDolly(object sender, float distance)
-        {
-            if(!manager.IsScreenCamNavigationUsed())
+        //! @param evt the InputData
+        //!
+        private void DragFunction(object sender, InputManager.DragEventArgs evt){
+            
+            if(!manager.IsCamNavigationAllowed())
                 return;
 
-            // Dolly cam
-            m_camXform.Translate(0f, 0f, distance * s_dollySpeed);
-
-            // Check if center of interest is in front of camera
-            Vector3 camCoord = m_cam.WorldToViewportPoint(centerOfInterest);
-            if(camCoord.z < 0)
-                // Else snap to camera
-                centerOfInterest = m_camXform.position;
-
-            // Store positional offset
-            coiOffset = m_camXform.position - centerOfInterest;
-
-        }
-
-        //! 
-        //! Orbit function: rotates the camera around a pivot point.
-        //! Currently the orbit point is set to a specific distance from the camera.
-        //! 
-        //! @param sender The input manager.
-        //! @param e The delta distance from the touch gesture triggering the movement.
-        //!
-        private void CameraOrbit(object sender, Vector2 delta)
-        {
-            if(!manager.IsScreenCamNavigationUsed())
-                return;
-
-            // Prepare the pivot point
-            Vector3 pivotPoint;
-
-            // If an object is selected
-            if (m_hasSelection)
-            {
-                pivotPoint = m_selectionCenter;
-                // Check if selection center is inside camera view
-                Vector3 camCoord = m_cam.WorldToViewportPoint(m_selectionCenter);
-                // If any element is negative, it out of camera
-                if (camCoord.x < screenTolerance || camCoord.y < screenTolerance || camCoord.x > 1 - screenTolerance || camCoord.y > 1 - screenTolerance || camCoord.z < 0 || stickToOrbit)
-                {
-                    // If center of interest coincides with selection center
-                    if (centerOfInterest == m_selectionCenter)
-                    {
-                        // It means the center of orbit was already set to an object, and needs to be reset to the center
-                        centerOfInterest = m_camXform.TransformPoint(Vector3.forward * 6f);
+            switch (evt.Level) {
+                //ROTATE CAMERA
+                case InputManager.InputLevel.Primary:
+                    if(attitudeValuesIncoming)
+                        return;
+                    // check phase
+                    switch (evt.State){
+                        case InputManager.InputState.Started:
+                            InitializeCameraAngles();
+                            break;
+                        case InputManager.InputState.Ongoing:
+                        case InputManager.InputState.Canceled:
+                            CameraLookAround(evt.Delta);
+                            break;
+                        case InputManager.InputState.Ended:
+                            break;
                     }
-                    pivotPoint = centerOfInterest;
-                    // And it should not change until selection is changed (else orbiting pivot will jump to object as soon as it 
-                    stickToOrbit = true;
-                }
+                    break;
+                //MOVE CAMERA
+                case InputManager.InputLevel.Secondary:
+                    // check phase
+                    switch (evt.State){
+                        case InputManager.InputState.Started:
+                            break;
+                        case InputManager.InputState.Ongoing:
+                        case InputManager.InputState.Canceled:
+                            CameraPedestalTruck(evt.Delta);
+                            break;
+                        case InputManager.InputState.Ended:
+                            break;
+                    }
+                    break;
+                //Rotate Around center of selected object(s)
+                case InputManager.InputLevel.Tertiary:
+                    // check phase
+                    switch (evt.State){
+                        case InputManager.InputState.Started:
+                            InitializeCameraAngles();
+                            if(!m_hasSelection || centerIsToClose){
+                                EvaluateObjectForOrbit(new Vector2(Screen.width/2f, Screen.height/2f));
+                                // Drops the pin and spawns the expanding ground ring
+                                _orbitViz.StartPin(evaluatedNonSelectionCenterForOrbit, camTransform.position);
+                            }
+                            break;
+                        case InputManager.InputState.Ongoing:
+                        case InputManager.InputState.Canceled:
+                            if(!m_hasSelection || centerIsToClose){
+                                CameraLookAroundObject(evt.Delta, evaluatedNonSelectionCenterForOrbit);
+                                // Dynamically fills the ground arc as the camera swings around
+                                _orbitViz.UpdateOrbit(camTransform.position);
+                            } else {
+                                CameraLookAroundObject(evt.Delta, m_selectionCenter);
+                            }
+                            break;
+                        case InputManager.InputState.Ended:
+                            // Gracefully shrinks and fades away, even if it was interrupted mid-drop
+                            _orbitViz.Dismiss();
+                            centerIsToClose = false;
+                            break;
+                    }
+                    break;  
+            } 
+        }
+
+        private void HoldFunction(object sender, InputManager.InputEventArgs evt){
+            
+            if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
+                return;
+
+            switch (evt.Level) {
+                //Fly around?
+                //fwd/bck
+                case InputManager.InputLevel.Tertiary:
+                    // check phase
+                    switch (evt.State){
+                        case InputManager.InputState.Started:
+                            StartFlightInteraction(evt.Position);
+                            InitializeCameraAngles();
+                            screenStartPos = evt.Position;
+                            break;
+                        case InputManager.InputState.Ongoing:
+                        case InputManager.InputState.Canceled:
+                            //float fwdSpeedByDistance = evt.Data.Position.y - screenStartPos.y;
+                            //CameraFlying(fwdSpeedByDistance, evt.Data.Delta.x);
+                            ProcessContinuousFlight(screenStartPos, evt.Position, evt.Delta);
+                            break;
+                        case InputManager.InputState.Ended:
+                            StopFlightInteraction();
+                            break;
+                    }
+                    break;  
             }
-            else
-            {
-                pivotPoint = centerOfInterest;
+        }
+
+        private void PinchFunction(object sender, InputManager.PinchEventArgs evt){
+            
+            if(!manager.IsCamNavigationAllowed()) // || attitudeValuesIncoming)
+                return;
+
+            switch (evt.Level) {
+                //allow all levels
+                case InputManager.InputLevel.Primary:
+                case InputManager.InputLevel.Secondary:
+                case InputManager.InputLevel.Tertiary:
+                    // check phase
+                    switch (evt.State){
+                        case InputManager.InputState.Started:
+                        case InputManager.InputState.Ongoing:
+                            camTransform.Translate(0f, 0f, evt.PinchDelta * s_dollySpeed);
+                            break;
+                        case InputManager.InputState.Canceled:
+                        case InputManager.InputState.Ended:
+                            break;
+                    }
+                    break;  
+            }
+        }
+
+        //!
+        //! Function to connect input managers input event when attitude sensor switched on
+        //!
+        //! @param evt the InputData
+        //!
+        private void AttitudeFunction(object sender, InputManager.AttitudeEventArgs evt){
+            
+            switch (evt.Level) {
+                //ROTATE CAMERA
+                case InputManager.InputLevel.Primary:
+                    switch (evt.State){
+                        case InputManager.InputState.Started:
+                            attitudeValuesIncoming = true;
+                            InitializeAttitudeValues(evt.Rotation);
+                            //TODO: dont allow camera view manipulation!
+                            break;
+                        case InputManager.InputState.Ongoing:
+                            // if(!attitudeValuesIncoming){
+                            // }else
+                                ApplyAttitudeValues(evt.Rotation);
+                            break;
+                        case InputManager.InputState.Canceled:
+                        case InputManager.InputState.Ended:
+                            attitudeValuesIncoming = false;
+                            break;
+                    }
+                    break; 
+            } 
+        }
+
+        //!
+        //! Function to connect input managers input event for clicking on the timeline
+        //!
+        //! @param evt the InputData
+        //!
+        private void DoubleClickFunction(object sender, InputManager.InputEventArgs evt){
+
+            switch (evt.Level) {
+                case InputManager.InputLevel.Primary:
+                    //SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(evt.Data.Position);
+                    
+                    SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(evt.Position);
+                    if (hitSO) {
+                        FocusOnGameObject(hitSO.gameObject);
+                        return;
+                    }
+                    GameObject hitGO = EvaluationHelper.Instance.EvaluateGameObject(evt.Position);
+                    if (hitGO) {
+                        FocusOnGameObject(hitGO);
+                        return;
+                    }
+                    GameObject hitMP = EvaluationHelper.Instance.EvaluateManipulator(evt.Position);
+                    if (hitGO) {
+                        FocusOnGameObject(hitMP);
+                        return;
+                    }
+                    
+                    break;  
+            }
+        }
+
+        private void InitializeCameraAngles() {    
+            Vector3 currentAngles = camTransform.eulerAngles;
+            
+            m_pitch     = currentAngles.x;
+            m_yaw       = currentAngles.y;
+            m_roll      = currentAngles.z; // Capture the initial tilt!
+
+            // Normalize pitch to -180 to 180 so our Mathf.Clamp works correctly
+            if (m_pitch > 180f) { m_pitch -= 360f; }
+
+            //check again for selection center, since we could have moved the object in the meantime
+            // [!REVISE] what if animation is playing and the object is moving, re-evalute all the time?
+            if (m_hasSelection) {
+                SetSelectionCenter(core.getManager<UIManager>().SelectedObjects);
+            }
+        }
+
+        //!
+        //! [NO] ~~when on mobile or via controller, us the cam fwd vectror projected onto the ground plane~~
+        //! [NO] ~~via mouse use input start position to use for rotate around check~~
+        //! have same behaviour everywhere:
+        //! make an evaluation from the camera center and use any non-2d hit as rotate-around-center
+        //!     if no hit was made, use ground plane height (Y = 0!)
+        //!
+        private void EvaluateObjectForOrbit(Vector2 sceenCenterPos) {
+            SceneObject hitSO = EvaluationHelper.Instance.EvaluateSceneObject(sceenCenterPos);
+            if (hitSO) {
+                evaluatedNonSelectionCenterForOrbit = hitSO.transform.position;
+                return;
+            }
+            GameObject hitGO = EvaluationHelper.Instance.EvaluateGameObject(sceenCenterPos);
+            if (hitGO) {
+                evaluatedNonSelectionCenterForOrbit = hitGO.transform.position;
+                return;
             }
 
-            // Arc
-            m_camXform.RotateAround(pivotPoint, Vector3.up, s_orbitSpeed * delta.x);
-            // Tilt
-            m_camXform.RotateAround(pivotPoint, m_camXform.right, -s_orbitSpeed * delta.y);
+            //make the raycast to the imaginary ground plane at Y = 0
+            Ray ray = new(Camera.main.transform.position, Camera.main.transform.forward);
+            Plane plane = new(Vector3.up, Vector3.zero);
 
-            // Update value
-            centerOfInterest = pivotPoint;
-            // Store positional offset
-            coiOffset = m_camXform.position - centerOfInterest;
+            if (plane.Raycast(ray, out float distance)) {
+                evaluatedNonSelectionCenterForOrbit = ray.GetPoint(distance);
+            } else {
+                evaluatedNonSelectionCenterForOrbit = Camera.main.transform.forward * 30;
+            }
+        }
 
+        #region Magic Window Metapher
+
+        /****** 
+        *
+        *   AI DESCRIPTION WHAT THE BELOW DOES
+        *   - as I'm no Quaternion Expert, Thomas
+        *
+        *   Look at Line 1, and then look at the far right of Line 2. You are setting localRotation, 
+        *   and then immediately reading rotation in the very next instruction.
+        *
+        *   In pure C#, that looks redundant. But in Unity's underlying C++ engine, setting localRotation 
+        *   sets a dirty flag. The millisecond you call .rotation on Line 2, you force Unity's C++ main 
+        *   thread to halt, grab the parent's world matrix, multiply your Line 1 local pose by the parent's 
+        *   world space, and hand it back to C#.
+        *
+        *   By taking the result of Line 1, getting Unity to bake it into World Space, and feeding it back 
+        *   into the delta multiplier on Line 2, you created a self-clearing feedback loop that renders the 
+        *   camera 100% immune to its parent transform's scale or rotation. Write a comment above those two 
+        *   functions warning future developers never to touch them
+        *
+        */
+        private void InitializeAttitudeValues(Quaternion attitudeRotation) {    
+            cameraMainRotationOffset = camTransform.rotation;
+            attitudeOffset = Quaternion.Inverse(attitudeRotation * Quaternion.Euler(0f, 0f, 180f));
+        }
+
+        private void ApplyAttitudeValues(Quaternion attitudeRotation) {
+            camTransform.localRotation = attitudeRotation * Quaternion.Euler(0f, 0f, 180f);
+            camTransform.rotation = cameraMainRotationOffset * attitudeOffset * camTransform.rotation;
+        }
+        #endregion
+
+        //! 
+        //! rotate the camera from a pov
+        //! 
+        //! @param e The delta distance from drag input
+        //!
+        private void CameraLookAround(Vector2 delta){
+           // Accumulate the angles
+            m_yaw   += s_orbitSpeed * delta.x;
+            m_pitch -= s_orbitSpeed * delta.y;
+
+            // Clamp the pitch so the camera can't flip upside down
+            // -89 is straight up, 89 is straight down
+            m_pitch = Mathf.Clamp(m_pitch, -89f, 89f);
+
+            // Apply the rotation via Euler Angles. 
+            // Notice the Z value is forced to 0f. It is mathematically impossible for the camera to tilt sideways now.
+            camTransform.eulerAngles = new Vector3(m_pitch, m_yaw, m_roll);
+        }
+
+        //! 
+        //! Orbit function: rotates the camera around a selected object
+        //! @param delta The delta distance from the touch gesture triggering the movement.
+        //! @param objsCenter the center of the object or multiple objects if more are selected
+        //!
+        private void CameraLookAroundObject(Vector2 delta, Vector3 objsCenter){
+            // Check if selection center is inside camera view
+            Vector3 objInViewportCoords = m_cam.WorldToViewportPoint(objsCenter);
+            // If any element is negative, it out of camera
+            if (objInViewportCoords.x < screenTolerance || objInViewportCoords.y < screenTolerance || objInViewportCoords.x > 1 - screenTolerance || objInViewportCoords.y > 1 - screenTolerance || objInViewportCoords.z < 0)
+                return;
+        
+            // 1. Calculate desired deltas
+            float yawDelta = s_orbitSpeed * delta.x;
+            float pitchDelta = -s_orbitSpeed * delta.y;
+
+            // 2. Predict the new pitch to clamp it properly before moving
+            float nextPitch = m_pitch + pitchDelta;
+            
+            if (nextPitch > 89f) {
+                // Clamp going too far down
+                pitchDelta = 89f - m_pitch;
+                m_pitch = 89f;
+            }else if (nextPitch < -89f) {
+                // Clamp going too far up
+                pitchDelta = -89f - m_pitch;
+                m_pitch = -89f;
+            }else{
+                // Normal movement
+                m_pitch = nextPitch;
+            }
+
+            // Keep yaw tracked for seamless switching with standard LookAround
+            m_yaw += yawDelta;
+
+            // 3. Apply the Orbit
+            // Rotate around World Up for horizontal movement
+            camTransform.RotateAround(objsCenter, Vector3.up, yawDelta);
+            // Rotate around the Camera's Local Right for vertical movement
+            camTransform.RotateAround(objsCenter, camTransform.right, pitchDelta);
+
+            // 4. Force the Roll to stay locked
+            // RotateAround can introduce microscopic floating-point roll drift over time. 
+            // This locks it back to your desired m_roll.
+            Vector3 currentEuler = camTransform.eulerAngles;
+            camTransform.eulerAngles = new Vector3(currentEuler.x, currentEuler.y, m_roll);
         }
 
         //! 
         //! Pedestal & Truck function: moves the camera vertically or horizontally.
         //! 
-        //! @param sender The input manager.
         //! @param e The delta distance from the touch gesture triggering the movement.
         //!
-        private void CameraPedestalTruck(object sender, Vector2 delta)
-        {
-            if(!manager.IsScreenCamNavigationUsed())
-                return;
-
+        private void CameraPedestalTruck(Vector2 delta){
             // Adjust the input
             Vector2 offset = -s_panSpeed * delta;
 
             // Move around
-            m_camXform.Translate(offset.x, offset.y, 0);
+            camTransform.Translate(offset.x, offset.y, 0);
+        }
 
-            // If it was not orbited
-            if (centerOfInterest != m_selectionCenter)
-            {
-                // Drag the center of interest with it
-                centerOfInterest = m_camXform.position - coiOffset;
+        private void StartFlightInteraction(Vector2 startPos){
+            isFlying = true;
+            isBooted = false;
+            bootTimer = 0f;
+            currentSpeed = 0f;
+            lookRecoveryTimer = 0f;
+            largeCircleAnimTimer = 0f;
+
+            CreateDynamicUI(startPos);
+        }
+
+        // --- DYNAMIC UI GENERATION ---
+        private void CreateDynamicUI(Vector2 screenPos){
+            if (uiContainer != null) UnityEngine.GameObject.Destroy(uiContainer);
+
+            circleSprite = GetOrCreateCircleSprite();
+
+            // Create Canvas overlay
+            uiContainer = new GameObject("FlightUI");
+            Canvas canvas = uiContainer.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100; // Render on top
+
+            // Container placed at touch position
+            GameObject posContainer = new GameObject("PosTracker");
+            posContainer.transform.SetParent(uiContainer.transform);
+            RectTransform posRect = posContainer.AddComponent<RectTransform>();
+            posRect.position = screenPos;
+
+            // 1. Small Boot Circle
+            GameObject smallGO = new GameObject("SmallBootCircle");
+            smallGO.transform.SetParent(posRect);
+            smallCircleFill = smallGO.AddComponent<Image>();
+            smallCircleFill.sprite = circleSprite;
+            smallCircleFill.color = new Color(1f, 1f, 1f, 0.8f);
+            smallCircleFill.type = Image.Type.Filled;
+            smallCircleFill.fillMethod = Image.FillMethod.Radial360;
+            smallCircleFill.fillAmount = 0f;
+            smallCircleFill.rectTransform.sizeDelta = new Vector2(40f, 40f);
+            smallGO.transform.localPosition = Vector3.zero;
+
+            // 2. Large Background Circle
+            GameObject largeBgGO = new GameObject("LargeCircleBg");
+            largeBgGO.transform.SetParent(posRect);
+            Image largeBg = largeBgGO.AddComponent<Image>();
+            largeBg.sprite = circleSprite;
+            largeBg.color = new Color(0f, 0f, 0f, 0.3f);
+            largeCircleRect = largeBg.rectTransform;
+            largeCircleRect.sizeDelta = new Vector2(120f, 120f);
+            largeCircleRect.localScale = Vector3.zero; // Start hidden for bounce anim
+            largeBgGO.transform.localPosition = Vector3.zero;
+
+            // 3. Large Progress Circle
+            GameObject largeProgGO = new GameObject("LargeCircleProgress");
+            largeProgGO.transform.SetParent(largeBgGO.transform);
+            largeCircleProgress = largeProgGO.AddComponent<Image>();
+            largeCircleProgress.sprite = circleSprite;
+            largeCircleProgress.color = new Color(0.2f, 0.8f, 1f, 0.9f); // Cyan
+            largeCircleProgress.type = Image.Type.Filled;
+            largeCircleProgress.fillMethod = Image.FillMethod.Radial360;
+            largeCircleProgress.fillAmount = 0f;
+            largeCircleProgress.rectTransform.sizeDelta = new Vector2(120f, 120f);
+            largeCircleProgress.rectTransform.localScale = Vector3.one;
+            largeProgGO.transform.localPosition = Vector3.zero;
+        }
+
+        // --- PROCEDURAL SPRITE GENERATION ---
+        private Sprite GetOrCreateCircleSprite(){
+            if (circleSprite != null) return circleSprite;
+
+            int resolution = 128; // 128x128 is a good balance for UI crispness vs generation speed
+            Texture2D tex = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
+            Color[] colors = new Color[resolution * resolution];
+            
+            float center = resolution / 2f;
+            float radius = resolution / 2f;
+
+            for (int y = 0; y < resolution; y++){
+                for (int x = 0; x < resolution; x++){
+                    // Calculate distance from center (with 0.5f offset for pixel center)
+                    float dx = (x + 0.5f) - center;
+                    float dy = (y + 0.5f) - center;
+                    float distance = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    // Anti-aliasing math: smooth fade over 1 pixel at the edge
+                    float alpha = Mathf.Clamp01(radius - distance);
+                    
+                    colors[y * resolution + x] = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+
+            tex.SetPixels(colors);
+            tex.Apply(); // Upload to GPU
+
+            // Create the sprite and pivot at center
+            circleSprite = Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 100f);
+            return circleSprite;
+        }
+
+        // --- MATH HELPERS ---
+        private float EaseOutBack(float x){
+            const float c1 = 1.70158f;
+            const float c3 = c1 + 1f;
+            return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
+        }
+
+        private void ProcessContinuousFlight(Vector2 startPos, Vector2 currentPos, Vector2 delta){
+            if (!isFlying) return;
+
+            bool isLooking = delta.sqrMagnitude > 1f;
+
+            // --- 1. BOOT PHASE ---
+            if (!isBooted){
+                bootTimer += Time.deltaTime;
+                
+                // Update small circle UI
+                if (smallCircleFill != null)
+                    smallCircleFill.fillAmount = bootTimer / bootDelay;
+
+                if (bootTimer >= bootDelay){
+                    isBooted = true;
+                    if (smallCircleFill != null) UnityEngine.GameObject.Destroy(smallCircleFill.gameObject); // Vanish small circle
+                }
+                return; // Don't move or look while booting
+            }
+
+            // --- 2. ANIMATE LARGE CIRCLE ---
+            if (isBooted && largeCircleAnimTimer < 1f){
+                largeCircleAnimTimer += Time.deltaTime * 3f; // Animation speed
+                float t = Mathf.Clamp01(largeCircleAnimTimer);
+                largeCircleRect.localScale = Vector3.one * EaseOutBack(t);
+            }
+
+            // --- 3. LOOK & MOVE LOGIC ---
+            if (isLooking){
+                // Call your existing look function
+                CameraLookAround(delta);
+
+                // Natural deceleration: the faster you look (delta magnitude), the heavier the brake
+                float brakeFactor = Mathf.Clamp01(delta.magnitude / 10f);
+                currentSpeed = Mathf.Lerp(currentSpeed, 0f, deceleration * brakeFactor * Time.deltaTime);
+                
+                // Reset recovery timer
+                lookRecoveryTimer = lookRecoveryDelay;
+            }else{
+                // If we recently looked, wait for recovery
+                if (lookRecoveryTimer > 0){
+                    lookRecoveryTimer -= Time.deltaTime;
+                    // Minor natural friction while recovering
+                    currentSpeed = Mathf.Lerp(currentSpeed, 0f, (deceleration * 0.2f) * Time.deltaTime); 
+                }else{
+                    // Accelerate
+                    currentSpeed = Mathf.MoveTowards(currentSpeed, maxSpeed, acceleration * Time.deltaTime);
+                }
+            }
+
+            // Apply movement
+            camTransform.position += camTransform.forward * currentSpeed * Time.deltaTime;
+
+            // --- 4. UPDATE UI PROGRESS ---
+            if (largeCircleProgress != null){
+                largeCircleProgress.fillAmount = currentSpeed / maxSpeed;
             }
         }
+
+        private void StopFlightInteraction(){
+            isFlying = false;
+            if (uiContainer != null) UnityEngine.GameObject.Destroy(uiContainer);
+        }
+
 
         //!
         //! Function called when selection has changed.
         //!
-        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects)
-        {
-            m_hasSelection = false;
-            if (sceneObjects.Count < 1)
-            {
-                // In case of deselection, set the center of interest back to the center of the view
-                // If it has been orbited (meaning center of interest coincides to selection), preserve distance to camera
-                if (centerOfInterest == m_selectionCenter)
-                {
-                    Vector3 bufferpos = m_cam.WorldToViewportPoint(m_selectionCenter);
-                    bufferpos.x = .5f;
-                    bufferpos.y = .5f;
-                    centerOfInterest = m_cam.ViewportToWorldPoint(bufferpos);
+        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects){
+            centerIsToClose = false;
 
-                    // Store positional offset
-                    coiOffset = m_camXform.position - centerOfInterest;
-                }
+            if (sceneObjects.Count < 1){
+                m_hasSelection = false;
                 return;
             }
 
-            currentFollowObject = null;
+            SetSelectionCenter(sceneObjects);
+            m_hasSelection = true;
+        }
 
+        private void SetSelectionCenter(List<SceneObject> sceneObjects) {
             // Calculate the average position
             Vector3 averagePos = Vector3.zero;
             foreach (SceneObject obj in sceneObjects)
@@ -322,47 +766,54 @@ namespace tracer
             averagePos /= sceneObjects.Count;
 
             m_selectionCenter = averagePos;
-            m_hasSelection = true;
 
-            // Reset control variable
-            stickToOrbit = false;
+            // [BEWARE] if we look through a camera and want to drag/orbit, our pos is the same
+            // as selected object pos and does not work
+            if(Vector3.Distance(m_selectionCenter, camTransform.position) < 0.25f){
+                //if so, use evaluation to calc center
+                centerIsToClose = true;
+            }    
+        }
+
+        private void FocusOnSelection(UnityEngine.InputSystem.InputAction.CallbackContext ctx) {
+            List<SceneObject> selected = core.getManager<UIManager>().SelectedObjects;
+            if(selected.Count > 0) {
+                FocusOnGameObject(selected[0].gameObject);
+            }
         }
 
         //!
         //! Focus on the current object (center it, move cam to it)
-        //! if we already focused it, lock to it!
+        //! [TODO] have closer/farther look at object as iteration
+        //! [TODO] have "lock to object" via hold? (we may have a radial options menu for all this stuff)
         //!
-        private void FocusOnSelection(object sender, SceneObject sceneObject){
-            if(!sceneObject){
+        private void FocusOnGameObject(GameObject focusHere){
+            if(!focusHere){
                 currentFocusedObject = null;
-                currentFollowObject = null;     //we follow this object, but not if we do any gizmo transformation!
                 return;
             }
-            if(currentFocusedObject == sceneObject){
-                currentFollowObject = currentFocusedObject;
+            if(currentFocusedObject == focusHere){
                 //Start coroutine to follow? Only if locked? another module?
                 //return; //focus again!
             }else{
-                currentFocusedObject = sceneObject;
+                currentFocusedObject = focusHere;
             }
 
-            GameObject go = sceneObject.gameObject;
+            //different behaviour for cam/light, because of encapsulation!
+            List<SceneObject> selected = core.getManager<UIManager>().SelectedObjects;
+            if(selected.Count > 0 && selected[0].gameObject == focusHere) {
+                if(selected[0].GetType() == typeof(SceneObjectCamera) || selected[0].GetType() == typeof(SceneObjectLight)) {
+                    core.StartCoroutine(SmoothCameraFocus(10, focusHere.transform.position, focusHere.transform.position - camTransform.forward * 5));
+                    return;
+                }
+            }
+
             //calculate bounds
-            Bounds b = new Bounds(go.transform.position, Vector3.zero);
-            switch(sceneObject){
-                case SceneObjectCamera:
-                case SceneObjectLight:
-                    break;
-                default:
-                    UnityEngine.Object[] rList = go.GetComponentsInChildren(typeof(Renderer));
-                    foreach (Renderer r in rList){
-                        b.Encapsulate(r.bounds);
-                    }
-                    break;
+            Bounds b = new Bounds(focusHere.transform.position, Vector3.zero);
+            UnityEngine.Object[] rList = focusHere.GetComponentsInChildren(typeof(Renderer));
+            foreach (Renderer r in rList){
+                b.Encapsulate(r.bounds);
             }
-
-            //set focus point as well
-            centerOfInterest = b.center;
 
             Vector3 max = b.size;
             // Get the radius of a sphere circumscribing the bounds, multiply by s_focusDistance (the higher the multiply, the farther away)
@@ -376,14 +827,12 @@ namespace tracer
             //Debug.Log("Radius = " + radius + " dist = " + dist);
 
             //never go away if dist is bigger, instead keep the distance?
-            dist = Mathf.Min(dist, Vector3.Distance(go.transform.position, m_camXform.position));
+            dist = Mathf.Min(dist, Vector3.Distance(focusHere.transform.position, camTransform.position));
 
             //Smooth transition
-            sceneObject.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - m_camXform.forward * dist));
+            core.StartCoroutine(SmoothCameraFocus(radius, b.center, b.center - camTransform.forward * dist));
 
-            //TODO: add another function to lock view on a locked object!
-            //AND update its position smoothly (update function?!)
-            //right 
+
         }
 
         //!
@@ -397,18 +846,18 @@ namespace tracer
             float t = 0f;
             float easeProgress;
             float duration = 1f;
-            Vector3 currentPos = m_camXform.position;
-            Vector3 currentLookAt = currentPos + m_camXform.forward;
+            Vector3 currentPos = camTransform.position;
+            Vector3 currentLookAt = currentPos + camTransform.forward;
             float currentOrth = m_cam.orthographicSize;
             while(t<1f && coroNr == m_smoothCameraFocusIsRunning){
                 t += Time.deltaTime / duration;
                 easeProgress = EaseOutCirc(t);
-                m_camXform.position = Vector3.Lerp(currentPos, pos, easeProgress);
-                m_camXform.LookAt(Vector3.Lerp(currentLookAt, lookAt, easeProgress));
+                camTransform.position = Vector3.Lerp(currentPos, pos, easeProgress);
+                camTransform.LookAt(Vector3.Lerp(currentLookAt, lookAt, easeProgress));
                 if (m_cam.orthographic)
                     m_cam.orthographicSize = Mathf.Lerp(currentOrth, orthSize, easeProgress);
                 //invoke to update the gizmo sizes
-                manager.SmoothCameraFocusChange();
+//              manager.SmoothCameraFocusChange();
                 yield return null;
             }
         }
@@ -417,5 +866,10 @@ namespace tracer
             return Mathf.Sqrt(1 - Mathf.Pow(progress01 - 1f, 2f));
         }
 
+        #region DEBUG VIZ
+        private OrbitImpactPin _orbitViz;
+
+        #endregion
     }
+
 }

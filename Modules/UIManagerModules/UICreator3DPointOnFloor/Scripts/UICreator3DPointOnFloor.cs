@@ -24,17 +24,18 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "UICreator3DPointOnFloor.cs"
 //! @brief early implementation of TRACER 3D UI point on floor module
 //! @author Paulo Scatena
-//! @version 0
-//! @date 15.02.2022
+//! @author Thomas Krüger
+//! @version 1
+//! @date 19.05.2026
+//! @revision updated with overhauled input manager, although this behaviour is not used and should absolutely be revised!
+// NOT ANYWHERE NEAR USABLE OR CORRECT...
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
-namespace tracer
-{
+namespace tracer{
     //!
     //! early implementation of TRACER 3D UI point on floor module
     //!
@@ -64,8 +65,7 @@ namespace tracer
         //! @param name Name of this module
         //! @param _core Reference to the TRACER _core
         //!
-        public UICreator3DPointOnFloor(string name, Manager manager) : base(name, manager)
-        {
+        public UICreator3DPointOnFloor(string name, Manager manager) : base(name, manager){
             // Disable module
             load = false;
         }
@@ -73,95 +73,129 @@ namespace tracer
         //!
         //! Init m_callback for the UICreator3DPointOnFloor module.
         //!
-        protected override void Init(object sender, EventArgs e)
-        {
+        protected override void Init(object sender, EventArgs e){
+            
             Debug.Log("Init point on floor module");
+
 
             // Subscribe to selection change
             manager.selectionChanged += SelectionUpdate;
+            // TODO: add a "button" within the above function
 
             // Grabbing from the input manager directly
             m_inputManager = core.getManager<InputManager>();
-
-            // Hookup to input events
-            m_inputManager.inputPressStarted += PressStart;
-            m_inputManager.inputPressEnd += PressEnd;
+            m_inputManager.clickOtherEvent  += ClickFunction;
+            m_inputManager.dragOtherEvent   += DragFunction;
 
             // Instantiate widget
             InstantiateModifier();
 
             // make the plane on ground
             helperPlane = new Plane(Vector3.up, new Vector3(0,-2,0));
-
         }
 
         //!
-        //! Function to prepare for transformations.
-        //! Called with the start of click from InputManager
-        //! @param sender m_callback sender
-        //! @param e event reference
+        //! Destructor, cleaning up event registrations. 
         //!
-        private void PressStart(object sender, Vector2 point)
-        {
-            //Debug.Log("Press start: " + e.point.ToString());
+        public override void Dispose(){
+            base.Dispose();
+
+            if(load || m_inputManager == null)
+                return;
+
+            m_inputManager.clickOtherEvent  -= ClickFunction;
+            m_inputManager.dragOtherEvent   -= DragFunction;
+        }
+
+        //!
+        //! Function to connect input managers input event for moving a selection to point on floor
+        //!
+        //! @param evt the InputData
+        //!
+        private void ClickFunction(object sender, InputManager.InputEventArgs evt){  
             if (selObj == null)
                 return;
 
-            Ray ray = Camera.main.ScreenPointToRay(point);
-            if (helperPlane.Raycast(ray, out float enter))
-            {
-                //Get the point that is clicked
-                Vector3 hitPoint = ray.GetPoint(enter);
+            if(evt.Level != InputManager.InputLevel.Primary)
+                return;
+            
+            // TODO: utilize EvaluationHelper!
 
-                Debug.DrawLine(Vector3.zero, hitPoint, Color.red, 2f);
+            //MOVE OBJECT TO DESTINATION
+            Ray ray = Camera.main.ScreenPointToRay(evt.Position);
+            if (!helperPlane.Raycast(ray, out float enter))
+                return;
 
-                // show gizmo
-                pointToMoveModifier.transform.position = hitPoint;
-                pointToMoveModifier.SetActive(true);
-
-                //monitor move
-                m_inputManager.inputMove += Move;
+            // check phase
+            switch (evt.State){
+                case InputManager.InputState.Started:
+                case InputManager.InputState.Ongoing:
+                case InputManager.InputState.Canceled:
+                    break;
+                case InputManager.InputState.Ended:
+                    // TODO: utilize EvaluationHelper!
+                    targetTranslation = ray.GetPoint(enter);
+                    // using its monobehaviour quality
+                    //selObj.StopAllCoroutines();
+                    selObj.StartCoroutine(SmoothMove());
+                    break;
             }
         }
 
-        // This for mouse drag
-        // Should only operate in case of existing selection
-        // But what happens if touch input is moving the object and other function change the selection
-        private void Move(object sender, Vector2 point)
-        {
-
-            //Debug.Log("Moving: " + e.point.ToString());
+        //!
+        //! Function to connect input managers input event for moving a selection to point on floor
+        //!
+        //! @param evt the InputData
+        //!
+        private void DragFunction(object sender, InputManager.DragEventArgs evt){  
             if (selObj == null)
                 return;
 
-            Ray ray = Camera.main.ScreenPointToRay(point);
-            if (helperPlane.Raycast(ray, out float enter))
-            {
-                //Get the point that is clicked
-                Vector3 hitPoint = ray.GetPoint(enter);
+            if(evt.Level != InputManager.InputLevel.Primary)
+                return;
+            
+            // TODO: utilize EvaluationHelper!
 
-                Debug.DrawLine(Vector3.zero, hitPoint, Color.green, 2f);
+            //MOVE OBJECT TO DESTINATION
+            Ray ray = Camera.main.ScreenPointToRay(evt.Position);
+            if (!helperPlane.Raycast(ray, out float enter))
+                return;
 
-                // move manip
-                pointToMoveModifier.transform.position = hitPoint;
-                lastHitPoint = hitPoint;
-                lastHitPoint.y = selObj.transform.position.y;
+            //Get the point that is clicked
+            Vector3 hitPoint = ray.GetPoint(enter);
+            // check phase
+            switch (evt.State){
+                case InputManager.InputState.Started:
+                    // show gizmo
+                    pointToMoveModifier.transform.position = hitPoint;
+                    pointToMoveModifier.SetActive(true);
+                    break;
+                case InputManager.InputState.Ongoing:
+
+                    // move manip
+                    pointToMoveModifier.transform.position = hitPoint;
+                    lastHitPoint = hitPoint;
+                    lastHitPoint.y = selObj.transform.position.y;
+                    break;
+                case InputManager.InputState.Canceled:
+                case InputManager.InputState.Ended:
+
+                    pointToMoveModifier.SetActive(false);
+                    targetTranslation = lastHitPoint;
+
+                    // using its monobehaviour quality
+                    //selObj.StopAllCoroutines();
+                    selObj.StartCoroutine(SmoothMove());
+                    break;
             }
         }
+
 
         // Soft translate
-        IEnumerator SmoothMove()
-        {
+        IEnumerator SmoothMove(){
             float time = 0;
             // We create a loop to control for how many time it will run
-            //while (time <= 2)
-            //{
-            //    time += Time.deltaTime;
-            //    selObj.transform.Translate(new Vector3(Time.deltaTime, 0, 0));
-            //    yield return null;
-            //}
-            while (time <= 3)
-            {
+            while (time <= 3){
                 time += Time.deltaTime;
                 Debug.Log(time);
                 selObj.transform.position = Vector3.Lerp(selObj.transform.position, targetTranslation, Time.deltaTime * translationDamping);
@@ -170,44 +204,15 @@ namespace tracer
         }
 
         //!
-        //! Function to finalize manipulator operation
-        //! Called with the end (cancellation) of click from InputManager
-        //! @param sender m_callback sender
-        //! @param e event reference
-        //!
-        private void PressEnd(object sender, Vector2 point)
-        {
-            //Debug.Log("Press end: " + e.point.ToString());
-
-            // stop monitoring move
-            m_inputManager.inputMove -= Move;
-
-            pointToMoveModifier.SetActive(false);
-            //noClickCanvas.SetActive(false);
-
-            // and actually move object
-            if (selObj == null)
-                return;
-
-            targetTranslation = lastHitPoint;
-
-            // using its monobehaviour quality
-            selObj.StopAllCoroutines();
-            selObj.StartCoroutine(SmoothMove());
-        }
-
-        //!
         //! Updates the selection with the first selected object available
         //! Being called when selection has changed.
         //!
-        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects)
-        {
+        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects){
 
             // Log
             //Debug.Log("Selection changed");
 
-            if (sceneObjects.Count > 0)
-            {
+            if (sceneObjects.Count > 0){
                 // Grab object
                 selObj = sceneObjects[0];
                 //Debug.Log(selObj);
@@ -224,8 +229,7 @@ namespace tracer
 
         }
 
-        private void InstantiateModifier()
-        {
+        private void InstantiateModifier(){
             // Click widget
             GameObject resourcePrefab = Resources.Load<GameObject>("Prefabs/PointToMoveModifier");
             pointToMoveModifier = GameObject.Instantiate(resourcePrefab);
@@ -235,6 +239,8 @@ namespace tracer
             resourcePrefab = Resources.Load<GameObject>("Prefabs/TransparentCanvas");
             noClickCanvas = GameObject.Instantiate(resourcePrefab);
             noClickCanvas.SetActive(false);
+
+            //do via disallow (de-)selection and 
         }
 
     }

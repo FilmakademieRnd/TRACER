@@ -50,6 +50,7 @@ namespace tracer
 
         //!
         //! A reference to the _parent Scene Object.
+        //! TODO: make readonly from outside
         //!
         public SceneObject m_parentObject;
         private Transform m_parentTransform;
@@ -60,21 +61,28 @@ namespace tracer
         public GameObject m_lockImage;
 
         private bool m_isSun = false;
+        private Transform ourTr;
         private Transform m_camTransform;
-        
+
         //!
         //! Start is called before the first frame update
         //!
-        void Start()
+        public void Init(UIManager uiManager, SceneObject parentObject)
         {
             m_camTransform = Camera.main.transform;
-            m_parentTransform = m_parentObject.transform;
+            m_parentObject = parentObject;
+            m_parentTransform = parentObject.transform;
             Core core = GameObject.Find("TRACER").GetComponent<Core>();
-            UIManager uiManager = core.getManager<UIManager>();
             uiManager.settings.uiScale.hasChanged += UpdateUIScale;
             m_iconScale = Vector3.one * uiManager.settings.uiScale.value;
             transform.right = m_camTransform.right;
+
+            ourTr = transform;
+            m_camTransform = Camera.main.transform;
+
             m_renderer = GetComponent<SpriteRenderer>();
+
+            CreateLockIcon();
         }
 
         public void setSun()
@@ -91,8 +99,8 @@ namespace tracer
                 SpriteRenderer sr = m_lockImage.AddComponent<SpriteRenderer>();
                 sr.sprite = Resources.Load<Sprite>("Images/SceneObjectLocked");
                 sr.material = GetComponent<SpriteRenderer>().material;
-                m_lockImage.transform.parent = transform;
-                m_lockImage.transform.localPosition = new Vector3(transform.localScale.x/2f,-transform.localScale.y/2f,-0.1f);
+                m_lockImage.transform.parent = ourTr;
+                m_lockImage.transform.localPosition = new Vector3(ourTr.localScale.x/2f,-ourTr.localScale.y/2f,-0.1f);
                 m_lockImage.transform.localScale = Vector3.one * 0.5f;
                 HideLock();
             }
@@ -108,8 +116,7 @@ namespace tracer
         //!
         //! Function coupled to user UI scale changes to update the icon scale
         //!
-        private void UpdateUIScale(object sender, float e)
-        {
+        private void UpdateUIScale(object sender, float e){
             m_iconScale = Vector3.one * e;
         }
 
@@ -133,6 +140,7 @@ namespace tracer
                 float depth = Vector3.Dot(camera.position - transform.position, camera.forward);
                 transform.position = m_parentTransform.position;
                 transform.localScale = m_iconScale * Mathf.Abs(depth * 0.1f);
+                ourTr.rotation = m_camTransform.rotation;
             }
             transform.rotation = m_camTransform.rotation;
 

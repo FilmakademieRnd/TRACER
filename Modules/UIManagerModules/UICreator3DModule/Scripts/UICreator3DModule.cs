@@ -125,6 +125,13 @@ namespace tracer
         //!
         Plane helperPlane;
 
+
+        //!
+        //! stored variables for drag viz
+        //!
+        private Vector3 helperPlaneCenter, lockedlocalAxis, lockedGlobalAxis;
+        private bool isSingleAxis = false;
+
         //!
         //! Internal reference of manipulator parts - translate X
         //!
@@ -179,10 +186,6 @@ namespace tracer
         //! 
         Vector3 hitPosOffset = Vector3.zero;
 
-        //!
-        //! Control boolean for single procedure for the first touch contact
-        //!
-        bool firstPress = true;
 
         //!
         //! Reference to initial scale value for parameter change
@@ -205,9 +208,9 @@ namespace tracer
         int modeTRS = -1;
 
         //!
-        //! store previous mode to restore when unhiding
+        //! store mode to restore when unhiding
         //!
-        private int previousTrsMode = -1;
+        private int savedTrsMode = -1;
 
         //!
         //! Auxiliary preconstructed vector - XY plane
@@ -230,6 +233,12 @@ namespace tracer
         Camera mainCamera;
 
         //!
+        //! do so only when selection changed, to not do this runtime all the time
+        //! add to do this for ALL other calcs in GetModifierScale and subscribe to changes of FielOfView as well!
+        //! 
+        private float camMathValues;
+
+        //!
         //! Event emitted when parameter has changed
         //!
         public event EventHandler<AbstractParameter> doneEditing;
@@ -239,13 +248,16 @@ namespace tracer
         //!
         private InputManager m_inputManager;
 
+        //only used for manipulation mode Viewport - to update the gizmo alignemnt accordingly
+        private Vector3 lastCamPos;
+        private Quaternion lastCamRot;
+
         //!
         //! Constructor
         //! @param name Name of this module
         //! @param _core Reference to the TRACER _core
         //!
-        public UICreator3DModule(string name, Manager manager) : base(name, manager)
-        {
+        public UICreator3DModule(string name, Manager manager) : base(name, manager){
 
         }
 
@@ -260,21 +272,21 @@ namespace tracer
             manager.selectionChanged -= SelectionUpdate;
             manager.settings.uiScale.hasChanged -= updateUIScale;
 
-            m_inputManager.inputPressStarted -= PressStart;
-            m_inputManager.inputPressEnd -= PressEnd;
-            m_inputManager.tappedEvent -= Tapped;
+            // NEW INPUT EVENTS
+            m_inputManager.dragOtherEvent -= DragFunction;
+            m_inputManager.clickOtherEvent -= ClickFunction;
 
-            m_inputManager.fingerGestureEvent -= updateGizmoScale;
-            m_inputManager.updateCameraUICommand -= updateGizmoScale;
+            /*m_inputManager.fingerGestureEvent -= updateGizmoScale;
+            m_inputManager.updateCameraUICommand -= updateGizmoScale;*/
+            core.updateEvent -= OnCoreUpdateEvent;
 
             UICreator2DModule UI2DModule = manager.getModule<UICreator2DModule>();
-            CameraSelectionModule CamModule = manager.getModule<CameraSelectionModule>();
             UIManager m_UIManager = core.getManager<UIManager>();
-            if (UI2DModule != null && CamModule != null)
+            if (UI2DModule != null)
             {
                 UI2DModule.parameterChanged -= SetManipulatorMode;
-                CamModule.uiCameraOperation -= SetCameraManipulator;
             }
+            manager.uiCameraLockChanged -= SetCameraManipulator;
 
             // [REVIEW]
             // Direct access to a module should be prevented!
@@ -286,33 +298,37 @@ namespace tracer
         //! Init m_callback for the UICreator3D module.
         //! Called after constructor. 
         //!
-        protected override void Init(object sender, EventArgs e)
-        {
+        protected override void Init(object sender, EventArgs e){
             //Debug.Log("Init 3D module");
             mainCamera = Camera.main;
 
             // Subscribe to selection change
             manager.selectionChanged += SelectionUpdate;
+            manager.manipulationLayerChanged += ManipulationLayerChanged;
 
             // Subscribe to manipulator change
             UICreator2DModule UI2DModule = manager.getModule<UICreator2DModule>();
             UI2DModule.parameterChanged += SetManipulatorMode;
 
             // Subscribe to camera change?
-            CameraSelectionModule CamModule = manager.getModule<CameraSelectionModule>();
-            if (CamModule != null)
-                CamModule.uiCameraOperation += SetCameraManipulator;
+            // manager.uiCameraLockChanged += SetCameraManipulator;
+            // subscribe only within SelectionUpdate
 
             // Grabbing from the input manager directly
             m_inputManager = core.getManager<InputManager>();
 
-            // Hookup to input events
-            m_inputManager.inputPressStarted += PressStart;
-            m_inputManager.inputPressEnd += PressEnd;
-            m_inputManager.tappedEvent += Tapped;
+            // NEW INPUT EVENTS
+            m_inputManager.dragOtherEvent += DragFunction;
+            // [TEST] implementation to change axis manipulation via right-click too
+            m_inputManager.clickOtherEvent += ClickFunction;
 
-            m_inputManager.fingerGestureEvent += updateGizmoScale;
-            m_inputManager.updateCameraUICommand += updateGizmoScale;
+            // Hookup to input events
+            /*m_inputManager.fingerGestureEvent += updateGizmoScale;
+            m_inputManager.updateCameraUICommand += updateGizmoScale;*/
+
+            //TODO: have UI (?) Event for CamChanged (pos)
+            //just do this in update
+            core.updateEvent += OnCoreUpdateEvent;
 
             // Grabbing scene scale
             uiScale = manager.settings.uiScale.value;
@@ -322,26 +338,102 @@ namespace tracer
             InstantiateAxes();
             HideAxes();
 
+            _dragViz = new DragVisualizer();
+            _dragRotateViz = new DragRotateVisualizer();
+
             this.doneEditing += manager.core.getManager<SceneManager>().getModule<UndoRedoModule>().addHistoryStep;
             this.doneEditing += core.getManager<NetworkManager>().getModule<UpdateSenderModule>().queueUndoRedoMessage;
         }
+        
+
+        #region NEW INPUT EVENTS
 
         //!
-        //! Function that is called when a tap is triggered instead of a start/end event
-        //! @param sender m_callback sender
-        //! @param e event reference
+        //! Callback from TRACER _core when Unity calls it's render update
+        //! [!REVISE] only do on updates? cam update, gizmo manipulation, animation?
         //!
-        private void Tapped(object sender, Vector2 point){
-            if(!selObj || !CameraRaycast(point)){
+        private void OnCoreUpdateEvent(object sender, EventArgs e){
+            if(!selObj)
                 return;
-             }
 
-            if(m_inputManager.WasDoubleClick()){
-                if(manager.LastClickedObject == selObj){  //works with locked objects as well!
-                    manager.focusOnLastClickedObject();
+            UpdateManipScale();
+
+            if(manager.ManipulationLayer == UIManager.ManipulationLayerEnum.VIEWPORT && lastActiveManip) {
+                Transform camTr = mainCamera.transform;
+                if(camTr.position != lastCamPos || camTr.rotation != lastCamRot) {
+                    UpdateGizmoAxisLayer(lastActiveManip.transform, selObj.transform, Camera.main.transform, manager.ManipulationLayer);
                 }
+                lastCamPos = camTr.position;
+                lastCamRot = camTr.rotation;
+            }
+
+        }
+
+        private DragVisualizer _dragViz;
+        private DragRotateVisualizer _dragRotateViz;
+
+        //!
+        //! Function to connect input managers input event for dragging a sceneObjects gizmo
+        //!
+        //! @param evt the InputData
+        //!
+        private void DragFunction(object sender, InputManager.DragEventArgs evt){
+
+            // [REVIEW]
+            // if no specific gizmo is shown, use prim - move, sec - rot, tert - scale
+            // (if so, add function parameter to use as _manipulator type_)
+            // update viz accordingly? 
+
+            // right now, only Primary
+            if (evt.Level != InputManager.InputLevel.Primary) return;
+
+            // check phase
+            switch (evt.State){
+                case InputManager.InputState.Started:
+                    //Debug.Log("Primary Drag Started");
+                    SetupManipulatorForTransformations(evt.StartPosition);
+                    CalculateStartOffset(evt.StartPosition);
+                    //better for viz?
+                    //HideGizmo();
+                    break;
+                case InputManager.InputState.Ongoing:
+                    //Debug.Log("Primary Drag ongoing");
+                    ExecuteManipulatorTransformation(evt.Position);
+                    break;
+                case InputManager.InputState.Canceled:
+                case InputManager.InputState.Ended:
+                    //Debug.Log("Primary Drag ended");
+                    //TODO: dont execute via controller-right-stick drag, since we only every rotate the cam with it
+                    FinalizeManipulatorTransformation(evt.Position);
+                    //better for viz?
+                    //ShowGizmo();
+                    break;
             }
         }
+
+        //!
+        //! helper to cycle through axis manipuation modes with click, not only controller or keyboard
+        //!
+        private void ClickFunction(object sender, InputManager.InputEventArgs evt){
+
+            // right now, only Primary
+            if (evt.Level != InputManager.InputLevel.Secondary) return;
+
+            // check phase
+            switch (evt.State){
+                case InputManager.InputState.Started:
+                case InputManager.InputState.Ongoing:
+                case InputManager.InputState.Canceled:
+                    break;
+                case InputManager.InputState.Ended:
+                    manager.CycleManipulationMode();
+                    break;
+            }
+        }
+
+        #endregion
+
+
 
 
         //!
@@ -350,68 +442,254 @@ namespace tracer
         //! @param sender m_callback sender
         //! @param e event reference
         //!
-        private void PressStart(object sender, Vector2 point)
-        {
-            //Debug.Log("<color=black>PressStart</color>");
-
+        private void SetupManipulatorForTransformations(Vector2 point){
             // grab the hit manip
-            manipulator = CameraRaycast(point);
-
-            if (manipulator)
-            {
-                //Debug.Log("<color=green> hit "+manipulator.name+"</color>");
-
+            manipulator = EvaluationHelper.Instance.EvaluateManipulator(point);
+            if (manipulator){
+                Debug.Log("HIT MANIPULATOR");
+                
                 // make a plane based on it
                 planeVec = manipulator.transform.forward;
-                Vector3 center = manipulator.GetComponent<Collider>().bounds.center;
-                helperPlane = new Plane(planeVec, center);
+                helperPlaneCenter = selObj.transform.position; //manipulator.GetComponent<Collider>().bounds.center;
+                helperPlane = new Plane(planeVec, helperPlaneCenter);
                 //Debug.DrawRay(center, planeVec * 10, Color.red, 1);
 
                 // if root modifier - plane normal is camera axis
                 if (manipulator.tag == "gizmoCenter")
-                    helperPlane = new Plane(mainCamera.transform.forward, center);
+                    helperPlane = new Plane(mainCamera.transform.forward, helperPlaneCenter);
 
                 // HACK - if translate single axis - plane normal is camera axis projected on the axis plane
-                if (manipulator == manipTx || manipulator == manipTy || manipulator == manipTz)
-                    helperPlane = new Plane(Vector3.ProjectOnPlane(mainCamera.transform.forward, manipulator.transform.up), center);
+                if (manipulator == manipTx || manipulator == manipTy || manipulator == manipTz ||
+                    manipulator == manipSx || manipulator == manipSy || manipulator == manipSz
+                )
+                    helperPlane = new Plane(Vector3.ProjectOnPlane(mainCamera.transform.forward, manipulator.transform.up), helperPlaneCenter);
 
                 // semi hack - if manip = main rotator - free rotation
                 if (manipulator == manipR)
                     //{
                     //freeRotationColl = manipulator.GetComponent<Collider>();
                     // make the collision plane a bit in front of the object
-                    helperPlane = new Plane(mainCamera.transform.forward, center - .2f * Vector3.Distance(mainCamera.transform.position, selObj.transform.position) * mainCamera.transform.forward);
+                    helperPlane = new Plane(mainCamera.transform.forward, helperPlaneCenter - .2f * Vector3.Distance(mainCamera.transform.position, selObj.transform.position) * mainCamera.transform.forward);
                 //}
 
                 // store manipulator position in its object local space (to save multiple calls)
                 localManipPosition = selObj.transform.parent.transform.InverseTransformPoint(manipulator.transform.position);
-
-                // monitor move
-                m_inputManager.inputMove += Move;
             }
+            
             // hack - storing initial scale in case of ui operation
-            if (selObj)
-            {
+            if (selObj){
                 //Debug.Log("<color=green> selected obj "+selObj.gameObject.name+"</color>");
                 Parameter<Vector3> sca = (Parameter<Vector3>)selObj.parameterList[sIndex];
                 initialSca = sca.value;
             }
         }
 
-        //!
-        //! Helper function that raycasts from camera and returns hit game object
-        //! It subscribes (at PressStart) to the event triggered at every position update from InputManager
-        //! @param pos screen point through which to raycast
-        //! @param layerMask layer mask containing the objects to be considered
-        //!
-        // Warning?
-        // Potential bad behaviors if there are other objects besides the manipulators with physics collider inside UI layer
-        private GameObject CameraRaycast(Vector3 pos, int layerMask = 1 << 5)
-        {
-            if (Physics.Raycast(mainCamera.ScreenPointToRay(pos), out RaycastHit hit, Mathf.Infinity, layerMask))
-                return hit.collider.gameObject;
 
-            return null;
+        private void CalculateStartOffset(Vector2 clickPos) {
+            if(!manipulator)
+                return;
+
+            //Create a ray from the Mouse click position
+            Ray ray = mainCamera.ScreenPointToRay(clickPos);
+            if (helperPlane.Raycast(ray, out float hitDistance)){
+                //Get the point that is clicked
+                Vector3 hitPoint = ray.GetPoint(hitDistance);
+                Vector3 projectedVec = hitPoint;
+
+                switch (modeTRS){ 
+                    // drag object - translate
+                    case 0: // multi obj dev
+                        // dirty temp hack - identify if single axis
+                        isSingleAxis = manipulator == manipTx || manipulator == manipTy || manipulator == manipTz;
+                        lockedlocalAxis = lockedGlobalAxis = Vector3.zero;
+                        if (isSingleAxis){
+                            lockedGlobalAxis = new Vector3(manipulator == manipTx ? 1 : 0, manipulator == manipTy ? 1 : 0, manipulator == manipTz ? 1 : 0);
+                            Transform manipulatorRoot = manipulator.transform.root;
+                            lockedlocalAxis = 
+                                manipulatorRoot.right * lockedGlobalAxis.x +
+                                manipulatorRoot.up * lockedGlobalAxis.y + 
+                                manipulatorRoot.forward * lockedGlobalAxis.z;
+                            
+                            projectedVec = Vector3.Project(hitPoint - manipulator.transform.position, manipulator.transform.up) + manipulator.transform.position;
+                        }
+
+                        // store the offset between clicked point and center of obj
+                        hitPosOffset = projectedVec - manipulator.transform.position;
+                        // for multi move
+                        foreach (SceneObject obj in selObjs){
+                            objOffsets.Add(obj.transform.position - manipulator.transform.position);
+                        }
+                        break;
+                    // drag rotate - manip version
+                    case 1:
+                        // Convert to object space
+                        hitPoint = selObj.transform.parent.transform.InverseTransformPoint(hitPoint);
+                        hitPosOffset = hitPoint - localManipPosition;
+                        rotationDragWorldStartVec = selObj.transform.parent.TransformDirection(hitPosOffset);
+                        break;
+                    // drag object - scale
+                    case 2:
+                        // temp hack - identify if single axis
+                        if (manipulator == manipSx || manipulator == manipSy || manipulator == manipSz){
+                            projectedVec = Vector3.Project(hitPoint - manipS.transform.position, manipulator.transform.up) + manipS.transform.position;
+                        }
+
+                        hitPosOffset = projectedVec;
+                        break;
+                }
+            }
+            m_inputManager.SetAllowCamNavigation(false);
+        }
+
+        private Vector3 rotationDragWorldStartVec;  //used just for visualization of how "far" we drag the rotation
+
+        //!
+        //! Function to be performed on click/touch drag
+        //! It subscribes (at PressStart) to the event triggered at every position update from InputManager
+        //! @param sender m_callback sender
+        //! @param e event reference
+        //!
+        private void ExecuteManipulatorTransformation(Vector2 point){
+
+            //Debug.Log("<color=black>Move</color>");
+
+            if (manipulator == null || selObj == null)
+                return;
+
+            //Debug.Log("<color=green> selObj "+selObj.gameObject.name+"</color>");
+            //Debug.Log("<color=green> mode:  "+modeTRS+"</color>");
+            
+            //Create a ray from the Mouse click position
+            Ray ray = mainCamera.ScreenPointToRay(point);
+            if(!helperPlane.Raycast(ray, out float enter))
+                return;
+
+            //Get the point that is clicked
+            Vector3 hitPoint = ray.GetPoint(enter);
+
+            // drag object - translate
+            if (modeTRS == 0){ // multi obj dev
+                //Debug.Log("<color=green> ray hit helperPlane!</color>");
+
+                Vector3 projectedVec = hitPoint;
+                // dirty temp hack - identify if single axis
+                if (isSingleAxis){    
+                    projectedVec = Vector3.Project(hitPoint - manipulator.transform.position, manipulator.transform.up) + manipulator.transform.position;
+                }
+
+                // adjust
+                projectedVec -= hitPosOffset;
+
+                _dragViz.UpdateVisuals(helperPlaneCenter, helperPlane.normal, projectedVec, isSingleAxis, lockedlocalAxis, lockedGlobalAxis);
+
+                //Debug.Log("<color=green> projectedVec: "+projectedVec+"</color>");
+
+                // Actual translation operation
+                // For a single object
+                if (selObjs.Count == 1){
+                    Vector3 localVec = selObj.transform.parent.InverseTransformPoint(projectedVec);
+                    Parameter<Vector3> pos = (Parameter<Vector3>)selObj.parameterList[tIndex];
+                    pos.setValue(localVec);
+                    //Debug.Log("<color=green> set value for single selection!</color>");
+                }
+                // For multiple objects
+                else{
+                    for (int i = 0; i < selObjs.Count; i++){
+                        Vector3 localVec = selObjs[i].transform.parent.InverseTransformPoint(projectedVec + objOffsets[i]);
+                        Parameter<Vector3> pos = (Parameter<Vector3>)selObjs[i].parameterList[tIndex];
+                        pos.setValue(localVec);
+                    }
+                }
+            }
+
+
+            // drag rotate - manip version
+            else if (modeTRS == 1){
+                // Convert to object space
+                hitPoint = selObj.transform.parent.InverseTransformPoint(hitPoint);
+                // get orientation quaternion
+                Quaternion rotQuat = new Quaternion();
+
+                rotQuat.SetFromToRotation(hitPosOffset, hitPoint - localManipPosition);
+
+                // Strengthen free rotation
+                bool isFreeRotation = false;
+                if (manipulator == manipR){
+                    rotQuat *= rotQuat;
+                    isFreeRotation = true;
+                }
+
+                //****** ONLY FOR VISUALIZATION
+                // Convert the local drag vectors into World Space so the visualizer can draw them accurately
+                Vector3 worldCurrentVec = selObj.transform.parent.TransformDirection(hitPoint - localManipPosition);
+
+                // Call the visualizer
+                _dragRotateViz.UpdateVisuals(
+                    helperPlaneCenter, 
+                    helperPlane.normal, 
+                    rotationDragWorldStartVec, 
+                    worldCurrentVec, 
+                    isFreeRotation,
+                    selObj.transform
+                );
+                //*****************************
+
+                // Actual rotation operation
+                // For a single object
+                if (selObjs.Count == 1){
+                    Parameter<Quaternion> rot = (Parameter<Quaternion>)selObj.parameterList[rIndex];
+                    rot.setValue(rotQuat * rot.value);
+                }
+                // For multiple objects
+                else
+                {
+                    for (int i = 0; i < selObjs.Count; i++)
+                    {
+                        // Effect on position
+                        Vector3 srcPos = selObjs[i].transform.position;
+                        Vector3 pivotPoint = manipR.transform.position;
+                        Vector3 dstPos = rotQuat * (srcPos - pivotPoint) + pivotPoint;
+                        Vector3 localVec = selObjs[i].transform.parent.InverseTransformPoint(dstPos);
+                        Parameter<Vector3> pos = (Parameter<Vector3>)selObjs[i].parameterList[tIndex];
+                        pos.setValue(localVec);
+
+                        // Rotation
+                        Parameter<Quaternion> rot = (Parameter<Quaternion>)selObjs[i].parameterList[rIndex];
+                        rot.setValue(rotQuat * rot.value);
+                    }
+
+                    // Make gizmo follow
+                    visualRot *= rotQuat;
+                    TransformManipR(visualRot);
+                }
+
+                // update offset
+                hitPosOffset = hitPoint - localManipPosition;
+            }
+
+            // drag object - scale
+            else if (modeTRS == 2){
+                
+                Vector3 projectedVec = hitPoint;
+                // temp hack - identify if single axis
+                if (manipulator == manipSx || manipulator == manipSy || manipulator == manipSz){
+                    projectedVec = Vector3.Project(hitPoint - manipS.transform.position, manipulator.transform.up) + manipS.transform.position;
+                }
+
+                Parameter<Vector3> sca;
+
+                //actual scale things - tracer assets
+                Vector3 deltaClick = projectedVec - hitPosOffset + manipS.transform.position;
+                Vector3 localDelta = manipS.transform.InverseTransformPoint(deltaClick);
+
+                // hack to see if it's main controller and so would use uniform scale - average values
+                if (manipulator == manipS)
+                    localDelta = Vector3.one * (localDelta.x + localDelta.y + localDelta.z) / 3f;
+
+                Vector3 scaleOffset = Vector3.one + localDelta;
+                sca = (Parameter<Vector3>)selObj.parameterList[sIndex];
+                sca.setValue(Vector3.Scale(initialSca, scaleOffset));
+            }
         }
 
         //!
@@ -420,18 +698,11 @@ namespace tracer
         //! @param sender m_callback sender
         //! @param e event reference
         //!
-        private void PressEnd(object sender, Vector2 point)
-        {
-            //Debug.Log("Press end: " + point.ToString());
-
-            // stop monitoring move
-            m_inputManager.inputMove -= Move;
-            firstPress = true;
-
+        private void FinalizeManipulatorTransformation(Vector2 point){
+            Debug.Log("FinalizeManipulatorTransformation");
             // Hack - restore scale
             // restore position instead
-            if (modeTRS == 2)
-            {
+            if (modeTRS == 2){
                 manipSx.transform.localPosition = Vector3.zero;
                 manipSy.transform.localPosition = Vector3.zero;
                 manipSz.transform.localPosition = Vector3.zero;
@@ -442,8 +713,7 @@ namespace tracer
 
             // for multi selection
             objOffsets.Clear();
-            if (selObjs.Count > 1)
-            {
+            if (selObjs.Count > 1){
                 // restore rotation gizmo orientation
                 visualRot = Quaternion.identity;
                 TransformManipR(visualRot);
@@ -477,231 +747,30 @@ namespace tracer
                         break;
                 }
             }
+            m_inputManager.SetAllowCamNavigation(true);
             manipulator = null;
+            _dragViz.Cleanup();
+            _dragRotateViz.Cleanup();
         }
 
-        //!
-        //! Function to be performed on click/touch drag
-        //! It subscribes (at PressStart) to the event triggered at every position update from InputManager
-        //! @param sender m_callback sender
-        //! @param e event reference
-        //!
-        // Warning?
-        // Should only operate in case of existing selection
-        // But what happens if touch input is moving the object and other function change the selection?
-        private void Move(object sender, Vector2 point)
-        {
+        private void HideGizmo() {
+            
+        }
 
-            //Debug.Log("<color=black>Move</color>");
-
-            if (selObj == null)
-                return;
-
-            //Debug.Log("<color=green> selObj "+selObj.gameObject.name+"</color>");
-            //Debug.Log("<color=green> mode:  "+modeTRS+"</color>");
-
-            // drag object - translate
-            if (modeTRS == 0) // multi obj dev
-            {
-                //Create a ray from the Mouse click position
-                Ray ray = mainCamera.ScreenPointToRay(point);
-                if (helperPlane.Raycast(ray, out float enter))
-                {
-                    //Debug.Log("<color=green> ray hit helperPlane!</color>");
-
-                    //Get the point that is clicked
-                    Vector3 hitPoint = ray.GetPoint(enter);
-
-                    Vector3 projectedVec = hitPoint;
-                    // dirty temp hack - identify if single axis
-                    if (manipulator == manipTx || manipulator == manipTy || manipulator == manipTz)
-                    {
-                        projectedVec = Vector3.Project(hitPoint - manipulator.transform.position, manipulator.transform.up) + manipulator.transform.position;
-                    }
-
-                    // store the offset between clicked point and center of obj
-                    if (firstPress)
-                    {
-                        hitPosOffset = projectedVec - manipulator.transform.position;
-                        firstPress = false;
-
-                        // for multi move
-                        foreach (SceneObject obj in selObjs)
-                        {
-                            objOffsets.Add(obj.transform.position - manipulator.transform.position);
-                            //Debug.Log("OBJECT: " + obj.ToString());
-                            //Debug.Log("OFFSET: " + (obj.transform.position - manipulator.transform.position).ToString());
-                        }
-                    }
-
-                    // adjust
-                    projectedVec -= hitPosOffset;
-                    //Debug.Log("<color=green> projectedVec: "+projectedVec+"</color>");
-
-                    // Actual translation operation
-                    // For a single object
-                    if (selObjs.Count == 1)
-                    {
-                        Vector3 localVec = selObj.transform.parent.transform.InverseTransformPoint(projectedVec);
-                        Parameter<Vector3> pos = (Parameter<Vector3>)selObj.parameterList[tIndex];
-                        pos.setValue(localVec);
-                        //Debug.Log("<color=green> set value for single selection!</color>");
-                    }
-                    // For multiple objects
-                    else
-                    {
-                        for (int i = 0; i < selObjs.Count; i++)
-                        {
-                            Vector3 localVec = selObjs[i].transform.parent.transform.InverseTransformPoint(projectedVec + objOffsets[i]);
-                            Parameter<Vector3> pos = (Parameter<Vector3>)selObjs[i].parameterList[tIndex];
-                            pos.setValue(localVec);
-                        }
-                    }
-                }
-            }
-
-
-            // drag rotate - manip version
-            if (modeTRS == 1)
-            {
-                bool hit = false;
-                Vector3 hitPoint = Vector3.zero;
-
-                // reate a ray from the Mouse click position
-                Ray ray = mainCamera.ScreenPointToRay(point);
-
-                // if manip = main rotator - free rotation
-                if (manipulator == manipR)
-                {
-                    if (helperPlane.Raycast(ray, out float enter))
-                    {
-                        hit = true;
-                        //Get the point that is clicked - on the normal to camera plane
-                        hitPoint = ray.GetPoint(enter);
-                        // Convert to object space
-                        hitPoint = selObj.transform.parent.transform.InverseTransformPoint(hitPoint);
-                    }
-                }
-                // else it's one of the axis spinner
-                else
-                {
-                    if (helperPlane.Raycast(ray, out float enter))
-                    {
-                        hit = true;
-                        //Get the point that is clicked - on the plane
-                        hitPoint = ray.GetPoint(enter);
-                        // change to the object local space
-                        hitPoint = selObj.transform.parent.transform.InverseTransformPoint(hitPoint);
-                    }
-                }
-                if (hit)
-                {
-                    // store the offset between clicked point and center of obj
-                    if (firstPress)
-                    {
-                        hitPosOffset = hitPoint - localManipPosition;
-
-                        firstPress = false;
-                    }
-
-                    // get orientation quaternion
-                    Quaternion rotQuat = new Quaternion();
-
-                    rotQuat.SetFromToRotation(hitPosOffset, hitPoint - localManipPosition);
-
-                    // Strengthen free rotation
-                    if (manipulator == manipR)
-                        rotQuat *= rotQuat;
-
-                    // Actual rotation operation
-                    // For a single object
-                    if (selObjs.Count == 1)
-                    {
-                        Parameter<Quaternion> rot = (Parameter<Quaternion>)selObj.parameterList[rIndex];
-                        rot.setValue(rotQuat * rot.value);
-                    }
-                    // For multiple objects
-                    else
-                    {
-                        for (int i = 0; i < selObjs.Count; i++)
-                        {
-                            // Effect on position
-                            Vector3 srcPos = selObjs[i].transform.position;
-                            Vector3 pivotPoint = manipR.transform.position;
-                            Vector3 dstPos = rotQuat * (srcPos - pivotPoint) + pivotPoint;
-                            Vector3 localVec = selObjs[i].transform.parent.transform.InverseTransformPoint(dstPos);
-                            Parameter<Vector3> pos = (Parameter<Vector3>)selObjs[i].parameterList[tIndex];
-                            pos.setValue(localVec);
-
-                            // Rotation
-                            Parameter<Quaternion> rot = (Parameter<Quaternion>)selObjs[i].parameterList[rIndex];
-                            rot.setValue(rotQuat * rot.value);
-                        }
-
-                        // Make gizmo follow
-                        visualRot *= rotQuat;
-                        TransformManipR(visualRot);
-                    }
-
-                    // update offset
-                    hitPosOffset = hitPoint - localManipPosition;
-                }
-            }
-
-            // drag object - scale
-            if (modeTRS == 2)
-            {
-                //Create a ray from the Mouse click position
-                Ray ray = mainCamera.ScreenPointToRay(point);
-                if (helperPlane.Raycast(ray, out float enter))
-                {
-                    //Get the point that is clicked
-                    Vector3 hitPoint = ray.GetPoint(enter);
-
-                    Vector3 projectedVec = hitPoint;
-                    // temp hack - identify if single axis
-                    if (manipulator == manipSx || manipulator == manipSy || manipulator == manipSz)
-                    {
-                        projectedVec = Vector3.Project(hitPoint - manipS.transform.position, manipulator.transform.up) + manipS.transform.position;
-                    }
-
-                    Parameter<Vector3> sca;
-
-                    // store the offset between clicked point and center of obj
-                    if (firstPress)
-                    {
-                        hitPosOffset = projectedVec;
-                        firstPress = false;
-                    }
-
-                    //actual scale things - tracer assets
-                    Vector3 deltaClick = projectedVec - hitPosOffset + manipS.transform.position;
-                    Vector3 localDelta = manipS.transform.InverseTransformPoint(deltaClick);
-
-                    // hack to see if it's main controller and so would use uniform scale - average values
-                    if (manipulator == manipS)
-                        localDelta = Vector3.one * (localDelta.x + localDelta.y + localDelta.z) / 3f;
-
-                    Vector3 scaleOffset = Vector3.one + localDelta;
-                    sca = (Parameter<Vector3>)selObj.parameterList[sIndex];
-                    sca.setValue(Vector3.Scale(initialSca, scaleOffset));
-                }
-
-            }
+        private void ShowGizmo() {
+            
         }
 
         //!
         //! Function that does nothing.
         //! Being called when selection has changed.
         //!
-        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects)
-        {
+        private void SelectionUpdate(object sender, List<SceneObject> sceneObjects){
 
             // Log
-            //Debug.Log("Selection changed");
+            //Debug.Log("<i>UICreator3DModule.SelectionUpdate()</i> "+sceneObjects.Count);
 
-            if (sceneObjects.Count > 0)
-            {
+            if (sceneObjects.Count > 0){
                 // Grab object
                 selObj = sceneObjects[0];
                 // by reference
@@ -742,9 +811,13 @@ namespace tracer
                 if (sceneObjects.Count > 1)
                     SetMultiManipulatorMode(null, 0);
 
-            }
-            else // empty selection
-            {
+                // Subscribe to possible change selection via camera (lock look through or in camera space)
+                manager.uiCameraLockChanged += SetCameraManipulator;
+
+                Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(Camera.main, selObj.transform.position);
+                core.StartCoroutine(AnimateFloatingText(""+manager.ManipulationLayer, screenPoint));
+
+            }else{ // empty selection
                 // Clean selection
                 selObj = null;
                 selObjs.Clear();
@@ -752,8 +825,29 @@ namespace tracer
                 //HideAxes();
                 //modeTRS = -1;
                 SetManipulatorMode(null, -1);
+
+                manager.uiCameraLockChanged -= SetCameraManipulator;
             }
 
+            camMathValues = Screen.dpi / (Screen.width + Screen.height);
+        }
+        private void ManipulationLayerChanged(object sender, UIManager.ManipulationLayerEnum newManipulationLayer) {
+            if(lastActiveManip){
+                switch ((TRSModeEnum)savedTrsMode) {
+                    case TRSModeEnum.SCALE:     newManipulationLayer = UIManager.ManipulationLayerEnum.LOCAL; break;
+                    case TRSModeEnum.TRANSLATE:
+                    case TRSModeEnum.ROTATE:
+                    default:
+                        break;
+                }
+            }
+            if(modeTRS > -1 && selObj){
+                Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(Camera.main, selObj.transform.position);
+                core.StartCoroutine(AnimateFloatingText(""+manager.ManipulationLayer, screenPoint));
+            }
+            
+            if(lastActiveManip && selObj)
+                UpdateGizmoAxisLayer(lastActiveManip.transform, selObj.transform, Camera.main.transform, newManipulationLayer);
         }
 
 
@@ -826,7 +920,7 @@ namespace tracer
             lastActiveManip.SetActive(true);
             //also update scale!
             lastActiveManip.transform.localScale = GetModifierScale();
-            modeTRS = previousTrsMode;
+            modeTRS = savedTrsMode;
         }
 
         //!
@@ -855,8 +949,50 @@ namespace tracer
             if (selObjs.Count > 1)
                 manip.transform.rotation = Quaternion.identity;
 
+
             // Adjust scale
             manip.transform.localScale = GetModifierScale();
+        }
+
+        public void UpdateGizmoAxisLayer(Transform gizmoRoot, Transform targetObject, Transform cameraTransform, UIManager.ManipulationLayerEnum mode) {
+            // Orient the Gizmo arrows based on the current mode
+            switch (mode) {
+                case UIManager.ManipulationLayerEnum.LOCAL:
+                    // The arrows perfectly match the object's internal tilt and spin
+                    gizmoRoot.rotation = targetObject.rotation;
+                    break;
+
+                case UIManager.ManipulationLayerEnum.GLOBAL:
+                    // The arrows lock to the absolute World grid (Identity = No rotation)
+                    gizmoRoot.rotation = Quaternion.identity;
+                    break;
+
+                case UIManager.ManipulationLayerEnum.VIEWPORT:
+                    // The arrows point away from the camera, but stay flat on the floor
+                    Vector3 flatCamForward = cameraTransform.forward;
+                    flatCamForward.y = 0f; // no vertical pitch
+
+                    // Safety check: Prevent errors if the camera looks EXACTLY straight down
+                    if (flatCamForward.sqrMagnitude > 0.0001f) {
+                        flatCamForward.Normalize();
+                        
+                        // LookRotation mathematically builds a Quaternion where "Forward" is our flatCamForward, 
+                        // and "Up" is the world's absolute Up.
+                        gizmoRoot.rotation = Quaternion.LookRotation(flatCamForward, Vector3.up);
+                    }else{
+                        // Fallback if the camera is pointing straight at the floor: 
+                        // Use the camera's UP vector (flattened) as the new forward
+                        Vector3 flatCamUp = cameraTransform.up;
+                        flatCamUp.y = 0f;
+                        gizmoRoot.rotation = Quaternion.LookRotation(flatCamUp.normalized, Vector3.up);
+                    }
+
+                    if((TRSModeEnum)savedTrsMode == TRSModeEnum.ROTATE){
+                        // Multiplies the current rotation by a local 90-degree spin on the Y-axis, swapping X and Z visually.
+                        gizmoRoot.rotation *= Quaternion.Euler(0f, 90f, 0f);
+                    }
+                    break;
+            }
         }
 
         //!
@@ -896,18 +1032,16 @@ namespace tracer
             manipT.transform.rotation = Quaternion.identity;
             manipT.transform.localScale = GetModifierScale();
             modeTRS = 0;
-            previousTrsMode = modeTRS;
+            savedTrsMode = modeTRS;
             // Incomplete function - lacking manipulator mode
         }
 
         //!
         //! Set the mode of operation of the manipulator and its respective event subscriptions
         //!
-        private void SetManipulatorMode(object sender, int manipulatorMode)
-        {
+        private void SetManipulatorMode(object sender, int manipulatorMode){
             // Disable manipulator
-            if (manipulatorMode < 0 || manipulatorMode > 2)
-            {
+            if (manipulatorMode < 0 || manipulatorMode > 2){
                 HideAxes();
                 modeTRS = -1;
                 // Place manipulator out of range to avoid unwanted click recognition when it's activated
@@ -921,20 +1055,8 @@ namespace tracer
                 return;
             }
 
-            if (selObj)
-            {
-                if (manipulatorMode == 0 )
-                {
-                    SetModeT();
-                }
-                else if (manipulatorMode == 1)
-                {
-                    SetModeR();
-                }
-                else if (manipulatorMode == 2)
-                {
-                    SetModeS();
-                }
+            if (selObj){
+                SetModeTRS((TRSModeEnum)manipulatorMode);
             }
 
         }
@@ -962,14 +1084,27 @@ namespace tracer
         //!
         //! Update the manipulator rotation according to rotation parameter changes
         //!
-        public void UpdateManipulatorRotation(object sender, Quaternion rotation)
-        {
-            if (selObjs.Count == 1) // only update here if single selection
-            {
+        public void UpdateManipulatorRotation(object sender, Quaternion rotation){
+            // only update here if single selection
+            if (selObjs.Count == 1) {
+                //Debug.Log("UpdateManipulatorRotation");
+                //this will happen ongoing while we hold to rotate
+                //and it is completely wrong for other ManipulationLayers like global or viewport!
                 Quaternion q = selObj.transform.rotation;
                 manipT.transform.localRotation = q;
                 manipR.transform.localRotation = q;
                 manipS.transform.localRotation = q;
+
+                switch ((TRSModeEnum)savedTrsMode) {
+                    case TRSModeEnum.ROTATE:
+                        //global/viewport: does not rotate the gizmo...
+                        UpdateGizmoAxisLayer(manipR.transform, selObj.transform, Camera.main.transform, manager.ManipulationLayer);
+                        break;
+                    case TRSModeEnum.SCALE:
+                    case TRSModeEnum.TRANSLATE:
+                    default:
+                        break;
+                }     
             }
         }
 
@@ -1032,62 +1167,38 @@ namespace tracer
         //!
         //! Helper function for transform gizmo scale adjustment according to screen and UI scale parameter
         //!
-        private Vector3 GetModifierScale()
-        {
+        private Vector3 GetModifierScale(){
             if (!selObj)
                 return Vector3.one;
          
             return Vector3.one * uiScale 
                        * (Vector3.Distance(mainCamera.transform.position, selObj.transform.position)
                        * (4.0f * Mathf.Tan(0.5f * (Mathf.Deg2Rad * mainCamera.fieldOfView)))
-                       * Screen.dpi / (Screen.width + Screen.height));
+                       * camMathValues);
+
         }
 
-        //!
-        //! Set transform gizmo to translate mode
-        //!
-        public void SetModeT()
-        {
-            //Debug.Log("T mode");
-            if (selObj != null)
-            {
-                HideAxes();
-                ShowAxis(manipT);
-                TransformAxisMulti(manipT);
-                modeTRS = 0;
-                previousTrsMode = modeTRS;
-            }
+        public enum TRSModeEnum {
+            TRANSLATE = 0, ROTATE = 1, SCALE = 2, NONE
         }
 
-        //!
-        //! Set transform gizmo to rotate mode
-        //!
-        public void SetModeR()
-        {
-            //Debug.Log("R mode");
-            if (selObj != null)
-            {
+        public void SetModeTRS(TRSModeEnum mode) {
+            if (selObj != null && mode != TRSModeEnum.NONE){
+                GameObject manipulator = null;
+                UIManager.ManipulationLayerEnum manipLayer = manager.ManipulationLayer;;
+                switch (mode) {
+                    case TRSModeEnum.TRANSLATE: manipulator = manipT; break;
+                    case TRSModeEnum.ROTATE:    manipulator = manipR; break;
+                    case TRSModeEnum.SCALE:     manipulator = manipS; manipLayer = UIManager.ManipulationLayerEnum.LOCAL; break;
+                }
                 HideAxes();
-                ShowAxis(manipR);
-                TransformAxisMulti(manipR);
-                modeTRS = 1;
-                previousTrsMode = modeTRS;
-            }
-        }
+                ShowAxis(manipulator);
+                TransformAxisMulti(manipulator);
+                
+                UpdateGizmoAxisLayer(manipulator.transform, selObj.transform, Camera.main.transform, manipLayer);
 
-        //!
-        //! Set transform gizmo to scale mode
-        //!
-        public void SetModeS()
-        {
-            //Debug.Log("S mode");
-            if (selObj != null)
-            {
-                HideAxes();
-                ShowAxis(manipS);
-                TransformAxisMulti(manipS);
-                modeTRS = 2;
-                previousTrsMode = modeTRS;
+                modeTRS = (int)mode;
+                savedTrsMode = modeTRS;
             }
         }
 
@@ -1107,5 +1218,55 @@ namespace tracer
         {
             UpdateManipScale();
         }
+
+        // --- HELPER METHODS FOR FIRING EVENTS ---
+        
+
+        #region DEBUGGING
+        private GameObject mainUIContainer;
+        // Ensures we always have a canvas to draw on
+        private void EnsureMainCanvasExists(){
+            if (mainUIContainer != null) return;
+            mainUIContainer = new GameObject("ControllerModuleUI");
+            Canvas canvas = mainUIContainer.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 999;
+        }
+        private System.Collections.IEnumerator AnimateFloatingText(string message, Vector2 startPos){
+            EnsureMainCanvasExists();
+            GameObject textGO = new GameObject("InputText");
+            textGO.transform.SetParent(mainUIContainer.transform);
+            
+            Text txt = textGO.AddComponent<Text>();
+            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); // Default Unity font fallback
+            txt.text = message;
+            txt.fontSize = 24;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.color = Color.white;
+            txt.rectTransform.position = startPos;
+            
+            // Add shadow for readability
+            Outline outline = textGO.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(1, -1);
+
+            float duration = 2f;
+            float elapsed = 0f;
+
+            while (elapsed < duration){
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                
+                // Float up and fade out
+                txt.rectTransform.position = startPos + new Vector2(0, t * 20f);
+                txt.color = new Color(1f, 1f, 1f, 1f - Mathf.Pow(t, 2f));
+                outline.effectColor = new Color(0, 0, 0, 1f - Mathf.Pow(t, 2f));
+                
+                yield return null;
+            }
+            UnityEngine.GameObject.Destroy(textGO);
+        }
+        #endregion   
     }
 }

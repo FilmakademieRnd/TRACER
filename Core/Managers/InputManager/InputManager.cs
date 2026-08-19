@@ -22,1255 +22,435 @@ if not go to https://opensource.org/licenses/MIT
 */
 
 //! @file "InputManager.cs"
-//! @brief Implementation of the TRACER Input Manager, managing all user inupts and mapping.
+//! @brief Implementation of the TRACER Input Manager, provides events to listen at for all modules
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @author Paulo Scatena
-//! @version 0
-//! @date 08.09.2022
+//! @author Thomas Krüger
+//! @version 2
+//! @date 12.08.2026
+//! @revision revert to use class and events again instead of EventHub
 
 
 using System;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
-using UnityEngine.InputSystem.EnhancedTouch;
-using UnityEngine.InputSystem.LowLevel;
 
-namespace tracer
-{
+namespace tracer{
     //!
     //! Class implementing the input manager, managing all user inupts and mapping.
     //!
-    public class InputManager : Manager
-    {
+    public class InputManager : Manager{
+
+        #region INPUT EVENT ARGS
+        //!
+        //! what level of input is addressed within the raising module
+        //!
+        public enum InputLevel      { Primary, Secondary, Tertiary }
+        //!
+        //! what state of input is currently raised from a module
+        //!
+        public enum InputState      { Started, Ongoing, Ended, Canceled }
 
         //!
-        //! Used for the detailed pinch event to have position and scroll delta
+        //! base payload of every input event - holds what all inputs have in common
         //!
-        public class DetailedEventArgs : EventArgs{
-            public DetailedEventArgs(Vector2 _point, Vector2 _delta){
-                point = _point;
-                delta = _delta;
+        public struct InputEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public readonly UnityEngine.Vector2 Position;
+            public readonly UnityEngine.Vector2 Delta;
+
+            public InputEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta = default)
+            { Level = _level; State = _state; Position = _position; Delta = _delta; }
+        }
+        //!
+        //! drag additionally reports where the gesture originally started
+        //!
+        public struct DragEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public readonly UnityEngine.Vector2 Position;
+            public readonly UnityEngine.Vector2 Delta;
+            public readonly UnityEngine.Vector2 StartPosition; 
+            public DragEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Vector2 _startPosition)
+            { Level = _level; State = _state; Position = _position; Delta = _delta; StartPosition = _startPosition; }    
+        }
+        //!
+        //! hold needs no extra data, but for understandings-sake we have this as an extra definition
+        //!
+        public struct PinchEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public readonly UnityEngine.Vector2 Position;
+            public readonly float PinchDelta;
+            public PinchEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, float _pinchDelta) 
+                { Level = _level; State = _state; Position = _position; PinchDelta = _pinchDelta; } 
+        }
+        //!
+        //! signed angle change of this frame in degrees, used only within multitouch gesture for now
+        //!
+        public struct RotateEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public readonly UnityEngine.Vector2 Position;
+            public readonly float RotationDelta;
+            public RotateEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, float _rotationDelta) 
+                { Level = _level; State = _state; Position = _position; RotationDelta = _rotationDelta; }
+        }
+        //!
+        //! input data of the device's rotation
+        //!
+        public struct AttitudeEventArgs {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            public UnityEngine.Quaternion Rotation;
+            public AttitudeEventArgs(InputLevel _level, InputState _state, UnityEngine.Quaternion _rotation)
+                { Level = _level; State = _state; Rotation = _rotation; }
+        }
+        //!
+        //! gps data from the module, only send if it gets asked for data via OnGPSDemandChanged
+        //!
+        public class GPSEventArgs
+        {
+            public readonly InputLevel Level;
+            public readonly InputState State;
+            private readonly float latitude;
+            private readonly float longitude;
+            private readonly float altitude;
+            private readonly float accuracy;
+            private readonly bool valid;
+            private readonly int minute;
+            private readonly int hour;
+            private readonly int day;
+            private readonly int month;
+            public GPSEventArgs(InputLevel _level, InputState _state,
+                float _lat, float _long, float _alt, float _accuracy, bool _valid,
+                int _minute, int _hour, int _day, int _month)
+            {
+                Level = _level; State = _state;
+                latitude = _lat; longitude = _long; altitude = _alt;
+                accuracy = _accuracy; valid = _valid;
+                minute = _minute; hour = _hour; day = _day; month = _month;
             }
-            public Vector2 point { get; set; }
-            public Vector2 delta { get; set; }
         }
 
-        //!
-        //! The default input event.
-        //!
-        public event EventHandler<Vector2> objectSelectionEvent;
-        
-        public event EventHandler<Vector2> tappedEvent;
-
-        //!
-        //! Press start event, i.e. the begin of a click.
-        //!
-        //public event EventHandler<Vector2> inputPressTapp;
-        //!
-        //! Press start event, i.e. the begin of a click.
-        //!
-        public event EventHandler<Vector2> inputPressStarted;
-        //!
-        //! Press start event, i.e. the begin of a click.
-        //!
-        public event EventHandler<Vector2> inputPressStartedUI;
-        //!
-        //! Press start event, i.e. the begin of a click.
-        //!
-        //public event EventHandler<Vector2> inputPressPerformed;   performed only makes sense for axis/movement, to receive smooth updated values instead of just the initial value
-        //!
-        //! Press start event, i.e. the begin of a click.
-        //!
-        //public event EventHandler<Vector2> inputPressPerformedUI;
-        //!
-        //! Press end event, i.e. the end of a click.
-        //!
-        public event EventHandler<Vector2> inputPressEnd;
-        //!
-        //! Press move event, i.e. the moving of the cursor/finger.
-        //!
-        public event EventHandler<Vector2> inputMove;
-
-        //!
-        //! The two finger pinch input event.
-        //!
-        public event EventHandler<float> pinchEvent;
-        //!
-        //! The two finger/scroll wheel pinch input event with position as well
-        //!
-        public event EventHandler<DetailedEventArgs> pinchDetailedEvent;
-        //!
-        //! The middle click pressed event which give the current position
-        //!
-        public event EventHandler<Vector2> middleClickPressEvent;
-        //!
-        //! The middle click move while pressed event which give the current position
-        //!
-        public event EventHandler<Vector2> middleClickMoveEvent;
-        //!
-        //! The middle click release event which give the current position
-        //!
-        public event EventHandler<Vector2> middleClickReleaseEvent;
-        //!
-        //! The two finger drag input event.
-        //!
-        public event EventHandler<Vector2> twoDragEvent;
-        //!
-        //! The two finger drag input event with positin data as well
-        //!
-        public event EventHandler<DetailedEventArgs> twoDragDetailEvent;
-        //!
-        //! The three finger drag input event.
-        //!
-        public event EventHandler<Vector2> threeDragEvent;
-
-        //!
-        //! Event to announce there is a finger gestures operation happening (only used for updateing the gizmo sized)
-        //!
-        public event EventHandler<bool> fingerGestureEvent;
-
-        //!
-        //! Event to stop the UI drag operations (snap select)
-        //!
-        public event EventHandler<bool> toggle2DUIInteraction;
-
-        //!
-        //! Event linked to the UI command of changing to the next available camera
-        //!
-        public event EventHandler<bool> updateCameraUICommand;
-
-        //!
-        //! Event linked to change of CameraControl
-        //!
-        public event EventHandler<CameraControl> cameraControlChanged;
-
-        #region Controller Events
-        public event EventHandler<float> buttonNorth;
-        public event EventHandler<float> buttonSouth;
-        public event EventHandler<float> buttonEast;
-        public event EventHandler<float> buttonWest;
-        public event EventHandler<float> buttonUp;
-        public event EventHandler<float> buttonDown;
-        public event EventHandler<float> buttonLeft;
-        public event EventHandler<float> buttonRight;
-        public event EventHandler<float> buttonLeftTrigger;
-        public event EventHandler<float> buttonRightTrigger;
-        public event EventHandler<float> buttonLeftShoulder;
-        public event EventHandler<float> buttonRighrShoulder;
-        public event EventHandler<Vector2> leftControllerStick;
-        public event EventHandler<Vector2> rightControllerStick;
-        public event EventHandler<Vector2> ControllerStickCanceled;
         #endregion
 
+        #region INPUT EVENTS
         //!
-        //! Enumeration describing possible touch input gestures.
+        //! fired when any input has started
+        //! for example rendering the view into an rtx once (beforehand)
         //!
-        public enum InputTouchType
-        {
-            ONE,
-            TWO,
-            THREE,
-            NONE
-        }
+        public event EventHandler<InputEventArgs> anyInputEvent;
         //!
-        //! The touch input gesture type.
+        //! fired when a click interaction ended on top of 2D UI
         //!
-        private InputTouchType m_touchType;
+        public event EventHandler<InputEventArgs> clickUIEvent;
+        //!
+        //! fired when a click interaction ended on a 3D UI, a scene object or nothing at all
+        //!
+        public event EventHandler<InputEventArgs> clickOtherEvent;
+        //!
+        //! fired when a drag interaction happens on top of 2D UI
+        //!
+        public event EventHandler<DragEventArgs> dragUIEvent;
+        //!
+        //! fired when a drag interaction happens on a 3D UI, a scene object or nothing at all
+        //!
+        public event EventHandler<DragEventArgs> dragOtherEvent;
+        //!
+        //! fired when a hold interaction happens on top of 2D UI
+        //!
+        public event EventHandler<InputEventArgs> holdUIEvent;
+        //!
+        //! fired when a hold interaction happens on a 3D UI, a scene object or nothing at all
+        //!
+        public event EventHandler<InputEventArgs> holdOtherEvent;
+         //!
+        //! fired when a double-click interaction ended on top of 2D UI
+        //!
+        public event EventHandler<InputEventArgs> doubleClickUIEvent;
+        //!
+        //! fired when a double-click interaction ended on a 3D UI, a scene object or nothing at all
+        //!
+        public event EventHandler<InputEventArgs> doubleClickOtherEvent;
+        //!
+        //! fired when a pinch interaction happens on top of 2D UI
+        //!
+        public event EventHandler<PinchEventArgs> pinchUIEvent;
+        //!
+        //! fired when a pinch interaction happens on a 3D UI, a scene object or nothing at all
+        //!
+        public event EventHandler<PinchEventArgs> pinchOtherEvent;
+        //!
+        //! fired when a rotate interaction (multi touch) happens on top of 2D UI
+        //!
+        public event EventHandler<RotateEventArgs> rotateUIEvent;
+        //!
+        //! fired when a rotate interaction (multi touch) happens on a 3D UI, a scene object or nothing at all
+        //!
+        public event EventHandler<RotateEventArgs> rotateOtherEvent;
+        //!
+        //! fires an attitude event, device sensors are never layer dependent
+        //!
+        public event EventHandler<AttitudeEventArgs> attitudeEvent;
+        //!
+        //! fires an gps event, device sensors are never layer dependent
+        //!
+        public event EventHandler<GPSEventArgs> gpsEvent;
+        //!
+        //! fires an ar event, device sensors are never layer dependent
+        //!
+        public event EventHandler<InputEventArgs> arEvent;
+        #endregion
+
+        #region EVENT RAISERS
+        //!
+        //! raise anyInputEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseAnyInput   (object sender, InputEventArgs e)   { anyInputEvent?.Invoke(sender, e); }
+        //!
+        //! raise clickUIEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseClickUI    (object sender, InputEventArgs e)   { clickUIEvent?.Invoke(sender, e); }
+        //!
+        //! raise clickOtherEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseClickOther (object sender, InputEventArgs e)   { clickOtherEvent?.Invoke(sender, e); }
+        //!
+        //! raise dragUIEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseDragUI     (object sender, DragEventArgs e)    { dragUIEvent?.Invoke(sender, e); }
+        //!
+        //! raise dragOtherEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseDragOther  (object sender, DragEventArgs e)    { dragOtherEvent?.Invoke(sender, e); }
+        //!
+        //! raise holdUIEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseHoldUI     (object sender, InputEventArgs e)    { holdUIEvent?.Invoke(sender, e); }
+        //!
+        //! raise holdOtherEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseHoldOther  (object sender, InputEventArgs e)    { holdOtherEvent?.Invoke(sender, e); }
+        //!
+        //! raise doubleClickUIEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseDoubleClickUI     (object sender, InputEventArgs e)    { doubleClickUIEvent?.Invoke(sender, e); }
+        //!
+        //! raise doubleClickOtherEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseDoubleClickOther  (object sender, InputEventArgs e)    { doubleClickOtherEvent?.Invoke(sender, e); }
+        //!
+        //! raise pinchUIEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaisePinchUI    (object sender, PinchEventArgs e)    { pinchUIEvent?.Invoke(sender, e); }
+        //!
+        //! raise pinchOtherEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaisePinchOther (object sender, PinchEventArgs e)    { pinchOtherEvent?.Invoke(sender, e); }
+        //!
+        //! raise rotateUIEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        public void RaiseRotateUI   (object sender, RotateEventArgs e)    { rotateUIEvent?.Invoke(sender, e); }
+        //!
+        //! raise rotateOtherEvent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseRotateOther(object sender, RotateEventArgs e)    { rotateOtherEvent?.Invoke(sender, e); }
+        //!
+        //! raise attitudeEvent, layer independent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseAttitude   (object sender, AttitudeEventArgs e){ attitudeEvent?.Invoke(sender, e); }
+        //!
+        //! raise gpsEvent, layer independent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseGPS        (object sender, GPSEventArgs e)     { gpsEvent?.Invoke(sender, e); }
+        //!
+        //! raise arEvent, layer independent
+        //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
+        //! sender is the producing module, so consumers can tell WHERE an input came from
+        //!
+        //! @param sender the original sender of that call
+        //! @param e the InputEventArgs specified for this type
+        public void RaiseAR        (object sender, InputEventArgs e)     { arEvent?.Invoke(sender, e); }
+        #endregion
+
+
+        // TODO: has to be reverted, maybe set via prio, so that not some "low" modules reset it, if its overwritten by something higher!
 
         //!
-        //! The touch type getter.
+        //! do we currently allow camera navigation via input events?
         //!
-        public InputTouchType touchType
-        {
-            get  => m_touchType;
-        }
+        private bool camNavigationAllowed = true;
+        //!
+        //! allow/deny camera navigation via input events 
+        //!
+        //! @param allow sets `camNavigationAllowed` to its value
+        public void SetAllowCamNavigation(bool allow){ camNavigationAllowed = allow; }
+        //!
+        //! check if camera navigation via input events are currently allowed
+        //!
+        //! @return `camNavigationAllowed`
+        public bool IsCamNavigationAllowed(){ return camNavigationAllowed; }
 
         //!
-        //! Enumeration describing possible input types.
+        //! do we currently allow ui-interaction via input events?
         //!
-        public enum InputLayerType
-        {
-            //NONE = 10,      //like no input at all (reset) [[because we do not detect right/middle clicks, the default must be SCREEN or we cannot move the cam in the editor]]
-            UI = 20,        //touch/click started on UI (timeline, button)
-            WORLD = 30,      //touch/click started on world ui (3d handles)
-            SCREEN = 40     //touch/click behaviour for user-camera (rotating, moving)
-        }
+        private bool uiInteractionAllowed = true;
+        //!
+        //! allow/deny ui-interaction via input events 
+        //!
+        //! @param allow sets `uiInteractionAllowed` to its value
+        public void SetUiInteraction(bool allow){ uiInteractionAllowed = allow; }
+        //!
+        //! check if ui-interaction via input events are currently allowed
+        //!
+        //! @return `uiInteractionAllowed`
+        public bool IsUiInteractionAllowed(){ return uiInteractionAllowed; }
 
         //!
-        //! Flag to determine if a touch/click started on a ui-element
+        //! do we currently allow multi-touch-gestures via input events?
         //!
-        private InputLayerType m_inputLayerType = InputLayerType.SCREEN;
+        //! @remark isMultiTouchGestureAllowed have to be false, when on-screen joysticks are hit!
+        //!
+        private bool isMultiTouchGestureAllowed = true;
+        //!
+        //! allow/deny multi-touch-gestures where they are checked
+        //!
+        //! @param allow sets `isMultiTouchGestureAllowed` to its value
+        public void SetMultiTouchGestures(bool allow){ isMultiTouchGestureAllowed = allow; }
+        //!
+        //! check if multi-touch-gestures are allowed
+        //!
+        //! @return `isMultiTouchGestureAllowed`
+        public bool IsMultiTouchGestureAllowed(){ return isMultiTouchGestureAllowed; }
+
+
+        #region SPECIFIC GPS
 
         //!
-        //! Flag to differentiate whether we have a touch or else (click, keyboard)
+        //! enum as Payloads to set what kind of gps demand we have
         //!
-        private bool m_inputIsTouch = false;
-        //!
-        //! Flag to specify type of gesture. 
-        //!
-        public enum GestureTypeEnum{
-            NONE = 0,   //reset, no input
-            PINCH = 10, //zoom
-            DRAG = 20   //move
-        }
-        //!
-        //! Flag to specify type of gesture. 
-        //!
-        private GestureTypeEnum m_gestureType = GestureTypeEnum.NONE;
-        //!
-        //! Buffers the main cameras initial rotation.
-        //!
-        private Quaternion m_cameraMainOffset;
-        //!
-        //! Buffers the sensors initial attitude.
-        //!
-        private Quaternion m_invAttitudeSensorOffset;
-        //!
-        //! A reference to the attitude button.
-        //!
-        private MenuButton m_attitudeButton;
-        //!
-        //! Enum defining the automatic camera control state.
-        //!
-        private List<RaycastResult> m_raycastList;
-        public enum CameraControl
-        {
-            NONE,
-            ATTITUDE,
-            TOUCH,
-            AR
-        }
-        //!
-        //! Flag defining if the camera is controlled by the attitide sensor.
-        //!
-        private CameraControl m_cameraControl = CameraControl.NONE;
-        public CameraControl cameraControl
-        {
-            get => m_cameraControl;
-            set
-            {
-                m_cameraControl = value;
-                cameraControlChanged?.Invoke(this, value);
-            }
-        }
-        //!
-        //! The previous camera control type
-        //!
-        private CameraControl m_oldcameraControl = CameraControl.NONE;
-        //!
-        //! The generated Unity input class defining all available user inputs.
-        //!
-        private Inputs m_inputs;
-        //!
-        //! Simple latch for in-editor right click input.
-        //!
-        private bool orbitClick = false;
-        //!
-        //! Simple latch for in-editor middle click input.
-        //!
-        private bool dragClick = false;
-        //!
-        //! timer to check if we made a double click / tap (right now used to focus on an object) todo: add distance check as well
-        //!
-        private float m_doubleClickCheckTimer = 0f;
-        //!
-        //! layer for reseting the double click timer
-        //!
-        private InputLayerType m_lastClickedLayer = InputLayerType.SCREEN;
-        //!
-        //! variable to set if recent tap was a double tap/click
-        //!
-        private bool m_wasDoubleClick = false;
-        
-        //!
-        //! Have a different doOnce bool for every buffer object, because it could be triggered earlier, if e.g. 3 fingers are not down simulteanously
-        //!
-        public class SeparateBufferClass{
-            private Vector2 buffer;
-            private bool bufferedOnce = false;
+        public enum GPSDemandType { OneShot, StartContinuous, StopContinuous }
 
-            public void Reset(){
-                bufferedOnce = false;
-            }
-            public void SetBufferOnce(Vector2 v2ToBuffer){
-                if(!bufferedOnce){
-                    bufferedOnce = true;
-                    buffer = v2ToBuffer;
-                }
-            }
-            public void SetBufferOnce(float x, float y){
-                if(!bufferedOnce){
-                    bufferedOnce = true;
-                    buffer.x = x; buffer.y = y;
-                }
-            }
-            public void OverrideBuffer(Vector2 v2ToBuffer){ buffer = v2ToBuffer; }
-            public void OverrideBuffer(float x, float y){ buffer.x = x; buffer.y = y; }
-            public bool WasValueBuffered(){ return bufferedOnce; }
-            public Vector2 GetBufferValue(){ return buffer;}
-            public float GetBufferValueX(){ return buffer.x;}
-        }
+        //! 
+        //! Consumers that want GPS Data fire this via `onGPSDemandChangedEvent` to ask for GPS (so we do not run GPS all the time)
         //!
-        //! the position buffer for a two finger camera manipulation
+        public event EventHandler<GPSDemandType> onGPSDemandChangedEvent;
         //!
-        private SeparateBufferClass m_posBuffer;
+        //! call this from any module to trigger (if available) the RaiseGPS function here from the GPSModule
         //!
-        //! the distance (zoom) buffer for a two finger camera manipulation
-        //!
-        private SeparateBufferClass m_distBuffer;
+        public void RaiseGPSDemand(object sender, GPSDemandType gpsDemanyType){ onGPSDemandChangedEvent?.Invoke(sender, gpsDemanyType); }
+
+        #endregion
 
         //!
         //! Constructor initializing member variables.
         //!
-        public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
-        {
-            // Enable input
-            m_inputs = new Inputs();
-            m_inputs.VPETMap.Enable();
-
-            //THE EXECUTION ORDER (for a click) IS
-            //click.started     (InputManager.PressStarted)
-            //click.canceled    (InputManager.PressEnd)
-            // tap.performed    (Tap Function)
-
-            //THE EXECUTION ORDER (for a touch [in editor test]) IS
-            //click.started     (InputManager.PressStarted)
-            //click.canceled    (InputManager.PressEnd)
-            //touch.onFingerDown(Finger Down 1)    
-            // tap.performed    (Tap Function)
-            //touch.OnFingerUp  (Finger Up)
-
-            // Binding of the click event
-            m_inputs.VPETMap.Tap.performed += ctx => TapFunction(ctx);
-
-            // Dedicated bindings for monitoring touch and drag interactions
-            m_inputs.VPETMap.Click.started += ctx => PressStarted(ctx);
-            //m_inputs.VPETMap.Click.performed += ctx => PressPerformed(ctx);
-            m_inputs.VPETMap.Click.canceled += ctx => PressEnd(ctx);
-            
-            
-            //controller input
-            m_inputs.VPETMap.Controller_North.performed += ctx => NorthButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_South.performed += ctx =>SouthButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_East.performed += ctx =>EastButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_West.performed += ctx =>WestButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Up.performed += ctx =>UpButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Down.performed += ctx =>DownButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Left.performed += ctx =>LeftButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Right.performed += ctx =>RightButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Left_Trigger.performed += ctx =>LeftTriggerButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Right_Trigger.performed += ctx =>RightTriggerButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Left_Shoulder.performed += ctx =>LeftShoulderButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Right_Shoulder.performed += ctx =>RightShoulderButtonPressed(ctx);
-            m_inputs.VPETMap.Controller_Left_Stick.performed += ctx => LeftStick(ctx);
-            m_inputs.VPETMap.Controller_Left_Stick.canceled += ctx => LeftStick(ctx);
-            m_inputs.VPETMap.Controller_Right_Stick.performed += ctx => RightStick(ctx);
-            m_inputs.VPETMap.Controller_Right_Stick.canceled += ctx => RightStick(ctx);
-            m_inputs.VPETMap.Controller_Left_Stick.canceled += ctx => StickCanceld(ctx);;
-            m_inputs.VPETMap.Controller_Right_Stick.canceled += ctx => StickCanceld(ctx);;
-
-            
-            // Keep track of cursor/touch move
-            m_inputs.VPETMap.Position.performed += ctx => MovePoint(ctx);
-
-            // Enhaced touch interface API
-            EnhancedTouchSupport.Enable();
-
-            // Subscription to new touch or lift gestures
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerDown += FingerDown;
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerUp += FingerUp;
-
-            // Subscription to finger movement 
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerMove += FingerMove;
-
-            // Additional subscriptions for specific input gestures
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerMove += TwoFingerMove;
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerMove += ThreeFingerMove;
-
-#if UNITY_EDITOR
-            // Editor-only mouse camera manipulation
-            m_inputs.VPETMap.OrbitClick.performed += OrbitClick_performed;
-            m_inputs.VPETMap.OrbitClick.canceled += OrbitClick_canceled;
-            m_inputs.VPETMap.DragClick.performed += DragClick_performed;
-            m_inputs.VPETMap.DragClick.canceled += DragClick_canceled;
-            m_inputs.VPETMap.Position.performed += Position_performed;
-#endif
-
-#if UNITY_EDITOR || (!UNITY_IOS && !UNITY_ANDROID)
-            //excluded for editor only, would work on e.g. standalone-windows as well
-            m_inputs.VPETMap.ZoomWheel.performed += ZoomWheel_performed;
-            m_inputs.VPETMap.MiddleClick.started += MiddleClick_started;
-            m_inputs.VPETMap.MiddleClick.performed += MiddleClick_performed;
-            m_inputs.VPETMap.MiddleClick.canceled += MiddleClick_ended;
-            
-#endif
-            m_posBuffer = new SeparateBufferClass();
-            m_distBuffer = new SeparateBufferClass();
-            
-            m_raycastList = new List<RaycastResult>(5);
+        //! @param  moduleType  type of modules to be loaded by this manager
+        //! @param tracerCore A reference to the TRACER _core.
+        //!
+        public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore){
         }
 
-        #region Controller Button Events Invoke
-        private void LeftShoulderButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonLeftShoulder?.Invoke(this, ctx.ReadValue<float>());
-        }
-        private void RightShoulderButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonRighrShoulder?.Invoke(this, ctx.ReadValue<float>());
-        }
-        private void RightTriggerButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonRightTrigger?.Invoke(this, ctx.ReadValue<float>());
-        }
-
-        private void LeftTriggerButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonLeftTrigger?.Invoke(this, ctx.ReadValue<float>());
-        }
-
-        private void RightButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonRight?.Invoke(this, ctx.ReadValue<float>());
-        }
-
-        private void LeftButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonLeft?.Invoke(this, ctx.ReadValue<float>());
-        }
-
-        private void DownButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonDown?.Invoke(this, ctx.ReadValue<float>());
-        }
-
-        private void UpButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonUp?.Invoke(this, ctx.ReadValue<float>());
-        }
-
-        private void WestButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonWest?.Invoke(this, ctx.ReadValue<float>());
-        }
-
-        private void EastButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonEast?.Invoke(this, ctx.ReadValue<float>());
-        }
-        private void SouthButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonSouth?.Invoke(this, ctx.ReadValue<float>());
-        }
-        private void NorthButtonPressed(InputAction.CallbackContext ctx)
-        {
-            buttonNorth?.Invoke(this, ctx.ReadValue<float>());
-            
-        }
-        private void LeftStick(InputAction.CallbackContext ctx)
-        {
-            leftControllerStick?.Invoke(this, ctx.ReadValue<Vector2>());
-        }
-        
-        private void RightStick(InputAction.CallbackContext ctx)
-        {
-            rightControllerStick?.Invoke(this, ctx.ReadValue<Vector2>());
-        }
-        
-        private void StickCanceld(InputAction.CallbackContext ctx)
-        {
-            ControllerStickCanceled?.Invoke(this, ctx.ReadValue<Vector2>());
-        }
-        
-        #endregion
-        
-        //!
-        //! Function to handle right mouse button input (editor only)
-        //!
-        private void OrbitClick_performed(InputAction.CallbackContext obj)
-        {
-            orbitClick = true;
-        }
-
-        //!
-        //! Function to handle right mouse button input (editor only)
-        //!
-        private void OrbitClick_canceled(InputAction.CallbackContext obj)
-        {
-            orbitClick = false;
-            m_posBuffer.Reset();
-        }
-
-        //!
-        //! Function to handle middle mouse button input (editor only)
-        //!
-        private void DragClick_performed(InputAction.CallbackContext obj)
-        {
-            dragClick = true;
-        }
-
-        //!
-        //! Function to handle middle mouse button input (editor only)
-        //!
-        private void DragClick_canceled(InputAction.CallbackContext obj)
-        {
-            dragClick = false;
-            m_posBuffer.Reset();
-        }
-
-        //!
-        //! Function to handle mouse movement for camera operation (editor only)
-        //!
-        private void Position_performed(InputAction.CallbackContext obj)
-        {
-            if (orbitClick)
-            {
-                Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-
-                m_posBuffer.SetBufferOnce(pos);
-
-                Vector2 bufferedValueDifference = pos - m_posBuffer.GetBufferValue();
-
-                // Invoke event
-                twoDragEvent?.Invoke(this, bufferedValueDifference);
-                // Invoke detail event
-                twoDragDetailEvent?.Invoke(this, new DetailedEventArgs(pos, bufferedValueDifference));
-
-                // Update buffer
-                m_posBuffer.OverrideBuffer(pos);
-
-                //HACK TO update gizmo size!
-                fingerGestureEvent?.Invoke(this, true);
-            }
-            else if (dragClick)
-            {
-                // Grab the position
-                Vector2 pos = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-
-                m_posBuffer.SetBufferOnce(pos);
-
-                // Invoke event
-                threeDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
-
-                // Update buffer
-                m_posBuffer.OverrideBuffer(pos);
-
-                //HACK TO update gizmo size!
-                fingerGestureEvent?.Invoke(this, true);
-            }    
-        }
-
-        //!
-        //! Function to handle mouse zoom wheel input (editor only)
-        //!
-        private void ZoomWheel_performed(InputAction.CallbackContext obj)
-        {
-            //if dragging, deny zooming
-            if(m_gestureType != GestureTypeEnum.NONE)
-                return;
-            
-            float dist = 0.1f * m_inputs.VPETMap.ZoomWheel.ReadValue<float>();
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-
-            bool resetInputLayer = m_inputLayerType == InputLayerType.SCREEN;
-
-            if(TappedUI(point)){
-                m_inputLayerType = InputLayerType.UI;
-            }else if(Tapped3DUI(point)){
-                m_inputLayerType = InputLayerType.WORLD;
-            }else{
-                //deny switching to SCREEN if we currently have UI/WORLD
-                //m_inputLayerType = InputLayerType.SCREEN;
-            }
-
-            // Invoke event
-            pinchEvent?.Invoke(this, dist);
-            
-            Vector2 delta = Vector2.zero;
-            delta.x = dist;
-            pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
-
-            //HACK TO update gizmo size!
-            fingerGestureEvent?.Invoke(this, true);
-
-            // Reset it again
-            if(resetInputLayer)
-                m_inputLayerType = InputLayerType.SCREEN;
-        }
-
-        //!
-        //! Function to handle the middle click e.g. for dragging the timeline (editor only)
-        //!
-        private void MiddleClick_started(InputAction.CallbackContext obj)
-        {
-            if(m_gestureType != GestureTypeEnum.NONE)
-                return;
-
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-
-            if(TappedUI(point)){
-                m_inputLayerType = InputLayerType.UI;
-            }else if(Tapped3DUI(point)){
-                m_inputLayerType = InputLayerType.WORLD;
-            }else{
-                m_inputLayerType = InputLayerType.SCREEN;
-            }
-
-            // Invoke event
-            middleClickPressEvent?.Invoke(this, point);
-        }
-
-        //!
-        //! Function to handle the middle click move e.g. for dragging the timeline (editor only)
-        //!
-        private void MiddleClick_performed(InputAction.CallbackContext obj)
-        {
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            
-            // Invoke event
-            middleClickMoveEvent?.Invoke(this, point);
-        }
-
-        //!
-        //! Function to handle the middle click, e.g. for dragging the timeline (editor only)
-        //!
-        private void MiddleClick_ended(InputAction.CallbackContext obj)
-        {
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            
-            // Invoke event
-            middleClickReleaseEvent?.Invoke(this, point);
-
-            // Reset
-            m_inputLayerType = InputLayerType.SCREEN;
-
-            m_posBuffer.Reset();
-        }
-
-        //! 
-        //! Function called when Unity initializes the TRACER _core.
-        //! 
-        //! @param sender A reference to the TRACER _core.
-        //! @param e Arguments for these event. 
-        //! 
-        protected override void Init(object sender, EventArgs e)
-        {
-            base.Init(sender, e);
-            // Global variables initialization
-            m_gestureType = GestureTypeEnum.NONE;
-            m_touchType = InputTouchType.NONE;
-        }
-
-        //! 
-        //! Virtual function called when Unity calls it's Start function.
-        //! 
-        //! @param sender A reference to the TRACER _core.
-        //! @param e Arguments for these event. 
-        //! 
-        protected override void Start(object sender, EventArgs e)
-        {
-            base.Start(sender, e);
-            if(m_cameraControl == CameraControl.NONE)
-                enableAttitudeSensor();
-        }
-
-        //! 
-        //! Function called before Unity destroys the TRACER _core.
-        //! 
-        //! @param sender A reference to the TRACER _core.
-        //! @param e Arguments for these event. 
-        //! 
-        public override void Cleanup()
-        {
-            base.Cleanup();
-
-            m_inputs.VPETMap.Tap.performed -= TapFunction;
-
-            m_inputs.VPETMap.Click.started -= PressStarted;
-            //m_inputs.VPETMap.Click.performed -= PressPerformed;
-            m_inputs.VPETMap.Click.canceled -= PressEnd;
-
-            m_inputs.VPETMap.Position.performed -= MovePoint;
-
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerDown -= FingerDown;
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerUp -= FingerUp;
-
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerMove -= FingerMove;
-
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerMove -= TwoFingerMove;
-            UnityEngine.InputSystem.EnhancedTouch.Touch.onFingerMove -= ThreeFingerMove;
-            
-            //controller input
-            m_inputs.VPETMap.Controller_North.performed -= NorthButtonPressed;
-            m_inputs.VPETMap.Controller_South.performed -= SouthButtonPressed;
-            m_inputs.VPETMap.Controller_East.performed -= EastButtonPressed;
-            m_inputs.VPETMap.Controller_West.performed -= WestButtonPressed;
-            m_inputs.VPETMap.Controller_Up.performed -= UpButtonPressed;
-            m_inputs.VPETMap.Controller_Down.performed -= DownButtonPressed;
-            m_inputs.VPETMap.Controller_Left.performed -= LeftButtonPressed;
-            m_inputs.VPETMap.Controller_Right.performed -= RightButtonPressed;
-            m_inputs.VPETMap.Controller_Left_Trigger.performed -= LeftTriggerButtonPressed;
-            m_inputs.VPETMap.Controller_Right_Trigger.performed -= RightTriggerButtonPressed;
-            m_inputs.VPETMap.Controller_Left_Shoulder.performed -= LeftShoulderButtonPressed;
-            m_inputs.VPETMap.Controller_Right_Shoulder.performed -= RightShoulderButtonPressed;
-            m_inputs.VPETMap.Controller_Left_Stick.performed -= LeftStick;
-            m_inputs.VPETMap.Controller_Left_Stick.canceled -= LeftStick;
-            m_inputs.VPETMap.Controller_Right_Stick.performed -= RightStick;
-            m_inputs.VPETMap.Controller_Right_Stick.canceled -= RightStick;
-            
-            m_inputs.VPETMap.Controller_Left_Stick.canceled -= StickCanceld;
-            m_inputs.VPETMap.Controller_Right_Stick.canceled -= StickCanceld;
-            
-
-#if UNITY_EDITOR
-            // Editor-only mouse camera manipulation
-            m_inputs.VPETMap.OrbitClick.performed -= OrbitClick_performed;
-            m_inputs.VPETMap.OrbitClick.canceled -= OrbitClick_canceled;
-            m_inputs.VPETMap.DragClick.performed -= DragClick_performed;
-            m_inputs.VPETMap.DragClick.canceled -= DragClick_canceled;
-            m_inputs.VPETMap.Position.performed -= Position_performed;
-#endif
-
-#if UNITY_EDITOR || (!UNITY_IOS && !UNITY_ANDROID)
-            m_inputs.VPETMap.ZoomWheel.performed -= ZoomWheel_performed;
-            m_inputs.VPETMap.MiddleClick.started -= MiddleClick_started;
-            m_inputs.VPETMap.MiddleClick.performed -= MiddleClick_performed;
-            m_inputs.VPETMap.MiddleClick.canceled -= MiddleClick_ended;
-#endif
-        }
-
-        public void enableAttitudeSensor()
-        {
-            // Enable attitude sensor and bind it to the camera update
-            if (m_cameraControl == CameraControl.NONE)
-            {
-                if (AttitudeSensor.current != null)
-                {
-                    if (!AttitudeSensor.current.enabled)
-                    {
-                        InputSystem.EnableDevice(AttitudeSensor.current);
-                        m_attitudeButton = new MenuButton("", useAttitude);
-                        m_attitudeButton.setIcon("Images/button_attitude");
-                        core.getManager<UIManager>().addButton(m_attitudeButton);
-                    }
-                }
-                else
-                    Helpers.Log("No attitude sensor found, feature will not be available.", Helpers.logMsgType.WARNING);
-            }
-        }
-
-        public void disableAttitudeSensor()
-        {
-            // Enable attitude sensor and bind it to the camera update
-
-            if (AttitudeSensor.current != null)
-            {
-                InputSystem.DisableDevice(AttitudeSensor.current);
-                core.getManager<UIManager>().removeButton(m_attitudeButton);
-                m_cameraControl = CameraControl.NONE;
-            }
-            else
-                Helpers.Log("No attitude sensor found, feature will not be available.", Helpers.logMsgType.WARNING);
-        }
-
-        //!
-        //! Single tap/touch operation.
-        //!
-        private void TapFunction(InputAction.CallbackContext c)
-        {
-            //Debug.Log("<color=green>Tap Function</color> phase: "+c.phase);
-            
-            if (c.performed){
-                //TAP never changes m_inputLayerType, because we get this after "Press End" and would never reset it to SCREEN
-                Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-                if(TappedUI(point)){
-                    SetDoubleTapTimer(InputLayerType.UI);
-                    //Debug.Log("tpd ui");
-                }else if(Tapped3DUI(point)){
-                    SetDoubleTapTimer(InputLayerType.WORLD);
-                    //Debug.Log("TPD 3D!");
-                }else{
-                    SetDoubleTapTimer(InputLayerType.SCREEN);
-                    objectSelectionEvent?.Invoke(this, point);
-                }
-                tappedEvent?.Invoke(null, point);
-            }
-
-            // just an exampe, needs different code to discover correct type and values!
-            // we need to define TRACER actions like tap, hold, drag, etc. and map it to
-            // multiple bindings like keyboard, mouse click and touch (see referenced video)
-            // please watch https://youtu.be/rMlcwtoui4I
-
-            // at start we should check if we are on object, canvas or UI element
-            if (c.started)
-            {
-                //e.type = InputEventType.STARTED;
-                //e.delta = Vector2.zero;
-                //e.time = 0f;
-            }
-
-            // if(c.canceled)
-            //     Debug.Log("... CANCELED");  
-        }
-
-        //!
-        //! Set double tap timer, reset if layer is different
-        //! (world & screen as the same, because otherwise we could not focus a not-selected object instantly)
-        //!
-        private void SetDoubleTapTimer(InputLayerType _touchedType){
-            switch(m_lastClickedLayer){
-                case InputLayerType.UI:
-                    if(_touchedType != InputLayerType.UI)
-                        ResetDoubleTapTimer();
-                    break;
-                case InputLayerType.WORLD:
-                case InputLayerType.SCREEN:
-                    if(_touchedType == InputLayerType.UI)
-                        ResetDoubleTapTimer();
-                    break;
-            }
-            m_lastClickedLayer = _touchedType;
-            m_wasDoubleClick = Time.time - m_doubleClickCheckTimer < 0.25f;
-            //Debug.Log("SetDoubleTapTimer "+m_wasDoubleClick);
-            m_doubleClickCheckTimer = Time.time;  
-        }
-
-        //!
-        //! Reset the double tap timer
-        //!
-        private void ResetDoubleTapTimer(){ 
-            m_wasDoubleClick = false;
-            m_doubleClickCheckTimer = 0f;
-        }
-
-        
-
-        //!
-        //! Input move function, for monitoring the moving of the cursor/finger.
-        //!
-        private void MovePoint(InputAction.CallbackContext c)
-        {
-            if (m_touchType == InputTouchType.ONE)
-            {
-                Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-                inputMove?.Invoke(this, point);
-
-                if(m_gestureType == GestureTypeEnum.NONE)
-                    m_gestureType = GestureTypeEnum.DRAG;
-            }
-        }
-
-        //!
-        //! Input press start function, for monitoring the start of touch/click interactions.
-        //!
-        private void PressStarted(InputAction.CallbackContext c)
-        {
-            //Debug.Log("<color=green>Press Started</color>");    //is only ever called for the first finger, for nothing else. (why though?)
-
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            m_touchType = InputTouchType.ONE;                                   //no, see above. m_touchType = (m_touchType == InputTouchType.ONE) ? InputTouchType.TWO : InputTouchType.ONE;
-            
-            //need this here to react to certain events below specific to touch or else
-            //ugly and inperformant setup...
-            if(c.control.device.ToString().ToLower().Contains("touch"))
-                m_inputIsTouch = true;
-            else
-                m_inputIsTouch = false;
-
-            if(TappedUI(point)){
-                m_inputLayerType = InputLayerType.UI;
-                inputPressStartedUI?.Invoke(this, point);
-            }else if(Tapped3DUI(point)){
-                m_inputLayerType = InputLayerType.WORLD;
-                inputPressStarted?.Invoke(this, point);
-            }else{
-                m_inputLayerType = InputLayerType.SCREEN;
-                inputPressStarted?.Invoke(this, point);
-            }
-
-            //Debug.Log("\tLayerType is "+m_inputLayerType.ToString());
-        }
-
-
-        //!
-        //! Input press start function, for monitoring the start of touch/click interactions.
-        //!
-        /*private void PressPerformed(InputAction.CallbackContext c)
-        {
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            Debug.Log("<color=yellow>Press Performed</color>");
-            if (TappedUI(point))
-                inputPressPerformedUI?.Invoke(this, point);
-            else
-                inputPressPerformed?.Invoke(this, point);
-        }*/
-
-        //!
-        //! Input press end function, for monitoring the end of touch/click interactions.
-        //!
-        private void PressEnd(InputAction.CallbackContext c)
-        {
-            Vector2 point = m_inputs.VPETMap.Position.ReadValue<Vector2>();
-            //Debug.Log("<color=blue>InputManager.PressEnd</color>");
-
-            inputPressEnd?.Invoke(this, point);
-
-            // Reset monitor variables
-            m_touchType = InputTouchType.NONE;
-            m_gestureType = GestureTypeEnum.NONE;
-            m_inputLayerType = InputLayerType.SCREEN;
-        }
-
-        //!
-        //! Function to handle  any new finger touching the screen.
-        //!
-        private void FingerDown(Finger fgr)
-        {
-            // If a specific gesture is in progress, do not accept new input
-            if(m_gestureType != GestureTypeEnum.NONE){
-                //TODO!
-                //always allow increasing of fingers, because we could have a moving ONE finger because of a high sensitivity
-                //although we want to touch with the other fingers!
-                //Debug.Log("ignore <color=green>Finger Down</color>");
-                return;
-            }
-
-            m_inputIsTouch = true;
-
-            // Reset monitor variables
-            m_touchType = InputTouchType.NONE;
-
-            // Poll touch count 
-            int touchCount = UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches.Count;
-            Debug.Log("<color=green>Finger Down "+touchCount+"</color>");
-
-            // Single touch
-            if (touchCount == 1)
-                m_touchType = InputTouchType.ONE;
-            // Double touch
-            if (touchCount == 2)
-                m_touchType = InputTouchType.TWO;
-            // Triple touch - ignored in case of a two finger operation in progress
-            if (touchCount == 3)
-                m_touchType = InputTouchType.THREE;
-        }
-
-        //!
-        //! Function to handle any finger being lifted from the screen.
-        //!
-        private void FingerUp(Finger fgr)
-        {
-            Debug.Log("<color=blue>Finger Up</color>");
-            //TODO this should decrease and not instantly end it all
-            //otherwise we could "hold" a button and have another finger touch+end and this will call the end at this button we are still holding
-
-
-            // Suspend the touch input
-            m_touchType = InputTouchType.NONE;
-
-            m_cameraControl = m_oldcameraControl;
-
-            // Reset
-            m_inputIsTouch = false;
-            m_gestureType = GestureTypeEnum.NONE;
-            m_inputLayerType = InputLayerType.SCREEN;
-
-
-            // Restore UI Interaction
-            toggle2DUIInteraction.Invoke(this, true);
-        }
-
-        //!
-        //! Function to handle initial finger movement on the screen.
-        //!
-        private void FingerMove(Finger fgr)
-        {
-            // If a specific gesture is in progress, do not accept new input
-            if(m_gestureType != GestureTypeEnum.NONE)
-                return;
-
-            //Debug.Log("<color=yellow>Finger Move</color>");
-
-            // Else (i.e., touch was made, but not moved)
-            // and if operating with multi-finger input,
-            // force the suspension of active selection.
-            if(m_touchType == InputTouchType.TWO || m_touchType == InputTouchType.THREE)
-            {
-                if(m_inputLayerType != InputLayerType.UI)
-                    LockUIOperation();
-                //ClearClickInput();
-            }
-        }
-
-        //!
-        //! Function to handle specifically two-finger gestures.
-        //!
-        private void TwoFingerMove(Finger fgr)
-        {
-            if (m_touchType != InputTouchType.TWO){
-                return;
-            }
-
-            // Monitor touches
-            var tcs = UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches;
-
-            //DENY ROTATING DURING GYRO!
-            if(m_cameraControl == CameraControl.ATTITUDE || m_oldcameraControl == CameraControl.ATTITUDE){
-                //so only allow zooming
-                if (m_gestureType != GestureTypeEnum.PINCH){
-                    m_distBuffer.Reset();
-                    m_gestureType = GestureTypeEnum.PINCH;
-                }
-            }else{
-                // Are they moving in the same direction?
-                float dotProd = Vector2.Dot(tcs[0].delta, tcs[1].delta);
-                // If yes, it's a two finger drag
-                if (dotProd > 0){
-                    if (m_gestureType != GestureTypeEnum.DRAG){
-                        m_posBuffer.Reset();
-                        m_gestureType = GestureTypeEnum.DRAG;
-                    }
-                }
-                // Else it's a two finger pinch
-                else if (dotProd < 0){
-                    if (m_gestureType != GestureTypeEnum.PINCH){
-                        m_distBuffer.Reset();
-                        m_gestureType = GestureTypeEnum.PINCH;
-                    }
-                }
-            }
-
-            OverrideCameraMode(CameraControl.TOUCH);
-
-            // Two finger drag (used for orbit)
-            switch(m_gestureType){ 
-                case GestureTypeEnum.DRAG:
-                    // Grab the average position
-                    Vector2 pos = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
-                    //Debug.Log("<color=yellow>Two Finger Move</color> is drag (orbit)");
-                    
-                    // Store it once
-                    m_posBuffer.SetBufferOnce(pos);
-
-                    // Invoke event
-                    twoDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
-
-                    // Update buffer
-                    m_posBuffer.OverrideBuffer(pos);
-                    break;
-                case GestureTypeEnum.PINCH:
-                    // Grab the distance
-                    float dist = Vector2.Distance(tcs[0].screenPosition, tcs[1].screenPosition);
-                    //Debug.Log("<color=yellow>Two Finger Move</color> is pinch (zoom)");
-
-                    // Store it once
-                    m_distBuffer.SetBufferOnce(dist, 0);
-
-                    Vector2 point = .5f * (tcs[0].screenPosition + tcs[1].screenPosition);
-                    Vector2 delta = Vector2.zero;
-                    delta.x = dist - m_distBuffer.GetBufferValueX();
-
-                    // Invoke event
-                    pinchEvent?.Invoke(this, delta.x);
-
-                    // Invoke detail event
-                    pinchDetailedEvent?.Invoke(this, new DetailedEventArgs(point, delta));
-
-                    // Update buffer
-                    m_distBuffer.OverrideBuffer(dist, 0);
-                break;
-            }
-            // Announce gesture event
-            fingerGestureEvent?.Invoke(this, true);
-        }
-
-        //!
-        //! Function to handle specifically three-finger gestures.
-        //!
-        private void ThreeFingerMove(Finger fgr)
-        {
-            if (m_touchType != InputTouchType.THREE)
-                return;
-
-            // Register the gesture
-            m_gestureType = GestureTypeEnum.DRAG;
-
-            // Monitor touches
-            var tcs = UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches;
-
-            // Grab the average position
-            Vector2 pos = 1f / 3f * (tcs[0].screenPosition + tcs[1].screenPosition + tcs[2].screenPosition);
-
-            // Store it once
-            m_posBuffer.SetBufferOnce(pos);
-            
-
-            OverrideCameraMode(CameraControl.TOUCH);
-
-            // Invoke event
-            threeDragEvent?.Invoke(this, pos - m_posBuffer.GetBufferValue());
-
-            // Update buffer
-            m_posBuffer.OverrideBuffer(pos);
-
-            // Announce gesture event
-            fingerGestureEvent?.Invoke(this, true);
-        }
-
-        //!
-        //! override the current mode (e.g. ATTITUDE to TOUCH) and reset it to this mode once the finger is lifted
-        //!
-        private void OverrideCameraMode(CameraControl ct){
-            if(m_cameraControl != ct){
-                m_oldcameraControl = m_cameraControl;
-                //DONT OVERRIDE IF WE ARE IN A SPECIFIC MODE?
-                m_cameraControl = ct;
-            }
-        }
-        
-        //!
-        //! update the gizmo sizes if we selected something after our camera focused an object via double click
-        //!
-        public void SmoothCameraFocusChange(){
-            //anounce to update the gizmo sizes
-            fingerGestureEvent.Invoke(this, true);
-        }
-
-        //!
-        //! Helper function to stop UI operations while moving camera
-        //!
-        private void LockUIOperation()
-        {
-            // Clear monitor variables
-            m_posBuffer.Reset();
-            m_distBuffer.Reset();
-
-            // Invoke end of press event
-            inputPressEnd?.Invoke(this, Vector2.zero);
-            toggle2DUIInteraction?.Invoke(this, false);
-        }
-
-        //!
-        //! Helper function to reset existing operations of an input click (e.g. object selection)
-        //!
-        private void ClearClickInput()
-        {
-            // Clear monitor variables
-            m_posBuffer.Reset();
-            m_distBuffer.Reset();
-
-            // Invoke end of press event
-            // [REVIEW]
-            // Doesn't seem to be needed - are we overlooking something if leaving it out? 
-            //inputPressEnd?.Invoke(this, null);
-
-            // Force an empty selection
-            // [REVIEW]
-            // Is this too much of a hack?
-            Vector2 point = new(-5, -5);
-            objectSelectionEvent?.Invoke(this, point);
-            m_inputLayerType = InputLayerType.SCREEN;
-            
-        }
-
-        //!
-        //! returns true if tap was over any UI element (it goes over all raycaster in the scene - ideally that would be GraphicRaycaster from the 2D UI)
-        //!
-        //! @param pos position of the tap
-        //!
-        private bool TappedUI(Vector2 pos)
-        {
-            PointerEventData eventDataCurrentPosition = new PointerEventData(EventSystem.current);
-            eventDataCurrentPosition.position = pos;
-            EventSystem.current.RaycastAll(eventDataCurrentPosition, m_raycastList);
-
-            return m_raycastList.Count > 0;
-        }
-
-        //!
-        //! returns true if tap was over the 3D manipulator objects (layerMask 5 for UI)
-        //!
-        //! @param pos position of the tap
-        //!
-        private bool Tapped3DUI(Vector2 pos, int layerMask = 1 << 5)
-        {
-            if (Physics.Raycast(Camera.main.ScreenPointToRay(pos), out _, Mathf.Infinity, layerMask))
-                return true;
-
-            return false;
-        }
-
-        //!
-        //! Function that overwrites the main cameras rotation by the attitude sensors values.
-        //! Connected to VPETMap.Look which triggers when the input system fires a attitude sensor performed event.  
-        //!
-        private void updateCameraRotation(InputAction.CallbackContext ctx)
-        {
-            Transform cam = Camera.main.transform;
-            cam.localRotation = ctx.ReadValue<Quaternion>() * Quaternion.Euler(0f, 0f, 180f);
-            cam.rotation = m_cameraMainOffset * m_invAttitudeSensorOffset * cam.rotation;
-        }
-
-        //!
-        //! Function that stores the current main camera and attitude sensors rotation offset.
-        //!
-        public void setCameraAttitudeOffsets()
-        {
-            m_cameraMainOffset = Camera.main.transform.rotation;
-            if (AttitudeSensor.current != null)
-                m_invAttitudeSensorOffset = Quaternion.Inverse(AttitudeSensor.current.attitude.ReadValue() * Quaternion.Euler(0f, 0f, 180f));
-        }
-
-        //!
-        //! Function that fires an event for announcing change of current camera
-        //!
-        public void updateCameraCommand()
-        {
-            updateCameraUICommand.Invoke(this, true);
-        }
-
-        //!
-        //! Function that toggles the main camera rotation overwrite by attitude sensor.
-        //!
-        private void useAttitude()
-        {
-            if (m_cameraControl == CameraControl.ATTITUDE)
-            {
-                m_inputs.VPETMap.Look.performed -= updateCameraRotation;
-                m_oldcameraControl = CameraControl.NONE;
-                m_cameraControl = CameraControl.NONE;
-            }
-            else if (m_cameraControl == CameraControl.NONE)
-            {
-                setCameraAttitudeOffsets();
-                m_inputs.VPETMap.Look.performed += updateCameraRotation;
-                m_oldcameraControl = CameraControl.ATTITUDE;
-                m_cameraControl = CameraControl.ATTITUDE;
-            }
-        }
-
-        public void ControllerSelect(Vector2 pos)
-        {
-            objectSelectionEvent?.Invoke(this, pos);
-        }
-
-        public bool getKey(int key)
-        {
-            return Keyboard.current[(Key) key].isPressed;
-        }
-
-        public bool IsInputTouch(){
-            return m_inputIsTouch;
-            //returns true one frame to late for using directly after PressStarted
-            //return UnityEngine.InputSystem.EnhancedTouch.Touch.activeFingers.Count > 0;
-        }
-        public bool IsAnyUIUsed(){ return m_inputLayerType == InputLayerType.UI || m_inputLayerType == InputLayerType.WORLD; }
-        public bool IsScreenCamNavigationUsed(){ return m_inputLayerType == InputLayerType.SCREEN; }
-        public bool WasDoubleClick(){   return m_wasDoubleClick;  }
     }
 
+    #region Tracking Input Data
+
+    //used by UnityInputModule and ControllerModule
+    //could be put elsewhere + remove UnityDependency!
+    public class InputTracker{
+        public InputManager.InputLevel Level;   //primary, secondary, tertiary
+        public InteractionState State = InteractionState.Idle;  //see above
+        /*
+            Leader & Muted - Pattern - The Rules:
+            - on multi-touch, identify the "Highest Level" tracker (e.g., Secondary) -> becomes Leader
+            - set all involved trackers to the same state (e.g., Dragging), but mute on the lower-level trackers
+            - ProcessTracker/OnPointerUp: if tracker == IsMuted, it discards itself completely
+            - Lead Tracker processes normally, but it calculates its position by averaging all trackers that share its current state.
+        */
+        public bool IsMuted = false;
+        public UnityEngine.Vector2 CurrentPosition; //necessary for multitouch and for correct oop approach
+        public UnityEngine.Vector2 CurrentDelta;
+        public float TimeDown;
+        public UnityEngine.Vector2 StartPosition;
+        public float LastClickTime = -100f; // Tracked for Double Click
+
+        public InputTracker(InputManager.InputLevel level){ Level = level; }
+        public void Reset(){ 
+            State = InteractionState.Idle; 
+            IsMuted = false; 
+            CurrentPosition = UnityEngine.Vector2.zero;
+            CurrentDelta = UnityEngine.Vector2.zero; 
+            TimeDown = 0f;
+            StartPosition = UnityEngine.Vector2.zero;
+        }
+    }
+
+    public enum InteractionState { 
+        Idle,           // Nothing is happening
+        Evaluating,     // Pointer is down, waiting to see if it becomes Click, Drag, or Hold
+        Dragging,       // Surpassed distance threshold (Holds are now denied)
+        Holding,        // Surpassed time threshold (Drags are now denied)
+        Pinching,       // Surpassed pinch delta (Drags/Holds denied)
+        Rotating       // Surpassed rotation delta (Drags/Holds denied)
+    }
+    #endregion
 }

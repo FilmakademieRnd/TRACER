@@ -26,8 +26,10 @@ if not go to https://opensource.org/licenses/MIT
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
 //! @author Paulo Scatena
-//! @version 0
-//! @date 21.08.2022
+//! @author Thomas Krüger
+//! @version 1
+//! @date 19.05.2026
+//! @revision added the role-dependent selection management within here
 
 using System.Collections.Generic;
 using System;
@@ -79,6 +81,39 @@ namespace tracer
         {
             get => (Roles)settings.roles.value;
         }
+
+        public enum ManipulationLayerEnum{
+            LOCAL, GLOBAL, VIEWPORT
+        }
+        public ManipulationLayerEnum ManipulationLayer {
+            get => manipulationLayer;
+            set{
+                if(manipulationLayer != value){
+                    manipulationLayer = value;
+                    manipulationLayerChanged?.Invoke(this, value);
+                }
+            }
+        }
+        private ManipulationLayerEnum manipulationLayer = ManipulationLayerEnum.LOCAL;
+        public event EventHandler<ManipulationLayerEnum> manipulationLayerChanged;
+        public ManipulationLayerEnum CycleManipulationMode() {
+            if(ManipulationLayer == ManipulationLayerEnum.LOCAL)
+                ManipulationLayer = ManipulationLayerEnum.GLOBAL;
+            else if(ManipulationLayer == ManipulationLayerEnum.GLOBAL)
+                ManipulationLayer = ManipulationLayerEnum.VIEWPORT;
+            else
+                ManipulationLayer = ManipulationLayerEnum.LOCAL;
+            return ManipulationLayer;
+        }
+
+        //! 
+        //! holds all (static) renderers for other evaluations
+        //! e.g. the HeightOverGround check
+        //!
+        private StaticMeshQuadtree meshQuadtree;
+
+        public StaticMeshQuadtree GetStaticMashQuadTree(){ return meshQuadtree;}
+
         //!
         //! Areference to the About Menu prefab.
         //!
@@ -161,6 +196,11 @@ namespace tracer
         //!
         public event EventHandler<UIBehaviour> UI2DCreated;
         //!
+        //! Event emitted when we change if object(s) are modified via lock to camera
+        //! used when looking through camera or lock to camera space
+        //!
+        public event EventHandler<bool> uiCameraLockChanged;
+        //!
         //! A list storing references to the menus (MenuTrees) created by the UI-Modules.
         //!
         private List<MenuTree> m_menus;
@@ -168,10 +208,6 @@ namespace tracer
         //! A list storing references to menu buttons created by the UI-Modules.
         //!
         private List<MenuButton> m_buttons;
-        //!
-        //! activating/deactivating 2D UI interaction
-        //!
-        bool _ui2Dinteractable;
         private MenuTree m_startMenu;
         //!
         //! A reference to the start menu.
@@ -179,17 +215,66 @@ namespace tracer
         public ref MenuTree startMenu
         { get => ref m_startMenu; }
         //!
-        //! Getter and setter for activating/deactivating 2D UI interaction
+        //! reference to the input manager
+        private InputManager inputManager;
         //!
-        public bool ui2Dinteractable
-        {
-            get { return _ui2Dinteractable; }
-            set { _ui2Dinteractable = value; }
-        }
+        //! Getter  2D UI interaction
+        //!
+        public bool ui2Dinteractable{ get { return inputManager.IsUiInteractionAllowed(); } }
         //!
         //! Event emitted when a uicreator3dmodule finished editing (move gizmo for example)
         //!
         public event EventHandler<AbstractParameter> m_manipulation3dDoneEvent;
+
+        public enum CameraControl{ STANDARD, ATTITUDE, AR }
+        //!
+        //! Flag defining if the camera is controlled by the attitide sensor.
+        //!
+        private CameraControl camControlBehaviour = CameraControl.STANDARD;
+        public CameraControl cameraControl{
+            get => camControlBehaviour;
+            set{
+                if(camControlBehaviour != value){
+                    camControlBehaviour = value;
+                    cameraControlChanged?.Invoke(this, value);
+                }
+            }
+        }
+
+        //!
+        //! Event linked to change of CameraControl
+        //!
+        public event EventHandler<CameraControl> cameraControlChanged;
+
+        #region Selectable SceneObject via Pixel Data    
+        // without ANY unity dependencie
+        // The Interface that any data provider must follow
+        public interface ISelectableSceneObjectProvider{
+            SceneObject GetSelectableViaScreenPosition(int x, int y);
+            object GetWorldObjectViaScreenPosition(int x, int y);
+        }
+
+        //!
+        //! The currently active provider (can be null)
+        //!
+        private ISelectableSceneObjectProvider _dataProvider;
+
+        public void RegisterProvider(ISelectableSceneObjectProvider provider){ _dataProvider = provider; }
+        public void UnregisterProvider(){ _dataProvider = null; }
+
+        // Other pure C# managers or modules can call this!
+        public SceneObject GetSelectableAtPixel(int x, int y){
+            if (_dataProvider == null)
+                return null; // If the Unity module is missing, fail gracefully.
+            return _dataProvider.GetSelectableViaScreenPosition(x, y);
+        }
+        
+        public object GetWorldObjectAtPixel(int x, int y){
+            if (_dataProvider == null)
+                return null; // If the Unity module is missing, fail gracefully.
+            return _dataProvider.GetWorldObjectViaScreenPosition(x, y);
+        }
+        #endregion
 
         //!
         //! Constructor initializing member variables.
@@ -200,7 +285,6 @@ namespace tracer
             m_menus = new List<MenuTree>();
             m_buttons = new List<MenuButton>();
             m_uiAppearanceSettings = Resources.Load("DATA_VPET_Colors") as VPETUISettings;
-            _ui2Dinteractable = true;
 
             List<AbstractParameter> roleList = new List<AbstractParameter> 
             { 
@@ -245,6 +329,8 @@ namespace tracer
 
             settings.roles.hasChanged += changeActiveRole;
 
+            core.getManager<SceneManager>().sceneReady += SceneReadyEvent;
+
             CreateSettingsMenu();
             createStartMenu();
 
@@ -253,6 +339,11 @@ namespace tracer
                     .Add("Role")
                     .Add(settings.roles)
                 .End();
+        }
+
+        private void SceneReadyEvent(object sender, EventArgs e) {
+            meshQuadtree = new StaticMeshQuadtree();
+            meshQuadtree.BuildTree();
         }
 
         public void ColorGameObjectActive(GameObject go)
@@ -270,6 +361,7 @@ namespace tracer
         public override void Cleanup()
         {
             base.Cleanup();
+            core.getManager<SceneManager>().sceneReady -= SceneReadyEvent;
             settings.uiScale.hasChanged -= updateCanvasScales;
             core.orientationChangedEvent -= updateCanvasScales;
             settings.roles.hasChanged -= changeActiveRole;
@@ -280,15 +372,14 @@ namespace tracer
         //!
         //! Unity's Start callback, used for Late initialization.
         //!
-        protected override void Start(object sender, EventArgs e)
-        {
+        protected override void Start(object sender, EventArgs e){
             base.Start(sender, e);
             
             updateCanvasScales(this,0f);
             settings.uiScale.hasChanged += updateCanvasScales;
             core.orientationChangedEvent += updateCanvasScales;
             
-            core.getManager<InputManager>().toggle2DUIInteraction += activate2DUIInteraction;
+            inputManager = core.getManager<InputManager>();
 
             // close open menu layout and show start menu
             m_startMenu.End();
@@ -417,8 +508,6 @@ namespace tracer
             else
                 m_buttons.Add(button);
 
-            if(button.id != -1)
-                button.id = m_buttons.Count - 1;
             buttonsUpdated?.Invoke(this, EventArgs.Empty);
         }
 
@@ -443,6 +532,13 @@ namespace tracer
         public ref List<MenuButton> getButtons()
         {
             return ref m_buttons;
+        }
+
+        //!
+        //! Returns a reference to to list of menu buttons.
+        //!
+        public MenuButton getButtons(int buttonID){
+            return m_buttons.Find(x => x.id == buttonID);
         }
 
         //!
@@ -594,8 +690,11 @@ namespace tracer
         //!
         //! @ param sceneObject The selected scene object to be added.
         //!
-        public void addSelectedObject(SceneObject sceneObject)
-        {
+        public void addSelectedObject(SceneObject sceneObject){
+            // depending by our role
+            if(!EvaluationHelper.Instance.IsSelectableWithRole(sceneObject, activeRole))
+                return;
+
             if (!sceneObject._lock){
                 m_selectedObjects.Add(sceneObject);
 
@@ -679,12 +778,8 @@ namespace tracer
             UI2DCreated?.Invoke(this, ui);
         }
 
-        //!
-        //! Function that deactivates the 2D UI interaction
-        //!
-        private void activate2DUIInteraction(object sender, bool e)
-        {
-            _ui2Dinteractable = e;
+        public void emitCameraLockObjectChanged(object sender, bool locked) {
+            uiCameraLockChanged?.Invoke(sender, locked);
         }
 
         //!

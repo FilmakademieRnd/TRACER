@@ -171,8 +171,14 @@ namespace tracer
 #if UNITY_EDITOR
             UnityEngine.Debug.unityLogger.logEnabled = true;
 #else
-            Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
-            UnityEngine.Debug.unityLogger.logEnabled = false;
+            if(!UnityEngine.Debug.isDebugBuild){
+                Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
+                UnityEngine.Debug.unityLogger.logEnabled = false;
+            }else{
+                UnityEngine.Debug.unityLogger.logEnabled = true;
+                // Prevents the screen from dimming and turning off
+                Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            }
 #endif
 
             Application.logMessageReceived += updateLog;
@@ -206,6 +212,9 @@ namespace tracer
             //Create Animation manager
             AnimationManager animationManager = new AnimationManager(typeof(AnimationManagerModule), this);
             m_managerList.Add(typeof(AnimationManager), animationManager);
+
+            //Initialize the EvaluationHelper (Unity Specific!)
+            EvaluationHelper.Instance.Init(this);
 
             LoadSettings();
 

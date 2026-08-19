@@ -24,8 +24,9 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "MeasureModule.cs"
 //! @brief Implementation of the TRACER MeasureModule, ui interface for ingame measurement
 //! @author Thomas "Kruegbert" Krüger
-//! @version 0
-//! @date 02.01.2025
+//! @version 1
+//! @date 09.05.2026
+//! @revision started adjusting it to the new InputManager
 
 
 using System;
@@ -34,7 +35,6 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace tracer{
@@ -258,8 +258,7 @@ namespace tracer{
                 manager.selectionChanged += OnSelectionChanged;
             }else{
                 manager.selectionChanged -= OnSelectionChanged;
-                //remove listener if we are within this mode, just to be sure
-                core.getManager<InputManager>().inputPressEnd -= OnPointerDown_Place;
+                core.getManager<InputManager>().clickOtherEvent -= ClickFunction;
             }
         }
 
@@ -311,65 +310,7 @@ namespace tracer{
         //! Function that is called when the input manager registers a pointer down event
         //! callback only active if "place via ray" button is active
         //!
-        //! @param sender A reference to the input manager.
-        //! @param point The point in screen space the pointer down event happened.
-        //!
-        private void OnPointerDown_Place(object sender, Vector2 point){
-            //check if any ui (despite our blocker) was hit
-            GameObject uiGo = TimelineModule.GetGameObjectAtUIRaycast(point);
-            if(uiGo != inputBlockingCanvas.gameObject){
-            //if(SceneRaycastHelper.DidHitSpecificUI(point, button_placeSelectedObjectViaRay.gameObject)){
-                //Debug.Log("Hit Button to stop placing - so dont do any raycast positioning queries!");
-                return;
-            }
-
-            inputBlockingCanvas.SetActive(false);            
-
-            MeshRenderer[] ignoreTheseForRaycasting;
-            //ignore (selection) itself
-            ignoreTheseForRaycasting = sceneObjectToPlace.GetComponents<MeshRenderer>();
-
-            //TODO for performance we would not need to gather all MeshRenderer on every click (only if we modify any)
-            if (SceneRaycastHelper.RaycastIntoScene(core.getManager<SceneManager>().scnRoot, point, out RaycastHit hit, ignoreTheseForRaycasting)){
-                //if we hit another measurement-pool object, select this for placing, instead of change  the current position
-                //no need to position a measure-object onto any other measure-object
-                //TODO: if we are in placement-mode via waypoint-creation, just end placement-mode
-                SceneObject sceneObjectWeHit = hit.transform.GetComponent<SceneObject>();
-                if(!sceneObjectWeHit)
-                    sceneObjectWeHit = hit.transform.GetComponentInParent<SceneObject>();
-
-                if (sceneObjectWeHit){
-                    //Debug.Log("Hit SceneObject Check if it is a Measure-Object");
-                    MeasurePool selectedMeasurePool = sceneObjectWeHit.GetComponentInParent<MeasurePool>();
-                    if (selectedMeasurePool && selectedMeasurePool.IsSceneObjectFromMeasurement(sceneObjectWeHit)){
-                        //Debug.Log("\tYES!");
-                        //revert color
-                        sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
-                        //save color
-                        objectToPlaceStandardColor = sceneObjectWeHit.GetComponent<MeshRenderer>().material.color;
-                        sceneObjectWeHit.GetComponent<MeshRenderer>().material.color = Color.green;
-                        OnSelectionChanged(null, new List<SceneObject>() { sceneObjectWeHit });
-                        inputBlockingCanvas.SetActive(true);
-                        return;
-                    }
-                }
-
-                //place this object: sceneObjectToPlace (BEWARE: setValue always sets local position and rotation!)
-                sceneObjectToPlace.transform.position = hit.point;
-                //align to hit normal with upwards vector
-                sceneObjectToPlace.transform.rotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
-                //move on normal, so the object is not within the object
-                sceneObjectToPlace.transform.position += sceneObjectToPlace.transform.up * sceneObjectToPlace.transform.localScale.y / 2f;
-
-                //reset this before, e.g. if we have these events deactivating it
-                inputBlockingCanvas.SetActive(true);
-
-                additionalPlaceEvent?.Invoke();
-            }else{
-                inputBlockingCanvas.SetActive(true);
-            }
-        }
-
+        
         private void OnPointerDown_AlignToNormal(object sender, Vector2 point){
             //check if any ui (despite our blocker) was hit
             GameObject uiGo = TimelineModule.GetGameObjectAtUIRaycast(point);
@@ -417,103 +358,6 @@ namespace tracer{
                 inputBlockingCanvas.SetActive(true);
             }
         }
-
-        /* did not work
-        //ongoing placement test could not work with dynamically adding sphere and meshcollider
-        //not even if we let them stay, because we would have too much meshcollider
-        //try using render path preview
-        private RenderTexture gpuTexture;
-        private int dataWidth, dataHeight;
-        private int scaleResolutionDivisorForPerformance = 1;
-        private Texture2D depthTexture;
-        private void OnPointerDown_PlaceOngoing_Start(object sender, Vector2 point){
-            if(SceneRaycastHelper.DidHitSpecificUI(point, button_placeSelectedObjectViaRay.gameObject)){
-                //Debug.Log("Hit Button to stop placing - so dont do any raycast positioning queries!");
-                return;
-            }
-
-            inputBlockingCanvas.SetActive(false);            
-
-            //ignore MeasurePool Objects, TextMeshes, UI
-
-            //Render the current view via replacement shader - no need to do this ongoing, since we will not change the view during this ongoing check
-            Camera camera = Camera.main;
-
-            dataWidth = camera.pixelWidth / scaleResolutionDivisorForPerformance;
-            dataHeight = camera.pixelHeight / scaleResolutionDivisorForPerformance;
-            gpuTexture = RenderTexture.GetTemporary(dataWidth, dataHeight, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
-
-            RenderTexture oldRenderTexture = camera.targetTexture;
-            DepthTextureMode oldDepthMode = camera.depthTextureMode;
-
-            camera.depthTextureMode = DepthTextureMode.Depth;
-            camera.targetTexture = gpuTexture;
-            Shader replacementShader = Shader.Find("Custom/ReplacementShaderForWorldPos");
-            camera.RenderWithShader(replacementShader, "");
-            
-            RenderTexture oldActiveRenderTexture = RenderTexture.active;
-            RenderTexture.active = gpuTexture;
-
-            depthTexture = new Texture2D(dataWidth, dataHeight, TextureFormat.ARGB32, false, true);
-            depthTexture.ReadPixels(new Rect(0, 0, dataWidth, dataHeight), 0, 0);
-            //depthTexture.SetPixel((int)point.x, (int)point.y, Color.red);
-            depthTexture.Apply();
-
-            Color textureColorData = depthTexture.GetPixel(dataWidth, dataHeight);
-            Debug.Log("Depth: "+textureColorData.r*1f);
-
-            RenderTexture.active = oldActiveRenderTexture;
-            camera.targetTexture = oldRenderTexture;
-            camera.depthTextureMode = oldDepthMode;
-            RenderTexture.ReleaseTemporary(gpuTexture);
-
-            //debug
-            GameObject debugGO = new GameObject("Debug RenderTexture");
-            DebugRenderTexture debugRT = debugGO.AddComponent<DebugRenderTexture>();
-            debugRT.SetTexture(depthTexture);
-
-            // CameraClearFlags oldClearFlags = camera.clearFlags;
-            // Color oldBackgroundColor = camera.backgroundColor;
-            // RenderingPath oldRenderingPath = camera.renderingPath;
-            // bool oldAllowMsaa = camera.allowMSAA;
-
-            // camera.targetTexture = gpuTexture; // Render into render texture.
-            // camera.clearFlags = CameraClearFlags.SolidColor; // Make sure non-rendered pixels have _id zero.
-            // camera.backgroundColor = Color.clear;
-            // camera.renderingPath = RenderingPath.Forward; // No gbuffer required.
-            // camera.allowMSAA = false; // Avoid interpolated colors.
-
-            Debug.Log("Rendered Replacement Texture ("+dataWidth+"x"+dataHeight+") once");
-        }
-
-        private void OnPointerDown_PlaceOngoing(object sender, Vector2 point){
-            Debug.Log("OnPointerDown_PlaceOngoing point: "+point);
-            //gather texture data which is the world pos!
-            int scaledX = (int)point.x / scaleResolutionDivisorForPerformance;
-            int scaledY = (int)point.y / scaleResolutionDivisorForPerformance;
-            int indexWouldBe = scaledX + dataWidth * scaledY;
-            
-            if (indexWouldBe < 0 || indexWouldBe > (dataWidth*dataHeight))
-                return;
-            
-            float depthColorValue01 = 1f-depthTexture.GetPixel(scaledX, scaledY).r;
-            Debug.Log("RT color value: "+depthColorValue01);
-            float depth = Mathf.Lerp(Camera.main.nearClipPlane, Camera.main.farClipPlane, depthColorValue01);
-            Debug.Log("RT depth: "+depth);
-
-            //depthTexture.SetPixel(scaledX, scaledY, Color.red);
-            //depthTexture.Apply();
-
-            //beware that hardcoded farplane of 1000 in the replacement shader - the z value here need to be divided by that!
-            Vector3 screenToWorldPos = new Vector3(point.x, point.y, depth*1f); //dataHeight-point.y?
-            Vector3 pos = Camera.main.ScreenToWorldPoint(screenToWorldPos);
-                //new Vector3(textureColorData.r, textureColorData.g, textureColorData.b/1000f);
-            sceneObjectToPlace.transform.position = pos;
-            Debug.Log("World Pos from via RT color: "+pos);
-            
-            //Color c = depthTexture.GetPixel(scaledX, dataHeight-scaledY);
-            //sceneObjectToPlace.transform.position = new Vector3(c.r, c.g, c.b);
-        }*/
         
 
         #endregion
@@ -589,6 +433,8 @@ namespace tracer{
             //otherwise we could not measure a big object that is a movable scene object (e.g. a car)
             inputBlockingCanvas.SetActive(true);
 
+            //TODO: deny via InputManager's bools!
+
             HideAllButtons();
             button_placeSelectedObjectViaRay.gameObject.SetActive(true);
 
@@ -600,8 +446,10 @@ namespace tracer{
 
             //hide gizmo and TRS ui --> we simulate this by de-selecting!
             manager.clearSelectedObjects();
+            
             //add event to input manager
-            core.getManager<InputManager>().inputPressEnd += OnPointerDown_Place; //needed UI, because of inputBlockingCanvas
+            core.getManager<InputManager>().clickOtherEvent += ClickFunction;
+
             //use the below for testing ongoing alignment
                 // did not work properly
                 // core.getManager<InputManager>().inputPressStartedUI += OnPointerDown_PlaceOngoing_Start;
@@ -618,7 +466,7 @@ namespace tracer{
             //revert color
             sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
             
-            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_Place;
+            core.getManager<InputManager>().clickOtherEvent -= ClickFunction;
 
             //re-enable gizmos by simulate a "reselection"
             manager.clearSelectedObjects();
@@ -711,6 +559,85 @@ namespace tracer{
 
         private void OnClick_ResetDistance(){
             sceneObjectToPlace.GetComponentInParent<MeasurePool>().ResetDistance();
+        }
+        #endregion
+
+        #region Input Manager Overhaul
+
+        //!
+        //! Function to connect input managers input event for clicking
+        //!
+        //! @param evt the InputData
+        //!
+        private void ClickFunction(object sender, InputManager.InputEventArgs evt){
+
+            if (evt.Level != InputManager.InputLevel.Primary) return;
+
+            // check phase
+            switch (evt.State){
+                case InputManager.InputState.Started:
+                case InputManager.InputState.Ongoing:
+                case InputManager.InputState.Canceled:
+                    //nothing to do
+                    break;
+                case InputManager.InputState.Ended:
+                    PlaceMeasurement(evt.Position);
+                    break;
+            }
+        }
+
+        private void PlaceMeasurement(Vector2 clickPos) {
+            // TODO: evaluate point on ANY MeshRenderer
+            GameObject hitObject = EvaluationHelper.Instance.EvaluateGameObject(clickPos);
+
+            //Physics.Raycast( EvaluationHelper.Instance.CreateScreenPointRay(clickPos), out RaycastHit hitInfo, Mathf.Infinity, 1 << 0);
+            
+
+            //if (SceneRaycastHelper.RaycastIntoScene(core.getManager<SceneManager>().scnRoot, point, out RaycastHit hit, ignoreTheseForRaycasting)){
+            if(hitObject){
+                //if we hit another measurement-pool object, select this for placing, instead of change  the current position
+                //no need to position a measure-object onto any other measure-object
+                //TODO: if we are in placement-mode via waypoint-creation, just end placement-mode
+                SceneObject sceneObjectWeHit = hitObject.GetComponent<SceneObject>();
+                if(!sceneObjectWeHit)
+                    sceneObjectWeHit = hitObject.GetComponentInParent<SceneObject>();
+
+                if (sceneObjectWeHit){
+                    //Debug.Log("Hit SceneObject Check if it is a Measure-Object");
+                    MeasurePool selectedMeasurePool = sceneObjectWeHit.GetComponentInParent<MeasurePool>();
+                    if (selectedMeasurePool && selectedMeasurePool.IsSceneObjectFromMeasurement(sceneObjectWeHit)){
+                        //Debug.Log("\tYES!");
+                        //revert color
+                        sceneObjectToPlace.GetComponent<MeshRenderer>().material.color = objectToPlaceStandardColor;
+                        //save color
+                        objectToPlaceStandardColor = sceneObjectWeHit.GetComponent<MeshRenderer>().material.color;
+                        sceneObjectWeHit.GetComponent<MeshRenderer>().material.color = Color.green;
+                        OnSelectionChanged(null, new List<SceneObject>() { sceneObjectWeHit });
+                        inputBlockingCanvas.SetActive(true);
+                        return;
+                    }
+                }
+
+                Vector3 hitPoint = hitObject.transform.position;
+                //instead of root, use the object we hit from the above evaluation helper?!
+                if(RayMeshUtility.GetHitPointPrecise(EvaluationHelper.Instance.CreateScreenPointRay(clickPos), core.getManager<SceneManager>().scnRoot, RayMeshUtility.Accuracy.ExactMesh, out hitPoint)) {
+                    // Todo: also get normal!
+                }
+
+                //place this object: sceneObjectToPlace (BEWARE: setValue always sets local position and rotation!)
+                sceneObjectToPlace.transform.position = hitPoint;
+                //align to hit normal with upwards vector
+                sceneObjectToPlace.transform.rotation = Quaternion.FromToRotation(Vector3.up, Camera.main.transform.up);//hit.normal);
+                //move on normal, so the object is not within the object
+                sceneObjectToPlace.transform.position += sceneObjectToPlace.transform.up * sceneObjectToPlace.transform.localScale.y / 2f;
+
+                //reset this before, e.g. if we have these events deactivating it
+                inputBlockingCanvas.SetActive(true);
+
+                additionalPlaceEvent?.Invoke();
+            }else{
+                inputBlockingCanvas.SetActive(true);
+            }
         }
         #endregion
 

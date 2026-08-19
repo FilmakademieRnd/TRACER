@@ -20,11 +20,12 @@ You should have received a copy of the MIT License along with this program;
 if not go to https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------------
 */
-//! @folder "PathGenerationModuke"
+//! @folder "PathGenerationModule"
 //! @brief Implementation of the TRACER PathGenerationModule to generate paths for SceneCharacterObjects and send them to AnimHost
 //! @author Thomas "Kruegbert" Krüger
-//! @version 1
-//! @date 06.02.2025
+//! @version 2
+//! @date 19.05.2026
+//! @revision started adjustments to the new InputManager
 
 
 
@@ -134,7 +135,7 @@ namespace tracer{
         //! @param Manager reference for this module
         //!
         public PathGenerationModule(string _name, Manager _manager) : base(_name, _manager){
-            //load = false;
+            load = false;
         }
 
         #region Public Functions
@@ -221,7 +222,7 @@ namespace tracer{
                 //OnSelectionChanged(null, manager.SelectedObjects);
             }else{
                 //remove listener if we are within this mode, just to be sure
-                core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
+//                core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
 
                 if(sceneCharacterForPath)
                     sceneCharacterForPath.onPathPositionChanged -= PathDataChanged;
@@ -536,7 +537,7 @@ namespace tracer{
             manager.clearSelectedObjects();
             
             //add event to input manager
-            core.getManager<InputManager>().inputPressEnd += OnPointerDown_GeneratePath; //needed UI, because of inputBlockingCanvas
+//            core.getManager<InputManager>().inputPressEnd += OnPointerDown_GeneratePath; //needed UI, because of inputBlockingCanvas
         }
 
         private void OnClick_SendPathToAnimHost(){
@@ -576,7 +577,7 @@ namespace tracer{
         #region Specific Button Functions
 
         private void AbortPlacementViaRay(){
-            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
+//            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
 
             //re-enable gizmos by simulate a "reselection"
             //manager.clearSelectedObjects();
@@ -590,7 +591,7 @@ namespace tracer{
         }
 
         private void EndPathCreation(){
-            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
+//            core.getManager<InputManager>().inputPressEnd -= OnPointerDown_GeneratePath;
 
             manager.addSelectedObject(sceneCharacterForPath);
 

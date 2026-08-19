@@ -127,6 +127,9 @@ namespace tracer
         public override void Dispose()
         {
             base.Dispose();
+            
+            manager.selectionChanged -= createUI;
+
             undoButton.onClick.RemoveAllListeners();
             redoButton.onClick.RemoveAllListeners();
             resetButton.onClick.RemoveAllListeners();

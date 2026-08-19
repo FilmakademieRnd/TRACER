@@ -31,8 +31,10 @@ https://opensource.org/licenses/MIT
 //! @brief implementation of VPET AR features
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
-//! @version 0
-//! @date 20.06.2023
+//! @author Thomas Krüger
+//! @version 1
+//! @date 22.07.2026
+//! @note updated deprecated functions and implement to (fake) work in editor
 
 using System;
 using System.Collections.Generic;
@@ -126,13 +128,15 @@ namespace tracer
             get => _arActive;
         }
 
+        //! used as data for the inputmanager event as in the UnityInputModule
+        private InputManager.InputEventArgs arInputData;
+
         //!
         //! Constructor
         //! @param name Name of this module
         //! @param core Reference to the VPET core
         //!
-        public ARModule(string name, Manager manager) : base(name, manager)
-        {
+        public ARModule(string name, Manager manager) : base(name, manager){
             arImgManager = null;
             sceneRoot = core.getManager<SceneManager>().scnRoot.transform;
             _arActive = false;
@@ -142,8 +146,11 @@ namespace tracer
             arSession = SceneObject.Instantiate(arSessionPrefab, Vector3.zero, Quaternion.identity)
                 .GetComponent<ARSession>();
 
-            switch (ARSession.state)
-            {
+            #if UNITY_EDITOR
+            return;
+            #endif
+
+            switch (ARSession.state){
                 case ARSessionState.CheckingAvailability:
                     // still checking AR state
                     Helpers.Log("ARModule: Checking availability...");
@@ -165,14 +172,15 @@ namespace tracer
             }
         }
 
+
         //!
         //! Destructor
         //!
-        ~ARModule()
-        {
+        ~ARModule(){
             if (arImgManager != null)
-                arImgManager.trackedImagesChanged -= MarkerTrackingChanged;
+                arImgManager.trackablesChanged.RemoveListener(MarkerTrackingChanged);
 
+            core.getManager<UIManager>().cameraControlChanged -= CameraControlBehaviourChanged;
         }
 
         //!
@@ -181,21 +189,25 @@ namespace tracer
         //! @param sender event sender
         //! @param e event arguments
         //!
-        protected override void Init(object sender, EventArgs e)
-        {
+        protected override void Init(object sender, EventArgs e){
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.started += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.performed += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
             //vpetCore.getManager<InputManager>().touchInputs.ARTouchScreen.PlaceScene.canceled += ctx => arOrigin.GetComponent<PlaceScene>().placeScene(ctx);
+            core.getManager<UIManager>().cameraControlChanged += CameraControlBehaviourChanged;
+
+            #if UNITY_EDITOR
+            //TEST WITHIN EDITOR
+            Helpers.Log("ARModule: Faking in editor");
+            initialize();
+            #endif
         }
 
         //!
         //! function being subscribed to the ARSession.stateChanged when it is yet unknown if the device supports AR
         //! @param obj unused additional information given by ARSession
         //!
-        private void arStateChanged(ARSessionStateChangedEventArgs obj)
-        {
-            switch (ARSession.state)
-            {
+        private void arStateChanged(ARSessionStateChangedEventArgs obj){
+            switch (ARSession.state){
                 case ARSessionState.Ready:
                 case ARSessionState.SessionInitializing:
                 case ARSessionState.SessionTracking:
@@ -203,7 +215,6 @@ namespace tracer
                     Helpers.Log("ARModule: AR available.");
                     ARSession.stateChanged -= arStateChanged;
                     initialize();
-                    //changeActive(this, true);
                     break;
                 default:
                     //AR not available
@@ -217,15 +228,16 @@ namespace tracer
         //!
         //! initialize the AR environement in the scene, executed after veryfing AR support of device
         //!
-        private void initialize()
-        {
+        private void initialize(){
+            
+            //creating class once, reduce Garbage Collection
+            arInputData = new InputManager.InputEventArgs();
+
             //Instanciate XROrigin from Prefab
             GameObject arSessionOriginPrefab = Resources.Load<GameObject>("Prefabs/ARSessionOrigin");
-            m_arOrigin = SceneObject.Instantiate(arSessionOriginPrefab, Vector3.zero, Quaternion.identity)
-                .GetComponent<XROrigin>();
+            m_arOrigin = SceneObject.Instantiate(arSessionOriginPrefab, Vector3.zero, Quaternion.identity).GetComponent<XROrigin>();
             
             //mattGameObjectPrefab = Resources.Load<GameObject>("Prefabs/ARMattGameObject");
-
             //m_arOrigin.GetComponent<PlaceScene>().scene = core.getManager<SceneManager>().scnRoot;
 
             //place XROrigin as parent of main camera
@@ -235,6 +247,9 @@ namespace tracer
             m_arOrigin.GetComponent<XROrigin>().CameraFloorOffsetObject = sceneRoot.gameObject;
 
             //add required components to camera
+            if(!Camera.main.gameObject.GetComponent<TrackedPoseDriver>())
+                Camera.main.gameObject.AddComponent<TrackedPoseDriver>();
+
             Camera.main.gameObject.GetComponent<TrackedPoseDriver>().enabled = true;
             m_poseDriver = Camera.main.gameObject.GetComponent<TrackedPoseDriver>();
             m_camManager = Camera.main.gameObject.AddComponent<ARCameraManager>();
@@ -242,14 +257,16 @@ namespace tracer
             m_occlusionManager.requestedEnvironmentDepthMode = EnvironmentDepthMode.Best;
             m_cameraBg = Camera.main.gameObject.AddComponent<ARCameraBackground>();
 
+#if !UNITY_EDITOR
             //Add Marker Tracking
             arImgManager = arSession.gameObject.AddComponent<ARTrackedImageManager>();
             RuntimeReferenceImageLibrary imgLib =
                 arImgManager.CreateRuntimeLibrary(Resources.Load<XRReferenceImageLibrary>("ReferenceImageLibrary"));
             arImgManager.referenceLibrary = imgLib;
             arImgManager.requestedMaxNumberOfMovingImages = 1;
-            arImgManager.trackedImagesChanged += MarkerTrackingChanged;
+            arImgManager.trackablesChanged.AddListener(MarkerTrackingChanged);
             arImgManager.enabled = true;
+#endif
 
             //prepare UI
             enableAR = new Parameter<bool>(false, "enableAR");
@@ -297,23 +314,44 @@ namespace tracer
         }
 
         //!
+        //! Method to update menu button based on camera control
+        //! @param sender callback sender
+        //! @param c event reference
+        //!
+        private void CameraControlBehaviourChanged(object sender, UIManager.CameraControl c) {
+            switch (c) {
+                case UIManager.CameraControl.AR:
+                    //nothing to do
+                    break;
+                case UIManager.CameraControl.ATTITUDE:
+                    //deactivate buttons!
+                    changeActive(this, false);
+                    changeOcclusion(this, false);
+                    changeMarkerTracking(this, false);
+                    changeMatte(this, false);
+
+                    //enable AR tracking
+                    _arActive = true;
+                    break;
+                case UIManager.CameraControl.STANDARD:
+                    //do nothing again
+                    break;
+            }
+        }
+
+        //!
         //! handle updates to marker tracking (added, updated, removed in camera view), triggered by ARImageManager
         //!
-        private void MarkerTrackingChanged(ARTrackedImagesChangedEventArgs e)
-        {
-            foreach (ARTrackedImage newImage in e.added)
-            {
-                if (newImage.referenceImage.name == "vpetMarker")
-                {
+        private void MarkerTrackingChanged(ARTrackablesChangedEventArgs<ARTrackedImage> e){
+            foreach (ARTrackedImage newImage in e.added){
+                if (newImage.referenceImage.name == "vpetMarker"){
                     sceneRoot.position = newImage.transform.position;
                     sceneRoot.rotation = newImage.transform.rotation;
                 }
             }
 
-            foreach (ARTrackedImage updatedImage in e.updated)
-            {
-                if (updatedImage.referenceImage.name == "vpetMarker")
-                {
+            foreach (ARTrackedImage updatedImage in e.updated){
+                if (updatedImage.referenceImage.name == "vpetMarker"){
                     sceneRoot.position = updatedImage.transform.position;
                     sceneRoot.rotation = updatedImage.transform.rotation;
                 }
@@ -330,22 +368,22 @@ namespace tracer
         //! @param sender event sender
         //! @param e event arguments
         //!
-        private void changeActive(object sender, bool b)
-        {
-            if (b)
-            {
+        private void changeActive(object sender, bool b){
+            if (b){
                 Camera.main.transform.parent = m_arOrigin.transform;
-                manager.disableAttitudeSensor();
-                manager.cameraControl = InputManager.CameraControl.AR;
-            }
-            else
-            {
-                manager.cameraControl = InputManager.CameraControl.NONE;
+                core.getManager<UIManager>().cameraControl = UIManager.CameraControl.AR;
+                
+                arInputData.State = InputManager.InputState.Started;
+                manager.RaiseAR(this, arInputData);
+            }else{
                 Camera.main.transform.parent = m_arOrigin.transform.parent;
                 m_arOrigin.transform.position = Vector3.zero;
                 m_arOrigin.transform.rotation = Quaternion.identity;
-                manager.enableAttitudeSensor();
-                manager.setCameraAttitudeOffsets();
+                
+                core.getManager<UIManager>().cameraControl = UIManager.CameraControl.STANDARD;
+
+                arInputData.State = InputManager.InputState.Ended;
+                manager.RaiseAR(this, arInputData);
             }
 
             if (arSession)
@@ -360,11 +398,9 @@ namespace tracer
                 if (b) m_occlusionManager.enabled = enableOcclusionMapping.value;
                 else m_occlusionManager.enabled = false;
 
-            if (b)
-            {
+            if (b){
                 m_arOrigin.transform.position = Camera.main.transform.position;
-                m_arOrigin.transform.rotation = Quaternion.AngleAxis(Camera.main.transform.rotation.eulerAngles.y,
-                    new Vector3(0, 1f, 0));
+                m_arOrigin.transform.rotation = Quaternion.AngleAxis(Camera.main.transform.rotation.eulerAngles.y, new Vector3(0, 1f, 0));
             }
 
         }
@@ -374,8 +410,7 @@ namespace tracer
         //! @param sender event sender
         //! @param b boolean to enable or disable feature
         //!
-        private void changeOcclusion(object sender, bool b)
-        {
+        private void changeOcclusion(object sender, bool b){
             if (b)
                 m_occlusionManager.requestedEnvironmentDepthMode = EnvironmentDepthMode.Best;
             else
@@ -387,29 +422,23 @@ namespace tracer
         //! @param sender event sender
         //! @param b boolean to enable or disable feature
         //!
-        private void changeMarkerTracking(object sender, bool b)
-        {
+        private void changeMarkerTracking(object sender, bool b){
             ARTrackedImageManager arTrackedImageManager;
             arTrackedImageManager = Camera.main.gameObject.GetComponent<ARTrackedImageManager>();
-            if (!arTrackedImageManager)
-            {
+            if (!arTrackedImageManager){
                 arTrackedImageManager = Camera.main.gameObject.AddComponent<ARTrackedImageManager>();
             }
 
             arTrackedImageManager.enabled = b;
 
-            if (b)
-            {
-                arTrackedImageManager.trackedImagesChanged += OnTrackedImageChanged;
-            }
-            else
-            {
-                arTrackedImageManager.trackedImagesChanged -= OnTrackedImageChanged;
+            if (b){
+                arTrackedImageManager.trackablesChanged.AddListener(OnTrackedImageChanged);
+            }else{
+                arTrackedImageManager.trackablesChanged.RemoveListener(OnTrackedImageChanged);
             }
         }
 
-        private void changeMatte(object sender, bool b)
-        {
+        private void changeMatte(object sender, bool b){
             //TODO MATTE CODE
 
             Material camMaterial = Camera.main.gameObject.GetComponent<ARCameraBackground>().material;
@@ -423,11 +452,9 @@ namespace tracer
 
             Material matteMaterial = mattGameObject.GetComponent<Renderer>().material;
             
-            if (b)
-            {
+            if (b){
                 
-                if (matteMaterial != null)
-                {
+                if (matteMaterial != null){
                     matteMaterial.SetTexture("_textureY", camMaterial.GetTexture("_textureY"));
                     matteMaterial.SetTexture("_textureCbCr", camMaterial.GetTexture("_textureCbCr"));
                     matteMaterial.SetMatrix("_DisplayTransform", camMaterial.GetMatrix("_DisplayTransform"));
@@ -437,15 +464,13 @@ namespace tracer
                     if (camMaterial)
                         videoRatio = (float)camMaterial.GetTexture("_textureY").width /
                                      (float)camMaterial.GetTexture("_textureY").height;
-                    float cropScaleHorizontal = 0, cropScaleVertical = 0;
+                    
+                    float cropScaleHorizontal, cropScaleVertical;
 
-                    if (displayRatio < videoRatio)
-                    {
+                    if (displayRatio < videoRatio){
                         cropScaleHorizontal = 1.0f - (displayRatio / videoRatio);
                         cropScaleVertical = 0.0f;
-                    }
-                    else
-                    {
+                    }else{
                         cropScaleHorizontal = 0.0f;
                         cropScaleVertical = 1.0f - (videoRatio / displayRatio);
                     }
@@ -453,11 +478,8 @@ namespace tracer
                     matteMaterial.SetFloat("_cropScaleX", cropScaleHorizontal);
                     matteMaterial.SetFloat("_cropScaleY", cropScaleVertical);
                 }
-            }
-            else
-            {
-                if (matteMaterial != null)
-                {
+            }else{
+                if (matteMaterial != null){
                     matteMaterial.SetTexture("_textureY", null);
                     matteMaterial.SetTexture("_textureCbCr", null);
                     // matteMaterial.SetMatrix("_DisplayTransform", arkitScreen.m_ClearMaterial.GetMatrix("_DisplayTransform"));
@@ -465,20 +487,14 @@ namespace tracer
             }
         }
 
-        void OnTrackedImageChanged(ARTrackedImagesChangedEventArgs eventArgs)
-        {
-            foreach (ARTrackedImage newImage in eventArgs.added)
-            {
-                XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, newImage.transform.position,
-                    newImage.transform.rotation);
+        void OnTrackedImageChanged(ARTrackablesChangedEventArgs<ARTrackedImage> eventArgs){
+            foreach (ARTrackedImage newImage in eventArgs.added){
+                XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, newImage.transform.position,newImage.transform.rotation);
             }
 
-            foreach (ARTrackedImage updatedImage in eventArgs.updated)
-            {
+            foreach (ARTrackedImage updatedImage in eventArgs.updated){
                 // Handle updated event
-                XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, updatedImage.transform.position,
-                    updatedImage.transform.rotation);
-
+                XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, updatedImage.transform.position,updatedImage.transform.rotation);
             }
         }
 
@@ -487,63 +503,59 @@ namespace tracer
         //! @param pos position th apply to the camera
         //! @param rot rotation to apply to the camera
         //!
-        public void moveCamera(Vector3 pos, Quaternion rot)
-        {
+        public void moveCamera(Vector3 pos, Quaternion rot){
             XROriginExtensions.MakeContentAppearAt(m_arOrigin, sceneRoot, pos, rot);
         }
 
     }
 
     //!
-        //! extension class to XROrigin to reimplement MakeContentAppearAt function
+    //! extension class to XROrigin to reimplement MakeContentAppearAt function
+    //!
+    public static class XROriginExtensions{
         //!
-        public static class XROriginExtensions
+        //! function to move XROrigin so that scene appears at given location relative to camera
+        //! @param origin XROrigin the location offset is applied to
+        //! @param content scene to be moved
+        //! @param position position the scene shall be moved to
+        //! @param rotation rotation the scene shall be rotated to
+        //!
+        public static void MakeContentAppearAt(this XROrigin origin, Transform content, Vector3 position,
+            Quaternion rotation)
         {
-            //!
-            //! function to move XROrigin so that scene appears at given location relative to camera
-            //! @param origin XROrigin the location offset is applied to
-            //! @param content scene to be moved
-            //! @param position position the scene shall be moved to
-            //! @param rotation rotation the scene shall be rotated to
-            //!
-            public static void MakeContentAppearAt(this XROrigin origin, Transform content, Vector3 position,
-                Quaternion rotation)
-            {
-                MakeContentAppearAt(origin, content, position);
-                MakeContentAppearAt(origin, content, rotation);
-            }
-
-            //!
-            //! function to reposition XROrigin so that scene appears at given location relative to camera
-            //! @param origin XROrigin the location offset is applied to
-            //! @param content scene to be moved
-            //! @param position position the scene shall be moved to
-            //!
-            private static void MakeContentAppearAt(this XROrigin origin, Transform content, Vector3 position)
-            {
-                if (content == null)
-                    throw new ArgumentNullException(nameof(content));
-
-                var originTransform = origin.transform;
-
-                origin.CameraFloorOffsetObject.transform.position += originTransform.position - position;
-
-                originTransform.position = content.position;
-            }
-
-            //!
-            //! function to rotate XROrigin so that scene appears at intended rotation
-            //! @param origin XROrigin the location offset is applied to
-            //! @param content scene to be moved
-            //! @param rotation rotation the scene shall be rotated to
-            //!
-            private static void MakeContentAppearAt(this XROrigin origin, Transform content, Quaternion rotation)
-            {
-                if (content == null)
-                    throw new ArgumentNullException(nameof(content));
-
-                origin.transform.rotation = Quaternion.Inverse(rotation) * content.rotation;
-            }
+            MakeContentAppearAt(origin, content, position);
+            MakeContentAppearAt(origin, content, rotation);
         }
+
+        //!
+        //! function to reposition XROrigin so that scene appears at given location relative to camera
+        //! @param origin XROrigin the location offset is applied to
+        //! @param content scene to be moved
+        //! @param position position the scene shall be moved to
+        //!
+        private static void MakeContentAppearAt(this XROrigin origin, Transform content, Vector3 position){
+            if (content == null)
+                throw new ArgumentNullException(nameof(content));
+
+            var originTransform = origin.transform;
+
+            origin.CameraFloorOffsetObject.transform.position += originTransform.position - position;
+
+            originTransform.position = content.position;
+        }
+
+        //!
+        //! function to rotate XROrigin so that scene appears at intended rotation
+        //! @param origin XROrigin the location offset is applied to
+        //! @param content scene to be moved
+        //! @param rotation rotation the scene shall be rotated to
+        //!
+        private static void MakeContentAppearAt(this XROrigin origin, Transform content, Quaternion rotation){
+            if (content == null)
+                throw new ArgumentNullException(nameof(content));
+
+            origin.transform.rotation = Quaternion.Inverse(rotation) * content.rotation;
+        }
+    }
     
 }

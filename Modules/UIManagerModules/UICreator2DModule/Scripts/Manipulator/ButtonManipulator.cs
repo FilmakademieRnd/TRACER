@@ -29,9 +29,10 @@ https://opensource.org/licenses/MIT
 
 //! @file "ButtonManipulator.cs"
 //! @brief button manipulator used for path creation ui button (now in a different module, still here to use for other stuff!)
-//! @author Thomas Krpger
-//! @version 0
-//! @date 21.01.2025
+//! @author Thomas Krüger
+//! @version 1
+//! @date 19.05.2026
+//! @revision switched off, needs to be reviewed and adjusted to new InputManager
 
 using System.Collections;
 using System.Collections.Generic;
@@ -67,9 +68,13 @@ namespace tracer{
 
         ~ButtonManipulator()
         {
-            if (abstractParam != null)
+            if (_snapSelect != null){
                 _snapSelect.editingEnded -= InvokeDoneEditing;
+                _snapSelect.parameterChanged -= changeButtonToShow;
+                _snapSelect.elementClicked -= executeElement;
+            }
         }
+
 
         //!
         //! function to initalize the button manipulator
@@ -288,7 +293,7 @@ namespace tracer{
 
 
         #region QUICK&DIRTY: CREATE PATH
-        private void SetListenerForPathTarget(){
+/*        private void SetListenerForPathTarget(){
             _manager.core.getManager<InputManager>().inputPressEnd -= OnPointerEnd;
             _manager.core.getManager<InputManager>().inputPressEnd += OnPointerEnd;
         }
@@ -418,7 +423,7 @@ namespace tracer{
             //if it has an intersection - try first right, second left and check if we can find another way
             return null;
         }
-
+*/
         //right now only on plane-ground
        /* private bool CreateIterativePath(Vector3 targetPos, List<Vector3> path, RaycastHit objectWeHit){
             float characterSize = 3f;

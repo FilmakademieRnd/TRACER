@@ -24,86 +24,172 @@ this program; if not go to
 https://opensource.org/licenses/MIT
 -----------------------------------------------------------------------------
 */
+using System.Collections;
 using UnityEngine;
-using UnityEngine.Events;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace tracer
-{
-	public class KeyFrame : Button, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerDownHandler
-	{
+namespace tracer{
+	public class KeyFrame : MonoBehaviour{
 	    public AbstractKey key;
-		
-		private RectTransform m_timelineTransform;
-
-	    private RectTransform m_rectTransform;
-	    
+		private RectTransform m_rectTransform;
 		private Image m_image;
 	
 	    private Vector3 m_lastPosition = Vector3.zero;
-		private float m_leftLimit, m_rightLimit = 0.0f;
-	    private UnityAction<AbstractKey, float> m_keyframeDragEndEvent;
-	    private UnityAction<GameObject> m_keyframeSelectedEvent;
-
-	    public UnityAction<AbstractKey, float> KeyframeDragEndEvent
-	    {
-	        set { m_keyframeDragEndEvent = value; }
-	    }
-
-        public UnityAction<GameObject> KeyframeSelectedEvent
-        {
-            set { m_keyframeSelectedEvent = value; }
-        }
-
-        protected override void Awake()
-	    {
-	        base.Awake();
-	        // get m_rectTransform component
-	        m_rectTransform = transform.GetComponent<RectTransform>();
-			m_image = transform.GetComponent<Image>();
-            Transform tp = transform.parent;
-			if (tp)
-			{
-				m_timelineTransform = tp.GetComponent<RectTransform>();
-                m_leftLimit = m_timelineTransform.position.x - m_timelineTransform.rect.width * transform.parent.parent.localScale.x * 0.5f;
-                m_rightLimit = m_timelineTransform.position.x + m_timelineTransform.rect.width * transform.parent.parent.localScale.x * 0.5f;
-            }
-        }
-
-		public void select()
-		{
-			m_image.color = Color.blue;
+	    private bool isSelected = false;
+		private int index;	//the index in our AnimationParameter keyList
+		private int siblingIndexWas = 0;
+		
+		private enum KeyFrameState {
+			wasCreated = 0,
+			idle = 5,
+			selected = 10,
+			isDragged = 20,
+			isDraggedError = 30,	//dragged onto other keyframe time
+			notSelectable = 40		//in play mode
 		}
 
-        public void deSelect()
-        {
-            m_image.color = new Color(1.0f, 0.517f, 0,216);
+		private KeyFrameState state = KeyFrameState.wasCreated;
+		private Coroutine colorCoroutine;
+		private Color standardColor = new Color(1.0f, 0.517f, 0, 1);
+		private Color selectedColor = Color.blue;
+		private Color draggedColor = Color.yellow;
+		private Color draggedErrorColor = Color.red;
+		private Color notSelectableColor = new Color(1.0f, 0.517f, 0, 0.2f);
+		private Color highlightColor = Color.white;
+
+        void Awake(){
+	        m_rectTransform = transform.GetComponent<RectTransform>();
+			m_image = transform.GetComponent<Image>();
+			m_lastPosition = m_rectTransform.position;
+
+			state = KeyFrameState.wasCreated;
+
+			AdjustColor();
         }
 
-        // DRAG
-        public void OnBeginDrag(PointerEventData data)
-	    {
-	        m_lastPosition = m_rectTransform.position;
-	    }
+		public void UpdateIndex(int _index){ index = _index; }
+		public int GetIndex(){ return index; }
+
+		public bool WasHit(GameObject evaluatedHitGO){ return evaluatedHitGO == m_image.gameObject; }
+		public bool IsSelected(){ return isSelected; }
+
+		public void Select(){			isSelected = true; state = KeyFrameState.selected; AdjustColor(); }
+        public void DeSelect(){			isSelected = false; state = KeyFrameState.idle; AdjustColor(); }
+		
+		public void SetPlayMode(bool inPlayMode){
+			if (inPlayMode) {
+				isSelected = false;
+				state = KeyFrameState.notSelectable;
+			} else {
+				state = KeyFrameState.idle;
+			}
+			AdjustColor();
+		}
+		//simple visual fluff
+		public void HighlightIfTimePassedThisKeyFrame(float prevTime, float currentTime) {
+			if(prevTime <= key.time && currentTime > key.time){
+				m_image.color = highlightColor;
+				AdjustColor();
+			}
+		}
+
+		public Vector3 GetPos(){	return m_rectTransform.position; }
+		public void SetLocalPos(float localX){ m_rectTransform.localPosition = new Vector3(localX,0,0); }
+
+        public void DragStart(){	
+			m_lastPosition = m_rectTransform.position;
+
+			siblingIndexWas = m_rectTransform.GetSiblingIndex();
+			m_rectTransform.SetSiblingIndex(0);
+			
+			state = KeyFrameState.isDragged;
+			AdjustColor();
+		}
+	    public void Dragging(float evaluatedPosOnTimeline){
+			m_rectTransform.localPosition = new Vector3(evaluatedPosOnTimeline, 0, 0);
+        }
+		public void DragError(bool inErrorState) {
+			if(inErrorState && state == KeyFrameState.isDragged) {
+				state = KeyFrameState.isDraggedError; 
+				AdjustColor();
+			}else if(!inErrorState && state == KeyFrameState.isDraggedError) {
+				state = KeyFrameState.isDragged; 
+				AdjustColor();
+			}
+		}
+		public void AbortDragging() {
+			//if we ended dragging on another kf, reset to original pos!
+			m_rectTransform.position = m_lastPosition;
+			RevertSetting();
+		}
+
+		public void DragEnd() {
+			RevertSetting();
+		}
+
+		private void RevertSetting() {
+			m_rectTransform.SetSiblingIndex(siblingIndexWas);
+			if (isSelected) {
+				state = KeyFrameState.selected;
+				AdjustColor();
+			} else {
+				state = KeyFrameState.idle;
+				AdjustColor();
+			}
+		}
+
+		private void AdjustColor() {
+			if(colorCoroutine != null)
+				StopCoroutine(colorCoroutine);
+
+			switch (state) {
+				case KeyFrameState.wasCreated:
+					Color invisibleStartColor = standardColor;
+					invisibleStartColor.a = 0f;
+					m_image.color = invisibleStartColor;
+					if(gameObject.activeInHierarchy)
+						colorCoroutine = StartCoroutine(ColorCoroutine(standardColor, 1f));
+					else m_image.color = standardColor;
+					break;
+				case KeyFrameState.idle:
+					if(gameObject.activeInHierarchy)
+						colorCoroutine = StartCoroutine(ColorCoroutine(standardColor, 1f));
+					else m_image.color = standardColor;
+					break;
+				case KeyFrameState.selected:
+					if(gameObject.activeInHierarchy)
+						colorCoroutine = StartCoroutine(ColorCoroutine(selectedColor, 0.5f));
+					else m_image.color = selectedColor;
+					break;
+				case KeyFrameState.isDragged:
+					if(gameObject.activeInHierarchy)
+						colorCoroutine = StartCoroutine(ColorCoroutine(draggedColor, 0.5f));
+					else m_image.color = draggedColor;
+					break;
+				case KeyFrameState.isDraggedError:
+					if(gameObject.activeInHierarchy)
+						colorCoroutine = StartCoroutine(ColorCoroutine(draggedErrorColor, 0.5f));
+					else m_image.color = draggedErrorColor;
+					break;
+				case KeyFrameState.notSelectable:
+					if(gameObject.activeInHierarchy)
+						colorCoroutine = StartCoroutine(ColorCoroutine(notSelectableColor, 0.3f));
+					else m_image.color = notSelectableColor;
+					break;
+			}
+		}
 	
-	    public void OnDrag(PointerEventData data)
-	    {
-			float newX = m_lastPosition.x + data.position.x - data.pressPosition.x;
 
-            if (newX > m_leftLimit && newX < m_rightLimit)
-                m_rectTransform.position = new Vector3(newX, m_lastPosition.y, m_lastPosition.z);
-        }
-	
-	    public void OnEndDrag(PointerEventData data)
-	    {
-	        m_keyframeDragEndEvent?.Invoke(key, m_rectTransform.position.x);
-	    }
-
-		public override void OnPointerDown(PointerEventData data)
-		{
-			base.OnPointerDown(data);
-            m_keyframeSelectedEvent?.Invoke(transform.gameObject);
-        }
+		private IEnumerator ColorCoroutine(Color endColor, float duration) {
+			float t = 0f;
+			duration = Mathf.Clamp(duration, 0.01f, 10f);
+			Color startColor = m_image.color;
+			while (t < 1f) {
+				t += Time.deltaTime/duration;
+				m_image.color = Color.Lerp(startColor, endColor, t);
+				yield return null;
+			}
+			m_image.color = endColor;
+		}
     }
 }

@@ -24,8 +24,10 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "TextHighlighter.cs"
 //! @brief Helper class to handle fading of SnapSelect elements
 //! @author Jonas Trottnow
-//! @version 0
-//! @date 02.03.2022
+//! @author Thomas Krüpger
+//! @version 1
+//! @date 30.06.2026
+//! @changes make it inherit from Selectable to get use of Unitys internal Selectable.FindSelectable
 
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -39,7 +41,9 @@ namespace tracer
     //! Implementation of of the helper class attached to each element of a SnapSelect
     //! handles e.g. fading transparency based on distance to the center and clicks
     //!
-    public class SnapSelectElement : MonoBehaviour, IPointerUpHandler, IPointerDownHandler
+    public class SnapSelectElement : Selectable 
+    //, IPointerUpHandler, IPointerDownHandler
+    //use ISubmitHandler if we want to use the public void OnSubmit(BaseEventData eventData) function
     {
         //!
         //! Reference to RectTransform of the Element 
@@ -171,7 +175,7 @@ namespace tracer
         //! needed to make OnPointerUp possible
         //! @param data Data of the drag event e.g. postion, delta, ...
         //!
-        public void OnPointerDown(PointerEventData eventData)
+        public override void OnPointerDown(PointerEventData eventData)
         {
             if (isToggle)
                 if (txt.color != uiSettings.colors.ElementSelection_Highlight)
@@ -187,7 +191,7 @@ namespace tracer
         //! Unity function called by IPointerUpHandler when a touch ends on the menu
         //! @param data Data of the drag event e.g. postion, delta, ...
         //!
-        public void OnPointerUp(PointerEventData data)
+        public override void OnPointerUp(PointerEventData data)
         {
             clicked?.Invoke(this, this);
             clickAction?.Invoke();

@@ -25,26 +25,27 @@ if not go to https://opensource.org/licenses/MIT
 //! @brief Implementation of the IconCreatorModule, creating icons for scene objects without geometry.
 //! @author Simon Spielmann
 //! @author Jonas Trottnow
-//! @version 0
-//! @date 29.03.2022
+//! @author Thomas Krüger
+//! @version 1
+//! @date 16.07.2026
+//! @note implementing height-over-ground display
 
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace tracer
-{
+namespace tracer{
 
-    public class IconCreatorModule : UIManagerModule
-    {
+    public class IconCreatorModule : UIManagerModule{
+
         //!
         //! Flag that defines whether icons are shown or not.
         //!
         private bool m_showIcons = true;
         //!
-        //! The list containing all UI elemets of the current menu.
+        //! The list containing all light and camera sceneobjects.
         //!
-        private List<SceneObject> m_sceneObjects;
+        private List<SceneObject> m_lightAndCamSceneObjects;
         //!
         //! The root scene object containing all icons.
         //!
@@ -71,16 +72,15 @@ namespace tracer
         //! @param name Name of this module
         //! @param _core Reference to the TRACER _core
         //!
-        public IconCreatorModule(string name, Manager manager) : base(name, manager)
-        {
-        }
+        public IconCreatorModule(string name, Manager manager) : base(name, manager){}
 
         //!
         //! Init Function
         //!
-        protected override void Init(object sender, EventArgs e)
-        {
-            m_sceneObjects = new List<SceneObject>();
+        protected override void Init(object sender, EventArgs e){
+            m_lightAndCamSceneObjects = new List<SceneObject>();
+            // [REVIEWV]
+            // should become SphereCollider and put onto other layer than default ?!
             m_Icon = Resources.Load("Prefabs/Icon") as GameObject;
             m_lightSprite = Resources.Load<Sprite>("Images/LightIcon");
             m_sunSprite = Resources.Load<Sprite>("Images/button_sun");
@@ -93,14 +93,30 @@ namespace tracer
             manager.addButton(hideIconButton);
 
             SceneManager sceneManager = core.getManager<SceneManager>();
-            sceneManager.sceneReady += createIcons;
+            core.getManager<SceneManager>().sceneReset += disposeIcons;
             sceneManager.sceneUpdated += recreateIcons;
-            sceneManager.sceneReset += disposeIcons;
             manager.settings.roles.hasChanged += recreateIcons;
+
+            core.getManager<UIManager>().selectionChanged += SelectionHasChanged;
         }
 
-        private void recreateIcons(object sender, int selectedIndex)
-        {
+        //! 
+        //! Function called before Unity destroys the TRACER _core.
+        //! 
+        //! @param sender A reference to the TRACER _core.
+        //! @param e Arguments for these event. 
+        //! 
+        public override void Dispose(){
+            base.Dispose();
+
+            core.getManager<SceneManager>().sceneReady -= createIcons;
+            core.getManager<SceneManager>().sceneReset -= disposeIcons;
+            manager.settings.roles.hasChanged -= recreateIcons;
+
+            core.getManager<UIManager>().selectionChanged -= SelectionHasChanged;
+        }
+
+        private void recreateIcons(object sender, int selectedIndex){
             disposeIcons(this, EventArgs.Empty);
             createIcons(core.getManager<SceneManager>(), EventArgs.Empty);
         }
@@ -114,15 +130,11 @@ namespace tracer
         //!
         //! Function that toggles whether icons are shown or not.
         //!
-        private void toggleIcons()
-        {
-            if (m_showIcons)
-            {
+        private void toggleIcons(){
+            if (m_showIcons){
                 m_showIcons = false;
                 disposeIcons(null, EventArgs.Empty);
-            }
-            else
-            {
+            }else{
                 m_showIcons = true;
                 createIcons(core.getManager<SceneManager>(), EventArgs.Empty);
             }
@@ -132,19 +144,16 @@ namespace tracer
         //! Function that parses the given list of scene objects to create and
         //! add icons depending on it's type as child objects.
         //!
-        private void createIcons(object sender, EventArgs e)
-        {
+        private void createIcons(object sender, EventArgs e){
             if (!m_showIcons)
                 return;
 
             SceneManager sceneManager = core.getManager<SceneManager>();
 
-            foreach (SceneObject sceneObject in sceneManager.getAllSceneObjects())
-            {
+            foreach (SceneObject sceneObject in sceneManager.getAllSceneObjects()){
                 GameObject icon = null;
                 SpriteRenderer renderer = null;
-                switch (sceneObject)
-                {
+                switch (sceneObject){
                     case SceneObjectLight:
                         if (manager.activeRole == UIManager.Roles.EXPERT ||
                             manager.activeRole == UIManager.Roles.LIGHTING ||
@@ -154,8 +163,7 @@ namespace tracer
                             
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);
                             IconUpdate iconUpdate = icon.GetComponent<IconUpdate>();
-                            iconUpdate.m_parentObject = sceneObject;
-                            iconUpdate.CreateLockIcon();
+                            iconUpdate.Init(manager, sceneObject);
                             renderer = icon.GetComponent<SpriteRenderer>();
 
                             switch (sceneObject)
@@ -172,7 +180,7 @@ namespace tracer
                             Parameter<Color> colorParameter = sceneObject.getParameter<Color>("color");
                             renderer.color = colorParameter.value;
                             colorParameter.hasChanged += updateIconColor;
-                            m_sceneObjects.Add(sceneObject);
+                            m_lightAndCamSceneObjects.Add(sceneObject);
                         }
                         break;
                     case SceneObjectCamera:
@@ -180,11 +188,14 @@ namespace tracer
                             manager.activeRole == UIManager.Roles.DOP)
                         {
                             icon = GameObject.Instantiate(m_Icon, m_IconRoot.transform);
-                            icon.GetComponent<IconUpdate>().m_parentObject = sceneObject;
-                            icon.GetComponent<IconUpdate>().CreateLockIcon();
+                            icon.GetComponent<IconUpdate>().Init(manager, sceneObject);
+                            
+                            //add to other SceneObjectTypes to show as well
+                            icon.AddComponent<HeightOverGround>().Initialize(sceneObject.transform, manager);
+
                             renderer = icon.GetComponent<SpriteRenderer>();
                             renderer.sprite = m_cameraSprite;
-                            m_sceneObjects.Add(sceneObject);
+                            m_lightAndCamSceneObjects.Add(sceneObject);
                         }
                         break;
                 }
@@ -209,16 +220,49 @@ namespace tracer
         //!
         //! Function for disposing and cleanup of all created gizmos.
         //!
-        private void disposeIcons(object sender, EventArgs e)
-        {
-            foreach(SceneObject sceneObject in m_sceneObjects)
-            {
+        private void disposeIcons(object sender, EventArgs e){
+            foreach(SceneObject sceneObject in m_lightAndCamSceneObjects){
                 if (sceneObject.GetType().BaseType == typeof(SceneObjectLight)){
                     sceneObject.getParameter<Color>("color").hasChanged -= updateIconColor;
                 }
+                HeightOverGround hog = sceneObject.GetComponent<HeightOverGround>();
+                if(hog)
+                    hog.DestroyViz();
                 
                 UnityEngine.Object.Destroy(sceneObject._icon);
             }
         }
+    
+        //!
+        //! Called every time a scene object has been selected. Could change IconUpdate, Could show HeightOverGround
+        //!
+        //! @param sender The UI manager.
+        //! @param sceneObjects a list of the currently selected objects.
+        //!
+        private void SelectionHasChanged(object sender, List<SceneObject> selectedSOs){
+            //Debug.Log("Icon Creator, SelectionHasChanged: "+selectedSOs.Count);
+            //Debug.Log("we have m_lightAndCamSceneObjects: "+m_lightAndCamSceneObjects.Count);
+            //do the below via dict for performance reasons
+            foreach(SceneObject lightOrCamSO in m_lightAndCamSceneObjects) {
+                if (!selectedSOs.Contains(lightOrCamSO)) {
+                    //Debug.Log("Hide HOG? At "+lightOrCamSO.gameObject.name);
+                    HeightOverGround hog = lightOrCamSO._icon?.GetComponent<HeightOverGround>();
+                    if(hog)
+                        hog.HideViz();
+                }
+            }
+
+            foreach(SceneObject selectedSO in selectedSOs) {
+                if (m_lightAndCamSceneObjects.Contains(selectedSO)) {
+                    //Debug.Log("Show HOG? At "+selectedSO.gameObject.name);
+                    HeightOverGround hog = selectedSO._icon?.GetComponent<HeightOverGround>();
+                    if(hog)
+                        hog.ShowViz(true);
+                }
+            
+            }
+        }
+
     }
+    
 }

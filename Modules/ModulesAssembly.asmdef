@@ -4,10 +4,12 @@
     "references": [
         "Core",
         "HelperAssembly",
+        "UnityHelperAssembly",
         "Unity.TextMeshPro",
         "Unity.Splines",
         "Unity.Mathematics",
-        "glTFast"
+        "glTFast",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

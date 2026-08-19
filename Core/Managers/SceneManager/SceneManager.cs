@@ -122,7 +122,7 @@ namespace tracer
         //!
         //! Function that returns a list containing all objects of a specific scene.
         //!
-        //! @param The scne ID to define the scene to gather all scene objects from.
+        //! @param sceneID The scne ID to define the scene to gather all scene objects from.
         //!
         //! @return The list containing all scene objects.
         //!
@@ -320,10 +320,11 @@ namespace tracer
 
             // create scene _parent if not there
             scnRoot = GameObject.Find("Scene");
-            if (scnRoot == null)
-            {
+            if (scnRoot == null){
                 scnRoot = new GameObject("VPETScene");
             }
+
+            nonSceneObjects = new Dictionary<short, object>();
         }
 
         //!
@@ -501,5 +502,27 @@ namespace tracer
 
             return tex.EncodeToJPG(95);
         }
+
+        #region Non SceneObjects
+        //!
+        //! all non scene-objects
+        //! (unity implementation will store all object that have a renderer attached for quering via IDExtractorModule)
+        //!
+        private Dictionary<short, object> nonSceneObjects;
+
+        public short AddNonSceneObject(object obj) {
+            short count = (short)nonSceneObjects.Count;
+            nonSceneObjects.Add(count, obj);
+            return count;
+        }
+
+        public object GetNonSceneObject(short nsoID) {
+            if (nonSceneObjects.TryGetValue(nsoID, out object nsobj))
+                return nsobj;
+            else
+                return null;
+        }
+
+        #endregion
     }
 }
