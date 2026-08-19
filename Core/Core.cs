@@ -232,7 +232,7 @@ namespace tracer
         {
             // Sync framerate to monitors refresh rate
             QualitySettings.vSyncCount = settings.vSyncCount;
-            Application.targetFrameRate = 10;
+            Application.targetFrameRate = 60;
 
             m_orientation = Input.deviceOrientation;
 

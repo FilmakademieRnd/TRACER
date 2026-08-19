@@ -93,8 +93,8 @@ namespace tracer
             toggleMenuButton.setIcon("Images/button_sun");
             manager.addButton(toggleMenuButton);
 
-            MenuButton fpsButton = new MenuButton("FPS", FPS, new List<UIManager.Roles>() { UIManager.Roles.LIGHTING, UIManager.Roles.SET, UIManager.Roles.DOP });
-            manager.addButton(fpsButton);
+            //MenuButton fpsButton = new MenuButton("FPS", FPS, new List<UIManager.Roles>() { UIManager.Roles.LIGHTING, UIManager.Roles.SET, UIManager.Roles.DOP });
+            //manager.addButton(fpsButton);
         }
 
         void FPS()
