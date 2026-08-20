@@ -64,28 +64,66 @@ namespace tracer{
         //! If false, only one tracker can be active (Drag/Hold) at a time
         //!
         private bool allowSimultaneousInteractions = false;
-
-        //Interaction Thresholds
-        private readonly float[] DragDistanceThreshold = {30f, 20f, 10f};       //in pixels!
-        private readonly float[] HoldTimeThreshold = {0.45f, 0.4f, 0.35f};      //in seconds
+        //!
+        //! Interaction thresholds (prim, sec, tert), distance in pixels, for when a drag is evaluated
+        //!
+        private readonly float[] DragDistanceThreshold = {30f, 20f, 10f};
+        //!
+        //! Interaction thresholds (prim, sec, tert), time in seconds, for when a hold is evaluated
+        //!
+        private readonly float[] HoldTimeThreshold = {0.75f, 0.6f, 0.55f};
+        //!
+        //! Interaction threshold, time in seconds, for when a double click is evaluated
+        //!
         private const float DoubleClickTimeThreshold = 0.35f;
-        // Add a tiny time buffer (e.g., 0.06 seconds). 
-        // This forces the FSM to wait 60ms before committing to a 1-finger drag, giving the user time to place their 2nd or 3rd finger!
+        //!
+        //! Interaction treshold, time in seconds, during what the user can place another finger before e.g. a 1-finger drag gets triggered
+        //! This forces the FSM to wait XXms before committing to a 1-finger drag, giving the user time to place their 2nd or 3rd finger!
+        //!
         private readonly float[] TouchTimeGracePeriod = {0.08f, 0.04f, 0.01f};
-
-        //Multi-Touch Settings, Note: some values rely on UI/Screen scale
-        private const float PinchDeadzone = 5f; // Pixels distance change to trigger pinch
-        private const float RotateDeadzone = 5f; // Degrees change to rotate
-        // Dot product threshold (0.5 to 0.9). Higher means fingers must move more perfectly parallel to trigger a Two-Finger Drag instead of a Pinch
+        //!
+        //! Multi-touch gesture Interaction threshold, distance in pixel, for when a pinch gets evaluated
+        //!
+        private const float PinchDeadzone = 5f;
+        //!
+        //! Multi-touch gesture Interaction threshold, degrees, for when a rotate gets evaluated
+        //!
+        private const float RotateDeadzone = 5f;
+        //!
+        //! Multi-touch gesture Interaction threshold, dot product value (-1...1), for when a drag gets evaluated (instead pinch)
+        //! Higher means fingers must move more perfectly parallel to trigger a Two-Finger Drag instead of a Pinch
+        //!
         private const float ParallelDotThreshold = 0.5f; 
-
+        //!
+        //! returns the interaction treshold for evaluating a drag depending on the multi-touch finger-count
+        //!
+        //! @param fingerCount
+        //! @return float the drag treshold in pixel
         private float GetDragThreshold(int fingerCount) { return DragDistanceThreshold[Mathf.Clamp(fingerCount - 1, 0, 2)];}
+        //!
+        //! returns the interaction treshold for evaluating a hold depending on the multi-touch finger-count
+        //!
+        //! @param fingerCount
+        //! @return float the hold treshold in seconds
         private float GetHoldThreshold(int fingerCount) { return HoldTimeThreshold[Mathf.Clamp(fingerCount - 1, 0, 2)]; }
+        //!
+        //! returns the grace period to wait for another finger before evaluating any interaction
+        //!
+        //! @param fingerCount
+        //! @return float the grace period to wait in seconds
         private float GetGracePeriod(int fingerCount) { return TouchTimeGracePeriod[Mathf.Clamp(fingerCount - 1, 0, 2)]; }
-
-        //fixing of scroll input action 'canceled' gets swallowed!
-        private float scrollTimeout = 0.15f; // The delay before a scroll is considered "Ended"
+        //!
+        //! The delay before a scroll is considered "Ended"
+        //! fixing of scroll input action 'canceled' gets swallowed!
+        //!
+        private float scrollTimeout = 0.15f;
+        //!
+        //! helper for current mouse scroll evaluation
+        //!
         private bool _isMouseScrolling = false;
+        //!
+        //! time in unity when last scroll was triggered
+        //!
         private float _lastScrollTime = 0f;
 
         //!
@@ -100,20 +138,36 @@ namespace tracer{
 
         //!
         //! named access for the places where one specific level is meant (e.g. binding a unity action)
+        //! primary - left mouse, first finger, right thumbstick, ...
         //!
         private InputTracker _primary   => _trackers[0];
+        //!
+        //! named access for the places where one specific level is meant (e.g. binding a unity action)
+        //! secondary - right mouse, second finger, left thumbstick, ...
+        //!
         private InputTracker _secondary => _trackers[1];
+        //!
+        //! named access for the places where one specific level is meant (e.g. binding a unity action)
+        //! tertiary - middle mouse, third finger, ...
+        //!
         private InputTracker _tertiary  => _trackers[2];
 
-        //to request at start, but not ongoing!
+        //!
+        //! very and request current layer of interaction at start of interaction and not ongoing!
+        //! one a layer is set, the interaction stays the same, so we do not mix thins up
+        //!
         private EvaluationHelper.OperationLayer layerDrag, layerHold, layerPinch, layerRotate = EvaluationHelper.OperationLayer.OTHER;
         #endregion
 
         #region TRACKER HELPERS
-
         // --- QUERIES (how many / which tracker is in a certain state) ---
 
-        // Number of trackers currently in that state (optionally ignoring the muted ones)
+        //!
+        //! Number of trackers currently in that state (optionally ignoring the muted ones) 
+        //!
+        //! @param state which state should be counted?
+        //! @param skipMuted should we ignore muted trackers?
+        //! @return count of trackers in specified state
         private int CountInState(InteractionState state, bool skipMuted = false) {
             int count = 0;
             foreach (InputTracker t in _trackers)
@@ -121,21 +175,34 @@ namespace tracer{
             return count;
         }
 
-        // Highest level tracker in that state, i.e. the Leader of a running gesture (null if none)
+        //!
+        //! Highest level tracker in that state, i.e. the Leader of a running gesture (null if none)
+        //!
+        //! @param state which state should be checked?
+        //! @return the tracker in the highest state
         private InputTracker HighestInState(InteractionState state) {
             for (int i = _trackers.Length - 1; i >= 0; i--)
                 if (_trackers[i].State == state) return _trackers[i];
             return null;
         }
 
-        // Is any OTHER tracker in that state? (used to find out if we are the last finger of a gesture)
+        //!
+        //! Is any OTHER tracker in that state? (used to find out if we are the last finger of a gesture)
+        //!
+        //! @param excludeTracker exclude a specific tracker from checking
+        //! @param state to check against
+        //! @return is any other tracker in specified state?
         private bool AnyOtherInState(InputTracker excludeTracker, InteractionState state) {
             foreach (InputTracker t in _trackers)
                 if (t != excludeTracker && t.State == state) return true;
             return false;
         }
 
-        // The first n trackers as an ordered group (Primary first) - only built on gesture start, so the allocation is uncritical
+        //!
+        //! The first n trackers as an ordered group (Primary first) - only built on gesture start, so the allocation is uncritical
+        //!
+        //! @param count how many leading trackers do we want to get ordered
+        //! @return ordered inputtracker array
         private InputTracker[] LeadingTrackers(int count) {
             InputTracker[] group = new InputTracker[Mathf.Clamp(count, 1, _trackers.Length)];
             Array.Copy(_trackers, group, group.Length);
@@ -144,7 +211,11 @@ namespace tracer{
 
         // --- RESETS ---
 
-        // Clean up everything sharing this state
+        //!
+        //! Clean up everything sharing this state
+        //!
+        //! @param state the state in which a tracker should be so we reset it
+        //!
         private void ResetAllInState(InteractionState state) {
             foreach (InputTracker t in _trackers)
                 if (t.State == state) t.Reset();
@@ -152,28 +223,44 @@ namespace tracer{
 
         // --- MULTI-TOUCH MATH (all of it works for 2 AND 3 trackers, so no separate code paths are needed) ---
 
-        // Centroid of the positions where the leading n trackers were pressed down
+        //!
+        //! Centroid of the positions where the leading n trackers were pressed down
+        //!
+        //! @param trackerCount of how many trackers do we want to get the average start position
+        //! @return average start position
         private Vector2 AverageStartPosition(int trackerCount) {
             Vector2 sum = Vector2.zero;
             for (int i = 0; i < trackerCount; i++) sum += _trackers[i].StartPosition;
             return sum / trackerCount;
         }
 
-        // Centroid of the current positions of the leading n trackers
+        //!
+        //! Centroid of the current positions of the leading n trackers
+        //!
+        //! @param trackerCount of how many trackers do we want to get the average current position
+        //! @return average current position
         private Vector2 AverageCurrentPosition(int trackerCount) {
             Vector2 sum = Vector2.zero;
             for (int i = 0; i < trackerCount; i++) sum += _trackers[i].CurrentPosition;
             return sum / trackerCount;
         }
 
-        // Longest time any of the leading n trackers is already held down
+        //!
+        //! Longest time any of the leading n trackers is already held down
+        //!
+        //! @param trackerCount of how many trackers do we want to check against the longest hold time
+        //! @return max time a tracker is held
         private float MaxTimeHeld(int trackerCount) {
             float maxTime = 0f;
             for (int i = 0; i < trackerCount; i++) maxTime = Mathf.Max(maxTime, Time.time - _trackers[i].TimeDown);
             return maxTime;
         }
 
-        // Averaged dot product of all tracker-pairs: 1 means all move perfectly parallel (drag), lower means they diverge (pinch/rotate)
+        //!
+        //! Averaged dot product of all tracker-pairs: 1 means all move perfectly parallel (drag), lower means they diverge (pinch/rotate)
+        //!
+        //! @param trackerCount of how many trackers do we want to check against the average direction dot product
+        //! @return average direction dot
         private float AverageDirectionDot(int trackerCount) {
             float sum = 0f;
             int pairs = 0;
@@ -188,7 +275,12 @@ namespace tracer{
             return pairs > 0 ? sum / pairs : 1f;
         }
 
-        // How much the fingers spread out around their centroid (for 2 fingers this is identical to their plain distance)
+        //!
+        //! How much the fingers spread out around their centroid (for 2 fingers this is identical to their plain distance)
+        //!
+        //! @param trackerCount of how many trackers do we want to check against the centroid spread
+        //! @param useStartPosition use average start position or average current position
+        //! @return centroid spread
         private float CentroidSpread(int trackerCount, bool useStartPosition) {
             Vector2 center = useStartPosition ? AverageStartPosition(trackerCount) : AverageCurrentPosition(trackerCount);
             float spread = 0f;
@@ -199,7 +291,12 @@ namespace tracer{
 
         // --- GESTURE EXECUTION ---
 
-        // Groups trackers, assigns the state, makes the highest level the Leader, and mutes the rest.
+        //!
+        //! Groups trackers, assigns the state, makes the highest level the Leader, and mutes the rest.
+        //!
+        //! @param state set this state to all trackers
+        //! @param group params how many trackers to use
+        //!
         private void ExecuteGroupGesture(InteractionState state, params InputTracker[] group) {
             InputTracker leader = group[group.Length - 1]; // Assumes array is ordered lowest to highest
 
@@ -226,7 +323,12 @@ namespace tracer{
             // Pinch/Rotate start events are handled in the Orchestrator as they require custom deltas
         }
 
-        // Dynamically averages the positions of ALL trackers sharing the exact same state
+        //!
+        //! Dynamically averages the positions of ALL trackers sharing the exact same state
+        //!
+        //! @param state get the shared center of all trackers in that sate
+        //! @return shared center
+        //!
         private Vector2 GetSharedCenter(InteractionState state) {
             Vector2 sum = Vector2.zero; 
             int count = 0;
@@ -235,6 +337,12 @@ namespace tracer{
             return count > 0 ? sum / count : Vector2.zero;
         }
 
+        //!
+        //! Dynamically averages the delta of ALL trackers sharing the exact same state
+        //!
+        //! @param state get the shared delta of all trackers in that sate
+        //! @return shared center
+        //!
         private Vector2 GetSharedDelta(InteractionState state) {
             Vector2 sum = Vector2.zero; 
             int count = 0;
@@ -254,7 +362,8 @@ namespace tracer{
         private Dictionary<InputManager.InputLevel, GameObject> activePinchUIs = new Dictionary<InputManager.InputLevel, GameObject>();
         private Dictionary<InputManager.InputLevel, GameObject> activeRotateUIs = new Dictionary<InputManager.InputLevel, GameObject>();
         // Optional: Enable/Disable the debug text
-        private const bool showDebugText = true;
+        private const bool showDebugViz = false;
+        private const bool showDebugText = false;
         #endregion
 
 
@@ -265,8 +374,7 @@ namespace tracer{
         //! @param name Name of this module.
         //! @param manager Reference to our Manager our class inherits from
         //!
-        public UnityInputModule(string name, Manager manager) : base(name, manager){
-        }
+        public UnityInputModule(string name, Manager manager) : base(name, manager){}
 
 
         //! 
@@ -282,8 +390,6 @@ namespace tracer{
             //enable input
             m_inputs = new Inputs();
 
-            //add listener
-            //trigger "any input detected"
             SetupAnyInputAction();
 
             // --- PRIMARY (1-Finger / Left Mouse) ---
@@ -298,20 +404,13 @@ namespace tracer{
             m_inputs.VPETMap.OnTertiaryInputClick.started += ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled += ctx => OnPointerUp(_tertiary);
 
-            
-            // --- GESTURES (Scrollwheel, Triggers, Touch Pinch/Rotate) ---
-            
-            /*m_inputs.VPETMap.Rotate.performed += ProcessRotateInput;
-            m_inputs.VPETMap.Rotate.canceled += ProcessRotateInput;
-            */
-
             m_inputs.VPETMap.Enable();
 
             EnhancedTouchSupport.Enable();
         }
 
         //!
-        //! setup the unity input action via code
+        //! setup the "any" unity input action via code
         //!
         private void SetupAnyInputAction() {
             anyInputAction = new InputAction("AnyInput", InputActionType.Button);
@@ -323,11 +422,6 @@ namespace tracer{
 
             // 3. Catches any physical keyboard key connected via USB/Bluetooth
             anyInputAction.AddBinding("<Keyboard>/anyKey");
-
-            // Subscribe to your events
-            // anyAction.performed += ProcessAnyInput;
-            // no more subscription, we poll manually from the update event to trigger different states
-            // without the need of started/performed - they may behave differently
             
             anyInputAction.Enable();
         }
@@ -349,15 +443,10 @@ namespace tracer{
 
             m_inputs.VPETMap.OnTertiaryInputClick.started -= ctx => OnPointerDown(_tertiary);
             m_inputs.VPETMap.OnTertiaryInputClick.canceled -= ctx => OnPointerUp(_tertiary);
-           
-            /*m_inputs.VPETMap.Rotate.performed -= ProcessRotateInput;
-            m_inputs.VPETMap.Rotate.canceled -= ProcessRotateInput;
-            */
             
             //clean the unity any-input action
             // Always clean up dynamic actions to prevent memory leaks
             if (anyInputAction != null){
-                //anyInputAction.performed                    -= ProcessAnyInput;
                 anyInputAction.Disable();
                 anyInputAction.Dispose();
             }
@@ -369,6 +458,7 @@ namespace tracer{
 
         //!
         //! check if any input was detected and keep track of its state
+        //! poll here instead of listening to a unity action to have better control
         //!
         private void ProcessManualAnyInput() {
             if(anyInputAction == null) return;
@@ -386,17 +476,24 @@ namespace tracer{
             }
         }
 
-        //! obsolete - the event driven approach is not good for continous values
+        //! 
         //! tracks the positions of our primary input (primary touch, mouse pos)
         //! and writes them into a buffer to allow further calculations (delta, speed, etc)
         //!
+        //! note: the event driven approach used before is not good for continous values 
+        //! https://docs.unity3d.com/Packages/com.unity.inputsystem@1.19/manual/Touch.html
+        //! You should not use Touchscreen for polling. If you want to read out touches similar to UnityEngine.Input.touches, see EnhancedTouch.     
+        //!
         private void ProcessPositionInput(){ 
-            //https://docs.unity3d.com/Packages/com.unity.inputsystem@1.19/manual/Touch.html
-            // You should not use Touchscreen for polling. If you want to read out touches similar to UnityEngine.Input.touches, see EnhancedTouch. 
             foreach (InputTracker t in _trackers)
                 UpdateTrackerPosition(t, GetCurrentPos(t.Level));
         }
-        // Helper to safely calculate deltas per-tracker
+        //!
+        //! Helper to safely calculate deltas per-tracker
+        //!
+        //! @param tracker the tracker we want its position to be updated
+        //! @param newPos the position to set
+        //!
         private void UpdateTrackerPosition(InputTracker tracker, Vector2 newPos) {
             // Only calculate delta if the tracker is actively being used, otherwise keep it 0
             if (tracker.State != InteractionState.Idle) {
@@ -406,13 +503,23 @@ namespace tracer{
             }
             tracker.CurrentPosition = newPos;
         }
-
+        //!
+        //! Check if we have a touch and if, how many
+        //!
+        //! @param nrOfTouches out nr we have, if any
+        //! @return do we have a touch
+        //!
         private bool IsTouch(out int nrOfTouches){
             nrOfTouches = UnityEngine.InputSystem.Touchscreen.current != null ? UnityEngine.InputSystem.EnhancedTouch.Touch.activeTouches.Count : 0;
-            bool isTouch = nrOfTouches > 0;
-            return isTouch;
+            return nrOfTouches > 0;
         }
-
+        //!
+        //! Get the current touch position of a specific input level
+        //! fallback (if no touch) is primary pointer position
+        //!
+        //! @param level primary, secondary or tertiary
+        //! @return the current position
+        //!
         private Vector2 GetCurrentPos(InputManager.InputLevel level) {
             if (IsTouch(out int touchesWeHave)) {
                 // Return the specific finger's position based on the level
@@ -436,7 +543,11 @@ namespace tracer{
 
 
         //!
-        //! Check (if option to not allow multi tracker use) which one we use right now
+        //! Check if any other tracker is active
+        //! used if allowSimultaneousInteractions is false and IsMultiTouchGestureAllowed is true
+        //!
+        //! @param excludeTracker which tracker not to use
+        //! @return is any other tracker active
         //!
         private bool IsAnyOtherTrackerActive(InputTracker excludeTracker) {
             foreach (InputTracker t in _trackers)
@@ -452,7 +563,6 @@ namespace tracer{
         private void ProcessScrollInput() {
             // 1. Read the raw value directly
             float scrollDelta = m_inputs.VPETMap.OnPinch.ReadValue<float>();
-
             // NOTE: the scroll wheel has no tracker of its own - it deliberately re-uses the _tertiary slot to publish
             // its pinch events (and locks _secondary so a right-click cannot interfere). So a Tertiary pinch event does
             // NOT necessarily mean "three fingers" - on desktop it is the mouse wheel. See the input-level manifest.
@@ -515,6 +625,12 @@ namespace tracer{
                 ProcessTracker(t);
         }
 
+        //!
+        //! process multi-touch gestures
+        //!
+        //! complex function to evaluate when/if a 2 or 3 finger interaction becomes a drag, pinch, hold, rotate
+        //! also verify if a finger is lifted, that the interaction ends
+        //!
         private void ProcessMultiTouchGestures() {
             // 1. Exit early
             if (!IsTouch(out int nrOfTouches) || nrOfTouches <= 1 || !manager.IsMultiTouchGestureAllowed()) 
@@ -646,7 +762,13 @@ namespace tracer{
                 }
             }
         }
-
+        //!
+        //! process single tracker; evaluate its potential state and fire events if found
+        //!
+        //! is able to execute multiple levels simultaneously (e.g. left and right mouseclick)
+        //!
+        //! @param tracker the tracker to evaluate (instead of iterating over it within the function)
+        //!
         private void ProcessTracker(InputTracker tracker) {
             
             // 1. DISCARD IF MUTED
@@ -664,7 +786,7 @@ namespace tracer{
                 float distanceFromStart = Vector2.Distance(tracker.StartPosition, tracker.CurrentPosition);
                 float timeHeld = Time.time - tracker.TimeDown;
 
-                //use the fastest one, if we are not on touch!
+                //use the first one, if we are not on touch!
                 int thresholdIndex = 1;
                 if(!IsTouch(out int nrOfTouches))
                     thresholdIndex = 0;
@@ -674,7 +796,6 @@ namespace tracer{
                 float reqHold = GetHoldThreshold(thresholdIndex);
 
                 //if we disallow multitouchgesture, we allow simulataneous interactions!
-                //if (!allowSimultaneousInteractions && (distanceFromStart > reqDistance || timeHeld > reqHold)) {
                 if ((!allowSimultaneousInteractions && manager.IsMultiTouchGestureAllowed()) && (distanceFromStart > reqDistance || timeHeld > reqHold)) {
                     if (IsAnyOtherTrackerActive(tracker)) 
                         return; 
@@ -717,22 +838,44 @@ namespace tracer{
 
 
         /**** PINCH SPECIFIC SCROLL WHEEL INPUT **/
+        //!
+        //! cooldown for the scroll event, try to have persistent scroll speed
+        //!
         private float scrollCooldown = 0.01f;
+        //!
+        //! multiplier for input action scroll value 
+        //!
         private float scrollWheelSensitivity = 20f;
+        //!
+        //! clamping unity input action value
+        //!
+        private float maxScrollDelta = 1f;
+        //!
+        //! last scroll time to check against for cooldown
+        //!
         private float lastScrollTime = -999f;
+        //!
+        //! try to have a persistent scroll speed independent of system
+        //!
+        //! @param the scroll delta via the input action AND multiplied with `scrollWheelSensitivity`
+        //!
         private float VerifyPersistentScrollSpeed(float scrollDelta){
             var currentTime = Time.unscaledTime;
             if (currentTime - lastScrollTime < scrollCooldown)
                 return 0f;
             lastScrollTime = currentTime;
-            return scrollDelta;
+            return Mathf.Clamp(scrollDelta, -maxScrollDelta, maxScrollDelta);
         }
 
         //!
-        //! TODO: implement for scroll wheel within certain action or key modifier
+        //! triggering a rotation input (same we do with a 2/3-finger multi touch gesture)
+        //!
+        //! TODO: 
+        //! - implement for scroll wheel with certain action or key modifier OR via selecting something
+        //! - should behave like wasd q/e when object is selected for moving, same for rotation
         //!
         private void ProcessRotateInput(InputAction.CallbackContext ctx) {
-            //this is only called via scroll-wheel / specific input event
+            //this is only called via modifier + scroll-wheel / specific input event
             //thats why we handle start, ongoing here BUT have to 
             //handle the end state within OnPointerUp (removed cancel-listener)
             float rotateDelta = ctx.ReadValue<float>();
@@ -761,14 +904,18 @@ namespace tracer{
 
         #region UP/DOWN-PHASES
         //!
-        //! 
+        //! unity input action listener on pointer down
+        //!
+        //! for `OnPrimaryInputClick.started`, `OnSecondaryInputClick.started`, `OnTertiaryInputClick.started`
+        //!
+        //! @param tracker primary, secondary and tertiary tracker
         //!
         private void OnPointerDown(InputTracker tracker) {
             // If we are currently pinching or rotating, deny starting a new click/drag evaluation
             if (tracker.State == InteractionState.Pinching || tracker.State == InteractionState.Rotating) { return; }
 
             // DEBUG
-            Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
+            // Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
             // -----
 
             // Fetch the exact position right now, bypassing the Update loop delay
@@ -784,7 +931,11 @@ namespace tracer{
         }
 
         //!
-        //! 
+        //! unity input action listener on pointer up
+        //!
+        //! for `OnPrimaryInputClick.canceled`, `OnSecondaryInputClick.canceled`, `OnTertiaryInputClick.canceled`
+        //!
+        //! @param tracker primary, secondary and tertiary tracker
         //!
         private void OnPointerUp(InputTracker tracker) {
             Debug.Log("<color=yellow>OnPointerUp "+tracker.Level+" / "+tracker.State+"</color>");
@@ -829,23 +980,23 @@ namespace tracer{
             tracker.Reset();
             ClearPreviews(tracker.Level);
         }
-
-        // Ensures if the Leader lifts first, the muted subordinates don't get stuck
+        //!
+        //! Ensures if the Leader lifts first, the muted subordinates don't get stuck
+        //!
+        //! @param stateToClear if tracker is in this state, reset it
+        //!
         private void ReleaseMutedTrackers(InteractionState stateToClear) {
             foreach (InputTracker t in _trackers)
                 if (t.State == stateToClear && t.IsMuted) t.Reset();
         }
         #endregion
 
-
-
         #region FIRE EVENTS
-
         // --- HELPER METHODS FOR FIRING EVENTS ---
-
-        
+ 
         //! 
         //! fire the event of the `anyInputAction`
+        //!
         //! @param state the state of the `anyInputAction` we check manually
         //!
         private void FireAnyInputEvent(InputManager.InputState state) {
@@ -854,8 +1005,10 @@ namespace tracer{
             manager.RaiseAnyInput(this, anyInputData);
         }
 
-        //!
         //! 
+        //! fire the click event
+        //!
+        //! @param tracker who fired this event? (prim, sec, tert)
         //!
         private void FireClickEvent(InputTracker tracker) {
             var data = new InputManager.InputEventArgs(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
@@ -878,8 +1031,10 @@ namespace tracer{
             SpawnClickVisual(tracker.Level, tracker.CurrentPosition, isDouble: false);
         }
 
-        //!
         //! 
+        //! fire the double-click event
+        //!
+        //! @param tracker who fired this event? (prim, sec, tert)
         //!
         private void FireDoubleClickEvent(InputTracker tracker) {
             var data = new InputManager.InputEventArgs(tracker.Level, InputManager.InputState.Ended, tracker.CurrentPosition);
@@ -897,8 +1052,13 @@ namespace tracer{
             SpawnClickVisual(tracker.Level, tracker.CurrentPosition, isDouble: true);
         }
 
-        //!
         //! 
+        //! fire the drag event
+        //!
+        //! @param tracker who fired this event? (prim, sec, tert)
+        //! @param state the state we are in
+        //! @param centerPos center of drag (if multi-touch, calculated center)
+        //! @param avgDelta average delta of drag (if multi-touch, calculated out of all)
         //!
         private void FireDragEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, Vector2 avgDelta) {
             var data = new InputManager.DragEventArgs(tracker.Level, state, centerPos, avgDelta, tracker.StartPosition);
@@ -920,8 +1080,12 @@ namespace tracer{
             }
         }
 
-        //!
         //! 
+        //! fire the hold event
+        //!
+        //! @param tracker who fired this event? (prim, sec, tert)
+        //! @param state the state we are in
+        //! @param centerPos center of drag (if multi-touch, calculated center)
         //!
         private void FireHoldEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos) {
             var data = new InputManager.InputEventArgs(tracker.Level, state, tracker.CurrentPosition);
@@ -942,8 +1106,13 @@ namespace tracer{
             }
         }
 
-        //!
         //! 
+        //! fire the pinch event
+        //!
+        //! @param tracker who fired this event? (prim, sec, tert)
+        //! @param state the state we are in
+        //! @param centerPos center of drag (if multi-touch, calculated center)
+        //! @param pinchDelta average delta of pinch
         //!
         private void FirePinchEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float pinchDelta) {
             var data = new InputManager.PinchEventArgs(tracker.Level, state, centerPos, pinchDelta);
@@ -964,8 +1133,13 @@ namespace tracer{
             }
         }
 
-        //!
         //! 
+        //! fire the rotate event (two finger rotate instead of pinch)
+        //!
+        //! @param tracker who fired this event? (prim, sec, tert)
+        //! @param state the state we are in
+        //! @param centerPos center of drag (if multi-touch, calculated center)
+        //! @param rotationDelta delta of rotation
         //!
         private void FireRotateEvent(InputTracker tracker, InputManager.InputState state, Vector2 centerPos, float rotateDelta) {
             var data = new InputManager.RotateEventArgs(tracker.Level, state, centerPos, rotateDelta);
@@ -993,6 +1167,9 @@ namespace tracer{
         #region UI DEBUGGING
         // --- ONE-SHOT VISUALS (Click & Text) ---
         private void SpawnClickVisual(InputManager.InputLevel level, Vector2 pos, bool isDouble){
+            if(!showDebugViz)
+                return;
+
             EnsureMainCanvasExists();
 
             // Spawn Text
@@ -1006,11 +1183,13 @@ namespace tracer{
                 SpawnWobbleCircle(pos + new Vector2(-20f, -20));
                 SpawnWobbleCircle(pos + new Vector2(20f, -20));
             }else
-                SpawnWobbleCircle(pos);
-            
+                SpawnWobbleCircle(pos);            
         }
 
         private void SpawnWobbleCircle(Vector2 pos){
+            if(!showDebugViz)
+                return;
+
             GameObject circleGO = new GameObject("ClickCircle");
             circleGO.transform.SetParent(mainUIContainer.transform);
             Image img = circleGO.AddComponent<Image>();
@@ -1022,6 +1201,9 @@ namespace tracer{
         }
 
         private IEnumerator AnimateWobble(RectTransform rect){
+            if(!showDebugViz)
+                yield break;
+
             float duration = 0.6f;
             float elapsed = 0f;
 
@@ -1043,6 +1225,9 @@ namespace tracer{
         }
 
         private IEnumerator AnimateFloatingText(string message, Vector2 startPos){
+            if(!showDebugViz)
+                yield break;
+
             GameObject textGO = new GameObject("InputText");
             textGO.transform.SetParent(mainUIContainer.transform);
             
@@ -1078,6 +1263,9 @@ namespace tracer{
 
         // --- CONTINUOUS VISUALS (Evaluating Previews & Active Hold Line) ---
         private void UpdateEvaluatingVisual(InputManager.InputLevel level, Vector2 startPos, Vector2 currentPos, float timeDown){
+            if(!showDebugViz)
+                return;
+
             EnsureMainCanvasExists();
 
             int inputLevelForThresholds = 0;
@@ -1126,6 +1314,9 @@ namespace tracer{
         }
 
         private void UpdateHoldActiveVisual(InputManager.InputLevel level, Vector2 startPos, Vector2 currentPos){
+            if(!showDebugViz)
+                return;
+
             EnsureMainCanvasExists();
 
             if (!activeHoldUIs.TryGetValue(level, out GameObject container) || container == null){
@@ -1168,6 +1359,9 @@ namespace tracer{
         }
 
         private void UpdateDragActiveVisual(InputManager.InputLevel level, Vector2 currentPos) {
+            if(!showDebugViz)
+                return;
+
             EnsureMainCanvasExists();
 
             if (!activeDragUIs.TryGetValue(level, out GameObject container) || container == null) {
@@ -1200,6 +1394,9 @@ namespace tracer{
         }
 
         private void UpdatePinchActiveVisual(InputManager.InputLevel level, Vector2 centerPos, float pinchValue) {
+            if(!showDebugViz)
+                return;
+
             EnsureMainCanvasExists();
 
             if (!activePinchUIs.TryGetValue(level, out GameObject container) || container == null) {
@@ -1229,6 +1426,9 @@ namespace tracer{
         }
 
         private void UpdateRotateActiveVisual(InputManager.InputLevel level, Vector2 centerPos, float rotationAngle) {
+            if(!showDebugViz)
+                return;
+
             EnsureMainCanvasExists();
 
             if (!activeRotateUIs.TryGetValue(level, out GameObject container) || container == null) {
@@ -1259,6 +1459,9 @@ namespace tracer{
 
         // Clears specific continuous previews
         private void ClearPreviews(InputManager.InputLevel level) {
+            if(!showDebugViz)
+                return;
+
             if (evaluatingUIs.TryGetValue(level, out GameObject evalUI) && evalUI != null) {
                 UnityEngine.GameObject.Destroy(evalUI);
             }
