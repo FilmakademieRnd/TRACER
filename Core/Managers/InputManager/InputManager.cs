@@ -1,59 +1,30 @@
-/*
------------------------------------------------------------------------------------
-TRACER FOUNDATION -
-Toolset for Realtime Animation, Collaboration & Extended Reality
-
-Copyright (c) 2024 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Labs
-https://research.animationsinstitut.de/tracer 
-https://github.com/FilmakademieRnd/TRACER
-
-TRACER FOUNDATION is a development by Filmakademie Baden-Wuerttemberg,
-Animationsinstitut R&D Labs in the scope of the EU funded project
-MAX-R (101070072) and funding on the own behalf of Filmakademie Baden-Wuerttemberg.
-Former EU projects Dreamspace (610005) and SAUCE (780470) have inspired the
-TRACER FOUNDATION development.
-
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the MIT License for more details.
-You should have received a copy of the MIT License along with this program;
-if not go to https://opensource.org/licenses/MIT
------------------------------------------------------------------------------------
-*/
-
-//! @file "InputManager.cs"
-//! @brief Implementation of the TRACER Input Manager, provides events to listen at for all modules
-//! @author Simon Spielmann
-//! @author Jonas Trottnow
-//! @author Paulo Scatena
-//! @author Thomas Krüger
-//! @version 2
-//! @date 12.08.2026
-//! @revision revert to use class and events again instead of EventHub
-
-
 using System;
+using System.Runtime.CompilerServices;
 
-namespace tracer{
+namespace tracer
+{
     //!
     //! Class implementing the input manager, managing all user inupts and mapping.
     //!
-    public class InputManager : Manager{
+    public class InputManager : Manager
+    {
+
 
         #region INPUT EVENT ARGS
         //!
         //! what level of input is addressed within the raising module
         //!
-        public enum InputLevel      { Primary, Secondary, Tertiary }
+        public enum InputLevel { Primary, Secondary, Tertiary }
         //!
         //! what state of input is currently raised from a module
         //!
-        public enum InputState      { Started, Ongoing, Ended, Canceled }
+        public enum InputState { Started, Ongoing, Ended, Canceled }
 
         //!
         //! base payload of every input event - holds what all inputs have in common
         //!
-        public struct InputEventArgs {
+        public readonly struct InputEventArgs
+        {
             public readonly InputLevel Level;
             public readonly InputState State;
             public readonly UnityEngine.Vector2 Position;
@@ -65,51 +36,55 @@ namespace tracer{
         //!
         //! drag additionally reports where the gesture originally started
         //!
-        public struct DragEventArgs {
+        public readonly struct DragEventArgs
+        {
             public readonly InputLevel Level;
             public readonly InputState State;
             public readonly UnityEngine.Vector2 Position;
             public readonly UnityEngine.Vector2 Delta;
-            public readonly UnityEngine.Vector2 StartPosition; 
+            public readonly UnityEngine.Vector2 StartPosition;
             public DragEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, UnityEngine.Vector2 _delta, UnityEngine.Vector2 _startPosition)
-            { Level = _level; State = _state; Position = _position; Delta = _delta; StartPosition = _startPosition; }    
+            { Level = _level; State = _state; Position = _position; Delta = _delta; StartPosition = _startPosition; }
         }
         //!
         //! hold needs no extra data, but for understandings-sake we have this as an extra definition
         //!
-        public struct PinchEventArgs {
+        public readonly struct PinchEventArgs
+        {
             public readonly InputLevel Level;
             public readonly InputState State;
             public readonly UnityEngine.Vector2 Position;
             public readonly float PinchDelta;
-            public PinchEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, float _pinchDelta) 
-                { Level = _level; State = _state; Position = _position; PinchDelta = _pinchDelta; } 
+            public PinchEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, float _pinchDelta)
+            { Level = _level; State = _state; Position = _position; PinchDelta = _pinchDelta; }
         }
         //!
         //! signed angle change of this frame in degrees, used only within multitouch gesture for now
         //!
-        public struct RotateEventArgs {
+        public readonly struct RotateEventArgs
+        {
             public readonly InputLevel Level;
             public readonly InputState State;
             public readonly UnityEngine.Vector2 Position;
             public readonly float RotationDelta;
-            public RotateEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, float _rotationDelta) 
-                { Level = _level; State = _state; Position = _position; RotationDelta = _rotationDelta; }
+            public RotateEventArgs(InputLevel _level, InputState _state, UnityEngine.Vector2 _position, float _rotationDelta)
+            { Level = _level; State = _state; Position = _position; RotationDelta = _rotationDelta; }
         }
         //!
         //! input data of the device's rotation
         //!
-        public struct AttitudeEventArgs {
+        public readonly struct AttitudeEventArgs
+        {
             public readonly InputLevel Level;
             public readonly InputState State;
-            public UnityEngine.Quaternion Rotation;
+            public readonly UnityEngine.Quaternion Rotation;
             public AttitudeEventArgs(InputLevel _level, InputState _state, UnityEngine.Quaternion _rotation)
-                { Level = _level; State = _state; Rotation = _rotation; }
+            { Level = _level; State = _state; Rotation = _rotation; }
         }
         //!
         //! gps data from the module, only send if it gets asked for data via OnGPSDemandChanged
         //!
-        public class GPSEventArgs
+        public readonly struct GPSEventArgs
         {
             public readonly InputLevel Level;
             public readonly InputState State;
@@ -165,7 +140,7 @@ namespace tracer{
         //! fired when a hold interaction happens on a 3D UI, a scene object or nothing at all
         //!
         public event EventHandler<InputEventArgs> holdOtherEvent;
-         //!
+        //!
         //! fired when a double-click interaction ended on top of 2D UI
         //!
         public event EventHandler<InputEventArgs> doubleClickUIEvent;
@@ -211,7 +186,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseAnyInput   (object sender, InputEventArgs e)   { anyInputEvent?.Invoke(sender, e); }
+        public void RaiseAnyInput(object sender, InputEventArgs e) { InvokeEvent(sender, e, anyInputEvent); }
         //!
         //! raise clickUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -219,7 +194,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseClickUI    (object sender, InputEventArgs e)   { clickUIEvent?.Invoke(sender, e); }
+        public void RaiseClickUI(object sender, InputEventArgs e) { InvokeEvent(sender, e, clickUIEvent); }
         //!
         //! raise clickOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -227,7 +202,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseClickOther (object sender, InputEventArgs e)   { clickOtherEvent?.Invoke(sender, e); }
+        public void RaiseClickOther(object sender, InputEventArgs e) { InvokeEvent(sender, e, clickOtherEvent); }
         //!
         //! raise dragUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -235,7 +210,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseDragUI     (object sender, DragEventArgs e)    { dragUIEvent?.Invoke(sender, e); }
+        public void RaiseDragUI(object sender, DragEventArgs e) { InvokeEvent(sender, e, dragUIEvent); }
         //!
         //! raise dragOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -243,7 +218,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseDragOther  (object sender, DragEventArgs e)    { dragOtherEvent?.Invoke(sender, e); }
+        public void RaiseDragOther(object sender, DragEventArgs e) { InvokeEvent(sender, e, dragOtherEvent); }
         //!
         //! raise holdUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -251,7 +226,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseHoldUI     (object sender, InputEventArgs e)    { holdUIEvent?.Invoke(sender, e); }
+        public void RaiseHoldUI(object sender, InputEventArgs e) { InvokeEvent(sender, e, holdUIEvent); }
         //!
         //! raise holdOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -259,7 +234,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseHoldOther  (object sender, InputEventArgs e)    { holdOtherEvent?.Invoke(sender, e); }
+        public void RaiseHoldOther(object sender, InputEventArgs e) { InvokeEvent(sender, e, holdOtherEvent); }
         //!
         //! raise doubleClickUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -267,7 +242,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseDoubleClickUI     (object sender, InputEventArgs e)    { doubleClickUIEvent?.Invoke(sender, e); }
+        public void RaiseDoubleClickUI(object sender, InputEventArgs e) { InvokeEvent(sender, e, doubleClickUIEvent); }
         //!
         //! raise doubleClickOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -275,7 +250,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseDoubleClickOther  (object sender, InputEventArgs e)    { doubleClickOtherEvent?.Invoke(sender, e); }
+        public void RaiseDoubleClickOther(object sender, InputEventArgs e) { InvokeEvent(sender, e, doubleClickOtherEvent); }
         //!
         //! raise pinchUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -283,7 +258,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaisePinchUI    (object sender, PinchEventArgs e)    { pinchUIEvent?.Invoke(sender, e); }
+        public void RaisePinchUI(object sender, PinchEventArgs e) { InvokeEvent(sender, e, pinchUIEvent); }
         //!
         //! raise pinchOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -291,13 +266,13 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaisePinchOther (object sender, PinchEventArgs e)    { pinchOtherEvent?.Invoke(sender, e); }
+        public void RaisePinchOther(object sender, PinchEventArgs e) { InvokeEvent(sender, e, pinchOtherEvent); }
         //!
         //! raise rotateUIEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
         //! sender is the producing module, so consumers can tell WHERE an input came from
         //!
-        public void RaiseRotateUI   (object sender, RotateEventArgs e)    { rotateUIEvent?.Invoke(sender, e); }
+        public void RaiseRotateUI(object sender, RotateEventArgs e) { InvokeEvent(sender, e, rotateUIEvent); }
         //!
         //! raise rotateOtherEvent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -305,7 +280,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseRotateOther(object sender, RotateEventArgs e)    { rotateOtherEvent?.Invoke(sender, e); }
+        public void RaiseRotateOther(object sender, RotateEventArgs e) { InvokeEvent(sender, e, rotateOtherEvent); }
         //!
         //! raise attitudeEvent, layer independent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -313,7 +288,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseAttitude   (object sender, AttitudeEventArgs e){ attitudeEvent?.Invoke(sender, e); }
+        public void RaiseAttitude(object sender, AttitudeEventArgs e) { InvokeEvent(sender, e, attitudeEvent); }
         //!
         //! raise gpsEvent, layer independent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -321,7 +296,7 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseGPS        (object sender, GPSEventArgs e)     { gpsEvent?.Invoke(sender, e); }
+        public void RaiseGPS(object sender, GPSEventArgs e) { InvokeEvent(sender, e, gpsEvent); }
         //!
         //! raise arEvent, layer independent
         //! only the input producing modules (UnityInputModule, ControllerModule, GPSModule, ...) call these
@@ -329,59 +304,34 @@ namespace tracer{
         //!
         //! @param sender the original sender of that call
         //! @param e the InputEventArgs specified for this type
-        public void RaiseAR        (object sender, InputEventArgs e)     { arEvent?.Invoke(sender, e); }
+        public void RaiseAR(object sender, InputEventArgs e) { InvokeEvent(sender, e, arEvent); }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void InvokeEvent<T>(object sender, T e, EventHandler<T> handler) 
+        {
+            //core.speedUpFPS();
+            handler?.Invoke(sender, e);
+        }
         #endregion
 
-
-        // TODO: has to be reverted, maybe set via prio, so that not some "low" modules reset it, if its overwritten by something higher!
+        #region COMMANDS
+        public record StartGPSCommand();
+        #endregion
 
         //!
         //! do we currently allow camera navigation via input events?
         //!
-        private bool camNavigationAllowed = true;
-        //!
-        //! allow/deny camera navigation via input events 
-        //!
-        //! @param allow sets `camNavigationAllowed` to its value
-        public void SetAllowCamNavigation(bool allow){ camNavigationAllowed = allow; }
-        //!
-        //! check if camera navigation via input events are currently allowed
-        //!
-        //! @return `camNavigationAllowed`
-        public bool IsCamNavigationAllowed(){ return camNavigationAllowed; }
-
+        public bool camNavigationAllowed { get; set; } = true;
         //!
         //! do we currently allow ui-interaction via input events?
         //!
-        private bool uiInteractionAllowed = true;
-        //!
-        //! allow/deny ui-interaction via input events 
-        //!
-        //! @param allow sets `uiInteractionAllowed` to its value
-        public void SetUiInteraction(bool allow){ uiInteractionAllowed = allow; }
-        //!
-        //! check if ui-interaction via input events are currently allowed
-        //!
-        //! @return `uiInteractionAllowed`
-        public bool IsUiInteractionAllowed(){ return uiInteractionAllowed; }
-
+        public bool uiInteractionAllowed { get; set; } = true;
         //!
         //! do we currently allow multi-touch-gestures via input events?
         //!
         //! @remark isMultiTouchGestureAllowed have to be false, when on-screen joysticks are hit!
         //!
-        private bool isMultiTouchGestureAllowed = true;
-        //!
-        //! allow/deny multi-touch-gestures where they are checked
-        //!
-        //! @param allow sets `isMultiTouchGestureAllowed` to its value
-        public void SetMultiTouchGestures(bool allow){ isMultiTouchGestureAllowed = allow; }
-        //!
-        //! check if multi-touch-gestures are allowed
-        //!
-        //! @return `isMultiTouchGestureAllowed`
-        public bool IsMultiTouchGestureAllowed(){ return isMultiTouchGestureAllowed; }
-
+        public bool isMultiTouchGestureAllowed { get; set; } = true;
 
         #region SPECIFIC GPS
 
@@ -397,7 +347,7 @@ namespace tracer{
         //!
         //! call this from any module to trigger (if available) the RaiseGPS function here from the GPSModule
         //!
-        public void RaiseGPSDemand(object sender, GPSDemandType gpsDemanyType){ onGPSDemandChangedEvent?.Invoke(sender, gpsDemanyType); }
+        public void RaiseGPSDemand(object sender, GPSDemandType gpsDemanyType) { onGPSDemandChangedEvent?.Invoke(sender, gpsDemanyType); }
 
         #endregion
 
@@ -407,7 +357,8 @@ namespace tracer{
         //! @param  moduleType  type of modules to be loaded by this manager
         //! @param tracerCore A reference to the TRACER _core.
         //!
-        public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore){
+        public InputManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
+        {
         }
 
     }
@@ -416,7 +367,8 @@ namespace tracer{
 
     //used by UnityInputModule and ControllerModule
     //could be put elsewhere + remove UnityDependency!
-    public class InputTracker{
+    public class InputTracker
+    {
         public InputManager.InputLevel Level;   //primary, secondary, tertiary
         public InteractionState State = InteractionState.Idle;  //see above
         /*
@@ -433,18 +385,20 @@ namespace tracer{
         public UnityEngine.Vector2 StartPosition;
         public float LastClickTime = -100f; // Tracked for Double Click
 
-        public InputTracker(InputManager.InputLevel level){ Level = level; }
-        public void Reset(){ 
-            State = InteractionState.Idle; 
-            IsMuted = false; 
+        public InputTracker(InputManager.InputLevel level) { Level = level; }
+        public void Reset()
+        {
+            State = InteractionState.Idle;
+            IsMuted = false;
             CurrentPosition = UnityEngine.Vector2.zero;
-            CurrentDelta = UnityEngine.Vector2.zero; 
+            CurrentDelta = UnityEngine.Vector2.zero;
             TimeDown = 0f;
             StartPosition = UnityEngine.Vector2.zero;
         }
     }
 
-    public enum InteractionState { 
+    public enum InteractionState
+    {
         Idle,           // Nothing is happening
         Evaluating,     // Pointer is down, waiting to see if it becomes Click, Drag, or Hold
         Dragging,       // Surpassed distance threshold (Holds are now denied)

@@ -80,7 +80,7 @@ namespace tracer
         //! 
         protected override void Init(object sender, EventArgs e)
         {
-            Parameter<Action> button = new Parameter<Action>(Connect, "Start");
+            ClassParameter<Action> button = new ClassParameter<Action>(Connect, "Start");
 
             m_menu = new MenuTree()
                .Begin(MenuItem.IType.VSPLIT)

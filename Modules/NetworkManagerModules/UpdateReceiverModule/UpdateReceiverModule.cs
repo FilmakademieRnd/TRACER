@@ -330,7 +330,6 @@ namespace tracer
                         sceneObject._lock = lockState;
                         if(sceneObject.playedByTimeline){   //if we are animating the object, lock it!
                             sceneObject.lockObject(true);
-                            Debug.Log("instantly lock unlocked object we received because its playing!");
                         }
                     }
                     else

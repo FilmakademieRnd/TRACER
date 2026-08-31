@@ -127,24 +127,5 @@ namespace tracer
             setValue(idx);
         }
     }
-    //!
-    //! Generic version of the ListParameter.
-    //!
-    //! @param parameterList The list of parameders with the given type T.
-    //! @param name The parameters name.
-    //! @param parent The parameters parent ParameterObject.
-    //! @param distribute Flag that determines whether a Parameter will be distributed.
-    //! @param role the Role the parameter is shown at.
-    //!
-    public class ListParameter<T> : ListParameter
-    {
-        public ListParameter(List<Parameter<T>> parameterList, string name, ParameterObject parent = null, bool distribute = true, UIManager.Roles role = UIManager.Roles.VIEWER) : base(name, parent, distribute, role)
-        {
-            _parameterList.AddRange(parameterList);
-        }
-        public T getValue()
-        {
-            return (T)(object)parameterList[value];
-        }
-    }
+   
 }

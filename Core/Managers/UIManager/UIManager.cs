@@ -220,7 +220,7 @@ namespace tracer
         //!
         //! Getter  2D UI interaction
         //!
-        public bool ui2Dinteractable{ get { return inputManager.IsUiInteractionAllowed(); } }
+        public bool ui2Dinteractable{ get { return inputManager.uiInteractionAllowed; } }
         //!
         //! Event emitted when a uicreator3dmodule finished editing (move gizmo for example)
         //!
@@ -593,7 +593,7 @@ namespace tracer
             // load about menu prefab and add about button
             m_aboutMenu = Resources.Load("AboutMenu/AboutMenu") as GameObject;
             settingsMenu = settingsMenu.Add(MenuItem.IType.SPACE);
-            Parameter<Action> aboutButton = new Parameter<Action>(showAboutMenu, "About");
+            ClassParameter<Action> aboutButton = new ClassParameter<Action>(showAboutMenu, "About");
             settingsMenu.Begin(MenuItem.IType.HSPLIT)
                 .Add(aboutButton);
             settingsMenu.End();

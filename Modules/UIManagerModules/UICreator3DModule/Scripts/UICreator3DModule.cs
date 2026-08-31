@@ -538,7 +538,7 @@ namespace tracer
                         break;
                 }
             }
-            m_inputManager.SetAllowCamNavigation(false);
+            m_inputManager.camNavigationAllowed = false;
         }
 
         private Vector3 rotationDragWorldStartVec;  //used just for visualization of how "far" we drag the rotation
@@ -747,7 +747,7 @@ namespace tracer
                         break;
                 }
             }
-            m_inputManager.SetAllowCamNavigation(true);
+            m_inputManager.camNavigationAllowed = true;
             manipulator = null;
             _dragViz.Cleanup();
             _dragRotateViz.Cleanup();

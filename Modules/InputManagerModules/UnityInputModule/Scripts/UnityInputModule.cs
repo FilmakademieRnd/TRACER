@@ -633,7 +633,7 @@ namespace tracer{
         //!
         private void ProcessMultiTouchGestures() {
             // 1. Exit early
-            if (!IsTouch(out int nrOfTouches) || nrOfTouches <= 1 || !manager.IsMultiTouchGestureAllowed()) 
+            if (!IsTouch(out int nrOfTouches) || nrOfTouches <= 1 || !manager.isMultiTouchGestureAllowed) 
                 return; 
 
             int evalCount = CountInState(InteractionState.Evaluating, skipMuted: true);
@@ -796,7 +796,7 @@ namespace tracer{
                 float reqHold = GetHoldThreshold(thresholdIndex);
 
                 //if we disallow multitouchgesture, we allow simulataneous interactions!
-                if ((!allowSimultaneousInteractions && manager.IsMultiTouchGestureAllowed()) && (distanceFromStart > reqDistance || timeHeld > reqHold)) {
+                if ((!allowSimultaneousInteractions && manager.isMultiTouchGestureAllowed) && (distanceFromStart > reqDistance || timeHeld > reqHold)) {
                     if (IsAnyOtherTrackerActive(tracker)) 
                         return; 
                 }
@@ -809,7 +809,7 @@ namespace tracer{
                 }
             }
 
-            if(allowSimultaneousInteractions || !manager.IsMultiTouchGestureAllowed()) {
+            if(allowSimultaneousInteractions || !manager.isMultiTouchGestureAllowed) {
                 //no shared center or stuff!
                 if (tracker.State == InteractionState.Dragging) {
                     UpdateDragActiveVisual(tracker.Level, tracker.CurrentPosition);
@@ -911,11 +911,13 @@ namespace tracer{
         //! @param tracker primary, secondary and tertiary tracker
         //!
         private void OnPointerDown(InputTracker tracker) {
+            core.speedUpFPS();
+
             // If we are currently pinching or rotating, deny starting a new click/drag evaluation
             if (tracker.State == InteractionState.Pinching || tracker.State == InteractionState.Rotating) { return; }
 
             // DEBUG
-            // Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
+             Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
             // -----
 
             // Fetch the exact position right now, bypassing the Update loop delay
@@ -979,6 +981,8 @@ namespace tracer{
 
             tracker.Reset();
             ClearPreviews(tracker.Level);
+
+            core.speedDownFPS();
         }
         //!
         //! Ensures if the Leader lifts first, the muted subordinates don't get stuck

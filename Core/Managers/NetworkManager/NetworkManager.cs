@@ -45,8 +45,8 @@ namespace tracer
         {
             [ShowInMenu]
             // to store a parameters value into the settings files.
-            public Parameter<string> ipAddress;
-            public Parameter<string> vID;
+            public ClassParameter<string> ipAddress;
+            public ClassParameter<string> vID;
         }
 
         //!
@@ -129,8 +129,8 @@ namespace tracer
         public NetworkManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_commandBufferWritten = new TaskCompletionSource<List<byte[]>>();
-            settings.ipAddress = new Parameter<string>("127.0.0.1", "ipAddress");
-            settings.vID = new Parameter<string>("000000", "vID");
+            settings.ipAddress = new ClassParameter<string>("127.0.0.1", "ipAddress");
+            settings.vID = new ClassParameter<string>("000000", "vID");
         }
 
         //! 

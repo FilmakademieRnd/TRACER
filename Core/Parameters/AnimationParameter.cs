@@ -95,7 +95,7 @@ namespace tracer
     //!
     //! This is an extansion for the Parameter class containing animation functionality.
     //!
-    public partial class Parameter<T> : AbstractParameter, IAnimationParameter
+    public partial class Parameter<T> : BaseParameter<T>, IAnimationParameter
     {
         //!
         //! Event emitted when a keyframe has changed.

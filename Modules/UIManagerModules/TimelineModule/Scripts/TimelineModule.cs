@@ -416,7 +416,7 @@ namespace tracer{
         //!
         private void ClickFunction(object sender, InputManager.InputEventArgs evt){
 
-            if(!m_inputManager.IsUiInteractionAllowed())
+            if(!m_inputManager.uiInteractionAllowed)
                 return;
 
             switch (evt.Level) {
@@ -459,7 +459,7 @@ namespace tracer{
         //!
         private void DoubleClickFunction(object sender, InputManager.InputEventArgs evt){
 
-            if(!m_inputManager.IsUiInteractionAllowed())
+            if(!m_inputManager.uiInteractionAllowed)
                 return;
 
             switch (evt.Level) {
@@ -481,7 +481,7 @@ namespace tracer{
         //!
         private void DragFunction(object sender, InputManager.DragEventArgs evt){
 
-            if(!m_inputManager.IsUiInteractionAllowed())
+            if(!m_inputManager.uiInteractionAllowed)
                 return;
 
             switch (evt.Level) {
@@ -507,7 +507,7 @@ namespace tracer{
 
         private void HoldFunction(object sender, InputManager.InputEventArgs evt){
 
-            if(!m_inputManager.IsUiInteractionAllowed())
+            if(!m_inputManager.uiInteractionAllowed)
                 return;
 
             //if we did not select the timeline within the InputState.Started, either way of the InputLevel: stop here
@@ -544,7 +544,7 @@ namespace tracer{
         }
 
         private void EvaluatePinchFunction(object sender, InputManager.PinchEventArgs evt) {
-            if(!m_inputManager.IsUiInteractionAllowed())
+            if(!m_inputManager.uiInteractionAllowed)
                 return;
 
             //if we did not select the timeline within the InputState.Started, either way of the InputLevel: stop here
@@ -1503,7 +1503,8 @@ namespace tracer{
         //!
         //! Function used to apply the key update
         //!
-        private void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false){
+        private void ApplyKeyUpdate<T>(Parameter<T> parameter, bool removeKey = false, bool removeAll = false) where T : struct 
+        {
             if (removeAll){
                 parameter.clearKeys();
                 selectedKeyframe = null;

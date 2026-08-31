@@ -242,7 +242,7 @@ namespace tracer
                         
                         newObjects.Add(GameObject.Instantiate(m_text, parentObject.transform));
                         TextMeshProUGUI textComponent = newObjects[0].GetComponent<TextMeshProUGUI>();
-                        textComponent.text = ((Parameter<string>)item.Parameter).value;
+                        textComponent.text = ((ClassParameter<string>)item.Parameter).value;
                         textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
                         textComponent.font = manager.uiAppearanceSettings.defaultFont;
                         textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
@@ -253,7 +253,7 @@ namespace tracer
                     {
                         newObjects.Add(GameObject.Instantiate(m_text, parentObject.transform));
                         TextMeshProUGUI textComponent = newObjects[0].GetComponent<TextMeshProUGUI>();
-                        textComponent.text = ((Parameter<string>)item.Parameter).value;
+                        textComponent.text = ((ClassParameter<string>)item.Parameter).value;
                         textComponent.color = manager.uiAppearanceSettings.colors.ElementSelection_Highlight;
                         textComponent.font = manager.uiAppearanceSettings.defaultFont;
                         textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
@@ -266,7 +266,7 @@ namespace tracer
                     {
                         newObjects.Add(GameObject.Instantiate(m_textBox, parentObject.transform));
                         TextMeshProUGUI textComponent = newObjects[0].GetComponentInChildren<TextMeshProUGUI>();
-                        textComponent.text = ((Parameter<string>)item.Parameter).value;
+                        textComponent.text = ((ClassParameter<string>)item.Parameter).value;
                         //textComponent.color = manager.uiAppearanceSettings.colors.ElementSelection_Highlight;
                         textComponent.font = manager.uiAppearanceSettings.defaultFont;
                         textComponent.fontSize = manager.uiAppearanceSettings.smallFontSize;
@@ -283,9 +283,9 @@ namespace tracer
                                 ColorBlock buttonColors = button.colors;
                                 buttonColors.pressedColor = manager.uiAppearanceSettings.colors.ElementSelection_Highlight;
                                 button.colors = buttonColors;
-                                Action parameterAction = ((Parameter<Action>)item.Parameter).value;
+                                Action parameterAction = ((ClassParameter<Action>)item.Parameter).value;
                                 button.onClick.AddListener(() => parameterAction());
-                                button.onClick.AddListener(delegate { ((Parameter<Action>)item.Parameter).InvokeHasChanged(); });
+                                button.onClick.AddListener(delegate { ((ClassParameter<Action>)item.Parameter).InvokeHasChanged(); });
                                 button.GetComponent<Image>().color = manager.uiAppearanceSettings.colors.ButtonBG;
                                 TextMeshProUGUI textComponent = newObjects[0].GetComponentInChildren<TextMeshProUGUI>();
                                 textComponent.text = item.Parameter.name;
@@ -552,8 +552,8 @@ namespace tracer
                             {
                                 newObjects.Add(GameObject.Instantiate(m_inputField, parentObject.transform));
                                 TMP_InputField inputField = newObjects[0].GetComponent<TMP_InputField>();
-                                inputField.text = ((Parameter<string>)item.Parameter).value;
-                                inputField.onEndEdit.AddListener(delegate { ((Parameter<string>)item.Parameter).setValue(inputField.text); });
+                                inputField.text = ((ClassParameter<string>)item.Parameter).value;
+                                inputField.onEndEdit.AddListener(delegate { ((ClassParameter<string>)item.Parameter).setValue(inputField.text); });
                                 Image imgButton = inputField.GetComponent<Image>();
                                 imgButton.color = manager.uiAppearanceSettings.colors.DropDown_TextfieldBG;
                                 inputField.textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
@@ -628,7 +628,7 @@ namespace tracer
                     case AbstractParameter.ParameterType.ACTION:
                         {
                             //Button button = newObject.GetComponent<Button>();
-                            //Action parameterAction = ((Parameter<Action>)item.Parameter).value;
+                            //Action parameterAction = ((ClassParameter<Action>)item.Parameter).value;
                             //button.onClick.AddListener(() => parameterAction());
                             //TextMeshProUGUI textComponent = newObject.GetComponentInChildren<TextMeshProUGUI>();
                             //textComponent.text = item.Parameter.name;
@@ -717,12 +717,12 @@ namespace tracer
                             TextMeshProUGUI textComponent = gameObjects[0].GetComponentInChildren<TextMeshProUGUI>();
                             if (textComponent)
                             {
-                                textComponent.text = ((Parameter<string>) parameter).value;
+                                textComponent.text = ((ClassParameter<string>) parameter).value;
                             }
                             else
                             {
                                 TMP_InputField inputField = gameObjects[0].GetComponent<TMP_InputField>();
-                                inputField.text = ((Parameter<string>)parameter).value;
+                                inputField.text = ((ClassParameter<string>)parameter).value;
                             }
                         }
                         break;

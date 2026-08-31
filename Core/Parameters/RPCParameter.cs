@@ -31,7 +31,7 @@ namespace tracer
     //!
     //! RPCParameter class defining the fundamental functionality and interface
     //!
-    public class RPCParameter<T> : Parameter<T>
+    public class RPCParameter<T> : Parameter<T> where T : struct
     {
         public RPCParameter(T parameterValue, string name, ParameterObject parent, bool distribute = true) : base(parameterValue, name, parent, distribute) { _isRPC = true; }
 
@@ -90,10 +90,10 @@ namespace tracer
     //!
     //! RPCParameter class defining the fundamental functionality and interface
     //!
-    public class RPCParameter : RPCParameter<object>
+    public class RPCParameter : RPCParameter<int>
     {
         //! Simple constructor without RPC parameter.
-        public RPCParameter(string name, ParameterObject parent, bool distribute = true) : base(parent, name, parent, distribute) { _isRPC = true;  }
+        public RPCParameter(string name, ParameterObject parent, bool distribute = true) : base(0, name, parent, distribute) { _isRPC = true;  }
 
         //!
         //! Overrides the Parameters deserialization functionality, because we do not have a payload.
@@ -116,7 +116,7 @@ namespace tracer
         {
             _value = value;
             if (local)
-                m_action?.Invoke(null);
+                m_action?.Invoke(0);
             InvokeHasChanged();
         }
     }

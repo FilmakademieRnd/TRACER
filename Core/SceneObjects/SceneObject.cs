@@ -200,8 +200,12 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected override void emitHasChanged (AbstractParameter parameter)
         {
+            _core.speedUpFPSTime();
+
             if (!_lock)
+            {
                 base.emitHasChanged(parameter);
+            }
         }
 
         //!

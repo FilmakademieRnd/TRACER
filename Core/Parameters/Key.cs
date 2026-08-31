@@ -50,7 +50,7 @@ namespace tracer
     //!
     //! Parameter base class.
     //!
-    public class Key<T> : AbstractKey
+    public class Key<T> : AbstractKey where T : struct
     {
         //!
         //! The key's value.

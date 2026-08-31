@@ -89,12 +89,12 @@ namespace tracer
         protected override void Start(object sender, EventArgs e)
         {
             manager.connectUsingQrCode += ReceiveSceneUsingQr;
-            Parameter<Action> button = new Parameter<Action>(Connect, "Connect");
+            ClassParameter<Action> button = new ClassParameter<Action>(Connect, "Connect");
 
             List<AbstractParameter> parameterList1 = new List<AbstractParameter>
             {
-                new Parameter<string>(null, "Server"),
-                new Parameter<string>(null, "Device")
+                new ClassParameter<string>(null, "Server"),
+                new ClassParameter<string>(null, "Device")
             };
 
             m_menu = new MenuTree()

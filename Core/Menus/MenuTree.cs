@@ -71,7 +71,7 @@ namespace tracer
         //! 
         public MenuTree Begin(string text)
         {
-            return Begin(MenuItem.IType.TEXT, new Parameter<string>(text, "InfoText" + Items.Count.ToString()));
+            return Begin(MenuItem.IType.TEXT, new ClassParameter<string>(text, "InfoText" + Items.Count.ToString()));
         }
 
         //!
@@ -134,15 +134,15 @@ namespace tracer
         //! 
         public MenuTree Add(string text)
         {
-            return Add(MenuItem.IType.TEXT, new Parameter<string>(text, "InfoText" + Items.Count.ToString()));
+            return Add(MenuItem.IType.TEXT, new ClassParameter<string>(text, "InfoText" + Items.Count.ToString()));
         }
 
         public MenuTree Add(string text, bool isTextSection = false)
         {
             if (isTextSection)
-                return Add(MenuItem.IType.TEXTSECTION, new Parameter<string>(text, "Text Section" + Items.Count.ToString()));
+                return Add(MenuItem.IType.TEXTSECTION, new ClassParameter<string>(text, "Text Section" + Items.Count.ToString()));
             else
-                return Add(MenuItem.IType.TEXT, new Parameter<string>(text, "InfoText" + Items.Count.ToString()));
+                return Add(MenuItem.IType.TEXT, new ClassParameter<string>(text, "InfoText" + Items.Count.ToString()));
         }
 
         //!

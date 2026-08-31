@@ -96,7 +96,7 @@ namespace tracer{
         //! @param name Name of this module.
         //! @param _core Reference to the TRACER _core.
         //!
-        public GPSModule(string name, Manager manager) : base(name, manager){}
+        public GPSModule(string name, Manager manager) : base(name, manager) {}
 
         //! 
         //! Init m_callback
@@ -106,6 +106,12 @@ namespace tracer{
         //! 
         protected override void Init(object sender, EventArgs e){
             manager.onGPSDemandChangedEvent += HandleGPSDemandEvent;
+            manager.RegisterHandler<InputManager.StartGPSCommand>(startGPS);
+        }
+
+        private void startGPS(InputManager.StartGPSCommand c)
+        {
+            // do funny thniks here!
         }
 
         //!
@@ -113,6 +119,7 @@ namespace tracer{
         //!
         public override void Dispose(){
             base.Dispose();
+            manager.UnregisterHandler<InputManager.StartGPSCommand>();
             manager.onGPSDemandChangedEvent -= HandleGPSDemandEvent;
             StopGPSHardware(false);
         }

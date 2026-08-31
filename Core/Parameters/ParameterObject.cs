@@ -99,7 +99,7 @@ namespace tracer
         //!
         //! @param name The name of the parameter to be returned.
         //!
-        public Parameter<T> getParameter<T>(string name)
+        public Parameter<T> getParameter<T>(string name) where T : struct
         {
             return (Parameter<T>)_parameterList.Find(parameter => parameter.name == name);
         }

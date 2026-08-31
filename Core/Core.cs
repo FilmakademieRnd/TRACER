@@ -35,6 +35,7 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace tracer
 {
@@ -106,8 +107,8 @@ namespace tracer
         {
             get => m_timesteps;
         }
-        private static Parameter<string> s_logParameter;
-        public Parameter<string> logParameter
+        private static ClassParameter<string> s_logParameter;
+        public ClassParameter<string> logParameter
         {
             get => s_logParameter;
         }
@@ -116,7 +117,7 @@ namespace tracer
         //! The global dictionary of parameter objects.
         //! The structure is Dictionary<client/scene ID, Dictionary<ParameterObject ID, ParameterObject>>
         //!
-        private Dictionary<byte, Dictionary<short, ParameterObject>> m_parameterObjectList;
+        private readonly Dictionary<byte, Dictionary<short, ParameterObject>> m_parameterObjectList = new Dictionary<byte, Dictionary<short, ParameterObject>>();
         //!
         //! The current orientation of the device;
         //!
@@ -126,9 +127,9 @@ namespace tracer
         //!
         //! @return A reference to the parameter object list.
         //!
-        public ref Dictionary<byte, Dictionary<short, ParameterObject>> parameterObjectList
+        public IReadOnlyDictionary<byte, Dictionary<short, ParameterObject>> parameterObjectList
         {
-            get => ref m_parameterObjectList;
+            get => m_parameterObjectList;
         }
         //!
         //! Event invoked when an Unity Update() callback is triggered.
@@ -182,7 +183,7 @@ namespace tracer
 #endif
 
             Application.logMessageReceived += updateLog;
-            s_logParameter = new Parameter<string>("", "logParameter");
+            s_logParameter = new ClassParameter<string>("", "logParameter");
 
             if (!string.IsNullOrEmpty(Application.absoluteURL))
             {
@@ -191,7 +192,7 @@ namespace tracer
 
             _settings = new coreSettings();
             m_timesteps = (byte)((s_timestepsBase / settings.framerate) * settings.framerate);
-            m_parameterObjectList = new Dictionary<byte, Dictionary<short, ParameterObject>>();
+            //m_parameterObjectList = new Dictionary<byte, Dictionary<short, ParameterObject>>();
 
             // Create network manager
             NetworkManager networkManager = new NetworkManager(typeof(NetworkManagerModule), this);
@@ -241,7 +242,7 @@ namespace tracer
         {
             // Sync framerate to monitors refresh rate
             QualitySettings.vSyncCount = settings.vSyncCount;
-            Application.targetFrameRate = 60;
+            Application.targetFrameRate = 10;
 
             m_orientation = Input.deviceOrientation;
 
@@ -277,22 +278,43 @@ namespace tracer
             //QualitySettings.vSyncCount = 1;
             updateEvent?.Invoke(this, EventArgs.Empty);
         }
-
+        
         private Task fpsTask;
+        bool nextRequest = false;
 
-        public async Task speedUpFPS()
+        public async Task speedUpFPSTime()
         {
             if (Application.targetFrameRate != settings.framerate)
+            {
                 Application.targetFrameRate = settings.framerate;
 
-            if (fpsTask == null || fpsTask.IsCompleted)
-            {
-                fpsTask = Task.Delay(TimeSpan.FromSeconds(10));
-                await fpsTask;
-            
-                Application.targetFrameRate = 10;
+                if (fpsTask != null)
+                    nextRequest = !fpsTask.IsCompleted;
+
+                if (fpsTask == null || fpsTask.IsCompleted)
+                {
+                    fpsTask = Task.Delay(TimeSpan.FromSeconds(5));
+                    await fpsTask;
+
+                    if (!nextRequest)
+                    {
+                        Application.targetFrameRate = 10;
+                        nextRequest = false;
+                    }
+                }
             }
         }
+
+        public void speedUpFPS()
+        {
+            Application.targetFrameRate = settings.framerate;
+        }
+
+        public void speedDownFPS()
+        {
+            Application.targetFrameRate = 10;
+        }
+
 
         private void checkDeviceOrientation()
         {

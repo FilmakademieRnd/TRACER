@@ -56,7 +56,7 @@ namespace tracer
         // glTF import state
         private GLTFLoader m_gltfLoader;
         private bool m_isLoadingGLTF = false;
-        private Parameter<string> m_gltfFilePathParameter;
+        private ClassParameter<string> m_gltfFilePathParameter;
         private Parameter<float> m_gltfScaleParameter;
 
         //!
@@ -83,19 +83,19 @@ namespace tracer
             RefreshSceneList();
 
             // TRACER scene buttons
-            Parameter<Action> loadButton = new Parameter<Action>(LoadScene, "Load");
-            Parameter<Action> saveButton = new Parameter<Action>(SaveScene, "Save");
-            Parameter<Action> loadDemoButton = new Parameter<Action>(LoadDemoScene, "Load Demo");
-            Parameter<Action> saveDatahubButton = new Parameter<Action>(DataHubSaveScene, "DataHub Save");
-            Parameter<Action> loadDatahubButton = new Parameter<Action>(DataHubLoadScene, "DataHub Load");
-            Parameter<Action> infoDatahubButton = new Parameter<Action>(DataHubInfoScene, "DataHub Info");
-            Parameter<Action> refreshButton = new Parameter<Action>(RefreshSceneList, "Refresh");
+            ClassParameter<Action> loadButton = new ClassParameter<Action>(LoadScene, "Load");
+            ClassParameter<Action> saveButton = new ClassParameter<Action>(SaveScene, "Save");
+            ClassParameter<Action> loadDemoButton = new ClassParameter<Action>(LoadDemoScene, "Load Demo");
+            ClassParameter<Action> saveDatahubButton = new ClassParameter<Action>(DataHubSaveScene, "DataHub Save");
+            ClassParameter<Action> loadDatahubButton = new ClassParameter<Action>(DataHubLoadScene, "DataHub Load");
+            ClassParameter<Action> infoDatahubButton = new ClassParameter<Action>(DataHubInfoScene, "DataHub Info");
+            ClassParameter<Action> refreshButton = new ClassParameter<Action>(RefreshSceneList, "Refresh");
 
             // glTF import parameters
-            m_gltfFilePathParameter = new Parameter<string>("No file selected", "gltfFilePath");
+            m_gltfFilePathParameter = new ClassParameter<string>("No file selected", "gltfFilePath");
             m_gltfScaleParameter = new Parameter<float>(DEFAULT_SCALE, "gltfScale");
-            Parameter<Action> browseGLTFButton = new Parameter<Action>(BrowseForGLTFFile, "Browse");
-            Parameter<Action> importGLTFButton = new Parameter<Action>(ImportGLTF, "Import glTF");
+            ClassParameter<Action> browseGLTFButton = new ClassParameter<Action>(BrowseForGLTFFile, "Browse");
+            ClassParameter<Action> importGLTFButton = new ClassParameter<Action>(ImportGLTF, "Import glTF");
 
             m_menu = new MenuTree()
               .Begin(MenuItem.IType.VSPLIT)
@@ -164,7 +164,7 @@ namespace tracer
                 foreach (string headerFile in headerFiles)
                 {
                     string sceneName = Path.GetFileNameWithoutExtension(headerFile);
-                    sceneList.Add(new Parameter<string>(sceneName, sceneName));
+                    sceneList.Add(new ClassParameter<string>(sceneName, sceneName));
                 }
 
                 // Sort alphabetically

@@ -92,14 +92,6 @@ namespace tracer
             MenuButton toggleMenuButton = new MenuButton("", toggleMenu, new List<UIManager.Roles>() { UIManager.Roles.LIGHTING, UIManager.Roles.SET, UIManager.Roles.DOP });
             toggleMenuButton.setIcon("Images/button_sun");
             manager.addButton(toggleMenuButton);
-
-            //MenuButton fpsButton = new MenuButton("FPS", FPS, new List<UIManager.Roles>() { UIManager.Roles.LIGHTING, UIManager.Roles.SET, UIManager.Roles.DOP });
-            //manager.addButton(fpsButton);
-        }
-
-        void FPS()
-        {
-            core.speedUpFPS();
         }
 
         //!
@@ -148,9 +140,9 @@ namespace tracer
                 m_day = m_sunLight.getParameter<int>("Day");
                 m_month = m_sunLight.getParameter<int>("Month");
 
-                Parameter<Action> timeButton = new Parameter<Action>(pickCurrentTime, "Current Time");
-                Parameter<Action> locationButton = new Parameter<Action>(pickCurrentLocation, "Current Location");
-                Parameter<Action> removeSunButton = new Parameter<Action>(removeSun, "Remove Sun");
+                ClassParameter<Action> timeButton = new ClassParameter<Action>(pickCurrentTime, "Current Time");
+                ClassParameter<Action> locationButton = new ClassParameter<Action>(pickCurrentLocation, "Current Location");
+                ClassParameter<Action> removeSunButton = new ClassParameter<Action>(removeSun, "Remove Sun");
 
                 m_sunMenu = new MenuTree()
                  .Begin(MenuItem.IType.VSPLIT)
@@ -212,6 +204,7 @@ namespace tracer
         //!
         private void pickCurrentTime()
         {
+            manager.SendCommand(new InputManager.StartGPSCommand());
             DateTime dateTime = DateTime.Now;
             m_month.value = dateTime.Month;
             m_day.value = dateTime.Day;
@@ -227,6 +220,8 @@ namespace tracer
         //!
         private void pickCurrentLocation()
         {
+            manager.SendCommand(new InputManager.StartGPSCommand());
+
             // ...
         }
 

@@ -28,8 +28,13 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 25.06.2021
 
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
+
+namespace System.Runtime.CompilerServices
+{
+    internal static class IsExternalInit { }
+}
 
 namespace tracer
 {
@@ -60,12 +65,17 @@ namespace tracer
         //!
         //! Dictionary of loaded modules.
         //!
-        private Dictionary<Type, Module> m_modules;
+        private readonly Dictionary<Type, Module> m_modules;
 
         //!
         //! The managers settings. 
         //!
         internal Settings _settings;
+
+        //!
+        //! Dictionary storing the Handler for a specific command type.
+        //!
+        private readonly Dictionary<Type, Action<object>> m_commands;
 
         //!
         //! Event invoked when an TRACER _core Awake() callback is triggered.
@@ -85,6 +95,7 @@ namespace tracer
         public Manager(Type moduleType, Core tracerCore)
         {
             m_modules = new Dictionary<Type, Module>();
+            m_commands = new Dictionary<Type, Action<object>>();
             m_core = tracerCore;
             Type[] modules = Helpers.GetAllTypes(AppDomain.CurrentDomain, moduleType);
 
@@ -187,6 +198,40 @@ namespace tracer
             return m_modules.Remove(type);
         }
 
+        //!
+        //! Registers a given handler for a spcific command.
+        //! @param The handler to be stored. 
+        //!
+        public void RegisterHandler<TCommand>(Action<TCommand> handler) where TCommand : class
+        {
+            var commandType = typeof(TCommand);
+            m_commands[commandType] = cmd => handler((TCommand)cmd);
+        }
+        
+        //!
+        //! Unregisters a given handler for a spcific command.
+        //!
+        public void UnregisterHandler<TCommand>()
+        {
+            m_commands.Remove(typeof(TCommand));
+        }
 
+        //!
+        //! Function to call a registered command. 
+        //! @param The command to be called.
+        //!
+        public void SendCommand<TCommand>(TCommand command) where TCommand : class
+        {
+            var commandType = typeof(TCommand);
+
+            if (m_commands.TryGetValue(commandType, out var handler))
+            {
+                handler(command);
+            }
+            else
+            {
+                Helpers.Log($"{this.GetType().ToString()} Befehl {commandType.Name} konnte nicht ausgeführt werden: Modul ist deaktiviert.");
+            }
+        }
     }
 }

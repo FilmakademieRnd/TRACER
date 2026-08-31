@@ -103,7 +103,7 @@ namespace tracer
                     _history.Add(new Parameter<Quaternion>((Parameter<Quaternion>)a));
                     break;
                 case AbstractParameter.ParameterType.STRING:
-                    _history.Add(new Parameter<String>((Parameter<String>)a));
+                    _history.Add(new ClassParameter<string>((ClassParameter<string>)a));
                     break;
                 case AbstractParameter.ParameterType.VECTOR2:
                     _history.Add(new Parameter<Vector2>((Parameter<Vector2>)a));

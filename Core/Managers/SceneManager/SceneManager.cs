@@ -62,7 +62,7 @@ namespace tracer
             //!
             //! The filepath for loading and storing a scene.
             //!
-            public Parameter<string> sceneFilepath;
+            public ClassParameter<string> sceneFilepath;
         }
 
         //!
@@ -316,7 +316,7 @@ namespace tracer
         public SceneManager(Type moduleType, Core tracerCore) : base(moduleType, tracerCore)
         {
             m_sceneDataHandler = new SceneDataHandler();
-            settings.sceneFilepath = new Parameter<string>("VPETdefaultScene", "Filepath");
+            settings.sceneFilepath = new ClassParameter<string>("VPETdefaultScene", "Filepath");
 
             // create scene _parent if not there
             scnRoot = GameObject.Find("Scene");

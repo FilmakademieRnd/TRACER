@@ -231,7 +231,7 @@ namespace tracer
         //!
         private void DragFunction(object sender, InputManager.DragEventArgs evt){
             
-            if(!manager.IsCamNavigationAllowed())
+            if(!manager.camNavigationAllowed)
                 return;
 
             switch (evt.Level) {
@@ -300,7 +300,7 @@ namespace tracer
 
         private void HoldFunction(object sender, InputManager.InputEventArgs evt){
             
-            if(!manager.IsCamNavigationAllowed() || attitudeValuesIncoming)
+            if(!manager.camNavigationAllowed || attitudeValuesIncoming)
                 return;
 
             switch (evt.Level) {
@@ -330,7 +330,7 @@ namespace tracer
 
         private void PinchFunction(object sender, InputManager.PinchEventArgs evt){
             
-            if(!manager.IsCamNavigationAllowed()) // || attitudeValuesIncoming)
+            if(!manager.camNavigationAllowed) // || attitudeValuesIncoming)
                 return;
 
             switch (evt.Level) {
