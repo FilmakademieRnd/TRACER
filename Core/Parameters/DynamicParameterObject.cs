@@ -56,7 +56,7 @@ public class DynamicParameterObject : ParameterObject
     public void AddParameter(AbstractParameter parameter, bool subscribe = false)
     {
         parameter._id = (short) parameterList.Count;
-        parameterList.Add(parameter);
+        _parameterList.Add(parameter);
 
         if (subscribe) 
             SubscribeToParameterChange(parameter);
@@ -67,7 +67,7 @@ public class DynamicParameterObject : ParameterObject
         foreach (AbstractParameter parameter in parameterList)
             UnsubscribeFromParameterChange(parameter);
 
-        parameterList.Clear();
+        _parameterList.Clear();
     }
 
     //!
@@ -134,7 +134,7 @@ public class DynamicParameterObject : ParameterObject
     ///
     public void UpdateDynamicParameter<T>(object sender, T value)
     {
-        emitHasChanged((AbstractParameter)sender);
+        emitHasChanged(sender as AbstractParameter);
     }
 
     public delegate void noneDelegate();

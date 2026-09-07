@@ -32,9 +32,7 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace tracer{
@@ -461,48 +459,55 @@ namespace tracer{
         #endregion
 
         #region Path Generation
-        private void CreateLinearPathToTarget(Vector3 start, Vector3 end){            
-            //set to use same height, use start.y, since AnimHost use a planar calculation
+        private void CreateLinearPathToTarget(Vector3 start, Vector3 end)
+        {
+            // Set to use same height, use start.y, since AnimHost uses a planar calculation
             end.y = start.y;
 
-            //AnimatedParameter Creation
-            float endFrameTime = 300;
-            
-            //tangents, right now, use linear interpolation, so same tangent time, pos, center
-            Vector3 centerPosForTangents = (start+end)/2f;
-            float tangentTime = endFrameTime / 2f;            //tangent time is the middle
+            // AnimatedParameter Creation
+            float endFrameTime = 300f;
 
-            // //AnimHost uses a direction, instead absolut position
-            // Vector3 localEnd = (end-start);
+            // Slope formula: (EndValue - StartValue) / TotalTime
+            Vector3 vector3Slope = (end - start) / endFrameTime;
 
-            // //local start position (obvious 0,0,0 doo!)
-            // Vector3 localStart = Vector3.zero;
-            // localEnd.y = start.y;
-            // localEnd = Quaternion.Inverse(sceneCharacterForPath.transform.rotation) * localEnd;
+            Quaternion startRotation = sceneCharacterForPath.transform.rotation;
+            // This rotation should right now look from start to end
+            Quaternion endRotation = Quaternion.LookRotation((end - start).normalized);
 
-            //used to generate the AnimatedParameter KeyList
+            // For Quaternions, we approximate the tangent or use 0f if we rely on smooth slerp transitions.
+            // Since it's a linear path, a 0f slope works perfectly for an even angular velocity.
+            float quaternionSlope = 0f;
+
+            // Used to generate the AnimatedParameter KeyList
             IAnimationParameter m_activeParameter;
 
-            //-- v3 position, ignore TRS (0,1,2) -> use 3
-            m_activeParameter =  sceneCharacterForPath.parameterList[3] as IAnimationParameter;
-            m_activeParameter.clearKeys();
-            AbstractKey[] keyList = new AbstractKey[]{  
-                new Key<Vector3>(0f,            start,  tangentTime, centerPosForTangents, tangentTime, centerPosForTangents),    //start position
-                new Key<Vector3>(endFrameTime,  end,    tangentTime, centerPosForTangents, tangentTime, centerPosForTangents)     //end position
-            };
-            m_activeParameter.createKeyList(keyList);
-            
-            //-- q rotation,  ignore TRS (1) -> use 4
-            m_activeParameter =  sceneCharacterForPath.parameterList[4] as IAnimationParameter;
-            m_activeParameter.clearKeys();
-            Quaternion startRotation = sceneCharacterForPath.transform.rotation;
-            Quaternion endRotation = Quaternion.LookRotation((end-start).normalized);         //this rotation should right now look from start to end
-            keyList = new AbstractKey[]{
-                new Key<Quaternion>(0f, startRotation/*Quaternion.identity*/,   tangentTime, startRotation, tangentTime, startRotation),   //start rotation
-                new Key<Quaternion>(endFrameTime, endRotation, tangentTime, endRotation,   tangentTime, endRotation)      //end rotation
-            };
+            // -- v3 position, ignore TRS (0,1,2) -> use 3
+            if (sceneCharacterForPath.parameterList[3] is IAnimationParameter positionParam)
+            {
+                positionParam.clearKeys();
 
-            m_activeParameter.createKeyList(keyList);
+                // For the first key, outTangent matters. For the last key, inTangent matters.
+                // Since it's linear, both tangents share the exact same constant slope.
+                AbstractKey[] keyList = new AbstractKey[]
+                {
+                    new Key<Vector3>(0f,           start, 0f,                 vector3Slope.x), // Dummy 0f inTangent for start, constant outTangent
+                    new Key<Vector3>(endFrameTime, end,   vector3Slope.x,     0f)              // Constant inTangent, dummy 0f outTangent for end
+                };
+                positionParam.createKeyList(keyList);
+            }
+
+            // -- q rotation, ignore TRS (1) -> use 4
+            if (sceneCharacterForPath.parameterList[4] is IAnimationParameter rotationParam)
+            {
+                rotationParam.clearKeys();
+
+                AbstractKey[] keyList = new AbstractKey[]
+                {
+                    new Key<Quaternion>(0f,           startRotation, 0f,              quaternionSlope),
+                    new Key<Quaternion>(endFrameTime, endRotation,   quaternionSlope, 0f)
+                };
+                rotationParam.createKeyList(keyList);
+            }
         }
         #endregion
 

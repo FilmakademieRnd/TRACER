@@ -25,9 +25,9 @@ if not go to https://opensource.org/licenses/MIT
 //! @brief Implementation of the 3D representation of the splinme and UI to add and remove keis.
 //! @author Alexandru-Sebastian Tufis-Schwartz
 //! @author Thomas Krüger
-//! @version 1
-//! @date 19.05.2026
-//! @revision not functional after InputManager overhaul, also design was bad - more of a quick&dirty way
+//! @author Simon Spielmann
+//! @version 1.2
+//! @date 1.09.2026
 
 
 using System;
@@ -35,12 +35,10 @@ using System.Collections.Generic;
 using tracer;
 using Unity.Mathematics;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.Splines;
-using Object = UnityEngine.Object;
+using UnityEngine.Splines; 
 
-
-public class SplineLine : UIManagerModule{
+public class SplineLine : UIManagerModule
+{
     //!
     //! Currently selected object.
     //!
@@ -50,33 +48,9 @@ public class SplineLine : UIManagerModule{
     //!
     private SplineContainer _spline;
     //!
-    //! The index of the currently selected SnapSelect element in the selector
-    //!
-    private int _selectorCurrentSelectedSnapSelectElement;
-    //!
-    //! Reference to the selector SnapSelect component
-    //!
-    private SnapSelect _selectorSnapSelect;
-    //!
-    //! The currently selected abstract parameter
-    //!
-    private AbstractParameter _selectedAbstractParam;
-    //!
     //! The Animation Manager.
     //!
     private AnimationManager _animationManager;
-    //!
-    //! Ref to the UICreator2DModule.
-    //!
-    private UICreator2DModule _creator2DModule;
-    //!
-    //! Ref to InputManager.
-    //!
-    private InputManager _inputManager;
-    //!
-    //! Boolean for updateing the size of the line renderer and knots(Sphear GO).
-    //!
-    private bool _updateLineWhenZooming;
     //!
     //! Distance between camera and spline.
     //!
@@ -96,16 +70,34 @@ public class SplineLine : UIManagerModule{
     //!
     //! list of keyframe representing spheres
     //!
-    private List<GameObject> _keyframeSpheres;
-    //!
-    //! Reference to UIManager
-    //!
-    UIManager _mUIManager;
-
+    private List<GameObject> _keyframeSpheres = new List<GameObject>();
     //!
     //! The Line renderer.
     //!
     private LineRenderer _lineRenderer;
+    //! 
+    //! The lines Material. 
+    //! 
+    private Material _lineMaterial;
+    //! 
+    //! The sheres Material. 
+    //!
+    private Material _sphereMaterial;
+    //! 
+    //! The number defining the lines resolution. 
+    //!
+    private const int LINE_SEGMENT_COUNT = 100; 
+    //!
+    //! Cached scnene manager.
+    //!
+    private SceneManager _sceneManager;
+
+    //!
+    //! Constructor
+    //!
+    public SplineLine(string name, Manager manager) : base(name, manager)
+    {
+    }
 
     //! 
     //! Function called when an Unity Start() m_callback is triggered
@@ -113,17 +105,19 @@ public class SplineLine : UIManagerModule{
     protected override void Start(object sender, EventArgs e)
     {
         base.Start(sender, e);
-        _mUIManager = core.getManager<UIManager>();
         _animationManager = core.getManager<AnimationManager>();
-        _inputManager = core.getManager<InputManager>();
-        
-        _mUIManager.selectionChanged += selection;
-        _mUIManager.UI2DCreated += grabUI2D;
+        _sceneManager = core.getManager<SceneManager>();
+
+        // Subscribe to global managers
+        manager.selectionChanged += selection;
         _animationManager.renewSplineContainer += executeRenewContainer;
+
+        _lineMaterial = Resources.Load<Material>("Materials/LineRendererMaterial");
+        _sphereMaterial = Resources.Load<Material>("Materials/keySphereMat");
+
         _splineHolder = new GameObject("SplineHolder");
-        _splineHolder.transform.position = new Vector3(0, 0, 0);
+        _splineHolder.transform.position = Vector3.zero;
         _splineHolder.layer = 11;
-        
     }
 
     //! 
@@ -132,8 +126,13 @@ public class SplineLine : UIManagerModule{
     public override void Dispose()
     {
         base.Dispose();
-        _mUIManager.selectionChanged -= selection;
-        _mUIManager.UI2DCreated -= grabUI2D;
+        manager.selectionChanged -= selection;
+        if (_animationManager != null)
+        {
+            _animationManager.renewSplineContainer -= executeRenewContainer;
+            _animationManager.startAnimaGeneration -= StartAnimGen;
+            _animationManager.stopAnimaGeneration -= StopAnimGen;
+        }
     }
 
     //!
@@ -141,67 +140,56 @@ public class SplineLine : UIManagerModule{
     //!
     private void selection(object sender, List<SceneObject> sceneObjects)
     {
-        if (sceneObjects.Count < 1)
+        _animationManager.startAnimaGeneration -= StartAnimGen;
+        _animationManager.stopAnimaGeneration -= StopAnimGen;
+
+        if (sceneObjects == null || sceneObjects.Count < 1)
         {
-            _animationManager.startAnimaGeneration -= StartAnimGen;
-            _animationManager.stopAnimaGeneration -= StopAnimGen;
             DelleteSplineContainer();
-            if (_selectorSnapSelect)
-            {
-                _selectorSnapSelect.parameterChanged -= ParamChange;
-            }
-
-            if (_updateLineWhenZooming)
-            {
-                //_inputManager.pinchEvent -= EventCallDrawLineBetweenPoints;
-                _updateLineWhenZooming = false;
-            }
-            // Thomas: reset the abstract parameter, otherwise an object could try to show the light settings which obviously does not work
-            // this could be the starting point to save the previous selection to objects, so we remain on any changed field instead of
-            // always going back to 'position'
-            _selectorCurrentSelectedSnapSelectElement = 0;
+            _animationTarget = null;
+            return;
         }
 
-        if (sceneObjects.Count > 0)
-        {
-            _animationManager.startAnimaGeneration += StartAnimGen;
-            _animationManager.stopAnimaGeneration += StopAnimGen;
-            _animationTarget = sceneObjects[0];
-            
-            _selectedAbstractParam = _animationTarget.parameterList[_selectorCurrentSelectedSnapSelectElement];
-        }
-    }
-
-    //!
-    //! Function to get the UI2D.
-    //!
-    void grabUI2D(object sender, UIBehaviour ui)
-    {
-        _selectorSnapSelect = (SnapSelect) ui;
-        _selectorSnapSelect.parameterChanged += ParamChange;
+        // Setup new target safely
+        _animationManager.startAnimaGeneration += StartAnimGen;
+        _animationManager.stopAnimaGeneration += StopAnimGen;
+        _animationTarget = sceneObjects[0];
     }
 
     //!
     //! Function called when _animCreatorButton is pressed 
     //!
-    public void StartAnimGen(object sender, IAnimationParameter animationParameter)
-    {
-        RenewContainer();
-    }
+    public void StartAnimGen(object sender, IAnimationParameter animationParameter) => RenewContainer();
 
-    public void StopAnimGen(object sender, IAnimationParameter animationParameter)
-    {
-        DelleteSplineContainer();
-    }
-    
+    //!
+    //! Function called when crate animation has been ended.  
+    //!
+    public void StopAnimGen(object sender, IAnimationParameter animationParameter) => DelleteSplineContainer();
+
+    //!
+    //! Function that creates a new spline when a key is updated
+    //!
+    private void executeRenewContainer(object sender, IAnimationParameter animationParameter) => RenewContainer();
+
     //!
     //! Function that Destroy the spline when an object is deselected
     //!
     public void DelleteSplineContainer()
     {
-        if (_splineGameObject!= null)
+        for (int i = _keyframeSpheres.Count - 1; i >= 0; i--)
         {
-            Object.Destroy(_splineGameObject);
+            if (_keyframeSpheres[i] != null)
+                UnityEngine.Object.Destroy(_keyframeSpheres[i]);
+        }
+        _keyframeSpheres.Clear();
+
+        if (_splineGameObject != null)
+        {
+            _sceneObjectsSplines.Remove(_splineGameObject);
+            UnityEngine.Object.Destroy(_splineGameObject);
+            _splineGameObject = null;
+            _spline = null;
+            _lineRenderer = null;
         }
     }
 
@@ -210,17 +198,95 @@ public class SplineLine : UIManagerModule{
     //!
     public void CreateSplineContainer()
     {
-        String splineName = new string(_animationTarget.name + "Spline");
+        if (_animationTarget == null) return;
+
+        string splineName = $"{_animationTarget.name}Spline";
         _splineGameObject = CreateNewSplineGo(splineName);
-        _sceneObjectsSplines.Add(_splineGameObject, splineName);
+        _sceneObjectsSplines.TryAdd(_splineGameObject, splineName); 
         _spline = _splineGameObject.AddComponent<SplineContainer>();
     }
 
-    private void executeRenewContainer(object sender, IAnimationParameter animationParameter)
+    //!
+    //! Function that redraw the spline
+    //!
+    private void RedrawSpline()
     {
-        RenewContainer();
+        if (_animationTarget == null || _spline == null) return;
+
+        var keys = _animationTarget.position.getKeys();
+        if (keys == null) return;
+
+        int keyCount = keys.Count;
+        for (int i = 0; i < keyCount; i++)
+        {
+            if (keys[i] is Key<Vector3> v3Key)
+            {
+                CreateSplineControlPoint("knot", v3Key.value, v3Key.inTangent, v3Key.outTangent, v3Key.interpolation, _spline);
+            }
+        }
+
+        if (keyCount >= 2)
+        {
+            DrawLineBetweenPoints();
+        }
     }
-    
+
+    //!
+    //! Function that draws the LineRenderer between the knots(key points)
+    //!
+    private void DrawLineBetweenPoints()
+    {
+        if (_animationTarget == null || _spline == null) return;
+
+        var keys = _animationTarget.position.getKeys();
+        if (keys == null || keys.Count == 0) return;
+
+        if (_lineRenderer == null)
+        {
+            _lineRenderer = _splineGameObject.AddComponent<LineRenderer>();
+            _lineRenderer.useWorldSpace = true;
+            _lineRenderer.material = _lineMaterial;
+
+            _lineRenderer.sortingOrder = 999;              // High number ensures it draws last (on top)
+        }
+
+        Transform parentTransform = _animationTarget.transform.parent;
+        Vector3 lineMiddle = Vector3.zero;
+        int count = keys.Count;
+
+        for (int i = 0; i < count; i++)
+        {
+            if (keys[i] is Key<Vector3> v3Key)
+                lineMiddle += parentTransform != null ? parentTransform.TransformPoint(v3Key.value) : v3Key.value;
+        }
+
+        if (count > 0)
+            lineMiddle /= count;
+
+        // Dynamic scaling based on camera distance
+        if (_sceneManager.mainCamera != null)
+        {
+            _keyHandleScale = Vector3.Distance(_sceneManager.mainCamera.transform.position, lineMiddle) / 100f;
+            _lineRenderer.startWidth = _keyHandleScale / 3f;
+            _lineRenderer.endWidth = _lineRenderer.startWidth;
+
+            for (int i = 0; i < _keyframeSpheres.Count; i++)
+            {
+                if (_keyframeSpheres[i] != null)
+                    _keyframeSpheres[i].transform.localScale = new Vector3(_keyHandleScale, _keyHandleScale, _keyHandleScale);
+            }
+        }
+
+        // Draw the evaluated points along the spline curves
+        _lineRenderer.positionCount = LINE_SEGMENT_COUNT + 1;
+        for (int i = 0; i <= LINE_SEGMENT_COUNT; i++)
+        {
+            float t = i / (float)LINE_SEGMENT_COUNT;
+            Vector3 worldSplinePoint = _spline.EvaluatePosition(t);
+            _lineRenderer.SetPosition(i, worldSplinePoint);
+        }
+    }
+
     //!
     //! Function that creates a new spline when a key is updated
     //!
@@ -232,146 +298,75 @@ public class SplineLine : UIManagerModule{
     }
 
     //!
-    //! Function that redraw the spline
-    //!
-    private void RedrawSpline()
-    {
-        if (_animationTarget.position.getKeys() != null)
-        {
-            foreach (var key in _animationTarget.position.getKeys())
-            {
-                CreateSplineControlPoint("knot", ((Key<Vector3>)key).value, _spline);
-            }
-
-            if (_animationTarget.position.getKeys().Count >= 2)
-            {
-                if (_lineRenderer == null)
-                {
-                    DrawLineBetweenPoints();
-                }
-
-                if (!_updateLineWhenZooming)
-                {
-                    //fkn wrong! this does not mean we're zooming - need to subscribe to a "camera change/update event!"
-                    //_inputManager.pinchEvent += EventCallDrawLineBetweenPoints;
-                    _updateLineWhenZooming = true;
-                }
-            }
-        }
-    }
-
-    //!
-    //! event listner when pinchEvent is triggerd 
-    //!
-    private void EventCallDrawLineBetweenPoints(object sender, float distance)
-    {
-        DrawLineBetweenPoints();
-    }
-
-    //!
-    //! Function that draws the LineRenderer between the knots(key points)
-    //!
-    private void DrawLineBetweenPoints()
-    {
-        if (_lineRenderer == null)
-        {
-            _lineRenderer = _splineGameObject.AddComponent<LineRenderer>();
-            _lineRenderer.useWorldSpace = true;
-        }
-        List<AbstractKey> keyList = _animationTarget.position.getKeys();
-        
-        
-        // make line nice
-        Vector3 lineMiddle = Vector3.zero;
-        foreach (var key in _animationTarget.position.getKeys())
-        {
-            lineMiddle += _animationTarget.transform.parent.TransformPoint(((Key<Vector3>)key).value);
-        }
-
-        lineMiddle /= _animationTarget.position.getKeys().Count;
-        _keyHandleScale = Vector3.Distance(Camera.main.transform.position, lineMiddle) / 100f;
-        _lineRenderer.startWidth = _keyHandleScale /3f;
-        _lineRenderer.endWidth = _lineRenderer.startWidth;
-        foreach (var obj in _spline.gameObject.GetComponentsInChildren<Transform>())
-        {
-            if (obj != _spline.transform)
-            {
-                obj.localScale = new Vector3(_keyHandleScale, _keyHandleScale, _keyHandleScale);
-            }
-        }
-        // nice nice 
-        
-        _lineRenderer.material = Resources.Load<Material>("Materials/LineRendererMaterial");
-        int lineSegmentCount = 100;
-        _lineRenderer.positionCount = lineSegmentCount + 1;
-        
-        for (int i = 0; i <= lineSegmentCount; i++)
-        {
-            float t = i / (float)lineSegmentCount;  // Normalized time along the spline
-            Vector3 point = _spline.EvaluatePosition(t);  // Evaluate the position on the spline at this time
-            _lineRenderer.SetPosition(i, point);  // Set this position on the LineRenderer
-        }
-    }
-
-    public SplineLine(string name, Manager manager) : base(name, manager)
-    {
-    }
-
-    //!
     //!Function that creates a new Spline GO
     //!
     public GameObject CreateNewSplineGo(string childName)
     {
-        // Create a new GameObject
         GameObject childObject = new GameObject(childName);
         childObject.layer = 11;
-
-        // Set the _parent of the new GameObject to the specified _parent
         childObject.transform.SetParent(_splineHolder.transform);
-
-        // Set the local position of the child GameObject relative to its _parent
-        childObject.transform.localPosition = new Vector3(0, 0, 0);
-
+        childObject.transform.localPosition = Vector3.zero;
         return childObject;
     }
-
 
     //!
     //!Function that creates a new Knot GO
     //!
-    public void CreateSplineControlPoint(string childName, Vector3 pos, SplineContainer spline)
+    public void CreateSplineControlPoint(string childName, Vector3 pos, float inTangentSlope, float outTangentSlope, AbstractKey.InterplolationTypes mode, SplineContainer spline)
     {
-        BezierKnot knot = new BezierKnot(new float3(pos.x, pos.y, pos.z));
-        _spline.Spline.Add(knot);
-        _spline.Spline.SetTangentMode(0);
-        // Create a new GameObject
+        BezierKnot knot;
+        int newKnotIndex;
+
+        switch (mode)
+        {
+            case AbstractKey.InterplolationTypes.BEZIER:
+                // BEZIER: Calculate handle vectors based on the float slopes
+                float handleXOffset = 1.0f; // Scale factor for the curve tightness
+                float3 inHandle = new float3(-handleXOffset, inTangentSlope * -handleXOffset, 0f);
+                float3 outHandle = new float3(handleXOffset, outTangentSlope * handleXOffset, 0f);
+
+                knot = new BezierKnot(new float3(pos.x, pos.y, pos.z), inHandle, outHandle);
+                _spline.Spline.Add(knot);
+
+                // Set tangent mode to Broken so Unity evaluates the customized handles
+                newKnotIndex = _spline.Spline.Count - 1;
+                _spline.Spline.SetTangentMode(newKnotIndex, TangentMode.Broken);
+                break;
+
+            case AbstractKey.InterplolationTypes.LINEAR:
+                // LINEAR: Create a clean knot without handles
+                knot = new BezierKnot(new float3(pos.x, pos.y, pos.z));
+                _spline.Spline.Add(knot);
+
+                // Force Unity's spline to draw a perfectly straight line to the next point
+                newKnotIndex = _spline.Spline.Count - 1;
+                _spline.Spline.SetTangentMode(newKnotIndex, TangentMode.Linear);
+                break;
+
+            case AbstractKey.InterplolationTypes.STEP:
+                // Create a clean knot without handles
+                knot = new BezierKnot(new float3(pos.x, pos.y, pos.z));
+                _spline.Spline.Add(knot);
+
+                // For drawing step curves smoothly in a standard spline component, 
+                // Unity treats it as linear. (See note below if you need an exact 90-degree visual step)
+                newKnotIndex = _spline.Spline.Count - 1;
+                _spline.Spline.SetTangentMode(newKnotIndex, TangentMode.Linear);
+                break;
+        }
+
+        // Visual helper setup (Spheres)
         GameObject splineControlPoint = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        splineControlPoint.name = childName;
         splineControlPoint.layer = 11;
-        splineControlPoint.GetComponent<Renderer>().material = Resources.Load<Material>("Materials/keySphereMat");
 
-        splineControlPoint.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
+        if (_sphereMaterial != null)
+            splineControlPoint.GetComponent<Renderer>().sharedMaterial = _sphereMaterial;
 
-        // Set the _parent of the new GameObject to the specified _parent
         splineControlPoint.transform.SetParent(spline.gameObject.transform);
-
-        // Set the local position of the child GameObject relative to its _parent
         splineControlPoint.transform.localPosition = pos;
-    }
-    
-    //!
-    //!Function called when parameter has changed
-    //!
-    public void ParamChange(object sender, int manipulatorMode)
-    {
-        _selectorCurrentSelectedSnapSelectElement = manipulatorMode;
-        _selectedAbstractParam = _animationTarget.parameterList[_selectorCurrentSelectedSnapSelectElement];
-        
+        splineControlPoint.transform.localScale = new Vector3(_keyHandleScale, _keyHandleScale, _keyHandleScale);
+
+        _keyframeSpheres.Add(splineControlPoint);
     }
 }
-
-
-
-
-
-
-

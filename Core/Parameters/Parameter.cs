@@ -124,10 +124,10 @@ namespace tracer
         //!
         //! Getter for parameters name.
         //!
-        public ref string name
+        public string name
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ref _name;
+            get => _name;
         }
         //!
         //! Function to initialize animation funcctionality of a parameter.
@@ -242,7 +242,7 @@ namespace tracer
         //! @param name The parameters _parent ParameterObject.
         //! @param name Flag that determines whether a Parameter will be distributed.
         //!
-        public BaseParameter(T value, string name, ParameterObject parent = null, bool distribute = true, UIManager.Roles role = UIManager.Roles.VIEWER)
+        public BaseParameter(T value, string name, ParameterObject parent = null, bool distribute = true, UIManager.Roles role = UIManager.Roles.VIEWER) 
         {
             _value = value;
             _name = name;
@@ -256,7 +256,7 @@ namespace tracer
             if (parent)
             {
                 _id = (short)_parent.parameterList.Count;
-                _parent.parameterList.Add(this);
+                _parent._parameterList.Add(this);
             }
             else
             {
@@ -371,7 +371,7 @@ namespace tracer
         public override int dataSize()
         {
             if (_isAnimated)
-                // parameterValue<ParamValueSize> + countKeys<short> + nbrKeys * (type<byte> + time<float> + tangentTime1<float> + tangentTime2<float> + value<ParamValueSize> + tangentvalue1<ParamValueSize> + tangentvalue2<ParamValueSize>) 
+                // parameterValue<ParamValueSize> + countKeys<short> + nbrKeys * (type<byte> + time<float> + inTangent<float> + outTangent<float> + value<ParamValueSize> + tangentvalue1<ParamValueSize> + tangentvalue2<ParamValueSize>) 
                 return _dataSize + 2 + _keyList.Count * (1 + 3 * sizeof(float) + 3 * _dataSize);
 
             return defaultDataSize();
@@ -469,11 +469,9 @@ namespace tracer
                     //Debug.Log("\tkey "+i+" Value: "+key.value+" at time "+key.time);
                     targetSpan[offset] = (byte) key.interpolation; // interpolation
                     MemoryMarshal.Write(targetSpan.Slice(offset += 1, 4), ref key.time); // time
-                    MemoryMarshal.Write(targetSpan.Slice(offset += 4, 4), ref key.tangentTime1); // tangent time 1
-                    MemoryMarshal.Write(targetSpan.Slice(offset += 4, 4), ref key.tangentTime2); // tangent time 2
+                    MemoryMarshal.Write(targetSpan.Slice(offset += 4, 4), ref key.inTangent); // tangent time 1
+                    MemoryMarshal.Write(targetSpan.Slice(offset += 4, 4), ref key.outTangent); // tangent time 2
                     SerializeData(targetSpan.Slice(offset += 4, _dataSize), key.value); // value
-                    SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.tangentValue1); // tangent value 1
-                    SerializeData(targetSpan.Slice(offset += _dataSize, _dataSize), key.tangentValue2); // tangent value 2
                     offset += _dataSize;
                 }
             }
@@ -514,22 +512,20 @@ namespace tracer
                 {
                     AbstractKey.InterplolationTypes interplolation = (AbstractKey.InterplolationTypes) MemoryMarshal.Read<byte> (sourceSpan.Slice(offset));
                     float time = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 1));
-                    float tangenttime1 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
-                    float tangenttime2 = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    float tangentIn = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
+                    float tangentOut = MemoryMarshal.Read<float>(sourceSpan.Slice(offset += 4));
                     T value = deSerializeData(sourceSpan.Slice(offset += 4));
-                    T tangentvalue1 = deSerializeData(sourceSpan.Slice(offset += _dataSize));
-                    T tangentvalue2 = deSerializeData(sourceSpan.Slice(offset += _dataSize));
                     offset += _dataSize;
 
-                    _keyList.Add(new Key<T>(time, value, tangenttime1, tangentvalue1, tangenttime2, tangentvalue2, interplolation));
+                    _keyList.Add(new Key<T>(time, value, tangentIn, tangentOut, interplolation));
                 }
                 //_animationManager.keyframesUpdated(this);
                 keyHasChanged?.Invoke(this, EventArgs.Empty);
             }
 
-            _networkLock = true;
+            //_networkLock = true;
             InvokeHasChanged();
-            _networkLock = false;
+            //_networkLock = false;
 
         }
 
@@ -651,9 +647,9 @@ namespace tracer
                     break;
             }
 
-            _networkLock = true;
+            //_networkLock = true;
             InvokeHasChanged();
-            _networkLock = false;
+            //_networkLock = false;
 
             if (_type == ParameterType.ACTION)
                 ((Action)(object)_value)?.Invoke();

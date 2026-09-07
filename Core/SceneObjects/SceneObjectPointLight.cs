@@ -95,7 +95,7 @@ namespace tracer
         private void updateRange(object sender, float a)
         {
             _light.range = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         // Update is called once per frame

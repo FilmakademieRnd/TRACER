@@ -184,7 +184,7 @@ namespace tracer
         {
             _camera.fieldOfView = a;
             _camera.focalLength = sensorSize.value.y / (2.0f * Mathf.Tan(Mathf.Deg2Rad * a * 0.5f));
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -195,7 +195,7 @@ namespace tracer
         private void updateAspect(object sender, float a)
         {
             _camera.aspect = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -206,7 +206,7 @@ namespace tracer
         private void updateNearClipPlane(object sender, float a)
         {
             _camera.nearClipPlane = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -217,7 +217,7 @@ namespace tracer
         private void updateFarClipPlane(object sender, float a)
         {
             _camera.farClipPlane = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -228,7 +228,7 @@ namespace tracer
         private void updateFocalDistance(object sender, float a)
         {
             //ToDO: Use this in PostEffect.
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -239,7 +239,7 @@ namespace tracer
         private void updateAperture(object sender, float a)
         {
             //ToDO: Use this in PostEffect.
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -250,21 +250,21 @@ namespace tracer
         private void updateSensorSize(object sender, Vector2 a)
         {
             _camera.sensorSize = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         private void updateSensorSizeSelection(object sender, int s)
         {
             sensorSize.value = ((Parameter<Vector2>)sensorSizePresets.parameterList[s]).value;
             fov.value = Camera.FocalLengthToFieldOfView(_camera.focalLength, sensorSize.value.y);
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
         
         private void updateFocalLengthSelection(object sender, int s)
         {
             float fl = ((Parameter<float>)focalLengthPresets.parameterList[s]).value;
             fov.value = Camera.FocalLengthToFieldOfView(fl, sensorSize.value.y);
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!

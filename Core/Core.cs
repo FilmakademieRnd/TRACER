@@ -31,11 +31,12 @@ if not go to https://opensource.org/licenses/MIT
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Runtime.CompilerServices;
-using UnityEngine;
-using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using System.Diagnostics;
+using UnityEngine;
+using static UnityEditor.PlayerSettings;
 
 namespace tracer
 {
@@ -73,8 +74,8 @@ namespace tracer
         //!
         public coreSettings settings
         {
-            get { return (coreSettings)_settings; }
-            set { _settings = value; }
+            get => (coreSettings)_settings; 
+            set => _settings = value;
         }
         //!
         //! Flag determining wether the Tracer instance acts as a server or client.
@@ -103,34 +104,30 @@ namespace tracer
         //!
         //! The max value for the local time.
         //!
-        public byte timesteps
-        {
-            get => m_timesteps;
-        }
+        public byte timesteps => m_timesteps;
+
         private static ClassParameter<string> s_logParameter;
-        public ClassParameter<string> logParameter
-        {
-            get => s_logParameter;
-        }
+        public ClassParameter<string> logParameter => s_logParameter;
+        
         public string deepLink;
         //!
         //! The global dictionary of parameter objects.
         //! The structure is Dictionary<client/scene ID, Dictionary<ParameterObject ID, ParameterObject>>
         //!
-        private readonly Dictionary<byte, Dictionary<short, ParameterObject>> m_parameterObjectList = new Dictionary<byte, Dictionary<short, ParameterObject>>();
-        //!
-        //! The current orientation of the device;
-        //!
-        private DeviceOrientation m_orientation;
+        private readonly Dictionary<byte, SortedList<short, ParameterObject>> m_parameterObjectList = new Dictionary<byte, SortedList<short, ParameterObject>>();
         //!
         //! Getter for the parameter object list.
         //!
         //! @return A reference to the parameter object list.
         //!
-        public IReadOnlyDictionary<byte, Dictionary<short, ParameterObject>> parameterObjectList
-        {
-            get => m_parameterObjectList;
-        }
+        public IReadOnlyDictionary<byte, SortedList<short, ParameterObject>> parameterObjectList => m_parameterObjectList;
+        //!
+        //! The current orientation of the device;
+        //!
+        private DeviceOrientation m_orientation;
+        // Reusable StringBuilder to prevent mass heap allocations during logging
+        private readonly StringBuilder m_logBuilder = new StringBuilder(512);
+        private int m_logNewLineCount = 0;
         //!
         //! Event invoked when an Unity Update() callback is triggered.
         //!
@@ -228,11 +225,23 @@ namespace tracer
 
         void updateLog(string logString, string stackTrace, LogType type)
         {
-            // clear log if more then 20 lines
-            if ( s_logParameter.value.Count(c => c.Equals('\n')) > 20 )
-                s_logParameter.value = logString;
+            if (m_logNewLineCount > 20)
+            {
+                m_logBuilder.Clear();
+                m_logBuilder.Append(logString);
+                m_logNewLineCount = 0;
+            }
             else
-                s_logParameter.value += '\n' + logString;
+            {
+                if (m_logBuilder.Length > 0)
+                {
+                    m_logBuilder.Append('\n');
+                    m_logNewLineCount++;
+                }
+                m_logBuilder.Append(logString);
+            }
+
+            s_logParameter.value = m_logBuilder.ToString();
         }
 
         //!
@@ -278,30 +287,26 @@ namespace tracer
             //QualitySettings.vSyncCount = 1;
             updateEvent?.Invoke(this, EventArgs.Empty);
         }
-        
-        private Task fpsTask;
-        bool nextRequest = false;
+
+        private int m_fpsRequestCount = 0;
+        private CancellationTokenSource m_cts;
 
         public async Task speedUpFPSTime()
         {
-            if (Application.targetFrameRate != settings.framerate)
+            if (Application.targetFrameRate == settings.framerate) return;
+
+            Application.targetFrameRate = settings.framerate;
+            Interlocked.Increment(ref m_fpsRequestCount);
+
+            try
             {
-                Application.targetFrameRate = settings.framerate;
+                await Task.Delay(TimeSpan.FromSeconds(5), m_cts.Token);
+            }
+            catch (OperationCanceledException) { return; }
 
-                if (fpsTask != null)
-                    nextRequest = !fpsTask.IsCompleted;
-
-                if (fpsTask == null || fpsTask.IsCompleted)
-                {
-                    fpsTask = Task.Delay(TimeSpan.FromSeconds(5));
-                    await fpsTask;
-
-                    if (!nextRequest)
-                    {
-                        Application.targetFrameRate = 10;
-                        nextRequest = false;
-                    }
-                }
+            if (Interlocked.Decrement(ref m_fpsRequestCount) == 0)
+            {
+                Application.targetFrameRate = 10;
             }
         }
 
@@ -344,7 +349,7 @@ namespace tracer
         private void updateTime()
         {
             timeEvent?.Invoke(this, EventArgs.Empty);
-            m_time = (m_time > (m_timesteps - 2) ? (byte)0 : m_time += 1);
+            m_time = (m_time > (m_timesteps - 2)) ? (byte)0 : (byte)(m_time + 1);
         }
 
         //!
@@ -408,36 +413,35 @@ namespace tracer
         {
             byte sceneID = parameterObject._sceneID;
             short poID = parameterObject._id;
-            Dictionary<short, ParameterObject> sceneObjects;
 
-            // check scene
-            if (!m_parameterObjectList.TryGetValue(sceneID, out sceneObjects))
+            if (!m_parameterObjectList.TryGetValue(sceneID, out var sceneObjects))
             {
-                sceneObjects = new Dictionary<short, ParameterObject>();
+                sceneObjects = new SortedList<short, ParameterObject>();
                 m_parameterObjectList.Add(sceneID, sceneObjects);
             }
 
-            // check ParameterObject
-            if (!sceneObjects.TryAdd(poID, parameterObject))
-                Helpers.Log("Parameter object List in scene ID: " + sceneID.ToString() + " already contains the Parameter Object.", Helpers.logMsgType.WARNING);
+            if (sceneObjects.ContainsKey(poID))
+            {
+                Helpers.Log($"Parameter object List in scene ID: {sceneID} already contains the Parameter Object.", Helpers.logMsgType.WARNING);
+                return;
+            }
 
-            //Helpers.Log("Parameter Objects in Database: " + m_parameterObjectList[sceneID].Count());
+            sceneObjects.Add(poID, parameterObject);
         }
 
         public void removeParameterObject(ParameterObject parameterObject)
         {
             byte sceneID = parameterObject._sceneID;
             short poID = parameterObject._id;
-            Dictionary<short, ParameterObject> sceneObjects;
 
-            // check scene
-            if (!m_parameterObjectList.TryGetValue(sceneID, out sceneObjects))
+            if (!m_parameterObjectList.TryGetValue(sceneID, out SortedList<short, ParameterObject> sceneObjects))
             {
-                Helpers.Log("Deletion of parameterObject (Scene: " + sceneID + ") not possible, object cannot be found in Dictionary!", Helpers.logMsgType.WARNING);
+                Helpers.Log($"Deletion of parameterObject (Scene: {sceneID}) not possible, object cannot be found in Dictionary!", Helpers.logMsgType.WARNING);
+                return;
             }
-            // check ParameterObject
-            else if (!sceneObjects.Remove(poID))
-                Helpers.Log("Deletion of parameterObject (ID: " + poID + ") not possible, object cannot be found in Dictionary!", Helpers.logMsgType.WARNING);
+
+            if (!sceneObjects.Remove(poID))
+                Helpers.Log($"Deletion of parameterObject (ID: {poID}) not possible, object cannot be found in Dictionary!", Helpers.logMsgType.WARNING);
         }
 
         //!
@@ -450,16 +454,14 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ParameterObject getParameterObject(byte sceneID, short poID)
         {
-            if (poID < 1 || sceneID < 0)
+            if (poID < 1)
                 return null;
-            else
-            {
-                Dictionary<short, ParameterObject> sceneObjects;
-                if (m_parameterObjectList.TryGetValue(sceneID, out sceneObjects))
-                    return sceneObjects[poID];
-                else
-                    return null;
-            }
+
+            if (m_parameterObjectList.TryGetValue(sceneID, out SortedList<short, ParameterObject> sceneObjects))
+                if (sceneObjects.TryGetValue(poID, out var parameterObject))
+                    return parameterObject;
+
+            return null;
         }
 
         //!
@@ -469,45 +471,42 @@ namespace tracer
         //!
         public List<ParameterObject> getAllParameterObjects()
         {
-            List<ParameterObject> returnvalue = new List<ParameterObject>();
+            int totalCount = 0;
+            foreach (var dict in m_parameterObjectList.Values)
+                totalCount += dict.Count;
 
-            foreach (Dictionary<short, ParameterObject> dict in m_parameterObjectList.Values)
-            {
+            List<ParameterObject> returnvalue = new List<ParameterObject>(totalCount);
+
+            foreach (SortedList<short, ParameterObject> dict in m_parameterObjectList.Values)
                 foreach (ParameterObject parameterObject in dict.Values)
-                {
                     returnvalue.Add(parameterObject);
-                }
-            }
+
             return returnvalue;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public short getNextFreeID(byte sceneID)
         {
-            Dictionary<short, ParameterObject> sceneObjects;
-            short nextFreeID = 0;
-            // check scene
-            if (!m_parameterObjectList.TryGetValue(sceneID, out sceneObjects))
+            if (!m_parameterObjectList.TryGetValue(sceneID, out SortedList<short, ParameterObject> sceneObjects) || sceneObjects.Count == 0)
+                return 0; 
+
+            short highestID = sceneObjects.Keys[sceneObjects.Count - 1];
+
+            if (highestID == sceneObjects.Count - 1)
             {
-                foreach (var id in sceneObjects)
+                if (highestID == short.MaxValue)
                 {
-                    if (id.Key > nextFreeID)
-                        return nextFreeID;
-
-                    if (id.Key == nextFreeID)
-                    {
-                        if (nextFreeID == short.MaxValue)
-                            Helpers.Log("No free ID's available!", Helpers.logMsgType.ERROR);
-
-                        nextFreeID++;
-                    }
+                    Helpers.Log("No free ID's available!", Helpers.logMsgType.ERROR);
+                    return 0;
                 }
-            }
-            else
-            {
-                return 0;
+                return (short)(highestID + 1);
             }
 
-                return nextFreeID;
+            for (int i = 0; i < sceneObjects.Count; i++)
+                if (sceneObjects.Keys[i] != i)
+                    return (short) i; 
+
+            return 0;
         }
     }
 }

@@ -28,12 +28,14 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 19.06.2024
 
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System;
-using System.Threading;
 using NetMQ;
 using NetMQ.Sockets;
+using System;
+using System.Buffers;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using UnityEngine;
 
 namespace tracer
@@ -46,7 +48,7 @@ namespace tracer
         //!
         //! List of medified parameters for undo/redo handling.
         //!
-        private List<AbstractParameter> m_modifiedParameters;
+        private HashSet<AbstractParameter> m_modifiedParameters;
 
         //!
         //! The size of all currently modified parameters in byte;
@@ -114,7 +116,7 @@ namespace tracer
         //! 
         protected override void Init(object sender, EventArgs e)
         {
-            m_modifiedParameters = new List<AbstractParameter>();
+            m_modifiedParameters = new HashSet<AbstractParameter>();
             m_controlMessages = new NetMQMessage(3);
             m_parameterMessages = new NetMQMessage(6);
 
@@ -146,7 +148,7 @@ namespace tracer
                 sceneObject.hasChanged += queueModifiedParameter;
             }
             
-            foreach (DynamicParameterObject dynamicParameterObject in ((SceneManager)sender).getAllDynamicParameterObjects())
+            foreach (DynamicParameterObject dynamicParameterObject in ((SceneManager)sender).getAllSceneObjects<DynamicParameterObject>())
             {
                 dynamicParameterObject.hasChanged += queueModifiedParameter;
             }
@@ -362,30 +364,28 @@ namespace tracer
         //! @param parameter The modified parameter.
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void queueModifiedParameter(object sender, AbstractParameter parameter)
+        private void queueModifiedParameter(object sender, ParameterObject.ChangedArgs e)
         {
             lock (m_lock)
             {
-                if (parameter._isRPC)
-                {
-                    if (!parameter._networkLock)
-                        queueRPCMessage(sender, parameter);
-                    return;
-                }
+                // Pre-allocate memory inside the HashSet to avoid resizing overhead
+                m_modifiedParameters.EnsureCapacity(m_modifiedParameters.Count + e.Parameters.Count);
 
-                int paramInList = m_modifiedParameters.FindIndex(p => p == parameter);
-                if (parameter._networkLock)
+                foreach (var parameter in e.Parameters)
                 {
-                    if (paramInList > -1)
+                    if (parameter._isRPC)
                     {
-                        m_modifiedParameters.RemoveAt(paramInList);
-                        m_modifiedParametersDataSize -= parameter.dataSize();
+                        if (!parameter._networkLock)
+                            queueRPCMessage(sender, parameter);
+                        return;
                     }
-                }
-                else if (paramInList == -1)
-                {
-                    m_modifiedParameters.Add(parameter);
-                    m_modifiedParametersDataSize += parameter.dataSize();
+
+                    // HashSet.Add() checks for duplicates and inserts the element in a single O(1) step.
+                    // It returns 'true' only if the parameter was not already present in the active set.
+                    if (m_modifiedParameters.Add(parameter))
+                    {
+                        m_modifiedParametersDataSize += parameter.dataSize();
+                    }
                 }
             }
         }
@@ -398,16 +398,17 @@ namespace tracer
         //! @param addToHistory should this update be added to undo/redo history
         //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private byte[] createParameterMessage()
+        private ArraySegment<byte> createParameterMessage()
         {
             // Message structure: Header, Parameter List (optional)
             // Header: ClientID, Time, MessageType
             // ParameterList: List<SceneObjectID, ParameterID, ParameterType, Parameter message length, ParameterData>
 
-            byte[] message = new byte[3 + m_modifiedParametersDataSize + 10 * m_modifiedParameters.Count];
-            Span<byte> msgSpan = new Span<byte>(message);
+            int totalLength = 3 + m_modifiedParametersDataSize + 10 * m_modifiedParameters.Count;
+            byte[] rentedArray = ArrayPool<byte>.Shared.Rent(totalLength);
+            Span<byte> msgSpan = new Span<byte>(rentedArray, 0, totalLength);
 
-            // header
+                                                            // header
                                                             // name, (size in bytes)
             msgSpan[0] = manager.cID;                       // ClientID (1)
             msgSpan[1] = core.time;                         // Time (1)
@@ -415,9 +416,8 @@ namespace tracer
 
             //list of parameters
             int start = 3;
-            for (int i = 0; i < m_modifiedParameters.Count; i++)
+            foreach (AbstractParameter parameter in m_modifiedParameters)
             {
-                AbstractParameter parameter = m_modifiedParameters[i];
                 int length = 10 + parameter.dataSize();
                 Span<byte> newSpan = msgSpan.Slice(start, length);
 
@@ -425,13 +425,13 @@ namespace tracer
                 BitConverter.TryWriteBytes(newSpan.Slice(1, 2), parameter._parent._id); // SceneObjectID (2)
                 BitConverter.TryWriteBytes(newSpan.Slice(3, 2), parameter._id);         // ParameterID (2)
                 newSpan[5] = (byte)parameter.tracerType;                                // ParameterType (1)
-                BitConverter.TryWriteBytes(newSpan.Slice(6, 4), newSpan.Length);        // Parameter message length (4)
+                BitConverter.TryWriteBytes(newSpan.Slice(6, 4), length);                // Parameter message length (4)
                 parameter.Serialize(newSpan.Slice(10));                                 // Parameter data (parameter._datasize)
 
                 start += length;
             }
 
-            return message;
+            return new ArraySegment<byte>(rentedArray, 0, totalLength);
         }
 
         //!
@@ -449,8 +449,14 @@ namespace tracer
             int i = 0;
             m_socket = sender;
 
-            sender.Connect("tcp://" + m_ip + ":" + m_port);
-            Helpers.Log("Update sender connected: " + "tcp://" + m_ip + ":" + m_port);
+            string connectionString = $"tcp://{m_ip}:{m_port}";
+            sender.Connect(connectionString);
+            Helpers.Log($"Update sender connected: {connectionString}");
+
+            // local buffers for sending outside of lock
+            NetMQMessage controlToMessageSend = new NetMQMessage();
+            NetMQMessage parametersToMessageSend = new NetMQMessage();
+
             while (m_isRunning)
             {
                 m_mre.WaitOne();
@@ -458,14 +464,14 @@ namespace tracer
                 {
                     // send controm messages
                     if (!m_controlMessages.IsEmpty)
-                    {
-                        try { sender.SendMultipartMessage(m_controlMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:controlMsg:SendFrame</color> " + e.ToString()); } // true not wait 
-                        m_controlMessages.Clear();
-                    }
+                        while (m_controlMessages.FrameCount > 0)
+                            controlToMessageSend.Append(m_controlMessages.Pop());
                     // add parameter message to message buffer
                     if (m_modifiedParameters.Count > 0)
                     {
-                        m_parameterMessages.Append(createParameterMessage());
+                        ArraySegment<byte> messageSegment = createParameterMessage();
+                        try { m_parameterMessages.Append(new NetMQFrame(messageSegment.Array, messageSegment.Count)); }
+                        finally { ArrayPool<byte>.Shared.Return(messageSegment.Array, clearArray: false); }
                         m_modifiedParameters.Clear();
                         m_modifiedParametersDataSize = 0;
                     }
@@ -473,11 +479,27 @@ namespace tracer
                     int frameCount = m_parameterMessages.FrameCount;
                     if (frameCount > packageSize || (i++ > packageSize && frameCount > 0))
                     {
-                        try { sender.SendMultipartMessage(m_parameterMessages); } catch (Exception e) { Debug.Log("<color=red> ERROR:modifiedParameter:SendFrame</color> " + e.ToString()); } // true not wait
-                        m_parameterMessages.Clear();
+                        while (m_parameterMessages.FrameCount > 0)
+                            parametersToMessageSend.Append(m_parameterMessages.Pop());
                         i = 0;
                     }
                 }
+
+                // send messages (outside lock)
+                if (controlToMessageSend.FrameCount > 0)
+                {
+                    try { sender.SendMultipartMessage(controlToMessageSend); }
+                    catch (Exception e) { Debug.Log("<color=red> ERROR:controlMsg:SendFrame</color> " + e.ToString()); }
+                    controlToMessageSend.Clear();
+                }
+
+                if (parametersToMessageSend.FrameCount > 0)
+                {
+                    try { sender.SendMultipartMessage(parametersToMessageSend); }
+                    catch (Exception e) { Debug.Log("<color=red> ERROR:modifiedParameter:SendFrame</color> " + e.ToString()); }
+                    parametersToMessageSend.Clear();
+                }
+
                 // reset to stop the thread after one loop is done
                 m_mre.Reset();
                 Thread.Yield();

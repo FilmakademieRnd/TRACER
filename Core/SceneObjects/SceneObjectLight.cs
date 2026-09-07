@@ -110,7 +110,7 @@ namespace tracer
         private void updateColor(object sender, Color a)
         {
             _light.color = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -121,7 +121,7 @@ namespace tracer
         private void updateIntensity(object sender, float a)
         {
             _light.intensity = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!

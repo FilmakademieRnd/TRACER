@@ -32,6 +32,10 @@ using NetMQ;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+#if UNITY_STANDALONE_WIN
+using System.Net.NetworkInformation;
+using System.Net;
+#endif
 
 namespace tracer
 {

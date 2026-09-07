@@ -626,14 +626,15 @@ namespace tracer
 
                 menu = menu.Begin(MenuItem.IType.HSPLIT);  // <<< start HSPLIT
 
-                if ((o.GetType().BaseType == typeof(AbstractParameter) ||
+                if ((o.GetType().BaseType.BaseType == typeof(AbstractParameter) ||
+                     o.GetType() == typeof(ClassParameter<string>) ||
                       o.GetType() == typeof(ListParameter)) &&
                      (a != null))
                 {
                     menu = menu.Add(info.Name);
                     menu = menu.Add((AbstractParameter)info.GetValue(settings));
                 }
-                else if (info.GetValue(settings).GetType().BaseType != typeof(AbstractParameter))
+                else if (info.GetValue(settings).GetType().BaseType != typeof(AbstractParameter) )
                 {
                     menu = menu.Add(info.Name);
                     menu = menu.Add(info.GetValue(settings).ToString());

@@ -60,29 +60,34 @@ namespace tracer
         //!
         //! The name of this parameter object.
         //!
-        public ref string objectName
+        public string objectName
         {
-            get => ref _name;
+            get => _name;
+            set => _name = value;
         }
+        protected readonly HashSet<AbstractParameter> _dirtyParameters = new HashSet<AbstractParameter>();
+        protected bool _isDirty = false;
         //!
         //! A reference to the tracer _core.
         //!
         static public Core _core { get; protected set; } = null;
+        public class ChangedArgs : EventArgs
+        {
+            public HashSet<AbstractParameter> Parameters { get; internal set; }
+        }
+        protected readonly ChangedArgs _cachedArgs = new ChangedArgs();
         //!
         //! Event emitted when parameter changed.
         //!
-        public event EventHandler<AbstractParameter> hasChanged;
+        public event EventHandler<ChangedArgs> hasChanged;
         //!
         //! List storing all parameters of this SceneObject.
         //!
-        protected List<AbstractParameter> _parameterList;
+        internal List<AbstractParameter> _parameterList;
         //!
         //! Getter for parameter list
         //!
-        public ref List<AbstractParameter> parameterList
-        {
-            get => ref _parameterList;
-        }
+        public IReadOnlyList<AbstractParameter> parameterList => _parameterList;
         //!
         //! Function that emits the parameter objects hasChanged event. (Used for parameter updates)
         //!
@@ -91,8 +96,11 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected virtual void emitHasChanged(AbstractParameter parameter)
         {
-            if (parameter._distribute)
-                hasChanged?.Invoke(this, parameter);
+            if (!parameter._distribute)
+                return;
+
+            if (_dirtyParameters.Add(parameter))
+                _isDirty = true;
         }
         //!
         //! Function that searches and returns a parameter of this parameter object based on a given name.
@@ -101,7 +109,15 @@ namespace tracer
         //!
         public Parameter<T> getParameter<T>(string name) where T : struct
         {
-            return (Parameter<T>)_parameterList.Find(parameter => parameter.name == name);
+            for (int i = 0; i < _parameterList.Count; i++)
+            {
+                var parameter = _parameterList[i];
+
+                if (string.Equals(parameter.name, name, StringComparison.Ordinal))
+                    return parameter as Parameter<T>;
+            }
+
+            return null;
         }
         //!
         //! Factory to create a new ParameterObject and do it's initialisation.
@@ -139,12 +155,28 @@ namespace tracer
             _id = s_id++;
             //Debug.Log("Create parameter object " + name + " ID:" + _id + " SID:" + _sceneID);
             _parameterList = new List<AbstractParameter>();
+            _dirtyParameters.EnsureCapacity(_parameterList.Count);
 
             _core.addParameterObject(this);
         }
         public List<AbstractParameter> getParametersByRole(UIManager.Roles role)
         {
-            return parameterList.FindAll(p => p._role >= role);
+            return _parameterList.FindAll(p => p._role >= role);
+        }
+
+        //!
+        //! Late update function, called after Unity's scene render is finished.
+        //!
+        private void LateUpdate()
+        {
+            if (!_isDirty) return;
+
+            _cachedArgs.Parameters = _dirtyParameters;
+            hasChanged?.Invoke(this, _cachedArgs); // Direktes Senden!
+            _cachedArgs.Parameters = null;
+
+            _dirtyParameters.Clear();
+            _isDirty = false;
         }
     }
 }

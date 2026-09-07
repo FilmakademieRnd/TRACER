@@ -32,7 +32,6 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace tracer
 {
@@ -138,20 +137,40 @@ namespace tracer
             if (!_isAnimated)
                 InitAnimation();
 
-            int i = findNextKeyIndex(key);
-            if (i == -1)
+            int exactIndex = -1;
+            int low = 0;
+            int high = _keyList.Count - 1;
+
+            while (low <= high)
             {
-                i = _keyList.FindIndex(i => i.time == key.time);
-                if (i > -1)
-                    ((Key<T>)_keyList[i]).value = key.value;
-                else
+                int mid = low + ((high - low) >> 1);
+                if (_keyList[mid].time == key.time)
                 {
-                    _keyList.Add(key);
+                    exactIndex = mid;
+                    break;
                 }
+                if (_keyList[mid].time < key.time)
+                    low = mid + 1;
+                else
+                    high = mid - 1;
+            }
+
+            // If the time already exists, overwrite the value. 
+            if (exactIndex != -1)
+            {
+                if (_keyList[exactIndex] is Key<T> existingKey)
+                    existingKey.value = key.value;
             }
             else
             {
-                _keyList.Insert(i, key);
+                // If it's a new time, find the correct sorted insertion index
+                int insertIndex = findNextKeyIndex(key.time);
+
+                if (insertIndex == -1)
+                    _keyList.Add(key);
+                else
+                    // Insert at the correct positions to keep the list sorted
+                    _keyList.Insert(insertIndex, key);
             }
 
             InvokeHasChanged();
@@ -164,17 +183,22 @@ namespace tracer
         //!
         public void removeKey(Key<T> key)
         {
-            if (_isAnimated)
-            {
-                _keyList.Remove(key);
+            if (!_isAnimated)
+                return;
 
+            if (_keyList.Remove(key))
+            {
                 if (_keyList.Count == 0)
                 {
+                    // Unsubscribe immediately to prevent memory leaks
                     _animationManager.animationUpdate -= updateParameterValue;
                     _isAnimated = false;
                 }
+
+                // Reset tracking indices since the list structure changed
                 _prevIdx = 0;
                 _nextIdx = 0;
+
                 InvokeHasChanged();
             }
         }
@@ -186,26 +210,29 @@ namespace tracer
         //!
         public void removeKeyAtIndex(int index)
         {
-            if (_isAnimated)
-            {
-                _keyList.RemoveAt(index);
+            if (!_isAnimated || index < 0 || index >= _keyList.Count)
+                return;
 
-                if (_keyList.Count == 0)
-                {
-                    _animationManager.animationUpdate -= updateParameterValue;
-                    _isAnimated = false;
-                }
-                _prevIdx = 0;
-                _nextIdx = 0;
-                InvokeHasChanged();
+            _keyList.RemoveAt(index);
+
+            if (_keyList.Count == 0)
+            {
+                _animationManager.animationUpdate -= updateParameterValue;
+                _isAnimated = false;
             }
+
+            _prevIdx = 0;
+            _nextIdx = 0;
+
+            InvokeHasChanged();
         }
 
         //!
         //! Create and insert a new key element to the parameters key list, 
         //! based on the current parameter value and Animation Manager time.
         //!
-        public void setKey(){
+        public void setKey()
+        {
             if (!_isAnimated)
                 InitAnimation();
 
@@ -219,7 +246,8 @@ namespace tracer
         //! @param time The time at which the new key is to be added.
         //! @param value The the value for the new keyframe to be added.
         //!
-        public void setKey(Key<T> key){
+        public void setKey(Key<T> key)
+        {
             addKey(key);
         }
 
@@ -229,7 +257,11 @@ namespace tracer
         //! @ param index The index of the key for which the value is to be changed.
         //!
         public void updateKey(int index){
-            ((Key<T>)_keyList[index]).value = _value;
+            if (index < 0 || index >= _keyList.Count)
+                return;
+
+            if (_keyList[index] is Key<T> key)
+                key.value = _value;
         }
 
         //!
@@ -255,7 +287,7 @@ namespace tracer
         //!
         public void setKeyValue(AbstractKey key, T value)
         {
-            ((Key<T>)key).value = value;
+            (key as Key<T>).value = value;
         }
 
         //!
@@ -266,7 +298,7 @@ namespace tracer
         //!
         public void setKeyValue (int index, T value)
         {
-            ((Key<T>)_keyList[index]).value = value;
+            (_keyList[index] as Key<T>).value = value;
         }
 
         //!
@@ -278,7 +310,16 @@ namespace tracer
         //!
         public void setKeyTime(AbstractKey key, float time)
         {
-            setKeyTime(_keyList.IndexOf(key), time);
+            if (key == null || !_keyList.Contains(key))
+                return;
+
+            // We remove the key, update its time, and let addKey handle the sorted re-insertion.
+            _keyList.Remove(key);
+            key.time = time;
+
+            // Convert to the generic type safely via pattern matching
+            if (key is Key<T> genericKey)
+                addKey(genericKey);
         }
 
         //!
@@ -289,42 +330,14 @@ namespace tracer
         //! @ param time The time the geven key shall be moved to.
         //!
         public void setKeyTime(int index, float time){
-            //Debug.Log("setKeyTime at index "+index);
-            if(index < 0 || index >= _keyList.Count){
-                Debug.LogWarning("setKeyTime::index ("+index+") of _keyList would be out of bounds.");
+            if (index < 0 || index >= _keyList.Count)
+            {
+                Debug.LogWarning($"setKeyTime::index ({index}) of _keyList would be out of bounds.");
                 return;
             }
-            Key<T> key = (Key<T>)_keyList[index];
-            int count = _keyList.Count;
-            key.time = time;
 
-            if (count < 2)
-                return;
-
-            if (index > 0 && index < count - 1)
-            {
-                if (time < _keyList[index - 1].time || time > _keyList[index + 1].time)
-                {
-                    _keyList.Remove(key);
-                    addKey(key);
-                }
-            }
-            else if (index == 0)
-            {
-                if (time > _keyList[index + 1].time)
-                {
-                    _keyList.Remove(key);
-                    addKey(key);
-                }
-            }
-            else if (index == count-1)
-            {
-                if (time < _keyList[index - 1].time)
-                {
-                    _keyList.Remove(key);
-                    addKey(key);
-                }
-            }
+            // Forward to the object-based method
+            setKeyTime(_keyList[index], time);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -366,31 +379,39 @@ namespace tracer
         //!
         private void updateParameterValue(object o, float time)
         {
-            if (((SceneObject)_parent)._lock || !_isAnimated)
+            // OPTIMIZATION: Avoid casting _parent every frame. 
+            // Ideally, cache 'SceneObject parentSceneObject' once in Start/Init instead of doing this cast!
+            if (!(_parent is SceneObject parentSceneObject) || parentSceneObject._lock || !_isAnimated)
                 return;
 
-            
-            if (_keyList.Count > 1)
+            int count = _keyList.Count;
+
+            if (count > 1)
             {
-                if (_keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
+                if (_prevIdx < count && _nextIdx < count && _keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
+                {
                     value = interpolateLinear(time);
+                }
                 else
                 {
-                    // current time is NOT in between the two active keys
+                    // Current time is NOT in between the two active keys
                     int i = findNextKeyIndex(time);
-                    // current time is bigger than all keys in list
+
+                    // Current time is bigger than all keys in list
                     if (i == -1)
                     {
-                        _prevIdx = _keyList.Count - 1;
-                        value = ((Key<T>)_keyList[_prevIdx]).value; //still update animation to the last key's value
+                        _prevIdx = count - 1;
+                        if (_keyList[_prevIdx] is Key<T> lastKey)
+                            value = lastKey.value; // Still update animation to the last key's value
                     }
-                    // current time is smaller than all keys in list
+                    // Current time is smaller than all keys in list
                     else if (i == 0)
                     {
                         _nextIdx = 0;
-                        value = ((Key<T>)_keyList[_nextIdx]).value; //still update animation to the first key's value
+                        if (_keyList[0] is Key<T> firstKey)
+                            value = firstKey.value; // Still update animation to the first key's value
                     }
-                    // current time is somewhere between all keys in list
+                    // Current time is somewhere between all keys in list
                     else
                     {
                         _nextIdx = i;
@@ -399,12 +420,14 @@ namespace tracer
                     }
                 }
             }
-            else 
+            else
             {
-                _nextIdx = _prevIdx = 0;
-                if (_keyList.Count == 1)    //still update animation to the left key's value
-                    value = ((Key<T>)_keyList[_prevIdx]).value;
-                
+                _nextIdx = 0;
+                _prevIdx = 0;
+
+                // Still update animation to the single key's value
+                if (count == 1 && _keyList[0] is Key<T> singleKey)
+                    value = singleKey.value;
             }
         }
 
@@ -418,7 +441,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int findNextKeyIndex(Key<T> key)
         {
-            return _keyList.FindIndex(i => i.time > key.time);
+            return findNextKeyIndex(key.time);
         }
 
         //!
@@ -430,7 +453,25 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int findNextKeyIndex(float time)
         {
-            return _keyList.FindIndex(i => i.time >= time);
+            int low = 0;
+            int high = _keyList.Count - 1;
+            int result = -1;
+
+            // Binary search algorithm: O(log N) runtime instead of O(N) linear scan
+            while (low <= high)
+            {
+                int mid = low + ((high - low) >> 1);
+                if (_keyList[mid].time > time)
+                {
+                    result = mid; // Potential candidate found, look further left
+                    high = mid - 1;
+                }
+                else
+                {
+                    low = mid + 1; // Look in the right half
+                }
+            }
+            return result;
         }
 
         //!
@@ -443,29 +484,60 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private T interpolateLinear(float time)
         {
-            float pt = _keyList[_prevIdx].time;
-            float nt = _keyList[_nextIdx].time;
-            T pv = ((Key<T>)_keyList[_prevIdx]).value;
-            T nv = ((Key<T>)_keyList[_nextIdx]).value;
+            // Cache list lookups to avoid redundant array indexing
+            var prevKey = _keyList[_prevIdx];
+            var nextKey = _keyList[_nextIdx];
 
-            if (nt == pt)
+            float prevTime = prevKey.time;
+            float nextTime = nextKey.time;
+
+            if (!(prevKey is Key<T> prevGenericKey) || !(nextKey is Key<T> nextGenericKey))
+                return default;
+
+            T pv = prevGenericKey.value;
+            T nv = nextGenericKey.value;
+
+            if (nextTime == prevTime)
                 return nv;
 
-            float inBetween = (time - pt) / (nt - pt);
+            float inBetween = (time - prevTime) / (nextTime - prevTime);
 
             switch (_type)
             {
                 case ParameterType.FLOAT:
-                    return (T)(object)((float)(object)pv * (1.0f - inBetween) + (float)(object)nv * inBetween);
+                    if (pv is float fPv && nv is float fNv)
+                    {
+                        float fResult = fPv * (1.0f - inBetween) + fNv * inBetween;
+                        return (T)(object)fResult;
+                    }
+                    break;
+
                 case ParameterType.VECTOR3:
-                    return (T)(object)((Vector3)(object)pv * (1.0f - inBetween) + (Vector3)(object)nv * inBetween);
+                    if (pv is Vector3 vPv && nv is Vector3 vNv)
+                    {
+                        Vector3 vResult = vPv * (1.0f - inBetween) + vNv * inBetween;
+                        return (T)(object)vResult;
+                    }
+                    break;
+
                 case ParameterType.QUATERNION:
-                    return (T)(object)Quaternion.Slerp((Quaternion)(object)pv, (Quaternion)(object)nv, inBetween);
+                    if (pv is Quaternion qPv && nv is Quaternion qNv)
+                    {
+                        Quaternion qResult = Quaternion.SlerpUnclamped(qPv, qNv, inBetween);
+                        return (T)(object)qResult;
+                    }
+                    break;
+
                 case ParameterType.COLOR:
-                    return (T)(object)Color.Lerp((Color)(object)pv, (Color)(object)nv, inBetween);
-                default:
-                    return default(T);
+                    if (pv is Color cPv && nv is Color cNv)
+                    {
+                        Color cResult = Color.LerpUnclamped(cPv, cNv, inBetween);
+                        return (T)(object)cResult;
+                    }
+                    break;
             }
+
+            return default;
         }
     }
 

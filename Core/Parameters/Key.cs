@@ -35,7 +35,7 @@ namespace tracer
         //!
         //! The key's time and tangent time.
         //!
-        public float time, tangentTime1, tangentTime2;
+        public float time, inTangent, outTangent;
         //!
         //! Enumeration for the different interpolation types
         //!
@@ -56,14 +56,14 @@ namespace tracer
         //! The key's value.
         //!
         public T value { get;  internal set; }
-        //!
-        //! The key's tangent value 1.
-        //!
-        public T tangentValue1 { get; internal set; }
-        //!
-        //! The key's tangent value 2.
-        //!
-        public T tangentValue2 { get; internal set; }
+        ////!
+        ////! The key's tangent value 1.
+        ////!
+        //public T tangentValue1 { get; internal set; }
+        ////!
+        ////! The key's tangent value 2.
+        ////!
+        //public T tangentValue2 { get; internal set; }
 
         //!
         //! The Key's default constructor
@@ -73,10 +73,8 @@ namespace tracer
             time = 0;
             value = default(T);
             interpolation = InterplolationTypes.LINEAR;
-            tangentTime1 = 0;
-            tangentTime2 = 0;
-            tangentValue1 = default(T);
-            tangentValue2 = default(T);
+            inTangent = 0;
+            outTangent = 0;
         }
 
         public override string getValueString()
@@ -87,15 +85,13 @@ namespace tracer
         //!
         //! The Key's constructor for generic types.
         //!
-        public Key(float time, T value, float tangentTime1 = 0, T tangentValue1 = default(T), float tangentTime2 = 0, T tangentValue2 = default(T), InterplolationTypes interpolation = InterplolationTypes.LINEAR)
+        public Key(float time, T value, float tangentIn = 0, float tangentOut = 0, InterplolationTypes interpolation = InterplolationTypes.LINEAR)
         {
             this.time = time;
             this.interpolation = interpolation;
             this.value = value;
-            this.tangentTime1 = tangentTime1;
-            this.tangentTime2 = tangentTime2;
-            this.tangentValue1 = tangentValue1;
-            this.tangentValue2 = tangentValue2;
+            this.inTangent = tangentIn;
+            this.outTangent = tangentOut;
         }
 
         //!
@@ -106,10 +102,10 @@ namespace tracer
             this.time = time;
             this.value = value;
             this.interpolation = InterplolationTypes.LINEAR;
-            this.tangentTime1 = 0;
-            this.tangentTime2 = 0;
-            this.tangentValue1 = default(T);
-            this.tangentValue2 = default(T);
+            this.inTangent = 0;
+            this.outTangent = 0;
+            //this.tangentValue1 = default(T);
+            //this.tangentValue2 = default(T);
         }
     }
 }

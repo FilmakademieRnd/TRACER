@@ -66,6 +66,11 @@ namespace tracer
         }
 
         //!
+        //! The current active camera.
+        //!
+        public Camera mainCamera = Camera.main;
+
+        //!
         //! Cast for accessing the settings variable with the correct type.
         //!
         public SceneManagerSettings settings { get => (SceneManagerSettings)_settings; }
@@ -84,18 +89,10 @@ namespace tracer
         //!
         public List<SceneObject> getAllSceneObjects()
         {
-            List<SceneObject> returnvalue = new List<SceneObject>();
-
-            foreach (Dictionary<short, ParameterObject> dict in core.parameterObjectList.Values)
-            {
-                foreach (ParameterObject parameterObject in dict.Values)
-                {
-                    SceneObject sceneObject = parameterObject as SceneObject;
-                    if (sceneObject)
-                        returnvalue.Add((SceneObject) parameterObject);
-                }
-            }
-            return returnvalue;
+            return core.parameterObjectList.Values
+             .SelectMany(dict => dict.Values)
+             .OfType<SceneObject>()
+             .ToList();
         }
 
         //!
@@ -103,20 +100,12 @@ namespace tracer
         //!
         //! @return The list containing all scene objects.
         //!
-        public List<T> getAllSceneObjects<T>() where T : SceneObject 
+        public List<T> getAllSceneObjects<T>() where T : ParameterObject 
         {
-            List<T> returnvalue = new List<T>();
-
-            foreach (Dictionary<short, ParameterObject> dict in core.parameterObjectList.Values)
-            {
-                foreach (ParameterObject parameterObject in dict.Values)
-                {
-                    T sceneObject = parameterObject as T;
-                    if (sceneObject)
-                        returnvalue.Add((T)parameterObject);
-                }
-            }
-            return returnvalue;
+            return core.parameterObjectList.Values
+                .SelectMany(dict => dict.Values)
+                .OfType<T>()
+                .ToList();
         }
 
         //!
@@ -128,35 +117,15 @@ namespace tracer
         //!
         public List<SceneObject> getAllSceneObjectsFromScene(byte sceneID)
         {
-            List<SceneObject> returnvalue = new List<SceneObject>();
+            if (!core.parameterObjectList.TryGetValue(sceneID, out var dict))
+                return new List<SceneObject>(); 
 
-            foreach (ParameterObject parameterObject in core.parameterObjectList[sceneID].Values)
-            {
-                SceneObject sceneObject = parameterObject as SceneObject;
-                if (sceneObject)
-                    returnvalue.Add((SceneObject)parameterObject);
-            }
-            return returnvalue;
-        }
+            List<SceneObject> returnvalue = new List<SceneObject>(dict.Count);
 
-        //!
-        //! Function that returns a list containing all Dynamic Parameter Objects.
-        //!
-        //! @return The list containing all Dynamic Parameter Objects.
-        //!
-        public List<DynamicParameterObject> getAllDynamicParameterObjects()
-        {
-            List<DynamicParameterObject> returnvalue = new List<DynamicParameterObject>();
-
-            foreach (Dictionary<short, ParameterObject> dict in core.parameterObjectList.Values)
-            {
-                foreach (ParameterObject parameterObject in dict.Values)
-                {
-                    DynamicParameterObject sceneObject = parameterObject as DynamicParameterObject;
-                    if (sceneObject)
-                        returnvalue.Add((DynamicParameterObject) parameterObject);
-                }
-            }
+            foreach (ParameterObject parameterObject in dict.Values)
+                if (parameterObject is SceneObject sceneObject)
+                    returnvalue.Add(sceneObject);
+            
             return returnvalue;
         }
 
@@ -167,23 +136,15 @@ namespace tracer
         //!
         public List<SceneObject> getAllAnimatedSceneObjects()
         {
-            List<SceneObject> returnvalue = new List<SceneObject>();
+            int maxCapacity = core.parameterObjectList.Values.Sum(d => d.Count);
+            List<SceneObject> returnvalue = new List<SceneObject>(maxCapacity);
 
-            foreach (Dictionary<short, ParameterObject> dict in core.parameterObjectList.Values)
-            {
-                foreach (ParameterObject parameterObject in dict.Values)
-                {
-                    SceneObject sceneObject = parameterObject as SceneObject;
-                    if (sceneObject){
-                        foreach(AbstractParameter apara in sceneObject.parameterList){
-                            if(apara._isAnimated){
-                                returnvalue.Add((SceneObject) parameterObject);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            foreach (var dict in core.parameterObjectList.Values)
+                foreach (var parameterObject in dict.Values)
+                    if (parameterObject is SceneObject sceneObject)
+                        if (sceneObject.parameterList.Any(apara => apara._isAnimated))
+                            returnvalue.Add(sceneObject);
+           
             return returnvalue;
         }
         
@@ -385,7 +346,7 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public SceneObject getSceneObject(byte sceneID, short poID)
         {
-            return (SceneObject) core.getParameterObject(sceneID, poID);
+            return core.getParameterObject(sceneID, poID) as SceneObject;
         }
 
         //!
@@ -397,14 +358,15 @@ namespace tracer
             if (m_scnRoot != null)
             {
                 Transform rootTransform = m_scnRoot.transform;
-                for (int i=0; i< rootTransform.childCount; i++)
+                for (int i = rootTransform.childCount - 1; i >= 0; i--)
                     GameObject.Destroy(rootTransform.GetChild(i).gameObject);
             }
 
             // remove all Tracer SceneObjects
-            List<SceneObject> sceneObjectList = getAllSceneObjects();
-            foreach (SceneObject sceneObject in sceneObjectList)
-                core.removeParameterObject(sceneObject);
+            foreach (SortedList<short, ParameterObject> sceneObjects in core.parameterObjectList.Values)
+                for (int i = sceneObjects.Count - 1; i >= 0; i--)
+                    if (sceneObjects.Values[i] is SceneObject sceneObject)
+                        core.removeParameterObject(sceneObject);
 
             m_sceneCameraList.Clear();
             m_sceneLightList.Clear();
@@ -424,24 +386,30 @@ namespace tracer
             if (m_scnRoot != null)
             {
                 Transform rootTransform = m_scnRoot.transform;
-                for (int i = 0; i < rootTransform.childCount; i++)
+                // Iterate BACKWARDS because childCount changes live when objects are destroyed
+                for (int i = rootTransform.childCount - 1; i >= 0; i--)
                     GameObject.Destroy(rootTransform.GetChild(i).gameObject);
             }
 
             // remove all Tracer SceneObjects
-            List<SceneObject> sceneObjectList = getAllSceneObjectsFromScene(sceneID);
-            foreach (SceneObject sceneObject in sceneObjectList)
+            if (core.parameterObjectList.TryGetValue(sceneID, out var sceneObjects))
             {
-                GameObject go = sceneObject.gameObject;
-                core.removeParameterObject(sceneObject);
-                m_simpleSceneObjectList.Remove(sceneObject);
-                if (sceneObject.GetType() == typeof(SceneObjectCamera))
-                    m_sceneCameraList.Remove((SceneObjectCamera) sceneObject);
-                else if (sceneObject.GetType() == typeof(SceneObjectLight))
-                    m_sceneLightList.Remove((SceneObjectLight) sceneObject);
-                if (go != null)
-                    GameObject.Destroy(go);
-                
+                // Iterate backwards through the SortedList since elements are being removed during the loop
+                for (int i = sceneObjects.Count - 1; i >= 0; i--)
+                {
+                    if (sceneObjects.Values[i] is SceneObject sceneObject)
+                    {
+                        GameObject go = sceneObject.gameObject;
+                        core.removeParameterObject(sceneObject);
+                        m_simpleSceneObjectList.Remove(sceneObject);
+                        if (sceneObject is SceneObjectCamera cameraObj)
+                            m_sceneCameraList.Remove(cameraObj);
+                        else if (sceneObject is SceneObjectLight lightObj)
+                            m_sceneLightList.Remove(lightObj);
+                        if (go != null)
+                            GameObject.Destroy(go);
+                    }
+                }
             }
 
             sceneReset?.Invoke(this, EventArgs.Empty);

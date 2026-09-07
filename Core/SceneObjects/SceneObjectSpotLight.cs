@@ -94,7 +94,7 @@ namespace tracer
         private void updateRange(object sender, float a)
         {
             _light.range = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //!
@@ -105,7 +105,7 @@ namespace tracer
         private void updateAngle(object sender, float a)
         {
             _light.spotAngle = a;
-            emitHasChanged((AbstractParameter)sender);
+            emitHasChanged(sender as AbstractParameter);
         }
 
         //! 

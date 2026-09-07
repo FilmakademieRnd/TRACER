@@ -88,7 +88,7 @@ namespace tracer
         //!
         //! List storing event connections for releasing them before gizmos will be deleted.
         //!
-        private List<Tuple<SceneObject, EventHandler<AbstractParameter>>> m_ParameterEventHandlers;
+        private List<Tuple<SceneObject, EventHandler<ParameterObject.ChangedArgs>>> m_ParameterEventHandlers;
         //!
         //! 
         //!
@@ -103,7 +103,7 @@ namespace tracer
         //!
         public GizmoCreatorModule(string name, Manager manager) : base(name, manager)
         {
-            m_ParameterEventHandlers = new List<Tuple<SceneObject, EventHandler<AbstractParameter>>>();
+            m_ParameterEventHandlers = new List<Tuple<SceneObject, EventHandler<ParameterObject.ChangedArgs>>>();
             m_eventHandlersColor = new List<Tuple<Parameter<Color>, EventHandler<Color>>>();
             m_gizmos = new List<VPETGizmo>();
             m_circlePos = new Vector3[32];
@@ -191,7 +191,7 @@ namespace tracer
                                         sceneObject._gizmo = gizmo.root.transform;
                                         updateScalePoint(sceneObject, null);
                                         sceneObject.hasChanged += updateScalePoint;
-                                        m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<AbstractParameter>>(sceneObject, updateScalePoint));
+                                        m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<ParameterObject.ChangedArgs>>(sceneObject, updateScalePoint));
                                         break;
                                     }
                                 case SceneObjectDirectionalLight:
@@ -220,7 +220,7 @@ namespace tracer
                                         sceneObject._gizmo = gizmo.root.transform;
                                         updateScaleSpot(sceneObject, null);
                                         sceneObject.hasChanged += updateScaleSpot;
-                                        m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<AbstractParameter>>(sceneObject, updateScaleSpot));
+                                        m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<ParameterObject.ChangedArgs>>(sceneObject, updateScaleSpot));
                                         break;
                                     }
                             }
@@ -236,7 +236,7 @@ namespace tracer
                             sceneObject._gizmo = gizmo.root.transform;
                             updateScaleCamera(sceneObject, null);
                             sceneObject.hasChanged += updateScaleCamera;
-                            m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<AbstractParameter>>(sceneObject, updateScaleCamera));
+                            m_ParameterEventHandlers.Add(new Tuple<SceneObject, EventHandler<ParameterObject.ChangedArgs>>(sceneObject, updateScaleCamera));
                             break;
                         }
                     //[SEIM test for schematic view]
@@ -262,7 +262,7 @@ namespace tracer
         //!
         //! Function for calculating and setting of scale updates for a point light gizmo.
         //!
-        private void updateScalePoint(object sender, AbstractParameter parameter)
+        private void updateScalePoint(object sender, ParameterObject.ChangedArgs e)
         {
             SceneObjectPointLight sceneObject = (SceneObjectPointLight) sender;
 
@@ -280,7 +280,7 @@ namespace tracer
         //!
         //! Function for calculating and setting of scale updates for a spot light gizmo.
         //!
-        private void updateScaleSpot(object sender, AbstractParameter parameter)
+        private void updateScaleSpot(object sender, ParameterObject.ChangedArgs e)
         {
             SceneObjectSpotLight sceneObject = (SceneObjectSpotLight)sender;
             float range = sceneObject.range.value;
@@ -302,9 +302,9 @@ namespace tracer
         //!
         //! Function for calculating and setting of scale updates for a camera gizmo.
         //!
-        private void updateScaleCamera(object sender, AbstractParameter parameter)
+        private void updateScaleCamera(object sender, ParameterObject.ChangedArgs e)
         {
-            SceneObjectCamera sceneObject = (SceneObjectCamera)sender;
+            SceneObjectCamera sceneObject = sender as SceneObjectCamera;
             float far = sceneObject.far.value;
             float fov = sceneObject.fov.value;
             float aspect = sceneObject.aspect.value;
@@ -357,7 +357,7 @@ namespace tracer
             }
         }
 
-        private void updateEclipticPos(object sender, AbstractParameter parameter)
+        private void updateEclipticPos(object sender, ParameterObject.ChangedArgs e)
         {
             SceneObjectSunLight sun = sender as SceneObjectSunLight;
             calculateEclipticPos(sun);
@@ -375,7 +375,7 @@ namespace tracer
 
             m_eventHandlersColor.Clear();
             
-            foreach (Tuple<SceneObject, EventHandler<AbstractParameter>> t in m_ParameterEventHandlers)
+            foreach (Tuple<SceneObject, EventHandler<ParameterObject.ChangedArgs>> t in m_ParameterEventHandlers)
                 t.Item1.hasChanged -= t.Item2;
            
             m_ParameterEventHandlers.Clear();

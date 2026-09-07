@@ -232,8 +232,8 @@ namespace tracer
                 switch (_lockType) {
                     case CameraLockageType.lookThrough:
                         
-                        preLookThroughCamPos = Camera.main.transform.position;
-                        preLookThroughCamRot = Camera.main.transform.rotation;
+                        preLookThroughCamPos = m_sceneManager.mainCamera.transform.position;
+                        preLookThroughCamRot = m_sceneManager.mainCamera.transform.rotation;
 
                         Type selectionType = m_selectedObject.GetType();
                         if (selectionType == typeof(SceneObjectCamera)){
@@ -243,24 +243,24 @@ namespace tracer
                             //show specific other safe frame
                         }
 
-                        Camera.main.cullingMask &= ~(1 << 11);
+                        m_sceneManager.mainCamera.cullingMask &= ~(1 << 11);
                         
                         if (string.Equals(m_selectedObject.transform.parent.name, "Scene")){
-                            Camera.main.transform.position = m_selectedObject.transform.position;
-                            Camera.main.transform.rotation = m_selectedObject.transform.rotation;
+                            m_sceneManager.mainCamera.transform.position = m_selectedObject.transform.position;
+                            m_sceneManager.mainCamera.transform.rotation = m_selectedObject.transform.rotation;
                         } else {
-                            Camera.main.transform.position = m_selectedObject.transform.parent.TransformPoint(m_selectedObject.transform.localPosition);
-                            Camera.main.transform.rotation = m_selectedObject.transform.parent.rotation * m_selectedObject.transform.localRotation;
+                            m_sceneManager.mainCamera.transform.position = m_selectedObject.transform.parent.TransformPoint(m_selectedObject.transform.localPosition);
+                            m_sceneManager.mainCamera.transform.rotation = m_selectedObject.transform.parent.rotation * m_selectedObject.transform.localRotation;
                         }
 
                         core.updateEvent += updateLookThrough;
                         break;
 
                     case CameraLockageType.lockObjectToCam:
-                        m_localPositionWouldBe = Camera.main.transform.InverseTransformPoint(m_selectedObject.transform.position);
+                        m_localPositionWouldBe = m_sceneManager.mainCamera.transform.InverseTransformPoint(m_selectedObject.transform.position);
                         //calculate the local rotation by Quaternion.Inverse(target spaces' object rotation) * world rotation of the object
                         //BEWARE matrix multiplication - order matters!
-                        m_localRotationWouldBe = Quaternion.Inverse(Camera.main.transform.rotation) * m_selectedObject.transform.rotation;
+                        m_localRotationWouldBe = Quaternion.Inverse(m_sceneManager.mainCamera.transform.rotation) * m_selectedObject.transform.rotation;
 
                         core.updateEvent += updateLockToCamera;
                         break;
@@ -284,8 +284,8 @@ namespace tracer
 
                     //revert cam to original position (if not canceled by selecting another object)
                     if(viaButton){
-                        Camera.main.transform.position = preLookThroughCamPos;  //was -= Camera.main.transform.forward;
-                        Camera.main.transform.rotation = preLookThroughCamRot;
+                        m_sceneManager.mainCamera.transform.position = preLookThroughCamPos;  //was -= Camera.main.transform.forward;
+                        m_sceneManager.mainCamera.transform.rotation = preLookThroughCamRot;
                     }
                     break;
                 case CameraLockageType.lockObjectToCam:
@@ -310,8 +310,8 @@ namespace tracer
         //! resets the cams values to standard (and move it one step backwar - most likely because we looked through a camera before)
         //!
         private void ResetRatio(){
-            Camera.main.fieldOfView = 60;
-            Camera.main.cullingMask = LayerMask.NameToLayer("Everything");
+            m_sceneManager.mainCamera.fieldOfView = 60;
+            m_sceneManager.mainCamera.cullingMask = LayerMask.NameToLayer("Everything");
         }
 
         //!
@@ -354,7 +354,7 @@ namespace tracer
         //!
         private void ShowSafeFrame(){
             if (m_safeFrame == null){
-                m_safeFrame = GameObject.Instantiate(m_safeFramePrefab, Camera.main.transform);
+                m_safeFrame = GameObject.Instantiate(m_safeFramePrefab, m_sceneManager.mainCamera.transform);
                 CanvasScaler scaler =  m_safeFrame.GetComponent<CanvasScaler>();
                 float physicalDeviceScale = Mathf.Sqrt(Screen.width * Screen.width + Screen.height * Screen.height) / Screen.dpi / 12f;
                 scaler.scaleFactor = Screen.dpi * 0.04f * Mathf.Min(Mathf.Max(manager.settings.uiScale.value, 0.4f), 3f) * physicalDeviceScale;
@@ -425,9 +425,9 @@ namespace tracer
         //!
         //! Function for updating the aspect ratio of the safe frame based on the currently selected camera.
         //!
-        private void updateSafeFrame(object so, AbstractParameter parameter)
+        private void updateSafeFrame(object so, ParameterObject.ChangedArgs parameter)
         {
-            Camera cameraMain = Camera.main;
+            Camera cameraMain = m_sceneManager.mainCamera;
             SceneObjectCamera soCamera = null;
 
             if (so != null &&
@@ -506,7 +506,7 @@ namespace tracer
             if (m_oldSOCamera)
                 m_oldSOCamera.hasChanged -= updateSafeFrame;
             
-            Camera mainCamera = Camera.main;
+            Camera mainCamera = m_sceneManager.mainCamera;
             int targetDisplay = mainCamera.targetDisplay;
             float aspect = mainCamera.aspect;
             SceneObjectCamera soCamera = m_sceneManager.sceneCameraList[m_cameraIndex];
@@ -531,7 +531,7 @@ namespace tracer
             if (m_sceneManager.sceneCameraList.Count <= 0)
                 return;
 
-            Camera mainCamera = Camera.main;
+            Camera mainCamera = m_sceneManager.mainCamera;
             float aspect = mainCamera.aspect;
             SceneObjectCamera soCamera = m_sceneManager.sceneCameraList[0];
             mainCamera.enabled = false;
@@ -549,7 +549,7 @@ namespace tracer
             if(!m_selectedObject)
                 return;
 
-            Transform camTransform = Camera.main.transform;
+            Transform camTransform = m_sceneManager.mainCamera.transform;
             Transform objTransform = m_selectedObject.transform;
             Vector3 newPosition;
             Quaternion newRotation;
@@ -590,9 +590,9 @@ namespace tracer
                 case UIManager.CameraControl.ATTITUDE:
                 case UIManager.CameraControl.AR:
                 case UIManager.CameraControl.STANDARD:
-                    Vector3 localToWorldPos = Camera.main.transform.TransformPoint(m_localPositionWouldBe);
+                    Vector3 localToWorldPos = m_sceneManager.mainCamera.transform.TransformPoint(m_localPositionWouldBe);
                     
-                    Quaternion localToWorldRot = Camera.main.transform.rotation * m_localRotationWouldBe;
+                    Quaternion localToWorldRot = m_sceneManager.mainCamera.transform.rotation * m_localRotationWouldBe;
                     //apply the stored local rotation from the camera into world space 
                     //BEWARE matrix multiplication - order matters!
                     

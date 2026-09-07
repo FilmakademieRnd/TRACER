@@ -87,7 +87,7 @@ namespace tracer
                 //not possible
                 //referencedSceneObject.position.getKeys()[animatedParameterKeyIndex].value = a;
                 Key<Vector3> key = (Key<Vector3>)referencedSceneObject.position.getKeys()[animatedParameterKeyIndex];
-                key = new Key<Vector3>(key.time, a, key.tangentTime1, key.tangentValue1, key.tangentTime2, key.tangentValue2);
+                key = new Key<Vector3>(key.time, a, key.inTangent, key.outTangent);
                 
                 referencedSceneObject.position.getKeys()[animatedParameterKeyIndex] = key;
             }

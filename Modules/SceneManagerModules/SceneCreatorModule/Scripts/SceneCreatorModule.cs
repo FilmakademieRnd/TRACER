@@ -289,11 +289,11 @@ namespace tracer
                         var methodInfo = typeof(DynamicParameterObject).GetMethod("Empty");
                         var dlg = Delegate.CreateDelegate(typeof(Action), methodInfo);
 
-                        parameter = (AbstractParameter) Activator.CreateInstance(paramType, dlg, po.pNames[i], obj, true);
+                        parameter = Activator.CreateInstance(paramType, dlg, po.pNames[i], obj, true) as AbstractParameter;
                     }
                     else
                     {
-                        parameter = (AbstractParameter) Activator.CreateInstance(paramType, Activator.CreateInstance(type), po.pNames[i], obj, true);
+                        parameter = Activator.CreateInstance(paramType, Activator.CreateInstance(type), po.pNames[i], obj, true) as AbstractParameter;
                     }
 
                     obj.SubscribeToParameterChange(parameter);

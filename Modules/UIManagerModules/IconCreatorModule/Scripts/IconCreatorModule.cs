@@ -149,7 +149,8 @@ namespace tracer{
         //! Function that parses the given list of scene objects to create and
         //! add icons depending on it's type as child objects.
         //!
-        private void createIcons(object sender, EventArgs e){
+        private void createIcons(object sender, EventArgs e)
+        {
             if (!m_showIcons)
                 return;
 
@@ -209,7 +210,7 @@ namespace tracer{
         //!
         private void updateIconColor(object sender, Color color)
         {
-            SceneObject sceneObject = (SceneObject) ((AbstractParameter)sender)._parent;
+            SceneObject sceneObject = (SceneObject) (sender as AbstractParameter)._parent;
             sceneObject._icon.GetComponent<SpriteRenderer>().color = color;
         }
 

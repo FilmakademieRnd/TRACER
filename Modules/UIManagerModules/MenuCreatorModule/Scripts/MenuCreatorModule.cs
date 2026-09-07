@@ -618,121 +618,124 @@ namespace tracer
             return newObjects;
         }
 
-        private void updateItem(object sender, AbstractParameter parameter)
+        private void updateItem(object sender, ParameterObject.ChangedArgs e)
         {
-            List<GameObject> gameObjects;
-            if (m_parameterMapping.TryGetValue(parameter, out gameObjects))
+            foreach (AbstractParameter parameter in e.Parameters)
             {
-                switch (parameter.tracerType)
+                List<GameObject> gameObjects;
+                if (m_parameterMapping.TryGetValue(parameter, out gameObjects))
                 {
-                    case AbstractParameter.ParameterType.ACTION:
-                        {
-                            //Button button = newObject.GetComponent<Button>();
-                            //Action parameterAction = ((ClassParameter<Action>)item.Parameter).value;
-                            //button.onClick.AddListener(() => parameterAction());
-                            //TextMeshProUGUI textComponent = newObject.GetComponentInChildren<TextMeshProUGUI>();
-                            //textComponent.text = item.Parameter.name;
-                            //textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
-                            //textComponent.font = manager.uiAppearanceSettings.defaultFont;
-                            //textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
-                            //Image imgButton = button.GetComponent<Image>();
-                            //imgButton.color = manager.uiAppearanceSettings.colors.ButtonBG;
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.BOOL:
-                        {
-                            Toggle toggle = gameObjects[0].GetComponent<Toggle>();
-                            toggle.isOn = ((Parameter<bool>)parameter).value;
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.INT:
-                        {
-                            TMP_InputField numberInputField = gameObjects[0].GetComponent<TMP_InputField>();
-                            numberInputField.text = ((Parameter<int>)parameter).value.ToString();
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.FLOAT:
-                        {
-                            TMP_InputField numberInputField = gameObjects[0].GetComponent<TMP_InputField>();
-                            numberInputField.text = ((Parameter<float>)parameter).value.ToString();
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.VECTOR2:
-                        {
-                            Vector2 vectorValue = ((Parameter<Vector2>)parameter).value;
+                    switch (parameter.tracerType)
+                    {
+                        case AbstractParameter.ParameterType.ACTION:
+                            {
+                                //Button button = newObject.GetComponent<Button>();
+                                //Action parameterAction = ((ClassParameter<Action>)item.Parameter).value;
+                                //button.onClick.AddListener(() => parameterAction());
+                                //TextMeshProUGUI textComponent = newObject.GetComponentInChildren<TextMeshProUGUI>();
+                                //textComponent.text = item.Parameter.name;
+                                //textComponent.color = manager.uiAppearanceSettings.colors.FontColor;
+                                //textComponent.font = manager.uiAppearanceSettings.defaultFont;
+                                //textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
+                                //Image imgButton = button.GetComponent<Image>();
+                                //imgButton.color = manager.uiAppearanceSettings.colors.ButtonBG;
+                            }
+                            break;
+                        case AbstractParameter.ParameterType.BOOL:
+                            {
+                                Toggle toggle = gameObjects[0].GetComponent<Toggle>();
+                                toggle.isOn = ((Parameter<bool>)parameter).value;
+                            }
+                            break;
+                        case AbstractParameter.ParameterType.INT:
+                            {
+                                TMP_InputField numberInputField = gameObjects[0].GetComponent<TMP_InputField>();
+                                numberInputField.text = ((Parameter<int>)parameter).value.ToString();
+                            }
+                            break;
+                        case AbstractParameter.ParameterType.FLOAT:
+                            {
+                                TMP_InputField numberInputField = gameObjects[0].GetComponent<TMP_InputField>();
+                                numberInputField.text = ((Parameter<float>)parameter).value.ToString();
+                            }
+                            break;
+                        case AbstractParameter.ParameterType.VECTOR2:
+                            {
+                                Vector2 vectorValue = ((Parameter<Vector2>)parameter).value;
 
-                            for (int i = 0; i < 2; i++)
-                            {
-                                TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
-                                numberInputField.text = vectorValue[i].ToString();
+                                for (int i = 0; i < 2; i++)
+                                {
+                                    TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
+                                    numberInputField.text = vectorValue[i].ToString();
+                                }
                             }
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.VECTOR3:
-                        {
-                            Vector3 vectorValue = ((Parameter<Vector3>)parameter).value;
+                            break;
+                        case AbstractParameter.ParameterType.VECTOR3:
+                            {
+                                Vector3 vectorValue = ((Parameter<Vector3>)parameter).value;
 
-                            for (int i = 0; i < 3; i++)
-                            {
-                                TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
-                                numberInputField.text = vectorValue[i].ToString();
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
+                                    numberInputField.text = vectorValue[i].ToString();
+                                }
                             }
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.VECTOR4:
-                        {
-                            Vector4 vectorValue = ((Parameter<Vector4>)parameter).value;
+                            break;
+                        case AbstractParameter.ParameterType.VECTOR4:
+                            {
+                                Vector4 vectorValue = ((Parameter<Vector4>)parameter).value;
 
-                            for (int i = 0; i < 4; i++)
-                            {
-                                TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
-                                numberInputField.text = vectorValue[i].ToString();
+                                for (int i = 0; i < 4; i++)
+                                {
+                                    TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
+                                    numberInputField.text = vectorValue[i].ToString();
+                                }
                             }
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.QUATERNION:
-                        {
-                            Quaternion vectorValue = ((Parameter<Quaternion>)parameter).value;
+                            break;
+                        case AbstractParameter.ParameterType.QUATERNION:
+                            {
+                                Quaternion vectorValue = ((Parameter<Quaternion>)parameter).value;
 
-                            for (int i = 0; i < 4; i++)
-                            {
-                                TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
-                                numberInputField.text = vectorValue[i].ToString();
+                                for (int i = 0; i < 4; i++)
+                                {
+                                    TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
+                                    numberInputField.text = vectorValue[i].ToString();
+                                }
                             }
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.COLOR:
-                        {
-                            Color vectorValue = ((Parameter<Color>)parameter).value;
+                            break;
+                        case AbstractParameter.ParameterType.COLOR:
+                            {
+                                Color vectorValue = ((Parameter<Color>)parameter).value;
 
-                            for (int i = 0; i < 4; i++)
-                            {
-                                TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
-                                numberInputField.text = vectorValue[i].ToString();
+                                for (int i = 0; i < 4; i++)
+                                {
+                                    TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
+                                    numberInputField.text = vectorValue[i].ToString();
+                                }
                             }
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.STRING:
-                        {
-                            TextMeshProUGUI textComponent = gameObjects[0].GetComponentInChildren<TextMeshProUGUI>();
-                            if (textComponent)
+                            break;
+                        case AbstractParameter.ParameterType.STRING:
                             {
-                                textComponent.text = ((ClassParameter<string>) parameter).value;
+                                TextMeshProUGUI textComponent = gameObjects[0].GetComponentInChildren<TextMeshProUGUI>();
+                                if (textComponent)
+                                {
+                                    textComponent.text = ((ClassParameter<string>)parameter).value;
+                                }
+                                else
+                                {
+                                    TMP_InputField inputField = gameObjects[0].GetComponent<TMP_InputField>();
+                                    inputField.text = ((ClassParameter<string>)parameter).value;
+                                }
                             }
-                            else
+                            break;
+                        case AbstractParameter.ParameterType.LIST:
                             {
-                                TMP_InputField inputField = gameObjects[0].GetComponent<TMP_InputField>();
-                                inputField.text = ((ClassParameter<string>)parameter).value;
+                                TMP_Dropdown dropDown = gameObjects[0].GetComponent<TMP_Dropdown>();
+                                List<string> names = new List<string>();
+                                dropDown.value = ((ListParameter)parameter).value;
                             }
-                        }
-                        break;
-                    case AbstractParameter.ParameterType.LIST:
-                        {
-                            TMP_Dropdown dropDown = gameObjects[0].GetComponent<TMP_Dropdown>();
-                            List<string> names = new List<string>();
-                            dropDown.value = ((ListParameter)parameter).value;
-                        }
-                        break;
+                            break;
+                    }
                 }
             }
         }
