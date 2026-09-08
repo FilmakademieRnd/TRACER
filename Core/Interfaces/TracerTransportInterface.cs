@@ -53,7 +53,7 @@ namespace tracer
         //!
         //! Connect the socket to a remote endpoint.
         //!
-        //! @param address The endpoint, e.g. "tcp://1.2.3.4:5556" or "ws://1.2.3.4:5566".
+        //! @param address The endpoint, e.g. "tcp://1.2.3.4:5556" or "ws://1.2.3.4:5506".
         //!
         void Connect(string address);
 
@@ -139,6 +139,17 @@ namespace tracer
         string scheme { get; }
 
         //!
+        //! Map a DataHub port number to the port this transport has to use for the
+        //! same channel. DataHub binds its tcp:// channels at 555x and the matching
+        //! ws:// channels at 550x (see ZeroMQHandler::m_addressPortBase), so the
+        //! WebSocket transport translates the port while the NetMQ transport keeps it.
+        //!
+        //! @param port The port number of the tcp:// channel, e.g. "5556".
+        //! @return The port number to be used with this transport.
+        //!
+        string port(string port);
+
+        //!
         //! Create a new socket.
         //!
         //! @param type The socket pattern to be created.
@@ -189,15 +200,16 @@ namespace tracer
         }
 
         //!
-        //! Build an endpoint string using the scheme of the current transport.
+        //! Build an endpoint string using the scheme and port mapping of the
+        //! current transport.
         //!
         //! @param ip The IP address of the endpoint.
-        //! @param port The port number of the endpoint.
-        //! @return The endpoint, e.g. "tcp://1.2.3.4:5556".
+        //! @param port The port number of the tcp:// channel, e.g. "5556".
+        //! @return The endpoint, e.g. "tcp://1.2.3.4:5556" or "ws://1.2.3.4:5506".
         //!
         public static string endpoint(string ip, string port)
         {
-            return current.scheme + "://" + ip + ":" + port;
+            return current.scheme + "://" + ip + ":" + current.port(port);
         }
 
         private static ITracerTransport discover()

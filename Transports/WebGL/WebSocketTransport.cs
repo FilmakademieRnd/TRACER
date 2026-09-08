@@ -54,6 +54,20 @@ namespace tracer
 
         public string scheme { get => "ws"; }
 
+        //!
+        //! DataHub binds its ws:// channels at 550x where the tcp:// ones are at
+        //! 555x (ZeroMQHandler::m_addressPortBase, ":550" vs ":555"), so 5556
+        //! becomes 5506 and 5557 becomes 5507. The command (5558) and scene (5555)
+        //! channels are tcp only in DataHub so far; they are mapped the same way
+        //! and start working as soon as DataHub binds them on ws:// too.
+        //!
+        public string port(string port)
+        {
+            if (port.Length == 4 && port.StartsWith("555"))
+                return "550" + port[3];
+            return port;
+        }
+
         public ITracerSocket CreateSocket(TracerSocketType type)
         {
             return new WebSocketTracerSocket(type);

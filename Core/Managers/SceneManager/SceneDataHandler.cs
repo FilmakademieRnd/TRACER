@@ -1202,7 +1202,7 @@ namespace tracer
             //! @param offset The offset in bytes used to interate over the array.
             //! 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static T ByteArrayToStructure<T>(ref byte[] bytearray, ref int offset) where T : new()
+            private static T ByteArrayToStructure<T>(ref byte[] bytearray, ref int offset) where T : class, new()
             {
                 T str = new T();
 
@@ -1211,7 +1211,11 @@ namespace tracer
 
                 Marshal.Copy(bytearray, offset, ptr, size);
 
-                str = (T)Marshal.PtrToStructure(ptr, str.GetType());
+                // Marshal into the instance created above instead of asking Marshal to
+                // create one by type. The by-type overload makes IL2CPP call the class
+                // constructor through a function pointer with the wrong signature, which
+                // WebAssembly rejects ("call_indirect to a signature that does not match").
+                Marshal.PtrToStructure(ptr, str);
                 Marshal.FreeHGlobal(ptr);
 
                 offset += size;

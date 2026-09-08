@@ -132,7 +132,7 @@ namespace tracer
                             case LightType.Spot:
                                 sceneObject = SceneObjectSpotLight.Attach(gameObject, networkManager.cID);
                                 break;
-                            case LightType.Area:
+                            case LightType.Rectangle:
                                 sceneObject = SceneObjectAreaLight.Attach(gameObject, networkManager.cID);
                                 break;
                         }

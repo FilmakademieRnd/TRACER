@@ -46,6 +46,9 @@ namespace tracer
         public bool supportsBind { get => true; }
         public string scheme { get => "tcp"; }
 
+        //! DataHub binds tcp:// on the ports the modules already use.
+        public string port(string port) => port;
+
         public NetMQTransport()
         {
             // Required before any NetMQ socket is created on Mono/IL2CPP. Previously
