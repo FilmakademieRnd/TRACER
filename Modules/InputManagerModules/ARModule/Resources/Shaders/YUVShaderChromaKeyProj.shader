@@ -28,7 +28,7 @@
 			#include "UnityCG.cginc"
 			#include "VPETCG.cginc"
 
-            CBUFFER_START(UnityPerFrame)
+            CBUFFER_START(UnityARFoundationPerFrame)
             // Device display transform is provided by the AR Foundation camera background renderer.
             float4x4 _UnityDisplayTransform;
             CBUFFER_END
