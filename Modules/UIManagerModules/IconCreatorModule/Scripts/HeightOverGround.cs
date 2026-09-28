@@ -115,6 +115,8 @@ public class HeightOverGround : MonoBehaviour{
 
         if(!isCreated)
             CreateGraphics(isSelected);
+        if(!isCreated)
+            return;
 
         if (isSelected) {
             if (manager.GetStaticMashQuadTree() != null){
@@ -334,7 +336,25 @@ public class HeightOverGround : MonoBehaviour{
     // PROCEDURAL GRAPHICS GENERATION
     // ==========================================
 
+    //!
+    //! Looks up a shader by name and logs an error instead of returning null silently.
+    //! Only shaders that ship in a Resources folder are guaranteed to exist in player builds;
+    //! built-in shaders are stripped unless referenced (Editor always finds them, devices don't).
+    //!
+    private static Shader FindShaderOrLog(string name){
+        Shader shader = Shader.Find(name);
+        if (shader == null)
+            Debug.LogError("HeightOverGround: shader '" + name + "' not found. It is probably stripped from this build.");
+        return shader;
+    }
+
     private void CreateGraphics(bool isSelected){
+        Shader lineShader = FindShaderOrLog("Custom/HeightLine");
+        Shader textShader = FindShaderOrLog("Custom/TextZTest");
+        Shader markerShader = FindShaderOrLog("Custom/HeightMarker");
+        if (lineShader == null || textShader == null || markerShader == null)
+            return; // isCreated stays false, ShowViz() becomes a no-op
+
         rootObj = new GameObject("HeightOverGround_Viz");
         rootObj.transform.SetParent(target); // Attach to keep hierarchy clean
 
@@ -352,8 +372,8 @@ public class HeightOverGround : MonoBehaviour{
         line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         line.receiveShadows = false;
 
-        lineMat = new Material(Shader.Find("Unlit/Transparent")) { mainTexture = GenerateDashedTexture() };
-        ConfigureParticleLineMaterial(lineMat);
+        lineMat = new Material(lineShader) { mainTexture = GenerateDashedTexture() };
+        lineMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
         lineMat.SetFloat("_ZTest", 4f);
         line.material = lineMat;
 
@@ -367,8 +387,9 @@ public class HeightOverGround : MonoBehaviour{
         textMesh.characterSize = 0.015f; // Keeps it sharp
         textMesh.color = materialColor;
 
-        textMat = new Material(Shader.Find("Custom/TextZTest")) {
-            mainTexture = textMesh.GetComponent<MeshRenderer>().sharedMaterial.mainTexture
+        Material fontMaterial = textMesh.GetComponent<MeshRenderer>().sharedMaterial;
+        textMat = new Material(textShader) {
+            mainTexture = fontMaterial != null ? fontMaterial.mainTexture : null
         };
         textMat.SetFloat("_ZTest", 4f); // Standard-Tiefe aktivieren
 
@@ -380,7 +401,7 @@ public class HeightOverGround : MonoBehaviour{
         marker.transform.rotation = Quaternion.Euler(90f, 0f, 0f); // Face upwards
         marker.transform.localScale = new Vector3(0.2f, 0.2f, 0.2f);
 
-        markerMat = new Material(Shader.Find("Custom/HeightMarker")) {
+        markerMat = new Material(markerShader) {
             mainTexture = GenerateMarkerTexture(),
             color = materialColor // Light blue
         };
@@ -439,33 +460,6 @@ public class HeightOverGround : MonoBehaviour{
         return generatedMarkerTexture;
     }
 
-    public void ConfigureParticleLineMaterial(Material mat){
-        if (mat == null) return;
-
-        // 1. Assign the standard particle unlit shader
-        mat.shader = Shader.Find("Particles/Standard Unlit");
-
-        // 2. Set Rendering Mode to "Fade" (Index 2 in the dropdown)
-        mat.SetFloat("_Mode", 2f);
-
-        // 3. Manually apply the under-the-hood blend math for "Fade"
-        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        mat.SetInt("_ZWrite", 0);
-        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-
-        // 4. Toggle the correct Shader Keywords for Fade
-        mat.DisableKeyword("_ALPHATEST_ON");
-        mat.EnableKeyword("_ALPHABLEND_ON");
-        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        mat.DisableKeyword("_ALPHAMODULATE_ON");
-
-        // 5. Set Color Mode to "Multiply" (Index 0 in the dropdown)
-        // This allows the LineRenderer's Start/End gradient vertex colors to multiply properly
-        mat.SetFloat("_ColorMode", 0f);
-
-    }
-
     //only important to check for current selector if we have SHOW_ONLY_AT_TRANSLATE_GIZMO = true
     private void UiCreationFinished(object sender, UnityEngine.EventSystems.UIBehaviour uib) {
         if(selectorSnapSelect)
@@ -495,7 +489,8 @@ public class HeightOverGround : MonoBehaviour{
     public void DestroyViz() {
         Destroy(generatedMarkerTexture);
         generatedMarkerTexture = null;
-        Destroy(rootObj);
+        if (rootObj)
+            Destroy(rootObj);
         Destroy(this);
     }
 }
