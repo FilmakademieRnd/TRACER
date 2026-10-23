@@ -24,111 +24,199 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "HeightOverGround.cs"
 //! @brief Implementation of the HeightOverGround snippet, acts like IconUpdate, show height over ground
 //! @author Thomas Krüger
-//! @version 0
-//! @date 16.07.2026
+//! @version 1
+//! @date 23.10.2026
+//! @changed doxygen style documentation
 
 using System.Collections;
 using tracer;
 using UnityEngine;
 
+    //!
+    //! implements a vizualisation of a height over a certain  "ground"
+    //! gets initialized on choosen objects via IconCreatorModule (right now only cameras)
+    //!
+
 public class HeightOverGround : MonoBehaviour{
 
+    //!
+    //! show this only on selected objects or on all objects this got initialized at
+    //!
     private const bool SHOW_ONLY_SELECTED = true;
+    //!
+    //! show it only on selected object in translate-manipulation mode or all the time?
+    //!
     private const bool SHOW_ONLY_AT_TRANSLATE_GIZMO = true;
-
+    //!
+    //! we create a viz at runtime, only once and share it with all instances of this
+    //!
     private static Texture2D generatedMarkerTexture;
+    //!
+    //! we create a viz at runtime, only once and share it with all instances of this
+    //!
+    private static Texture2D generatedDashTexture;
 
+    //!
+    //! reference to the UI manager, since we are not a module but a helper class
+    //!
     private UIManager manager;
+    //!
+    //! parameter reference so we know what we are currently editing (showing in ui), see SHOW_ONLY_AT_TRANSLATE_GIZMO
+    //!
     private AbstractParameter selectedAbstractParam;
+    //!
+    //! reference to the ui element that we add listeners to, to check if its state changed to tranlsate (see above)
+    //!
     private SnapSelect selectorSnapSelect;
-    private int selectorCurrentSelectedSnapSelectElement = 0;
-
+    //!
+    //! current calculated height over ground value
+    //!
     private float groundY = 0f;
     
     // --- TO TWEAK ---
-    private bool updateOngoing = true;
-    private float textOffsetRight = 0.02f;
-    private float dashesPerMeter = 16f;
+    //!
+    //! update value independent within our Update function
+    //!
+    private const bool ONGOING_SELF_UPDATE = true;
+    //!
+    //! text mesh pro text transform offset to the right side of our "height line"
+    //!
+    private const float TEXT_OFFSET_RIGHT = 0.02f;
+    //!
+    //! our materials mainTextureScale X value which indicates the "dots per meter"
+    //!
+    private const float VIZ_DASHES_PER_METER = 16f;
 
     // --- State Variables ---
+    //!
+    //! the transform target we calculate the height for
+    //!
     private Transform target;
+    //!
+    //! the camera used for aligning the viz to
+    //!
     private Camera cam;
+    //!
+    //! temporary saved height y value to stop ONGOING_SELF_UPDATE if difference to current value is too small
+    //!
     private float lastTargetY;
+    //!
+    //! temporary saved ground y value to stop ONGOING_SELF_UPDATE if difference to current value is too small
+    //!
     private float lastGroundY;
+    //!
+    //! bools to avaid updating alignment if any is not set
+    //!
     private bool isAnimating, isCreated, isShown = false;
-    private float lastShownTime = 0;    //because we often deselect all SOs before selection, the viz would flip...
+    //!
+    //! temporary fix to avoid flipping, because we often deselect all SOs when making a selection
+    //!
+    private float lastShownTime = 0;
 
     // --- Generated Graphics ---
+    //!
+    //! reference to runtime created root GameObject of our visualisation
+    //!
     private GameObject rootObj;
+    //!
+    //! reference to runtime created height line
+    //!
     private LineRenderer line;
+    //!
+    //! reference to runtime created text mesh pro for height-text
+    //!
     private TextMesh textMesh;
+    //!
+    //! reference to runtime created ground marker
+    //!
     private GameObject marker;
+    //!
+    //! reference to runtime created Material for height line
+    //!
     private Material lineMat;
+    //!
+    //! reference to runtime created Material for marker
+    //!
     private Material markerMat;
+    //!
+    //! reference to runtime created Material for text
+    //!
     private Material textMat;
-    private Color materialColor = new Color(0.2f, 0.6f, 1f, 0.8f) ;
+    //!
+    //! tweakable value for all colors (line, marker, text)
+    //!
+    private readonly Color materialColor = new Color(0.2f, 0.6f, 1f, 0.8f) ;
 
-    /// <summary>
-    /// Call this to initialize the visualization on a specific transform.
-    /// </summary>
+    //!
+    //! Call this to initialize the visualization on a specific transform.
+    //!
+    //! @param targetTransform the transform where we calculate the height for
+    //! @param _manager reference to the UIManager (to access MeshQuadTree)
+    //!
     public void Initialize(Transform targetTransform, UIManager _manager){
         manager = _manager;
         target = targetTransform;
         cam = Camera.main;
         lastTargetY = target.position.y;
 
-        if (manager.GetStaticMashQuadTree() != null){
-            groundY = manager.GetStaticMashQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
+        if (manager.GetStaticMeshQuadTree() != null){
+            groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
         }
         lastGroundY = groundY;
 
-        //variable to show only "on selection" or "show all"
         if(!SHOW_ONLY_SELECTED)
             ShowViz();
     }
 
     /*********** LÖSUNG FOR 3DGS ****************
+    Lösung für Splats? (und komplexe Geometrie allgemein): Der Depth-Buffer Ansatz:
 
-    Die Lösung für Splats (und komplexe Geometrie allgemein): Der Depth-Buffer Ansatz!
+    Gaussian Splats, extrem dichte Punktwolken oder hochkomplexe prozedurale Geometrie 
+    (die für mathematisches Raycasting zu teuer ist) Support: Paradigma-Wechsel:
+        - Anstatt mathematische Linien per RAM zu ziehen -> GPU!
+        - > unsichtbare Orthographic-Camera (1x1 Pixel), schaut vom Objekt strikt nach unten
+        - > rendert in RenderTexture (Format: Depth)
+        - > read Single Pixel aus Depth-Texture
+        - > Depth-Wert (0.0 bis 1.0) über Cam' Near/Far-Clip-Plane in Weltkoordinaten umrechnen
 
-    Wenn ihr wisst, dass ihr später Gaussian Splats, extrem dichte Punktwolken oder hochkomplexe prozedurale Geometrie 
-    (die für mathematisches Raycasting zu teuer ist) unterstützen wollt, solltet ihr das Paradigma wechseln:
-        - Anstatt mathematische Linien durch den RAM zu ziehen, nutzt ihr die GPU!
-        - Erstelle eine winzige, unsichtbare Orthographic-Camera (1x1 Pixel), die vom Objekt strikt nach unten schaut.
-        - Lass diese Kamera in eine RenderTexture (Format: Depth) rendern.
-        - Lies den einzigen Pixel dieser Depth-Texture aus.
-        - Wandle den Depth-Wert (0.0 bis 1.0) über die Near/Far-Clip-Plane der Kamera wieder in Weltkoordinaten um.
-
-    Der massive Vorteil: 
-    Die Kamera rendert genau das, was visuell da ist. 
+    Vorteil: 
+    Cam rendert genau das, was visuell da ist. 
     Wenn ein Gaussian Splat in der Szene sichtbar ist, schreibt er automatisch in den Z-Buffer (Depth-Buffer) der GPU. 
     Die GPU rechnet dir die absolute, pixelperfekte Kollision mit der Splat-Wolke aus – 
     und das in Bruchteilen einer Millisekunde, völlig unabhängig davon, ob es ein Mesh, ein Splat oder ein Terrain ist.
-
     *********************************************/
 
+    //!
+    //! Call to show Height Over Ground Viz. Creates viz (if not already), animates it and updates it
+    //!
+    //! @param isSelected show because it is selected?
+    //!
     public void ShowViz(bool isSelected = false) {
         if(SHOW_ONLY_SELECTED && !isSelected)
             return;
 
-        Debug.Log("SHOW VIZ");
+        //Debug.Log("SHOW VIZ");
 
+        //create if not already done
         if(!isCreated)
             CreateGraphics(isSelected);
+        //abort if could not be created
         if(!isCreated)
             return;
 
-        if (isSelected) {
-            if (manager.GetStaticMashQuadTree() != null){
-                groundY = manager.GetStaticMashQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
-            }
+        //calculate height via given settings
+        if (manager.GetStaticMeshQuadTree() != null){
+            groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
         }
 
-        
+        //set active
         rootObj.SetActive(true);
+
+        //if last selection time was long ago, play intro routine
         if(lastShownTime == 0 || Time.time - lastShownTime < 5)
             StartCoroutine(IntroRoutine());
 
+        //update the material settings accordingly
         UpdateDepthViz(isSelected);
         
         //line mat would not be transparent
@@ -137,8 +225,14 @@ public class HeightOverGround : MonoBehaviour{
         isShown = true;
     }
 
+    //!
+    //! Update marker and text materials ZTestr value accordingly to if the object is selected
+    //! because we will show the viz through walls if we only show the selected ones
+    //!
+    //! @param isSelected do we call this on the selected object?
+    //!
     private void UpdateDepthViz(bool isSelected) {
-        Debug.Log("UPDATE DEPTH VIZ");
+        // Debug.Log("UPDATE DEPTH VIZ");
         // In Unity's CompareFunction Enum:
         // 8 = Always (Renders through walls and clutter)
         // 4 = LessEqual (Normal 3D behavior, hidden by walls/objects in front of it)
@@ -147,6 +241,9 @@ public class HeightOverGround : MonoBehaviour{
         textMat.SetFloat("_ZTest", zTestValue);
     }
 
+    //!
+    //! hide the visualisation
+    //!
     public void HideViz() {
         if(isShown)
             lastShownTime = Time.time;
@@ -156,18 +253,20 @@ public class HeightOverGround : MonoBehaviour{
 
         isShown = false;
     }
-
+    //!
+    //! Update function for either ongoing calculation or just updating the viz to face the camera
+    //!
     private void Update(){
         if (isAnimating || !isCreated || !isShown || target == null) return;
 
         // Update the text alignment and facing every frame so it tracks the camera smoothly
         UpdateAlignments(groundY);
 
-        if (updateOngoing){
+        if (ONGOING_SELF_UPDATE){
             //for now, just assume we ware selected
             if (SHOW_ONLY_SELECTED) {
-                if (manager.GetStaticMashQuadTree() != null){
-                    groundY = manager.GetStaticMashQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
+                if (manager.GetStaticMeshQuadTree() != null){
+                    groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
                 }   
             }
             // Only update the line math and text value if the heights physically changed
@@ -192,7 +291,9 @@ public class HeightOverGround : MonoBehaviour{
     // ==========================================
     // ANIMATION & BEHAVIOR
     // ==========================================
-
+    //!
+    //! intro animation (scales up ground marker, extend line from a to b, fold out text and count height op)
+    //!
     private IEnumerator IntroRoutine(){
         isAnimating = true;
         Vector3 worldTop = target.position;
@@ -286,6 +387,11 @@ public class HeightOverGround : MonoBehaviour{
         isAnimating = false;
     }
 
+    //!
+    //! sets position and rotation of viz to face camera, positions text in the middle OR within camera viewport
+    //!
+    //! @param currentBottomY
+    //!
     private void UpdateAlignments(float currentBottomY){
         if (target == null || cam == null) return;
 
@@ -298,7 +404,7 @@ public class HeightOverGround : MonoBehaviour{
 
         // Fallback to strict midpoint if behind the camera
         if (screenTop.z < 0 || screenBottom.z < 0){
-            textMesh.transform.position = (worldTop + worldBottom) * 0.5f + cam.transform.right * textOffsetRight;
+            textMesh.transform.position = (worldTop + worldBottom) * 0.5f + cam.transform.right * TEXT_OFFSET_RIGHT;
         }else{
             // Calculate safe visible screen boundaries (10% padding from top/bottom)
             float safeMax = Mathf.Min(Mathf.Max(screenTop.y, screenBottom.y), 0.9f);
@@ -315,13 +421,15 @@ public class HeightOverGround : MonoBehaviour{
             Vector3 worldPos = Vector3.Lerp(worldBottom, worldTop, t);
 
             // Apply the offset dynamically to the right of the camera view
-            textMesh.transform.position = worldPos + cam.transform.right * textOffsetRight;
+            textMesh.transform.position = worldPos + cam.transform.right * TEXT_OFFSET_RIGHT;
         }
 
         // --- 2. Camera Facing ---
         textMesh.transform.rotation = Quaternion.LookRotation(textMesh.transform.position - cam.transform.position);
     }
-
+    //!
+    //! updates line tiling by height distance (so it stays the same)
+    //!
     private void UpdateLineTiling(){
         Vector3 worldStart = line.transform.TransformPoint(line.GetPosition(0));
         Vector3 worldEnd = line.transform.TransformPoint(line.GetPosition(1));
@@ -329,7 +437,7 @@ public class HeightOverGround : MonoBehaviour{
         
         // Scaling the X (or U) coordinate by length ensures the pattern pins to the top and visually 
         // repeats downwards instead of stretching like a rubber band.
-        lineMat.mainTextureScale = new Vector2(currentLength * dashesPerMeter, 1f);
+        lineMat.mainTextureScale = new Vector2(currentLength * VIZ_DASHES_PER_METER, 1f);
     }
 
     // ==========================================
@@ -341,13 +449,20 @@ public class HeightOverGround : MonoBehaviour{
     //! Only shaders that ship in a Resources folder are guaranteed to exist in player builds;
     //! built-in shaders are stripped unless referenced (Editor always finds them, devices don't).
     //!
-    private static Shader FindShaderOrLog(string name){
+    //! @param name name/path of the Shader to find
+    //!
+    private Shader FindShaderOrLog(string name){
         Shader shader = Shader.Find(name);
         if (shader == null)
             Debug.LogError("HeightOverGround: shader '" + name + "' not found. It is probably stripped from this build.");
         return shader;
     }
 
+    //!
+    //! create the viz (new gameobject, linerenderer, textmesh) and add listener if applicable
+    //!
+    //! @param isSelected did we call this via selection?
+    //!
     private void CreateGraphics(bool isSelected){
         Shader lineShader = FindShaderOrLog("Custom/HeightLine");
         Shader textShader = FindShaderOrLog("Custom/TextZTest");
@@ -418,20 +533,27 @@ public class HeightOverGround : MonoBehaviour{
         rootObj.SetActive(false);
         isCreated = true;
     }
-
+    //!
+    //! create our dash texture at runtime (once)
+    //!
     private Texture2D GenerateDashedTexture(){
-        Texture2D tex = new Texture2D(32, 1, TextureFormat.RGBA32, false);
+        if(generatedDashTexture)
+            return generatedDashTexture;
+
+        generatedDashTexture = new Texture2D(32, 1, TextureFormat.RGBA32, false);
         for (int x = 0; x < 32; x++){
             // Half white, half transparent
-            tex.SetPixel(x, 0, x < 16 ? Color.white : Color.clear);
+            generatedDashTexture.SetPixel(x, 0, x < 16 ? Color.white : Color.clear);
         }
-        tex.wrapMode = TextureWrapMode.Repeat;
-        tex.filterMode = FilterMode.Point;
-        tex.Apply();
-        return tex;
+        generatedDashTexture.wrapMode = TextureWrapMode.Repeat;
+        generatedDashTexture.filterMode = FilterMode.Point;
+        generatedDashTexture.Apply();
+        return generatedDashTexture;
     }
-
-    private static Texture2D GenerateMarkerTexture(){
+    //!
+    //! create our marker texture at runtime (once)
+    //!
+    private Texture2D GenerateMarkerTexture(){
         if(generatedMarkerTexture)
             return generatedMarkerTexture;
 
@@ -460,7 +582,10 @@ public class HeightOverGround : MonoBehaviour{
         return generatedMarkerTexture;
     }
 
-    //only important to check for current selector if we have SHOW_ONLY_AT_TRANSLATE_GIZMO = true
+    //!
+    //! Listener on UI2DCreated
+    //! only done to check for current selector if we have set SHOW_ONLY_AT_TRANSLATE_GIZMO
+    //!
     private void UiCreationFinished(object sender, UnityEngine.EventSystems.UIBehaviour uib) {
         if(selectorSnapSelect)
             selectorSnapSelect.parameterChanged -= ParamChange;
@@ -469,23 +594,28 @@ public class HeightOverGround : MonoBehaviour{
             selectorSnapSelect = (SnapSelect)uib;
             selectorSnapSelect.parameterChanged += ParamChange;
             
-            selectorCurrentSelectedSnapSelectElement = 0;
-            selectedAbstractParam = manager.SelectedObjects[0].parameterList[selectorCurrentSelectedSnapSelectElement];
+            int manipulatorMode = 0;
+            selectedAbstractParam = manager.SelectedObjects[0].parameterList[manipulatorMode];
             if(selectedAbstractParam.name != "position") {
                 HideViz();
             }
         }
     }
+    //!
+    //! Listener on parameterChanged for our SnapSelect
+    //! only done to check for current selector if we have set SHOW_ONLY_AT_TRANSLATE_GIZMO
+    //!
     private void ParamChange(object sender, int manipulatorMode){
-        selectorCurrentSelectedSnapSelectElement = manipulatorMode;
-        selectedAbstractParam = manager.SelectedObjects[0].parameterList[selectorCurrentSelectedSnapSelectElement];
+        selectedAbstractParam = manager.SelectedObjects[0].parameterList[manipulatorMode];
         if(selectedAbstractParam.name != "position") {
             HideViz();
         } else {
             ShowViz(true);
         }
     }
-
+    //!
+    //! Destroy our viz via IconCreatoreModul.disposeIcons
+    //!
     public void DestroyViz() {
         Destroy(generatedMarkerTexture);
         generatedMarkerTexture = null;
