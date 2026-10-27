@@ -96,7 +96,7 @@ namespace tracer
         //!
         //! The base for the number of time steps the System uses.
         //!
-        private static int s_timestepsBase = 128;
+        private static readonly int s_timestepsBase = 128;
         //!
         //! The max value for the local time (multiples of framerate).
         //!
@@ -188,8 +188,13 @@ namespace tracer
             }
 
             _settings = new coreSettings();
-            m_timesteps = (byte)((s_timestepsBase / settings.framerate) * settings.framerate);
-            //m_parameterObjectList = new Dictionary<byte, Dictionary<short, ParameterObject>>();
+            
+            // time steps
+            int currentFramerate = settings.framerate > 0 ? settings.framerate : 60; // Guard against Division by Zero
+            int calculatedSteps = (s_timestepsBase / currentFramerate) * currentFramerate;
+            if (calculatedSteps <= 0)
+                calculatedSteps = currentFramerate;
+            m_timesteps = (byte)Mathf.Min(calculatedSteps, 255);
 
             // Create network manager
             NetworkManager networkManager = new NetworkManager(typeof(NetworkManagerModule), this);
@@ -349,7 +354,7 @@ namespace tracer
         private void updateTime()
         {
             timeEvent?.Invoke(this, EventArgs.Empty);
-            m_time = (m_time > (m_timesteps - 2)) ? (byte)0 : (byte)(m_time + 1);
+            m_time = (byte)((m_time + 1) % m_timesteps);
         }
 
         //!

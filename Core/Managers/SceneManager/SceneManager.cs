@@ -354,24 +354,39 @@ namespace tracer
         //!
         public void ResetScene()
         {
-            // remove all Unity GameObjects
             if (m_scnRoot != null)
             {
                 Transform rootTransform = m_scnRoot.transform;
                 for (int i = rootTransform.childCount - 1; i >= 0; i--)
-                    GameObject.Destroy(rootTransform.GetChild(i).gameObject);
+                {
+                    Transform child = rootTransform.GetChild(i);
+                    if (child != null && child.gameObject != null)
+                        GameObject.Destroy(child.gameObject);
+                }
             }
 
-            // remove all Tracer SceneObjects
-            foreach (SortedList<short, ParameterObject> sceneObjects in core.parameterObjectList.Values)
-                for (int i = sceneObjects.Count - 1; i >= 0; i--)
-                    if (sceneObjects.Values[i] is SceneObject sceneObject)
-                        core.removeParameterObject(sceneObject);
+            // Remove all Tracer SceneObjects from the core simulation
+            if (core != null && core.parameterObjectList != null)
+            {
+                foreach (SortedList<short, ParameterObject> sceneObjects in core.parameterObjectList.Values)
+                {
+                    if (sceneObjects == null) continue;
 
-            m_sceneCameraList.Clear();
-            m_sceneLightList.Clear();
-            m_simpleSceneObjectList.Clear();
+                    for (int i = sceneObjects.Count - 1; i >= 0; i--)
+                    {
+                        ParameterObject pObj = sceneObjects.Values[i];
+                        if (pObj is SceneObject sceneObject)
+                            core.removeParameterObject(sceneObject);
+                    }
+                }
+            }
 
+            // Clear runtime tracking lists
+            m_sceneCameraList?.Clear();
+            m_sceneLightList?.Clear();
+            m_simpleSceneObjectList?.Clear();
+
+            // Trigger the scene reset event safely
             sceneReset?.Invoke(this, EventArgs.Empty);
         }
 

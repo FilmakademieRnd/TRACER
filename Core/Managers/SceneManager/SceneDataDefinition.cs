@@ -45,6 +45,44 @@ namespace tracer
         //!
         public enum LightType { SPOT, DIRECTIONAL, POINT, AREA, DISC, SUN }
 
+        //[StructLayout(LayoutKind.Sequential, Pack = 4)]
+        //public struct Float3
+        //{
+        //    public float x, y, z;
+
+        //    // Praktischer Indexer, damit dein restlicher Code float[index] weiterhin nutzen kann!
+        //    public float this[int index]
+        //    {
+        //        get => index == 0 ? x : index == 1 ? y : z;
+        //        set { if (index == 0) x = value; else if (index == 1) y = value; else z = value; }
+        //    }
+        //}
+
+        //[StructLayout(LayoutKind.Sequential, Pack = 4)]
+        //public struct Float4
+        //{
+        //    public float x, y, z, w;
+
+        //    public float this[int index]
+        //    {
+        //        get => index == 0 ? x : index == 1 ? y : index == 2 ? z : w;
+        //        set { if (index == 0) x = value; else if (index == 1) y = value; else if (index == 2) z = value; else w = value; }
+        //    }
+        //}
+
+        //[StructLayout(LayoutKind.Sequential, Pack = 1)]
+        //public unsafe struct Byte64
+        //{
+        //    // Erstellt exakt 64 Bytes sequentiellen Speicher
+        //    private fixed byte data[64];
+
+        //    public byte this[int index]
+        //    {
+        //        get { unsafe { fixed (byte* p = data) return p[index]; } }
+        //        set { unsafe { fixed (byte* p = data) p[index] = value; } }
+        //    }
+        //}
+
         //!
         //! Data structure for serialising basic SceneNodes.
         //! The struct layout and array size for marshaling has to be fixed
@@ -120,6 +158,18 @@ namespace tracer
             //! The bone IDs for referencing the associated skeleton bones.
             [MarshalAs(UnmanagedType.ByValArray, SizeConst = 99)]
             public int[] skinnedMeshBoneIDs;
+        };
+
+        //!
+        //!
+        //!
+        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
+        public class SceneNodeGS : SceneNode
+        {
+            //! The ID for referencing the associated geometry data.
+            public int gsId;
+            public int shDegree;
+            public int sortMode;
         };
 
         //!
@@ -233,6 +283,35 @@ namespace tracer
             //! The array of bone scales for this character as vec3[].
             public float[] boneScale;
         };
+
+        //!
+        //! GS
+        //!
+        public class GaussianSpaltPackage
+        {
+            public int count;
+            public int shNcount;
+            public int shNbands;
+            public int meansLSize;
+            public int meansUSize;
+            public int scalesSize;
+            public int quadsSize;
+            public int sh0Size;
+            public int shNcentroidsSize;
+            public int shNlablesSize;
+            public float[] min; // 3x
+            public float[] max; // 3x
+            public float[] scalesCodebook; // 256x
+            public float[] sh0Codebook; // 256x
+            public float[] shNcodebook; // 256x
+            public byte[] c_meansL;
+            public byte[] c_meansU;
+            public byte[] c_scales;
+            public byte[] c_quads;
+            public byte[] c_sh0;
+            public byte[] c_shNcentroids;
+            public byte[] c_shNlables;
+        }
 
         //!
         //! TRACER structure used to hold texture data.

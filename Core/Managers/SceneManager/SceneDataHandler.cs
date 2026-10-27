@@ -27,6 +27,7 @@ https://opensource.org/licenses/MIT
 //! @date 11.03.2022
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -49,10 +50,11 @@ namespace tracer
             public class SceneData
             {
                 public TracerHeader header;
-                public byte[] thubnail;
+                public byte[] thumbnail;
                 public List<SceneNode> nodeList;
                 public List<ObjectPackage> objectList;
                 public List<CharacterPackage> characterList;
+                public List<GaussianSpaltPackage> gaussianSpaltList;
                 public List<TexturePackage> textureList;
                 public List<MaterialPackage> materialList;
                 public List<ParameterObjectPackage> parameterObjectList;
@@ -60,26 +62,29 @@ namespace tracer
                 public SceneData()
                 {
                     header = new TracerHeader();
-                    thubnail = new byte[0];
+                    thumbnail = new byte[0];
                     nodeList = new List<SceneNode>();
                     objectList = new List<ObjectPackage>();
                     characterList = new List<CharacterPackage>();
+                    gaussianSpaltList = new List<GaussianSpaltPackage>();
                     textureList = new List<TexturePackage>();
                     materialList = new List<MaterialPackage>();
                     parameterObjectList = new List<ParameterObjectPackage>();
                 }
 
-                ~SceneData() { clear(); }
+                // [SEIM] deactivated to enhance GC!
+                //~SceneData() { clear(); }
 
-                public void clear()
-                {
-                    nodeList.Clear();
-                    objectList.Clear();
-                    characterList.Clear();
-                    textureList.Clear();
-                    materialList.Clear();
-                    parameterObjectList.Clear();
-                }
+                //public void clear()
+                //{
+                //    nodeList.Clear();
+                //    objectList.Clear();
+                //    characterList.Clear();
+                //    gaussianSpaltList.Clear();
+                //    textureList.Clear();
+                //    materialList.Clear();
+                //    parameterObjectList.Clear();
+                //}
             }
 
             //!
@@ -207,6 +212,28 @@ namespace tracer
                 set { m_characterByteData = value; }
             }
             //!
+            //! The list containing the gaussian splat objects.
+            //!
+            private byte[] m_gaussianSplatByteData;
+            //!
+            //! Getter function returning a reference to the byte array  
+            //! containing the gaussian splat objects.
+            //!
+            //! @return A reference to the serialised gaussian splat objects data.
+            //!
+            public ref byte[] gaussianSplatByteDataRef
+            {
+                get { return ref m_gaussianSplatByteData; }
+            }
+            //!
+            //! Setter function for setting a the byte array,
+            //! containing the serialised gaussian splat object data.
+            //!
+            public byte[] gaussianSplatByteData
+            {
+                set { m_gaussianSplatByteData = value; }
+            }
+            //!
             //! The list containing the serialised textures.
             //!
             private byte[] m_texturesByteData;
@@ -295,6 +322,7 @@ namespace tracer
                 m_nodesByteData = new byte[0];
                 m_objectsByteData = new byte[0];
                 m_characterByteData = new byte[0];
+                m_gaussianSplatByteData = new byte[0];
                 m_texturesByteData = new byte[0];
                 m_materialsByteData = new byte[0];
                 m_parameterObjectsByteData = new byte[0];
@@ -328,6 +356,11 @@ namespace tracer
                 else
                     Helpers.Log("SceneDataHandler: Character byte array null or empty!", Helpers.logMsgType.WARNING);
 
+                if (m_gaussianSplatByteData != null && m_gaussianSplatByteData.Length > 0)
+                    sceneData.gaussianSpaltList = convertGaussianSplatByteStream();
+                else
+                    Helpers.Log("SceneDataHandler: Gaussian Splat byte array null or empty!", Helpers.logMsgType.WARNING);
+
                 if (m_texturesByteData != null && m_texturesByteData.Length > 0)
                     sceneData.textureList = convertTexturesByteStream(ref sceneData);
                 else
@@ -350,31 +383,52 @@ namespace tracer
             //! Function to convert SceneData into byte arrays.
             //! SceneData will be deleted during this process!
             //! 
-            //! @param sceneData the scruct containing the TRACER scene data.
+            //! @param sceneData the struct containing the TRACER scene data.
             //!
-            public void setSceneData(ref SceneData sceneData)
+            public void setSceneData(SceneData sceneData)
             {
-                // create byte arrays and clear buffers
-                m_headerByteData = StructureToByteArray(sceneData.header);
-                
-                m_thumbnailByteData = sceneData.thubnail;
+                if (sceneData == null) return;
 
-                getNodesByteArray(ref sceneData.nodeList);
+                // create byte arrays and clear buffers
+                int headerSize = Marshal.SizeOf(sceneData.header);
+                m_headerByteData = new byte[headerSize];
+
+                IntPtr ptr = Marshal.AllocHGlobal(headerSize);
+                try
+                {
+                    // Struktur in den unverwalteten Speicher kopieren
+                    Marshal.StructureToPtr(sceneData.header, ptr, true);
+
+                    // Daten DIREKT in das bestehende m_headerByteData kopieren (0 Byte GC-Müll!)
+                    Marshal.Copy(ptr, m_headerByteData, 0, headerSize);
+                }
+                finally
+                {
+                    // Speicher auf jeden Fall wieder freigeben (Verhindert Memory Leaks)
+                    Marshal.FreeHGlobal(ptr);
+                }
+
+                m_thumbnailByteData = sceneData.thumbnail;
+
+                getNodesByteArray(sceneData.nodeList);
                 sceneData.nodeList.Clear();
 
-                getObjectsByteArray(ref sceneData.objectList);
+                getObjectsByteArray(sceneData.objectList);
                 sceneData.objectList.Clear();
 
-                getCharacterByteArray(ref sceneData.characterList);
+                getCharacterByteArray(sceneData.characterList);
                 sceneData.characterList.Clear();
 
-                getTexturesByteArray(ref sceneData.textureList);
+                getGaussianSplatByteArray(sceneData.gaussianSpaltList);
+                sceneData.gaussianSpaltList.Clear();
+
+                getTexturesByteArray(sceneData.textureList);
                 sceneData.textureList.Clear();
 
-                getMaterialsByteArray(ref sceneData.materialList);
+                getMaterialsByteArray(sceneData.materialList);
                 sceneData.materialList.Clear();
 
-                getParameterObjectsByteArray(ref sceneData.parameterObjectList);
+                getParameterObjectsByteArray(sceneData.parameterObjectList);
                 sceneData.parameterObjectList.Clear();
             }
 
@@ -384,7 +438,7 @@ namespace tracer
             private TracerHeader convertHeaderByteStream()
             {
                 int offset = 0;
-                return ByteArrayToStructure<TracerHeader>(ref m_headerByteData, ref offset);
+                return ByteArrayToStructure<TracerHeader>(m_headerByteData, ref offset);
             }
 
             //!
@@ -392,40 +446,64 @@ namespace tracer
             //!
             private List<SceneNode> convertNodesByteStream()
             {
-                List<SceneNode> nodeList = new List<SceneNode>();
+                List<SceneManager.SceneNode> nodeList = new List<SceneManager.SceneNode>();
+
+                if (m_nodesByteData == null || m_nodesByteData.Length == 0)
+                {
+                    return nodeList;
+                }
 
                 int dataIdx = 0;
-                while (dataIdx < m_nodesByteData.Length - 1)
-                {
-                    SceneNode node = new SceneNode();
+                int nodeCounter = 0; // Zähler hinzufügen
 
+                // Iterate through the byte stream until the end is reached
+                while (dataIdx < m_nodesByteData.Length)
+                {
+                    int currentHeaderIdx = dataIdx;
+                    // Read the node type header (int)
                     NodeType nodeType = (NodeType)BitConverter.ToInt32(m_nodesByteData, dataIdx);
                     dataIdx += size_int;
 
+                    Debug.Log($"[Parser] Node #{nodeCounter} an Byte-Offset {currentHeaderIdx}: Typ = {nodeType}");
+
+                    SceneManager.SceneNode node;
+                    nodeCounter++;
+
+                    // Parse the exact structure based on the node type and upcast it to SceneNode
                     switch (nodeType)
                     {
                         case NodeType.GROUP:
-                            node = SceneDataHandler.ByteArrayToStructure<SceneNode>(ref m_nodesByteData, ref dataIdx);
+                            node = SceneDataHandler.ByteArrayToStructure<SceneManager.SceneNode>(m_nodesByteData, ref dataIdx);
                             break;
+
                         case NodeType.CHARACTER:
-                            node = SceneDataHandler.ByteArrayToStructure<SceneNodeCharacter>(ref m_nodesByteData, ref dataIdx);
+                            node = SceneDataHandler.ByteArrayToStructure<SceneManager.SceneNodeCharacter>(m_nodesByteData, ref dataIdx);
                             break;
+
                         case NodeType.GEO:
-                            node = SceneDataHandler.ByteArrayToStructure<SceneNodeGeo>(ref m_nodesByteData, ref dataIdx);
+                            node = SceneDataHandler.ByteArrayToStructure<SceneManager.SceneNodeGeo>(m_nodesByteData, ref dataIdx);
                             break;
+
                         case NodeType.SKINNEDMESH:
-                            node = SceneDataHandler.ByteArrayToStructure<SceneNodeSkinnedGeo>(ref m_nodesByteData, ref dataIdx);
+                            node = SceneDataHandler.ByteArrayToStructure<SceneManager.SceneNodeSkinnedGeo>(m_nodesByteData, ref dataIdx);
                             break;
+
                         case NodeType.LIGHT:
-                            node = SceneDataHandler.ByteArrayToStructure<SceneNodeLight>(ref m_nodesByteData, ref dataIdx);
+                            node = SceneDataHandler.ByteArrayToStructure<SceneManager.SceneNodeLight>(m_nodesByteData, ref dataIdx);
                             break;
+
                         case NodeType.CAMERA:
-                            node = SceneDataHandler.ByteArrayToStructure<SceneNodeCam>(ref m_nodesByteData, ref dataIdx);
+                            node = SceneDataHandler.ByteArrayToStructure<SceneManager.SceneNodeCam>(m_nodesByteData, ref dataIdx);
                             break;
+
+                        default:
+                            // Fallback for safety to prevent infinite loops on corrupt data
+                            throw new InvalidOperationException($"Unknown node type encountered during deserialization: {nodeType}");
                     }
 
                     nodeList.Add(node);
                 }
+
                 return nodeList;
             }
 
@@ -436,148 +514,154 @@ namespace tracer
             {
                 List<MaterialPackage> materialList = new List<MaterialPackage>();
 
-                int dataIdx = 0;
-                while (dataIdx < m_materialsByteData.Length - 1)
+                if (m_materialsByteData == null || m_materialsByteData.Length == 0)
                 {
+                    return materialList;
+                }
 
+                // Create a global span over the source data for fast and safe slicing
+                ReadOnlySpan<byte> sourceSpan = m_materialsByteData;
+                int dataIdx = 0;
+
+                // Iterate through the byte stream until the end is reached
+                while (dataIdx < sourceSpan.Length)
+                {
                     MaterialPackage matPack = new MaterialPackage();
 
-                    // get type
-                    int intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
-                    matPack.type = intValue;
+                    // 1. Get type (int)
+                    matPack.type = BitConverter.ToInt32(m_materialsByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get material name length
-                    intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                    // 2. Get material name length (int)
+                    int nameLength = BitConverter.ToInt32(m_materialsByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get material name
-                    ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_materialsByteData, dataIdx, intValue);
-                    matPack.name = Encoding.ASCII.GetString(nameByte);
-                    dataIdx += intValue;
+                    // 3. Get material name (string)
+                    if (nameLength > 0)
+                    {
+                        ReadOnlySpan<byte> nameSpan = sourceSpan.Slice(dataIdx, nameLength);
+                        matPack.name = Encoding.ASCII.GetString(nameSpan);
+                        dataIdx += nameLength;
+                    }
+                    else
+                    {
+                        matPack.name = string.Empty;
+                    }
 
-                    // get material src length
-                    intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                    // 4. Get material src length (int)
+                    int srcLength = BitConverter.ToInt32(m_materialsByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get material src
-                    nameByte = new ReadOnlySpan<byte>(m_materialsByteData, dataIdx, intValue);
-                    matPack.src = Encoding.ASCII.GetString(nameByte);
-                    dataIdx += intValue;
+                    // 5. Get material src (string)
+                    if (srcLength > 0)
+                    {
+                        ReadOnlySpan<byte> srcSpan = sourceSpan.Slice(dataIdx, srcLength);
+                        matPack.src = Encoding.ASCII.GetString(srcSpan);
+                        dataIdx += srcLength;
+                    }
+                    else
+                    {
+                        matPack.src = string.Empty;
+                    }
 
-                    // matID
+                    // 6. Get material ID (int)
                     matPack.materialID = BitConverter.ToInt32(m_materialsByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // size textureIds, textureNameIds, textureOffsets/2 (Vec2), textureScales/2 (Vec2)
-                    intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                    // 7. Get texture count size (int)
+                    int textureCount = BitConverter.ToInt32(m_materialsByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // textureIds
-                    dataIdx = deserialize(m_materialsByteData, out matPack.textureIds, dataIdx, intValue);
+                    // 8. Get textureIds (int[])
+                    matPack.textureIds = new int[textureCount];
+                    if (textureCount > 0)
+                    {
+                        int byteLength = textureCount * size_int;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, int>(byteSlice).CopyTo(matPack.textureIds);
+                        dataIdx += byteLength;
+                    }
 
-                    // textureOffsets
-                    dataIdx = deserialize(m_materialsByteData, out matPack.textureOffsets, dataIdx, intValue * 2);
+                    // 9. Get textureOffsets (float[]) - Size is textureCount * 2
+                    int offsetElements = textureCount * 2;
+                    matPack.textureOffsets = new float[offsetElements];
+                    if (offsetElements > 0)
+                    {
+                        int byteLength = offsetElements * size_float;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(matPack.textureOffsets);
+                        dataIdx += byteLength;
+                    }
 
-                    // textureScales
-                    dataIdx = deserialize(m_materialsByteData, out matPack.textureScales, dataIdx, intValue * 2);
+                    // 10. Get textureScales (float[]) - Size is textureCount * 2
+                    int scaleElements = textureCount * 2;
+                    matPack.textureScales = new float[scaleElements];
+                    if (scaleElements > 0)
+                    {
+                        int byteLength = scaleElements * size_float;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(matPack.textureScales);
+                        dataIdx += byteLength;
+                    }
 
-
+                    // 11. Optional Shader Parsing (if type != 1)
                     if (matPack.type != 1)
                     {
-                        // size shaderConfig
-                        intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                        // Shader config size (int)
+                        int shaderConfigLength = BitConverter.ToInt32(m_materialsByteData, dataIdx);
                         dataIdx += size_int;
 
-                        // shaderConfig
-                        dataIdx = deserialize(m_materialsByteData, out matPack.shaderConfig, dataIdx, intValue);
+                        // Shader config (bool[]) - bool is 1 byte per element in this structure
+                        matPack.shaderConfig = new bool[shaderConfigLength];
+                        if (shaderConfigLength > 0)
+                        {
+                            ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, shaderConfigLength);
+                            MemoryMarshal.Cast<byte, bool>(byteSlice).CopyTo(matPack.shaderConfig);
+                            dataIdx += shaderConfigLength;
+                        }
 
-                        // size shaderProperties
-                        intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                        // Shader property count (int)
+                        int propertyCount = BitConverter.ToInt32(m_materialsByteData, dataIdx);
                         dataIdx += size_int;
 
-                        // shader property IDs
-                        dataIdx = deserialize(m_materialsByteData, out matPack.shaderPropertyIds, dataIdx, intValue);
+                        // Shader property IDs (int[])
+                        matPack.shaderPropertyIds = new int[propertyCount];
+                        if (propertyCount > 0)
+                        {
+                            int byteLength = propertyCount * size_int;
+                            ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                            MemoryMarshal.Cast<byte, int>(byteSlice).CopyTo(matPack.shaderPropertyIds);
+                            dataIdx += byteLength;
+                        }
 
-                        // shader property types
-                        dataIdx = deserialize(m_materialsByteData, out matPack.shaderPropertyTypes, dataIdx, intValue);
+                        // Shader property types (int[])
+                        matPack.shaderPropertyTypes = new int[propertyCount];
+                        if (propertyCount > 0)
+                        {
+                            int byteLength = propertyCount * size_int;
+                            ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                            MemoryMarshal.Cast<byte, int>(byteSlice).CopyTo(matPack.shaderPropertyTypes);
+                            dataIdx += byteLength;
+                        }
 
-                        // size shaderProperties data
-                        intValue = BitConverter.ToInt32(m_materialsByteData, dataIdx);
+                        // Shader properties data size (int)
+                        int propertiesDataSize = BitConverter.ToInt32(m_materialsByteData, dataIdx);
                         dataIdx += size_int;
 
-                        // shader property data
-                        matPack.shaderProperties = new byte[intValue];
-                        Buffer.BlockCopy(m_materialsByteData, dataIdx, matPack.shaderProperties, 0, intValue);
-                        dataIdx += intValue;
+                        // Shader property raw data (byte[])
+                        matPack.shaderProperties = new byte[propertiesDataSize];
+                        if (propertiesDataSize > 0)
+                        {
+                            ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, propertiesDataSize);
+                            byteSlice.CopyTo(matPack.shaderProperties);
+                            dataIdx += propertiesDataSize;
+                        }
                     }
 
                     materialList.Add(matPack);
                 }
+
                 return materialList;
-            }
-
-            //!
-            //! Helper for deserialization of bool lists
-            //!
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static int deserialize(in byte[] srcData, out bool[] dstData, int srcOffset, int length)
-            {
-                dstData = new bool[length];
-                for (int i = 0; i < length; i++)
-                {
-                    dstData[i] = BitConverter.ToBoolean(srcData, srcOffset);
-                    srcOffset++;
-                }
-                return srcOffset;
-            }
-
-            //!
-            //! Helper for deserialization of int lists
-            //!
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static int deserialize(in byte[] srcData, out int[] dstData, int srcOffset, int length)
-            {
-                dstData = new int[length];
-                for (int i = 0; i < length; i++)
-                {
-                    dstData[i] = BitConverter.ToInt32(srcData, srcOffset);
-                    srcOffset += size_int;
-                }
-                return srcOffset;
-            }
-
-            //!
-            //! Helper for deserialization of float lists
-            //!
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static int deserialize(in byte[] srcData, out float[] dstData, int srcOffset, int length)
-            {
-                dstData = new float[length];
-                for (int i = 0; i < length; i++)
-                {
-                    dstData[i] = BitConverter.ToSingle(srcData, srcOffset);
-                    srcOffset += size_float;
-                }
-                return srcOffset;
-            }
-
-            //!
-            //! Helper for deserialization of string lists
-            //!
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static int deserialize(in ReadOnlySpan<byte> srcData, out string[] dstData, int srcOffset, int length)
-            {
-                dstData = new string[length];
-                for (int i = 0; i < length; i++)
-                {
-                    int jLength = MemoryMarshal.Read<int>(srcData.Slice(srcOffset));
-                    srcOffset += size_int;
-
-                    dstData[i] = Encoding.ASCII.GetString(srcData.Slice(srcOffset, jLength));
-                    srcOffset += jLength;
-                }
-                return srcOffset;
             }
 
             //!
@@ -587,42 +671,189 @@ namespace tracer
             {
                 List<ParameterObjectPackage> parameterObjectList = new List<ParameterObjectPackage>();
 
+                if (m_parameterObjectsByteData == null || m_parameterObjectsByteData.Length == 0)
+                {
+                    return parameterObjectList;
+                }
+
+                // Create a global span over the source data for fast and safe slicing
+                ReadOnlySpan<byte> sourceSpan = m_parameterObjectsByteData;
                 int dataIdx = 0;
-                while (dataIdx < m_parameterObjectsByteData.Length - 1)
+
+                // Iterate through the byte stream until the end is reached
+                while (dataIdx < sourceSpan.Length)
                 {
                     ParameterObjectPackage poPack = new ParameterObjectPackage();
 
-                    // get _id
-                    int intValue = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
-                    poPack.id = intValue;
+                    // 1. Get _id (int)
+                    poPack.id = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get parameter object name length
-                    intValue = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
+                    // 2. Get parameter object name length (int)
+                    int nameLength = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get parameter object name
-                    ReadOnlySpan<byte> nameByte = new ReadOnlySpan<byte>(m_parameterObjectsByteData, dataIdx, intValue);
-                    poPack.name = Encoding.ASCII.GetString(nameByte);
-                    dataIdx += intValue;
+                    // 3. Get parameter object name (string)
+                    if (nameLength > 0)
+                    {
+                        ReadOnlySpan<byte> nameSpan = sourceSpan.Slice(dataIdx, nameLength);
+                        poPack.name = Encoding.ASCII.GetString(nameSpan);
+                        dataIdx += nameLength;
+                    }
+                    else
+                    {
+                        poPack.name = string.Empty;
+                    }
 
-                    // get nbr of parameters 
-                    intValue = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
+                    // 4. Get number of parameters (int)
+                    int numParameters = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // parameter types
-                    dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pTypes, dataIdx, intValue);
-                   
-                    // parameter is RPC
-                    dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pRPC, dataIdx, intValue);
-                    
-                    // parameter names
-                    dataIdx = deserialize(m_parameterObjectsByteData, out poPack.pNames, dataIdx, intValue);
+                    // 5. Get parameter types (int[])
+                    poPack.pTypes = new int[numParameters];
+                    if (numParameters > 0)
+                    {
+                        int byteLength = numParameters * size_int;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, int>(byteSlice).CopyTo(poPack.pTypes);
+                        dataIdx += byteLength;
+                    }
+
+                    // 6. Get parameter RPC properties (bool[])
+                    poPack.pRPC = new bool[numParameters];
+                    if (numParameters > 0)
+                    {
+                        // bool is 1 byte per element in this structure
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, numParameters);
+                        MemoryMarshal.Cast<byte, bool>(byteSlice).CopyTo(poPack.pRPC);
+                        dataIdx += numParameters;
+                    }
+
+                    // 7. Get parameter names (string[])
+                    poPack.pNames = new string[numParameters];
+                    for (int i = 0; i < numParameters; i++)
+                    {
+                        // Read individual string length header
+                        int strLength = BitConverter.ToInt32(m_parameterObjectsByteData, dataIdx);
+                        dataIdx += size_int;
+
+                        if (strLength > 0)
+                        {
+                            ReadOnlySpan<byte> strSpan = sourceSpan.Slice(dataIdx, strLength);
+                            poPack.pNames[i] = Encoding.ASCII.GetString(strSpan);
+                            dataIdx += strLength;
+                        }
+                        else
+                        {
+                            poPack.pNames[i] = string.Empty;
+                        }
+                    }
 
                     parameterObjectList.Add(poPack);
                 }
 
                 return parameterObjectList;
+            }
+
+            private List<GaussianSpaltPackage> convertGaussianSplatByteStream(ref SceneData sceneData)
+            {
+                if (m_gaussianSplatByteData == null || m_gaussianSplatByteData.Length == 0)
+                {
+                    return new List<GaussianSpaltPackage>();
+                }
+
+                // Konservative Schätzung der Kapazität, um internes Listen-Resizing zu vermeiden
+                int estimatedCapacity = m_gaussianSplatByteData.Length / 4096; // 4KB als grober Richtwert pro Paket
+                List<GaussianSpaltPackage> gaussianSplatList = new List<GaussianSpaltPackage>(Math.Max(4, estimatedCapacity));
+
+                ReadOnlySpan<byte> sourceSpan = m_gaussianSplatByteData;
+                int dataIdx = 0;
+
+                while (dataIdx < sourceSpan.Length)
+                {
+                    GaussianSpaltPackage gsPack = new GaussianSpaltPackage();
+
+                    // 1. Die 10 Integer-Werte via BinaryPrimitives auslesen
+                    gsPack.count = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.shNcount = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.shNbands = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.meansLSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.meansUSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.scalesSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.quadsSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.sh0Size = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.shNcentroidsSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+                    gsPack.shNlablesSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
+
+                    // 2. Float-Arrays (min, max, codebooks) via MemoryMarshal einlesen
+                    // min (3 floats = 12 Bytes)
+                    gsPack.min = new float[3];
+                    MemoryMarshal.Cast<byte, float>(sourceSpan.Slice(dataIdx, 12)).CopyTo(gsPack.min);
+                    dataIdx += 12;
+
+                    // max (3 floats = 12 Bytes)
+                    gsPack.max = new float[3];
+                    MemoryMarshal.Cast<byte, float>(sourceSpan.Slice(dataIdx, 12)).CopyTo(gsPack.max);
+                    dataIdx += 12;
+
+                    // scalesCodebook (256 floats = 1024 Bytes)
+                    gsPack.scalesCodebook = new float[256];
+                    MemoryMarshal.Cast<byte, float>(sourceSpan.Slice(dataIdx, 1024)).CopyTo(gsPack.scalesCodebook);
+                    dataIdx += 1024;
+
+                    // sh0Codebook (256 floats = 1024 Bytes)
+                    gsPack.sh0Codebook = new float[256];
+                    MemoryMarshal.Cast<byte, float>(sourceSpan.Slice(dataIdx, 1024)).CopyTo(gsPack.sh0Codebook);
+                    dataIdx += 1024;
+
+                    // shNcodebook (256 floats = 1024 Bytes)
+                    gsPack.shNcodebook = new float[256];
+                    MemoryMarshal.Cast<byte, float>(sourceSpan.Slice(dataIdx, 1024)).CopyTo(gsPack.shNcodebook);
+                    dataIdx += 1024;
+
+                    // 3. Die Byte-Arrays (Nutzdaten) zurückkopieren
+                    gsPack.c_meansL = new byte[gsPack.meansLSize];
+                    sourceSpan.Slice(dataIdx, gsPack.meansLSize).CopyTo(gsPack.c_meansL);
+                    dataIdx += gsPack.meansLSize;
+
+                    gsPack.c_meansU = new byte[gsPack.meansUSize];
+                    sourceSpan.Slice(dataIdx, gsPack.meansUSize).CopyTo(gsPack.c_meansU);
+                    dataIdx += gsPack.meansUSize;
+
+                    gsPack.c_scales = new byte[gsPack.scalesSize];
+                    sourceSpan.Slice(dataIdx, gsPack.scalesSize).CopyTo(gsPack.c_scales);
+                    dataIdx += gsPack.scalesSize;
+
+                    gsPack.c_quads = new byte[gsPack.quadsSize];
+                    sourceSpan.Slice(dataIdx, gsPack.quadsSize).CopyTo(gsPack.c_quads);
+                    dataIdx += gsPack.quadsSize;
+
+                    gsPack.c_sh0 = new byte[gsPack.sh0Size];
+                    sourceSpan.Slice(dataIdx, gsPack.sh0Size).CopyTo(gsPack.c_sh0);
+                    dataIdx += gsPack.sh0Size;
+
+                    gsPack.c_shNcentroids = new byte[gsPack.shNcentroidsSize];
+                    sourceSpan.Slice(dataIdx, gsPack.shNcentroidsSize).CopyTo(gsPack.c_shNcentroids);
+                    dataIdx += gsPack.shNcentroidsSize;
+
+                    gsPack.c_shNlables = new byte[gsPack.shNlablesSize];
+                    sourceSpan.Slice(dataIdx, gsPack.shNlablesSize).CopyTo(gsPack.c_shNlables);
+                    dataIdx += gsPack.shNlablesSize;
+
+                    gaussianSplatList.Add(gsPack);
+                }
+
+                return gaussianSplatList;
             }
 
             //!
@@ -633,32 +864,51 @@ namespace tracer
             private List<TexturePackage> convertTexturesByteStream(ref SceneData sceneData)
             {
                 List<TexturePackage> textureList = new List<TexturePackage>();
+
+                if (m_texturesByteData == null || m_texturesByteData.Length == 0)
+                {
+                    return textureList;
+                }
+
+                // Create a global span over the source data for fast and safe slicing
+                ReadOnlySpan<byte> sourceSpan = m_texturesByteData;
                 int dataIdx = 0;
 
-                while (dataIdx < m_texturesByteData.Length - 1)
+                // Iterate through the byte stream until the end is reached
+                while (dataIdx < sourceSpan.Length)
                 {
                     TexturePackage texPack = new TexturePackage();
 
-                    int intValue = BitConverter.ToInt32(m_texturesByteData, dataIdx);
+                    // Get width (int)
+                    texPack.width = BitConverter.ToInt32(m_texturesByteData, dataIdx);
                     dataIdx += size_int;
-                    texPack.width = intValue;
-                    intValue = BitConverter.ToInt32(m_texturesByteData, dataIdx);
-                    dataIdx += size_int;
-                    texPack.height = intValue;
-                    intValue = BitConverter.ToInt32(m_texturesByteData, dataIdx);
-                    dataIdx += size_int;
-                    texPack.format = (TextureFormat)intValue;
 
-                    // pixel data
+                    // Get height (int)
+                    texPack.height = BitConverter.ToInt32(m_texturesByteData, dataIdx);
+                    dataIdx += size_int;
+
+                    // Get format (TextureFormat enum from int)
+                    int formatValue = BitConverter.ToInt32(m_texturesByteData, dataIdx);
+                    dataIdx += size_int;
+                    texPack.format = (TextureFormat)formatValue;
+
+                    // Get pixel data size (int)
                     int numValues = BitConverter.ToInt32(m_texturesByteData, dataIdx);
                     dataIdx += size_int;
                     texPack.colorMapDataSize = numValues;
+
+                    // Get pixel data (byte[])
                     texPack.colorMapData = new byte[numValues];
-                    Buffer.BlockCopy(m_texturesByteData, dataIdx, texPack.colorMapData, 0, numValues);
-                    dataIdx += numValues;
+                    if (numValues > 0)
+                    {
+                        ReadOnlySpan<byte> pixelSlice = sourceSpan.Slice(dataIdx, numValues);
+                        pixelSlice.CopyTo(texPack.colorMapData);
+                        dataIdx += numValues;
+                    }
 
                     textureList.Add(texPack);
                 }
+
                 return textureList;
             }
 
@@ -669,80 +919,88 @@ namespace tracer
             {
                 List<CharacterPackage> characterList = new List<CharacterPackage>();
 
+                if (m_characterByteData == null || m_characterByteData.Length == 0)
+                {
+                    return characterList;
+                }
+
+                // Create a global span over the source data for high-performance slicing
+                ReadOnlySpan<byte> sourceSpan = m_characterByteData;
                 int dataIdx = 0;
 
-                while (dataIdx < m_characterByteData.Length - 1)
+                // Iterate through the byte stream until the end is reached
+                while (dataIdx < sourceSpan.Length)
                 {
                     CharacterPackage characterPack = new CharacterPackage();
 
-                    // get bone Mapping size
+                    // 1. Get bone mapping size (int)
                     characterPack.bMSize = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get bone Mapping size
+                    // 2. Get skeleton mapping size (int)
                     characterPack.sSize = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get root dag path
+                    // 3. Get root dag path (int)
                     characterPack.characterRootId = BitConverter.ToInt32(m_characterByteData, dataIdx);
                     dataIdx += size_int;
 
-                    // get bone mapping
+                    // 4. Get bone mapping (int[])
                     characterPack.boneMapping = new int[characterPack.bMSize];
-                    for (int i = 0; i < characterPack.bMSize; i++)
+                    if (characterPack.bMSize > 0)
                     {
-                        characterPack.boneMapping[i] = BitConverter.ToInt32(m_characterByteData, dataIdx);
-                        dataIdx += size_int;
+                        int byteLength = characterPack.bMSize * size_int;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, int>(byteSlice).CopyTo(characterPack.boneMapping);
+                        dataIdx += byteLength;
                     }
 
-                    //get skeleton mapping
+                    // 5. Get skeleton mapping (int[])
                     characterPack.skeletonMapping = new int[characterPack.sSize];
-                    for (int i = 0; i < characterPack.sSize; i++)
+                    if (characterPack.sSize > 0)
                     {
-                        characterPack.skeletonMapping[i] = BitConverter.ToInt32(m_characterByteData, dataIdx);
-                        dataIdx += size_int;
+                        int byteLength = characterPack.sSize * size_int;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, int>(byteSlice).CopyTo(characterPack.skeletonMapping);
+                        dataIdx += byteLength;
                     }
 
-                    //get skeleton bone postions
-                    characterPack.bonePosition = new float[characterPack.sSize * 3];
-                    for (int i = 0; i < characterPack.sSize; i++)
+                    // 6. Get skeleton bone positions (float[])
+                    int posElements = characterPack.sSize * 3;
+                    characterPack.bonePosition = new float[posElements];
+                    if (posElements > 0)
                     {
-                        characterPack.bonePosition[i * 3] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
-                        characterPack.bonePosition[i * 3 + 1] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
-                        characterPack.bonePosition[i * 3 + 2] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
+                        int byteLength = posElements * size_float;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(characterPack.bonePosition);
+                        dataIdx += byteLength;
                     }
 
-                    //get skeleton bone rotations
-                    characterPack.boneRotation = new float[characterPack.sSize * 4];
-                    for (int i = 0; i < characterPack.sSize; i++)
+                    // 7. Get skeleton bone rotations (float[])
+                    int rotElements = characterPack.sSize * 4;
+                    characterPack.boneRotation = new float[rotElements];
+                    if (rotElements > 0)
                     {
-                        characterPack.boneRotation[i * 4] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
-                        characterPack.boneRotation[i * 4 + 1] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
-                        characterPack.boneRotation[i * 4 + 2] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
-                        characterPack.boneRotation[i * 4 + 3] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
+                        int byteLength = rotElements * size_float;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(characterPack.boneRotation);
+                        dataIdx += byteLength;
                     }
 
-                    //get skeleton bone scales
-                    characterPack.boneScale = new float[characterPack.sSize * 3];
-                    for (int i = 0; i < characterPack.sSize; i++)
+                    // 8. Get skeleton bone scales (float[])
+                    int scaleElements = characterPack.sSize * 3;
+                    characterPack.boneScale = new float[scaleElements];
+                    if (scaleElements > 0)
                     {
-                        characterPack.boneScale[i * 3] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
-                        characterPack.boneScale[i * 3 + 1] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
-                        characterPack.boneScale[i * 3 + 2] = BitConverter.ToSingle(m_characterByteData, dataIdx);
-                        dataIdx += size_float;
+                        int byteLength = scaleElements * size_float;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(characterPack.boneScale);
+                        dataIdx += byteLength;
                     }
 
                     characterList.Add(characterPack);
                 }
+
                 return characterList;
             }
 
@@ -753,129 +1011,235 @@ namespace tracer
             {
                 List<ObjectPackage> objectList = new List<ObjectPackage>();
 
+                if (m_objectsByteData == null || m_objectsByteData.Length == 0)
+                {
+                    return objectList;
+                }
+
+                // Create a global span over the source data for fast slicing
+                ReadOnlySpan<byte> sourceSpan = m_objectsByteData;
                 int dataIdx = 0;
-                while (dataIdx < m_objectsByteData.Length - 1)
+
+                // Use a safe boundary check matching the exact header size requirements
+                while (dataIdx < sourceSpan.Length)
                 {
                     ObjectPackage objPack = new ObjectPackage();
 
-                    // get vertices
-                    int numValues = BitConverter.ToInt32(m_objectsByteData, dataIdx);
+                    // 1. Get Vertices
+                    int numVertices = BitConverter.ToInt32(m_objectsByteData, dataIdx);
                     dataIdx += size_int;
-                    objPack.vSize = numValues;
-                    objPack.vertices = new float[numValues * 3];
-                    for (int i = 0; i < numValues * 3; i++)
+                    objPack.vSize = numVertices;
+
+                    int vertexElements = numVertices * 3;
+                    objPack.vertices = new float[vertexElements];
+                    if (vertexElements > 0)
                     {
-                        objPack.vertices[i] = BitConverter.ToSingle(m_objectsByteData, dataIdx);
-                        dataIdx += size_float;
+                        int byteLength = vertexElements * size_float;
+                        // Slice the required bytes and cast them directly into the target float array
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(objPack.vertices);
+                        dataIdx += byteLength;
                     }
 
-
-                    // get indices
-                    numValues = BitConverter.ToInt32(m_objectsByteData, dataIdx);
+                    // 2. Get Indices
+                    int numIndices = BitConverter.ToInt32(m_objectsByteData, dataIdx);
                     dataIdx += size_int;
-                    objPack.iSize = numValues;
-                    objPack.indices = new int[numValues];
-                    for (int i = 0; i < numValues; i++)
+                    objPack.iSize = numIndices;
+
+                    objPack.indices = new int[numIndices];
+                    if (numIndices > 0)
                     {
-                        objPack.indices[i] = BitConverter.ToInt32(m_objectsByteData, dataIdx);
-                        dataIdx += size_int;
+                        int byteLength = numIndices * size_int;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, int>(byteSlice).CopyTo(objPack.indices);
+                        dataIdx += byteLength;
                     }
 
-                    // get normals
-                    numValues = BitConverter.ToInt32(m_objectsByteData, dataIdx);
+                    // 3. Get Normals
+                    int numNormals = BitConverter.ToInt32(m_objectsByteData, dataIdx);
                     dataIdx += size_int;
-                    objPack.nSize = numValues;
-                    objPack.normals = new float[numValues * 3];
-                    for (int i = 0; i < numValues * 3; i++)
+                    objPack.nSize = numNormals;
+
+                    int normalElements = numNormals * 3;
+                    objPack.normals = new float[normalElements];
+                    if (normalElements > 0)
                     {
-                        objPack.normals[i] = BitConverter.ToSingle(m_objectsByteData, dataIdx);
-                        dataIdx += size_float;
+                        int byteLength = normalElements * size_float;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(objPack.normals);
+                        dataIdx += byteLength;
                     }
 
-                    // get uvs
-                    numValues = BitConverter.ToInt32(m_objectsByteData, dataIdx);
+                    // 4. Get Uvs
+                    int numUvs = BitConverter.ToInt32(m_objectsByteData, dataIdx);
                     dataIdx += size_int;
-                    objPack.uvSize = numValues;
-                    objPack.uvs = new float[numValues * 2];
-                    for (int i = 0; i < numValues * 2; i++)
+                    objPack.uvSize = numUvs;
+
+                    int uvElements = numUvs * 2;
+                    objPack.uvs = new float[uvElements];
+                    if (uvElements > 0)
                     {
-                        objPack.uvs[i] = BitConverter.ToSingle(m_objectsByteData, dataIdx);
-                        dataIdx += size_float;
+                        int byteLength = uvElements * size_float;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(objPack.uvs);
+                        dataIdx += byteLength;
                     }
 
-                    // get boneWeights
-                    numValues = BitConverter.ToInt32(m_objectsByteData, dataIdx);
+                    // 5. Get Bone Weights
+                    int numBoneWeights = BitConverter.ToInt32(m_objectsByteData, dataIdx);
                     dataIdx += size_int;
-                    objPack.bWSize = numValues;
-                    objPack.boneWeights = new float[numValues * 4];
-                    for (int i = 0; i < numValues * 4; i++)
+                    objPack.bWSize = numBoneWeights;
+
+                    int boneWeightElements = numBoneWeights * 4;
+                    objPack.boneWeights = new float[boneWeightElements];
+                    if (boneWeightElements > 0)
                     {
-                        objPack.boneWeights[i] = BitConverter.ToSingle(m_objectsByteData, dataIdx);
-                        dataIdx += size_float;
+                        int byteLength = boneWeightElements * size_float;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, float>(byteSlice).CopyTo(objPack.boneWeights);
+                        dataIdx += byteLength;
                     }
 
-                    // get boneIndices
-                    objPack.boneIndices = new int[objPack.bWSize * 4];
-                    for (int i = 0; i < objPack.bWSize * 4; i++)
+                    // 6. Get Bone Indices
+                    int boneIndexElements = objPack.bWSize * 4;
+                    objPack.boneIndices = new int[boneIndexElements];
+                    if (boneIndexElements > 0)
                     {
-                        objPack.boneIndices[i] = BitConverter.ToInt32(m_objectsByteData, dataIdx);
-                        dataIdx += size_int;
+                        int byteLength = boneIndexElements * size_int;
+                        ReadOnlySpan<byte> byteSlice = sourceSpan.Slice(dataIdx, byteLength);
+                        MemoryMarshal.Cast<byte, int>(byteSlice).CopyTo(objPack.boneIndices);
+                        dataIdx += byteLength;
                     }
 
                     objectList.Add(objPack);
                 }
+
                 return objectList;
+            }
+
+            //!
+            //!
+            //!
+            private List<GaussianSpaltPackage> convertGaussianSplatByteStream()
+            {
+                List<GaussianSpaltPackage> gaussianSplatList = new List<GaussianSpaltPackage>();
+
+                int dataIdx = 0;
+                while (dataIdx < m_gaussianSplatByteData.Length - 1)
+                {
+                    GaussianSpaltPackage gsPack = new GaussianSpaltPackage();
+
+                    // tbc... [SEIM]
+                }
+
+                return gaussianSplatList;
             }
 
             //!
             //! Function that concatinates all serialised TRACER nodes to a byte array.
             //!
-            private void getNodesByteArray(ref List<SceneManager.SceneNode> nodeList)
+            private void getNodesByteArray(List<SceneManager.SceneNode> nodeList)
             {
-                m_nodesByteData = new byte[0];
+                if (nodeList == null || nodeList.Count == 0)
+                {
+                    m_nodesByteData = Array.Empty<byte>();
+                    return;
+                }
+
+                // Cache the sizes of the structures upfront to avoid calling Marshal.SizeOf inside loops
+                int typeHeaderSize = SceneDataHandler.size_int;
+                int sizeNode = Marshal.SizeOf<SceneManager.SceneNode>();
+                int sizeGeo = Marshal.SizeOf<SceneManager.SceneNodeGeo>();
+                int sizeSkinned = Marshal.SizeOf<SceneManager.SceneNodeSkinnedGeo>();
+                int sizeLight = Marshal.SizeOf<SceneManager.SceneNodeLight>();
+                int sizeCam = Marshal.SizeOf<SceneManager.SceneNodeCam>();
+                int sizeChar = Marshal.SizeOf<SceneManager.SceneNodeCharacter>();
+
+                // 1. Calculate the total required size upfront
+                int totalSize = 0;
                 foreach (SceneManager.SceneNode node in nodeList)
                 {
-                    byte[] nodeBinary;
-                    byte[] nodeTypeBinary;
-                    if (node.GetType() == typeof(SceneManager.SceneNodeGeo))
-                    {
-                        nodeTypeBinary = BitConverter.GetBytes((int)NodeType.GEO);
-                        SceneManager.SceneNodeGeo nodeGeo = (SceneManager.SceneNodeGeo)Convert.ChangeType(node, typeof(SceneManager.SceneNodeGeo));
-                        nodeBinary = StructureToByteArray(nodeGeo);
-                    }
-                    else if (node.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
-                    {
-                        nodeTypeBinary = BitConverter.GetBytes((int)NodeType.SKINNEDMESH);
-                        SceneManager.SceneNodeSkinnedGeo nodeskinnedGeo = (SceneManager.SceneNodeSkinnedGeo)Convert.ChangeType(node, typeof(SceneManager.SceneNodeSkinnedGeo));
-                        nodeBinary = StructureToByteArray(nodeskinnedGeo);
-                    }
-                    else if (node.GetType() == typeof(SceneManager.SceneNodeLight))
-                    {
-                        nodeTypeBinary = BitConverter.GetBytes((int)NodeType.LIGHT);
-                        SceneManager.SceneNodeLight nodeLight = (SceneManager.SceneNodeLight)Convert.ChangeType(node, typeof(SceneManager.SceneNodeLight));
-                        nodeBinary = StructureToByteArray(nodeLight);
-                    }
-                    else if (node.GetType() == typeof(SceneManager.SceneNodeCam))
-                    {
-                        nodeTypeBinary = BitConverter.GetBytes((int)NodeType.CAMERA);
-                        SceneManager.SceneNodeCam nodeCam = (SceneManager.SceneNodeCam)Convert.ChangeType(node, typeof(SceneManager.SceneNodeCam));
-                        nodeBinary = StructureToByteArray(nodeCam);
-                    }
-                    else if (node.GetType() == typeof(SceneManager.SceneNodeCharacter))
-                    {
-                        nodeTypeBinary = BitConverter.GetBytes((int)NodeType.CHARACTER);
-                        SceneManager.SceneNodeCharacter nodeChar = (SceneManager.SceneNodeCharacter)Convert.ChangeType(node, typeof(SceneManager.SceneNodeCharacter));
-                        nodeBinary = StructureToByteArray(nodeChar);
-                    }
-                    else
-                    {
-                        nodeTypeBinary = BitConverter.GetBytes((int)NodeType.GROUP);
-                        nodeBinary = StructureToByteArray(node);
-                    }
+                    totalSize += typeHeaderSize; // Every node writes an int for NodeType
 
-                    // concate arrays
-                    m_nodesByteData = Concat<byte>(m_nodesByteData, nodeTypeBinary);
-                    m_nodesByteData = Concat<byte>(m_nodesByteData, nodeBinary);
+                    if (node is SceneManager.SceneNodeGeo) totalSize += sizeGeo;
+                    else if (node is SceneManager.SceneNodeSkinnedGeo) totalSize += sizeSkinned;
+                    else if (node is SceneManager.SceneNodeLight) totalSize += sizeLight;
+                    else if (node is SceneManager.SceneNodeCam) totalSize += sizeCam;
+                    else if (node is SceneManager.SceneNodeCharacter) totalSize += sizeChar;
+                    else totalSize += sizeNode;
+                }
+
+                // 2. Allocate the final array exactly ONCE
+                m_nodesByteData = new byte[totalSize];
+                Span<byte> targetSpan = m_nodesByteData;
+                int dstIdx = 0;
+
+                // Pin the managed target array momentarily to get safe native pointers for all operations
+                GCHandle handle = GCHandle.Alloc(m_nodesByteData, GCHandleType.Pinned);
+
+                try
+                {
+                    IntPtr basePtr = handle.AddrOfPinnedObject();
+
+                    // 3. Write data directly into the final array
+                    foreach (SceneManager.SceneNode node in nodeList)
+                    {
+                        NodeType nodeType;
+                        int structureSize;
+                        object targetStructure;
+
+                        // Use high-performance Pattern Matching instead of GetType() and Convert.ChangeType
+                        if (node is SceneManager.SceneNodeGeo nodeGeo)
+                        {
+                            nodeType = NodeType.GEO;
+                            structureSize = sizeGeo;
+                            targetStructure = nodeGeo;
+                        }
+                        else if (node is SceneManager.SceneNodeSkinnedGeo nodeSkinnedGeo)
+                        {
+                            nodeType = NodeType.SKINNEDMESH;
+                            structureSize = sizeSkinned;
+                            targetStructure = nodeSkinnedGeo;
+                        }
+                        else if (node is SceneManager.SceneNodeLight nodeLight)
+                        {
+                            nodeType = NodeType.LIGHT;
+                            structureSize = sizeLight;
+                            targetStructure = nodeLight;
+                        }
+                        else if (node is SceneManager.SceneNodeCam nodeCam)
+                        {
+                            nodeType = NodeType.CAMERA;
+                            structureSize = sizeCam;
+                            targetStructure = nodeCam;
+                        }
+                        else if (node is SceneManager.SceneNodeCharacter nodeChar)
+                        {
+                            nodeType = NodeType.CHARACTER;
+                            structureSize = sizeChar;
+                            targetStructure = nodeChar;
+                        }
+                        else
+                        {
+                            nodeType = NodeType.GROUP;
+                            structureSize = sizeNode;
+                            targetStructure = node;
+                        }
+
+                        // Write node type (int)
+                        BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, typeHeaderSize), (int)nodeType);
+                        dstIdx += typeHeaderSize;
+
+                        // Marshal the structure directly into the correct position within the final array
+                        IntPtr dstPtr = basePtr + dstIdx;
+                        Marshal.StructureToPtr(targetStructure, dstPtr, false);
+                        dstIdx += structureSize;
+                    }
+                }
+                finally
+                {
+                    // Always release the handle to unpin the array and avoid memory leaks
+                    handle.Free();
                 }
             }
 
@@ -884,51 +1248,86 @@ namespace tracer
             //!
             //! @param objectList The list that contains the serialised meshes to be concatinated.
             //!
-            private void getObjectsByteArray(ref List<ObjectPackage> objectList)
+            private void getObjectsByteArray(List<ObjectPackage> objectList)
             {
-                m_objectsByteData = new byte[0];
+                if (objectList == null || objectList.Count == 0)
+                {
+                    m_objectsByteData = Array.Empty<byte>();
+                    return;
+                }
+
+                // 1. Die exakte Gesamtgröße ALLER Objekte im Vorfeld berechnen
+                int totalSize = 0;
+                foreach (var objPack in objectList)
+                {
+                    totalSize += 5 * sizeof(int) +
+                                 objPack.vSize * 3 * sizeof(float) +
+                                 objPack.iSize * sizeof(int) +
+                                 objPack.nSize * 3 * sizeof(float) +
+                                 objPack.uvSize * 2 * sizeof(float) +
+                                 objPack.bWSize * 4 * sizeof(float) +
+                                 objPack.bWSize * 4 * sizeof(int);
+                }
+
+                // 2. Nur EINMAL Speicher für alle Daten allokieren (0% GC-Druck)
+                m_objectsByteData = new byte[totalSize];
+
+                // 3. Einen Span auf das Ziel-Array legen für ultraschnellen Speicherzugriff
+                Span<byte> targetSpan = m_objectsByteData;
+                int dstIdx = 0;
 
                 foreach (ObjectPackage objPack in objectList)
                 {
-                    byte[] objByteData = new byte[5 * SceneDataHandler.size_int +
-                                                        objPack.vSize * 3 * SceneDataHandler.size_float +
-                                                        objPack.iSize * SceneDataHandler.size_int +
-                                                        objPack.nSize * 3 * SceneDataHandler.size_float +
-                                                        objPack.uvSize * 2 * SceneDataHandler.size_float +
-                                                        objPack.bWSize * 4 * SceneDataHandler.size_float +
-                                                        objPack.bWSize * 4 * SceneDataHandler.size_int];
-                    int dstIdx = 0;
-                    // vertices
-                    BitConverter.TryWriteBytes(new Span<byte>(objByteData, dstIdx, SceneDataHandler.size_int), objPack.vSize);
-                    dstIdx += SceneDataHandler.size_int;
-                    Buffer.BlockCopy(objPack.vertices, 0, objByteData, dstIdx, objPack.vSize * 3 * SceneDataHandler.size_float);
-                    dstIdx += objPack.vSize * 3 * SceneDataHandler.size_float;
-                    // indices
-                    BitConverter.TryWriteBytes(new Span<byte>(objByteData, dstIdx, SceneDataHandler.size_int), objPack.iSize);
-                    dstIdx += SceneDataHandler.size_int;
-                    Buffer.BlockCopy(objPack.indices, 0, objByteData, dstIdx, objPack.iSize * SceneDataHandler.size_int);
-                    dstIdx += objPack.iSize * SceneDataHandler.size_int;
-                    // normals
-                    BitConverter.TryWriteBytes(new Span<byte>(objByteData, dstIdx, SceneDataHandler.size_int), objPack.nSize);
-                    dstIdx += SceneDataHandler.size_int;
-                    Buffer.BlockCopy(objPack.normals, 0, objByteData, dstIdx, objPack.nSize * 3 * SceneDataHandler.size_float);
-                    dstIdx += objPack.nSize * 3 * SceneDataHandler.size_float;
-                    // uvs
-                    BitConverter.TryWriteBytes(new Span<byte>(objByteData, dstIdx, SceneDataHandler.size_int), objPack.uvSize);
-                    dstIdx += SceneDataHandler.size_int;
-                    Buffer.BlockCopy(objPack.uvs, 0, objByteData, dstIdx, objPack.uvSize * 2 * SceneDataHandler.size_float);
-                    dstIdx += objPack.uvSize * 2 * SceneDataHandler.size_float;
-                    // bone weights
-                    BitConverter.TryWriteBytes(new Span<byte>(objByteData, dstIdx, SceneDataHandler.size_int), objPack.bWSize);
-                    dstIdx += SceneDataHandler.size_int;
-                    Buffer.BlockCopy(objPack.boneWeights, 0, objByteData, dstIdx, objPack.bWSize * 4 * SceneDataHandler.size_float);
-                    dstIdx += objPack.bWSize * 4 * SceneDataHandler.size_float;
-                    // bone indices
-                    Buffer.BlockCopy(objPack.boneIndices, 0, objByteData, dstIdx, objPack.bWSize * 4 * SceneDataHandler.size_int);
-                    dstIdx += objPack.bWSize * 4 * SceneDataHandler.size_int;
+                    // --- VERTICES ---
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), objPack.vSize);
+                    dstIdx += sizeof(int);
 
-                    // concate
-                    m_objectsByteData = Concat<byte>(m_objectsByteData, objByteData);
+                    int vBytes = objPack.vSize * 3 * sizeof(float);
+                    ReadOnlySpan<float> vSpan = objPack.vertices;
+                    MemoryMarshal.AsBytes(vSpan).CopyTo(targetSpan.Slice(dstIdx, vBytes));
+                    dstIdx += vBytes;
+
+                    // --- INDICES ---
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), objPack.iSize);
+                    dstIdx += sizeof(int);
+
+                    int iBytes = objPack.iSize * sizeof(int);
+                    ReadOnlySpan<int> iSpan = objPack.indices;
+                    MemoryMarshal.AsBytes(iSpan).CopyTo(targetSpan.Slice(dstIdx, iBytes));
+                    dstIdx += iBytes;
+
+                    // --- NORMALS ---
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), objPack.nSize);
+                    dstIdx += sizeof(int);
+
+                    int nBytes = objPack.nSize * 3 * sizeof(float);
+                    ReadOnlySpan<float> nSpan = objPack.normals;
+                    MemoryMarshal.AsBytes(nSpan).CopyTo(targetSpan.Slice(dstIdx, nBytes));
+                    dstIdx += nBytes;
+
+                    // --- UVS ---
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), objPack.uvSize);
+                    dstIdx += sizeof(int);
+
+                    int uvBytes = objPack.uvSize * 2 * sizeof(float);
+                    ReadOnlySpan<float> uvSpan = objPack.uvs;
+                    MemoryMarshal.AsBytes(uvSpan).CopyTo(targetSpan.Slice(dstIdx, uvBytes));
+                    dstIdx += uvBytes;
+
+                    // --- BONE WEIGHTS ---
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), objPack.bWSize);
+                    dstIdx += sizeof(int);
+
+                    int bWBytes = objPack.bWSize * 4 * sizeof(float);
+                    ReadOnlySpan<float> bWSpan = objPack.boneWeights;
+                    MemoryMarshal.AsBytes(bWSpan).CopyTo(targetSpan.Slice(dstIdx, bWBytes));
+                    dstIdx += bWBytes;
+
+                    // --- BONE INDICES ---
+                    int bIBytes = objPack.bWSize * 4 * sizeof(int);
+                    ReadOnlySpan<int> bISpan = objPack.boneIndices;
+                    MemoryMarshal.AsBytes(bISpan).CopyTo(targetSpan.Slice(dstIdx, bIBytes));
+                    dstIdx += bIBytes;
                 }
             }
 
@@ -937,50 +1336,235 @@ namespace tracer
             //!
             //! @param characterList The list that contains the serialised skinned meshes to be concatinated.
             //!
-            private void getCharacterByteArray(ref List<CharacterPackage> characterList)
+            private void getCharacterByteArray(List<CharacterPackage> characterList)
             {
-                m_characterByteData = new byte[0];
+                if (characterList == null || characterList.Count == 0)
+                {
+                    m_characterByteData = Array.Empty<byte>();
+                    return;
+                }
+
+                // 1. Calculate the total required size upfront
+                int totalSize = 0;
+                int fixedHeaderSize = 3 * SceneDataHandler.size_int; // 3 ints for headers
+
                 foreach (CharacterPackage chrPack in characterList)
                 {
-                    byte[] characterByteData = new byte[SceneDataHandler.size_int * 3 +
-                                                    chrPack.boneMapping.Length * SceneDataHandler.size_int +
-                                                    chrPack.skeletonMapping.Length * SceneDataHandler.size_int +
-                                                    chrPack.sSize * SceneDataHandler.size_float * 10];
-                    int dstIdx = 0;
-                    // bone mapping size
-                    BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.bMSize);
+                    // Calculate sizes based on actual primitive arrays using MemoryMarshal
+                    int boneMappingBytes = (chrPack.boneMapping?.Length ?? 0) * SceneDataHandler.size_int;
+                    int skeletonMappingBytes = (chrPack.skeletonMapping?.Length ?? 0) * SceneDataHandler.size_int;
+                    int bonePositionBytes = (chrPack.bonePosition?.Length ?? 0) * SceneDataHandler.size_float;
+                    int boneRotationBytes = (chrPack.boneRotation?.Length ?? 0) * SceneDataHandler.size_float;
+                    int boneScaleBytes = (chrPack.boneScale?.Length ?? 0) * SceneDataHandler.size_float;
+
+                    totalSize += fixedHeaderSize +
+                                 boneMappingBytes +
+                                 skeletonMappingBytes +
+                                 bonePositionBytes +
+                                 boneRotationBytes +
+                                 boneScaleBytes;
+                }
+
+                // 2. Allocate the final array exactly ONCE
+                m_characterByteData = new byte[totalSize];
+                Span<byte> targetSpan = m_characterByteData;
+                int dstIdx = 0;
+
+                // 3. Write data directly into the final array
+                foreach (CharacterPackage chrPack in characterList)
+                {
+                    // bone mapping size (int)
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), chrPack.bMSize);
                     dstIdx += SceneDataHandler.size_int;
 
-                    // skeleton mapping size
-                    BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.sSize);
+                    // skeleton mapping size (int)
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), chrPack.sSize);
                     dstIdx += SceneDataHandler.size_int;
 
-                    // root dag _id
-                    BitConverter.TryWriteBytes(new Span<byte>(characterByteData, dstIdx, SceneDataHandler.size_int), chrPack.characterRootId);
+                    // root dag _id (int)
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), chrPack.characterRootId);
                     dstIdx += SceneDataHandler.size_int;
 
-                    // bone mapping
-                    Buffer.BlockCopy(chrPack.boneMapping, 0, characterByteData, dstIdx, chrPack.bMSize * SceneDataHandler.size_int);
-                    dstIdx += chrPack.bMSize * SceneDataHandler.size_int;
+                    // bone mapping (int[])
+                    if (chrPack.boneMapping != null && chrPack.boneMapping.Length > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(chrPack.boneMapping.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
-                    // skeleton mapping
-                    Buffer.BlockCopy(chrPack.skeletonMapping, 0, characterByteData, dstIdx, chrPack.sSize * SceneDataHandler.size_int);
-                    dstIdx += chrPack.sSize * SceneDataHandler.size_int;
+                    // skeleton mapping (int[])
+                    if (chrPack.skeletonMapping != null && chrPack.skeletonMapping.Length > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(chrPack.skeletonMapping.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
-                    //skelton bone positions
-                    Buffer.BlockCopy(chrPack.bonePosition, 0, characterByteData, dstIdx, chrPack.sSize * 3 * SceneDataHandler.size_float);
-                    dstIdx += chrPack.sSize * 3 * SceneDataHandler.size_float;
+                    // skeleton bone positions (float[])
+                    if (chrPack.bonePosition != null && chrPack.bonePosition.Length > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(chrPack.bonePosition.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
-                    //skelton bone rotations
-                    Buffer.BlockCopy(chrPack.boneRotation, 0, characterByteData, dstIdx, chrPack.sSize * 4 * SceneDataHandler.size_float);
-                    dstIdx += chrPack.sSize * 4 * SceneDataHandler.size_float;
+                    // skeleton bone rotations (float[])
+                    if (chrPack.boneRotation != null && chrPack.boneRotation.Length > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(chrPack.boneRotation.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
-                    //skelton bone scales
-                    Buffer.BlockCopy(chrPack.boneScale, 0, characterByteData, dstIdx, chrPack.sSize * 3 * SceneDataHandler.size_float);
-                    dstIdx += chrPack.sSize * 3 * SceneDataHandler.size_float;
+                    // skeleton bone scales (float[])
+                    if (chrPack.boneScale != null && chrPack.boneScale.Length > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(chrPack.boneScale.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
+                }
+            }
 
-                    // concatenating character byte data to serialised character array
-                    m_characterByteData = Concat<byte>(m_characterByteData, characterByteData);
+            //!
+            //! Function that concatinates all TRACER Gaussuian Splat objects to a byte array.
+            //!
+            //! @param characterList The list that contains the serialised skinned meshes to be concatinated.
+            //!
+            private void getGaussianSplatByteArray(List<GaussianSpaltPackage> gaussianSplatList)
+            {
+                if (gaussianSplatList == null || gaussianSplatList.Count == 0)
+                {
+                    m_gaussianSplatByteData = Array.Empty<byte>();
+                    return;
+                }
+
+                // 1. Exakte Gesamtgröße ALLER Gaussian-Splat-Pakete im Vorfeld berechnen
+                int totalSize = 0;
+                foreach (var gsPack in gaussianSplatList)
+                {
+                    totalSize += sizeof(int) * 10 +                  // Alle TryWriteBytes (10 Stück)
+                                 sizeof(float) * 3 +                  // min
+                                 sizeof(float) * 3 +                  // max
+                                 sizeof(float) * 256 +                // scalesCodebook
+                                 sizeof(float) * 256 +                // sh0Codebook
+                                 sizeof(float) * 256 +                // shNcodebook
+                                 gsPack.meansLSize +
+                                 gsPack.meansUSize +
+                                 gsPack.scalesSize +
+                                 gsPack.quadsSize +
+                                 gsPack.sh0Size +
+                                 gsPack.shNcentroidsSize +
+                                 gsPack.shNlablesSize;
+                }
+
+                m_gaussianSplatByteData = new byte[totalSize];
+
+                Span<byte> targetSpan = m_gaussianSplatByteData;
+                int dstIdx = 0;
+
+                foreach (GaussianSpaltPackage gsPack in gaussianSplatList)
+                {
+                    // --- INTEGERS WRITE (TryWriteBytes) ---
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.count);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.shNcount);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.shNbands);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.meansLSize);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.meansUSize);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.scalesSize);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.quadsSize);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.sh0Size);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.shNcentroidsSize);
+                    dstIdx += sizeof(int);
+
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.shNlablesSize);
+                    dstIdx += sizeof(int);
+
+
+                    // --- FLOATS COPY (MemoryMarshal) ---
+                    // minimum
+                    int minBytes = 3 * sizeof(float);
+                    ReadOnlySpan<float> minSpan = gsPack.min;
+                    MemoryMarshal.AsBytes(minSpan).CopyTo(targetSpan.Slice(dstIdx, minBytes));
+                    dstIdx += minBytes;
+
+                    // maximum
+                    int maxBytes = 3 * sizeof(float);
+                    ReadOnlySpan<float> maxSpan = gsPack.max;
+                    MemoryMarshal.AsBytes(maxSpan).CopyTo(targetSpan.Slice(dstIdx, maxBytes));
+                    dstIdx += maxBytes;
+
+                    // scales codebook
+                    int scBytes = 256 * sizeof(float);
+                    ReadOnlySpan<float> scSpan = gsPack.scalesCodebook;
+                    MemoryMarshal.AsBytes(scSpan).CopyTo(targetSpan.Slice(dstIdx, scBytes));
+                    dstIdx += scBytes;
+
+                    // sh0 codebook
+                    int sh0Bytes = 256 * sizeof(float);
+                    ReadOnlySpan<float> sh0Span = gsPack.sh0Codebook;
+                    MemoryMarshal.AsBytes(sh0Span).CopyTo(targetSpan.Slice(dstIdx, sh0Bytes));
+                    dstIdx += sh0Bytes;
+
+                    // shN codebook
+                    int shNBytes = 256 * sizeof(float);
+                    ReadOnlySpan<float> shNSpan = gsPack.shNcodebook;
+                    MemoryMarshal.AsBytes(shNSpan).CopyTo(targetSpan.Slice(dstIdx, shNBytes));
+                    dstIdx += shNBytes;
+
+
+                    // --- COMPRESSED BYTE DATA COPY ---
+                    // compressed lower means
+                    ReadOnlySpan<byte> meansLSpan = gsPack.c_meansL;
+                    meansLSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.meansLSize));
+                    dstIdx += gsPack.meansLSize;
+
+                    // compressed upper means
+                    ReadOnlySpan<byte> meansUSpan = gsPack.c_meansU;
+                    meansUSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.meansUSize));
+                    dstIdx += gsPack.meansUSize;
+
+                    // compressed scales
+                    ReadOnlySpan<byte> scalesSpan = gsPack.c_scales;
+                    scalesSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.scalesSize));
+                    dstIdx += gsPack.scalesSize;
+
+                    // compressed quads
+                    ReadOnlySpan<byte> quadsSpan = gsPack.c_quads;
+                    quadsSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.quadsSize));
+                    dstIdx += gsPack.quadsSize;
+
+                    // compressed sh0s
+                    ReadOnlySpan<byte> sh0sSpan = gsPack.c_sh0;
+                    sh0sSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.sh0Size));
+                    dstIdx += gsPack.sh0Size;
+
+                    // compressed shn centroids
+                    ReadOnlySpan<byte> centroidsSpan = gsPack.c_shNcentroids;
+                    centroidsSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.shNcentroidsSize));
+                    dstIdx += gsPack.shNcentroidsSize;
+
+                    // compressed shN lables
+                    ReadOnlySpan<byte> lablesSpan = gsPack.c_shNlables;
+                    lablesSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.shNlablesSize));
+                    dstIdx += gsPack.shNlablesSize;
                 }
             }
 
@@ -989,32 +1573,53 @@ namespace tracer
             //!
             //! @param textureList The list that contains the serialised textures to be concatinated.
             //!
-            private void getTexturesByteArray(ref List<TexturePackage> textureList)
+            private void getTexturesByteArray(List<TexturePackage> textureList)
             {
-                m_texturesByteData = new byte[0];
+                if (textureList == null || textureList.Count == 0)
+                {
+                    m_texturesByteData = Array.Empty<byte>();
+                    return;
+                }
+
+                // Calculate the total required size upfront
+                int totalSize = 0;
+                int headerSize = 4 * SceneDataHandler.size_int; // 4 ints per texture
 
                 foreach (TexturePackage texPack in textureList)
                 {
-                    byte[] texByteData = new byte[4 * SceneDataHandler.size_int + texPack.colorMapDataSize];
-                    int dstIdx = 0;
-                    // width
-                    BitConverter.TryWriteBytes(new Span<byte>(texByteData, dstIdx, SceneDataHandler.size_int), texPack.width);
-                    dstIdx += SceneDataHandler.size_int;
-                    // height
-                    BitConverter.TryWriteBytes(new Span<byte>(texByteData, dstIdx, SceneDataHandler.size_int), texPack.height);
-                    dstIdx += SceneDataHandler.size_int;
-                    // format
-                    BitConverter.TryWriteBytes(new Span<byte>(texByteData, dstIdx, SceneDataHandler.size_int), (int)texPack.format);
-                    dstIdx += SceneDataHandler.size_int;
-                    // data size
-                    BitConverter.TryWriteBytes(new Span<byte>(texByteData, dstIdx, SceneDataHandler.size_int), (int)texPack.colorMapDataSize);
-                    dstIdx += SceneDataHandler.size_int;
-                    // pixel data
-                    Buffer.BlockCopy(texPack.colorMapData, 0, texByteData, dstIdx, texPack.colorMapDataSize);
-                    dstIdx += texPack.colorMapDataSize;
+                    totalSize += headerSize + texPack.colorMapDataSize;
+                }
 
-                    // concate
-                    m_texturesByteData = Concat<byte>(m_texturesByteData, texByteData);
+                // Allocate the final array exactly ONCE
+                m_texturesByteData = new byte[totalSize];
+
+                // Create a span for high-performance and safe memory access
+                Span<byte> targetSpan = m_texturesByteData;
+                int dstIdx = 0;
+
+                // Write data directly into the final array
+                foreach (TexturePackage texPack in textureList)
+                {
+                    // width
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), texPack.width);
+                    dstIdx += SceneDataHandler.size_int;
+
+                    // height
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), texPack.height);
+                    dstIdx += SceneDataHandler.size_int;
+
+                    // format
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), (int)texPack.format);
+                    dstIdx += SceneDataHandler.size_int;
+
+                    // data size
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), texPack.colorMapDataSize);
+                    dstIdx += SceneDataHandler.size_int;
+
+                    // pixel data (Direct copy without temporary arrays)
+                    ReadOnlySpan<byte> pixelSpan = new ReadOnlySpan<byte>(texPack.colorMapData, 0, texPack.colorMapDataSize);
+                    pixelSpan.CopyTo(targetSpan.Slice(dstIdx, texPack.colorMapDataSize));
+                    dstIdx += texPack.colorMapDataSize;
                 }
             }
 
@@ -1023,80 +1628,155 @@ namespace tracer
             //!
             //! @param materialList The list that contains the serialised materials to be concatinated.
             //!
-            private void getMaterialsByteArray(ref List<MaterialPackage> materialList)
+            private void getMaterialsByteArray(List<MaterialPackage> materialList)
             {
-                m_materialsByteData = new byte[0];
+                if (materialList == null || materialList.Count == 0)
+                {
+                    m_materialsByteData = Array.Empty<byte>();
+                    return;
+                }
+
+                // Calculate the total required size upfront to avoid allocations in the loop
+                int totalSize = 0;
+                int fixedHeaderSize = 8 * SceneDataHandler.size_int;
 
                 foreach (MaterialPackage matPack in materialList)
                 {
-                    byte[] matByteData = new byte[
-                        8 * SceneDataHandler.size_int +
-                        matPack.name.Length +
-                        matPack.src.Length +
-                        matPack.textureIds.Length * SceneDataHandler.size_int +
-                        matPack.textureOffsets.Length * SceneDataHandler.size_float +
-                        matPack.textureScales.Length * SceneDataHandler.size_float +
-                        matPack.shaderConfig.Length +
-                        matPack.shaderPropertyIds.Length * SceneDataHandler.size_int +
-                        matPack.shaderPropertyTypes.Length * SceneDataHandler.size_int +
-                        matPack.shaderProperties.Length];
+                    // Cache safe lengths for encoded strings (ASCII length equals character count)
+                    int nameLength = matPack.name?.Length ?? 0;
+                    int srcLength = matPack.src?.Length ?? 0;
 
-                    int dstIdx = 0;
+                    totalSize += fixedHeaderSize +
+                                 nameLength +
+                                 srcLength +
+                                 (matPack.textureIds?.Length ?? 0) * SceneDataHandler.size_int +
+                                 (matPack.textureOffsets?.Length ?? 0) * SceneDataHandler.size_float +
+                                 (matPack.textureScales?.Length ?? 0) * SceneDataHandler.size_float +
+                                 (matPack.shaderConfig?.Length ?? 0) + // bool is 1 byte
+                                 (matPack.shaderPropertyIds?.Length ?? 0) * SceneDataHandler.size_int +
+                                 (matPack.shaderPropertyTypes?.Length ?? 0) * SceneDataHandler.size_int +
+                                 (matPack.shaderProperties?.Length ?? 0);
+                }
+
+                // Allocate the final array exactly ONCE
+                m_materialsByteData = new byte[totalSize];
+                Span<byte> targetSpan = m_materialsByteData;
+                int dstIdx = 0;
+
+                foreach (MaterialPackage matPack in materialList)
+                {
+                    int nameLength = matPack.name?.Length ?? 0;
+                    int srcLength = matPack.src?.Length ?? 0;
 
                     // type (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(matPack.type), ref matByteData, dstIdx);
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), matPack.type);
+                    dstIdx += SceneDataHandler.size_int;
 
                     // name length (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(matPack.name.Length), ref matByteData, dstIdx);
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), nameLength);
+                    dstIdx += SceneDataHandler.size_int;
 
-                    // name (byte[])
-                    dstIdx = serialize<byte>(Encoding.ASCII.GetBytes(matPack.name), ref matByteData, dstIdx);
+                    // name (string converted directly to target span without temporary byte array)
+                    if (nameLength > 0)
+                    {
+                        Encoding.ASCII.GetBytes(matPack.name, 0, nameLength, m_materialsByteData, dstIdx);
+                        dstIdx += nameLength;
+                    }
 
                     // src length (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(matPack.src.Length), ref matByteData, dstIdx);
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), srcLength);
+                    dstIdx += SceneDataHandler.size_int;
 
-                    // src (string)
-                    dstIdx = serialize<byte>(Encoding.ASCII.GetBytes(matPack.src), ref matByteData, dstIdx);
+                    // src (string converted directly to target span)
+                    if (srcLength > 0)
+                    {
+                        Encoding.ASCII.GetBytes(matPack.src, 0, srcLength, m_materialsByteData, dstIdx);
+                        dstIdx += srcLength;
+                    }
 
                     // matID (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(matPack.materialID), ref matByteData, dstIdx);
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), matPack.materialID);
+                    dstIdx += SceneDataHandler.size_int;
 
-                    // size (int) for textureIds, textureOffsets/2 (Vec2), textureScales/2 (Vec2)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(matPack.textureIds.Length), ref matByteData, dstIdx);
+                    // size (int) for textureIds
+                    int texIdsLength = matPack.textureIds?.Length ?? 0;
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), texIdsLength);
+                    dstIdx += SceneDataHandler.size_int;
 
                     // textureIds (int[])
-                    dstIdx = serialize<int>(matPack.textureIds, ref matByteData, dstIdx);
+                    if (texIdsLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(matPack.textureIds.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
                     // textureOffsets (float[])
-                    dstIdx = serialize<float>(matPack.textureOffsets, ref matByteData, dstIdx);
+                    int texOffsetsLength = matPack.textureOffsets?.Length ?? 0;
+                    if (texOffsetsLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(matPack.textureOffsets.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
                     // textureScales (float[])
-                    dstIdx = serialize<float>(matPack.textureScales, ref matByteData, dstIdx);
+                    int texScalesLength = matPack.textureScales?.Length ?? 0;
+                    if (texScalesLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(matPack.textureScales.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
                     // size shaderConfig (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(matPack.shaderConfig.Length), ref matByteData, dstIdx);
+                    int shaderConfigLength = matPack.shaderConfig?.Length ?? 0;
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), shaderConfigLength);
+                    dstIdx += SceneDataHandler.size_int;
 
                     // shaderConfig (bool[])
-                    dstIdx = serialize<bool>(matPack.shaderConfig, ref matByteData, dstIdx);
+                    if (shaderConfigLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(matPack.shaderConfig.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
                     // size shader properties (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(matPack.shaderPropertyIds.Length), ref matByteData, dstIdx);
+                    int propertyIdsLength = matPack.shaderPropertyIds?.Length ?? 0;
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), propertyIdsLength);
+                    dstIdx += SceneDataHandler.size_int;
+
 
                     // shader property IDs (int[])
-                    dstIdx = serialize<int>(matPack.shaderPropertyIds, ref matByteData, dstIdx);
+                    if (propertyIdsLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(matPack.shaderPropertyIds.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
                     // shader property types (int[])
-                    dstIdx = serialize<int>(matPack.shaderPropertyTypes, ref matByteData, dstIdx);
+                    int propertyTypesLength = matPack.shaderPropertyTypes?.Length ?? 0;
+                    if (propertyTypesLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(matPack.shaderPropertyTypes.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
                     // size shaderProperties data (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(matPack.shaderProperties.Length), ref matByteData, dstIdx);
+                    int propertiesLength = matPack.shaderProperties?.Length ?? 0;
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), propertiesLength);
+                    dstIdx += SceneDataHandler.size_int;
 
                     // shader property data (byte[])
-                    dstIdx = serialize<byte>(matPack.shaderProperties, ref matByteData, dstIdx);
-
-
-                    // concate
-                    m_materialsByteData = Concat<byte>(m_materialsByteData, matByteData);
+                    if (propertiesLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = new ReadOnlySpan<byte>(matPack.shaderProperties, 0, propertiesLength);
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, propertiesLength));
+                        dstIdx += propertiesLength;
+                    }
                 }
             }
 
@@ -1105,94 +1785,104 @@ namespace tracer
             //!
             //! @param parameterObjectList The list that contains the serialised materials to be concatinated.
             //!
-            private void getParameterObjectsByteArray(ref List<ParameterObjectPackage> parameterObjectList)
+            private void getParameterObjectsByteArray(List<ParameterObjectPackage> parameterObjectList)
             {
-                m_parameterObjectsByteData = new byte[0];
+                if (parameterObjectList == null || parameterObjectList.Count == 0)
+                {
+                    m_parameterObjectsByteData = Array.Empty<byte>();
+                    return;
+                }
 
+                // Calculate the total required size upfront
+                int totalSize = 0;
+                int fixedHeaderSize = 3 * SceneDataHandler.size_int;
 
                 foreach (ParameterObjectPackage poPack in parameterObjectList)
                 {
-                    // count characters in srings
-                    int charLength = 0;
-                    foreach (string s in poPack.pNames)
-                        charLength += s.Length;
+                    int nameLength = poPack.name?.Length ?? 0;
+                    int pTypesLength = poPack.pTypes?.Length ?? 0;
+                    int pRPCLength = poPack.pRPC?.Length ?? 0; // bool is 1 byte per element
+                    int pNamesCount = poPack.pNames?.Length ?? 0;
 
-                    byte[] poByteData = new byte[
-                        3 * SceneDataHandler.size_int +
-                        poPack.name.Length +
-                        poPack.pTypes.Length * SceneDataHandler.size_int +
-                        poPack.pRPC.Length * SceneDataHandler.size_float +
-                        poPack.pNames.Length * SceneDataHandler.size_int +
-                        charLength];
-                    
-                    int dstIdx = 0;
-                    
+                    // Calculate size for all strings in the pNames array
+                    int pNamesCharsLength = 0;
+                    if (poPack.pNames != null)
+                        foreach (string s in poPack.pNames)
+                            pNamesCharsLength += (s?.Length ?? 0) + SceneDataHandler.size_int;
+
+                    totalSize += fixedHeaderSize +
+                                 nameLength +
+                                 pTypesLength * SceneDataHandler.size_int +
+                                 pRPCLength +
+                                 pNamesCharsLength;
+                }
+
+                m_parameterObjectsByteData = new byte[totalSize];
+                Span<byte> targetSpan = m_parameterObjectsByteData;
+                int dstIdx = 0;
+
+                // Write data directly into the final array
+                foreach (ParameterObjectPackage poPack in parameterObjectList)
+                {
+                    int nameLength = poPack.name?.Length ?? 0;
+                    int pTypesLength = poPack.pTypes?.Length ?? 0;
+                    int pRPCLength = poPack.pRPC?.Length ?? 0;
+
                     // _id (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.id), ref poByteData, dstIdx);
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), poPack.id);
+                    dstIdx += SceneDataHandler.size_int;
 
                     // name length (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.name.Length), ref poByteData, dstIdx);
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), nameLength);
+                    dstIdx += SceneDataHandler.size_int;
 
-                    // name (byte[])
-                    dstIdx = serialize<byte>(Encoding.ASCII.GetBytes(poPack.name), ref poByteData, dstIdx);
+                    // name (string)
+                    if (nameLength > 0)
+                    {
+                        Encoding.ASCII.GetBytes(poPack.name, 0, nameLength, m_parameterObjectsByteData, dstIdx);
+                        dstIdx += nameLength;
+                    }
 
                     // nbr parameters (int)
-                    dstIdx = serialize<byte>(BitConverter.GetBytes(poPack.pTypes.Length), ref poByteData, dstIdx);
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), pTypesLength);
+                    dstIdx += SceneDataHandler.size_int;
 
-                    // prameter types (int[])
-                    dstIdx = serialize<int>(poPack.pTypes, ref poByteData, dstIdx);
+                    // parameter types (int[])
+                    if (pTypesLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(poPack.pTypes.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
-                    // prameter RPC properties (bool[])
-                    dstIdx = serialize<bool>(poPack.pRPC, ref poByteData, dstIdx);
+                    // parameter RPC properties (bool[])
+                    if (pRPCLength > 0)
+                    {
+                        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(poPack.pRPC.AsSpan());
+                        bytes.CopyTo(targetSpan.Slice(dstIdx, bytes.Length));
+                        dstIdx += bytes.Length;
+                    }
 
-                    // prameter names (string[])
-                    dstIdx = serialize<string>(poPack.pNames, ref poByteData, dstIdx);
+                    // parameter names (string[])
+                    if (poPack.pNames != null)
+                    {
+                        foreach (string s in poPack.pNames)
+                        {
+                            int sLength = s?.Length ?? 0;
 
-                    // concate
-                    m_parameterObjectsByteData = Concat<byte>(m_parameterObjectsByteData, poByteData);
+                            // Write the individual string length header
+                            BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, SceneDataHandler.size_int), sLength);
+                            dstIdx += SceneDataHandler.size_int;
+
+                            // Write the string characters directly into the correct buffer
+                            if (sLength > 0)
+                            {
+                                Encoding.ASCII.GetBytes(s, 0, sLength, m_parameterObjectsByteData, dstIdx);
+                                dstIdx += sLength;
+                            }
+                        }
+                    }
                 }
-            }
-
-            //!
-            //! Function that serializes an arbitrary formated array into a byte array.
-            //!
-            //! @param srcData The arbitrary source data array.
-            //! @param dstData The byte formated destination array.
-            //! @param dstIdx The the destination intex within the destination array.
-            //! @return The new destination index after copying the source data.
-            //!
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static int serialize<T>(T[] srcData, ref byte[] dstData, int dstIdx)
-            {
-                int typeSize = Marshal.SizeOf(typeof(T));
-                if (typeof(T) == typeof(bool))
-                    typeSize = 1;
-                Buffer.BlockCopy(srcData, 0, dstData, dstIdx, srcData.Length * typeSize);
-                return dstIdx + srcData.Length * typeSize;
-            }
-
-            //!
-            //! Function that serializes an array of strings into a byte array.
-            //!
-            //! @param srcData The source string array.
-            //! @param dstData The byte formated destination array.
-            //! @param dstIdx The the destination intex within the destination array.
-            //! @return The new destination index after copying the source data.
-            //!
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static int serialize(string[] srcData, ref byte[] dstData, int dstIdx)
-            {
-                for (int i = 0; i < srcData.Length; i++)
-                {
-                    int sLength = srcData.Length;
-
-                    Buffer.BlockCopy(BitConverter.GetBytes(sLength), 0, dstData, dstIdx, size_int);
-                    dstIdx += size_int;
-                    Buffer.BlockCopy(Encoding.ASCII.GetBytes(srcData[i]), 0, dstData, dstIdx, sLength);
-                    dstIdx += sLength;
-                }
-
-                return dstIdx;
             }
 
             //! 
@@ -1202,48 +1892,24 @@ namespace tracer
             //! @param offset The offset in bytes used to interate over the array.
             //! 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static T ByteArrayToStructure<T>(ref byte[] bytearray, ref int offset) where T : new()
+            private static T ByteArrayToStructure<T>(byte[] bytearray, ref int offset) 
             {
-                T str = new T();
+                int size = Marshal.SizeOf(typeof(T));
 
-                int size = Marshal.SizeOf(str);
                 IntPtr ptr = Marshal.AllocHGlobal(size);
-
-                Marshal.Copy(bytearray, offset, ptr, size);
-
-                str = (T)Marshal.PtrToStructure(ptr, str.GetType());
-                Marshal.FreeHGlobal(ptr);
-
-                offset += size;
-
-                return str;
-            }
-
-            //!
-            //! Template function for concatination of arrays. 
-            //!
-            //! @param first The array field to be appended to.
-            //! @param arrays The arrays to be append.
-            //!
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static T[] Concat<T>(T[] first, params T[][] arrays)
-            {
-                int length = first.Length;
-                for (int i = 0; i < arrays.Length; i++)
+                try
                 {
-                    length += arrays[i].Length;
-                }
-                T[] result = new T[length];
+                    Marshal.Copy(bytearray, offset, ptr, size);
 
-                length = first.Length;
-                Buffer.BlockCopy(first, 0, result, 0, first.Length);
-                for (int i = 0; i < arrays.Length; i++)
-                {
-                    var array = arrays[i];
-                    Buffer.BlockCopy(array, 0, result, length, array.Length);
-                    length += array.Length;
+                    T str = (T)Marshal.PtrToStructure(ptr, typeof(T));
+
+                    offset += size;
+                    return str;
                 }
-                return result;
+                finally
+                {
+                    Marshal.FreeHGlobal(ptr);
+                }
             }
 
             //!
@@ -1262,25 +1928,7 @@ namespace tracer
 
                 return result;
             }
-
-            //! 
-            //! Template function for serialising arbitrary structures in to byte streams.
-            //! 
-            //! @param obj The object to be serialised.
-            //!
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static byte[] StructureToByteArray(object obj)
-            {
-                int size = Marshal.SizeOf(obj);
-                byte[] arr = new byte[size];
-                IntPtr ptr = Marshal.AllocHGlobal(size);
-
-                Marshal.StructureToPtr(obj, ptr, true);
-                Marshal.Copy(ptr, arr, 0, size);
-                Marshal.FreeHGlobal(ptr);
-
-                return arr;
-            }
+        
         }
     }
 }
