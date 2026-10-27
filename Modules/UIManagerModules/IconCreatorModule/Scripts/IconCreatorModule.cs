@@ -238,21 +238,28 @@ namespace tracer{
             //Debug.Log("Icon Creator, SelectionHasChanged: "+selectedSOs.Count);
             //Debug.Log("we have m_lightAndCamSceneObjects: "+m_lightAndCamSceneObjects.Count);
             //do the below via dict for performance reasons
-            foreach(SceneObject lightOrCamSO in m_lightAndCamSceneObjects) {
-                if (!selectedSOs.Contains(lightOrCamSO)) {
-                    //Debug.Log("Hide HOG? At "+lightOrCamSO.gameObject.name);
-                    if (lightOrCamSO._icon != null)
-                        lightOrCamSO._icon.GetComponent<HeightOverGround>()?.HideViz();
+            // The visualizer is purely cosmetic. Any exception here would abort the
+            // UIManager.selectionChanged invocation list and prevent later subscribers
+            // (e.g. UICreator2DModule building the parameter menu) from running.
+            try {
+                foreach(SceneObject lightOrCamSO in m_lightAndCamSceneObjects) {
+                    if (!selectedSOs.Contains(lightOrCamSO)) {
+                        //Debug.Log("Hide HOG? At "+lightOrCamSO.gameObject.name);
+                        if (lightOrCamSO._icon != null)
+                            lightOrCamSO._icon.GetComponent<HeightOverGround>()?.HideViz();
+                    }
+                }
+
+                foreach(SceneObject selectedSO in selectedSOs) {
+                    if (m_lightAndCamSceneObjects.Contains(selectedSO)) {
+                        //Debug.Log("Show HOG? At "+selectedSO.gameObject.name);
+                        if (selectedSO._icon != null)
+                            selectedSO._icon.GetComponent<HeightOverGround>()?.ShowViz(true);
+                    }
                 }
             }
-
-            foreach(SceneObject selectedSO in selectedSOs) {
-                if (m_lightAndCamSceneObjects.Contains(selectedSO)) {
-                    //Debug.Log("Show HOG? At "+selectedSO.gameObject.name);
-                    if (selectedSO._icon != null)
-                        selectedSO._icon.GetComponent<HeightOverGround>()?.ShowViz(true);
-                }
-            
+            catch (Exception e) {
+                Debug.LogException(e);
             }
         }
 

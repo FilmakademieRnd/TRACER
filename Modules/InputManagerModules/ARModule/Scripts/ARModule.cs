@@ -129,7 +129,6 @@ namespace tracer
         }
 
         //! used as data for the inputmanager event as in the UnityInputModule
-        private InputManager.InputEventArgs arInputData;
 
         //!
         //! Constructor
@@ -230,9 +229,6 @@ namespace tracer
         //!
         private void initialize(){
             
-            //creating class once, reduce Garbage Collection
-            arInputData = new InputManager.InputEventArgs();
-
             //Instanciate XROrigin from Prefab
             GameObject arSessionOriginPrefab = Resources.Load<GameObject>("Prefabs/ARSessionOrigin");
             m_arOrigin = SceneObject.Instantiate(arSessionOriginPrefab, Vector3.zero, Quaternion.identity).GetComponent<XROrigin>();
@@ -373,8 +369,7 @@ namespace tracer
                 Camera.main.transform.parent = m_arOrigin.transform;
                 core.getManager<UIManager>().cameraControl = UIManager.CameraControl.AR;
                 
-                arInputData.State = InputManager.InputState.Started;
-                manager.RaiseAR(this, arInputData);
+                manager.RaiseAR(this, new InputManager.InputEventArgs(InputManager.InputLevel.Primary, InputManager.InputState.Started, default));
             }else{
                 Camera.main.transform.parent = m_arOrigin.transform.parent;
                 m_arOrigin.transform.position = Vector3.zero;
@@ -382,8 +377,7 @@ namespace tracer
                 
                 core.getManager<UIManager>().cameraControl = UIManager.CameraControl.STANDARD;
 
-                arInputData.State = InputManager.InputState.Ended;
-                manager.RaiseAR(this, arInputData);
+                manager.RaiseAR(this, new InputManager.InputEventArgs(InputManager.InputLevel.Primary, InputManager.InputState.Ended, default));
             }
 
             if (arSession)
