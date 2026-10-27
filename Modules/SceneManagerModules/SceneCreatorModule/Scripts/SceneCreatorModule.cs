@@ -30,9 +30,11 @@ if not go to https://opensource.org/licenses/MIT
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Text;
 
 using UnityEngine;
+using Unity.Collections;
 using static tracer.AbstractParameter;
 
 namespace tracer
@@ -129,14 +131,15 @@ namespace tracer
 
             foreach (var sceneCharacterObject in manager.getAllSceneObjects())
             {
-                if (sceneCharacterObject is SceneCharacterObject)
+                if (sceneCharacterObject is SceneCharacterObject character)
                 {
-                    sceneCharacterObject.gameObject.GetComponent<SceneCharacterObject>().setBones();
+                    character.setBones();
                 }
             }
 
             sceneDataHandler.clearSceneByteData();
-            sceneData.clear();
+            // [SEIM] disabled for better  CG!
+            //sceneData.clear();
             clearData();
 
             if (emitSceneReady)
@@ -152,89 +155,142 @@ namespace tracer
         //!
         private void createMaterials(ref SceneManager.SceneDataHandler.SceneData sceneData)
         {
+            if (sceneData.materialList == null || sceneData.materialList.Count == 0) return;
+
+            // Adjust list capacity upfront to avoid continuous inner resizing overhead
+            SceneMaterialList.Capacity = Math.Max(SceneMaterialList.Capacity, SceneMaterialList.Count + sceneData.materialList.Count);
+
+            // Local cache to avoid searching the same custom shaders over and over again via Shader.Find
+            Dictionary<string, Shader> customShaderCache = new Dictionary<string, Shader>();
+
             foreach (SceneManager.MaterialPackage matPack in sceneData.materialList)
             {
+                if (matPack == null) continue;
+
                 if (matPack.type == 1)
                 {
-                    Material _mat = new Material(Shader.Find("Standard"));
-                    _mat.name = matPack.name;
-                    if (matPack.textureIds.Length > 0)
+                    Material mat = new Material(StandardShader);
+                    mat.name = matPack.name;
+
+                    if (matPack.textureIds != null && matPack.textureIds.Length > 0)
                     {
-                        _mat.mainTexture = SceneTextureList[matPack.textureIds[0]];
+                        int firstTexID = matPack.textureIds[0];
+                        if (firstTexID > -1 && firstTexID < SceneTextureList.Count)
+                        {
+                            mat.mainTexture = SceneTextureList[firstTexID];
+                        }
                     }
 
-                    SceneMaterialList.Add(_mat);
-                    
+                    SceneMaterialList.Add(mat);
                 }
                 else if (matPack.type == 0)
                 {
-                    Material mat = new Material(Shader.Find(matPack.src));
-                    mat.name = matPack.name;
-
-                    // shader configuration
-                    if (matPack.shaderConfig[4])
-                        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-
-                    for (int i = 0; i < matPack.shaderConfig.Length; i++)
+                    // Resolve shader using the optimized local dictionary cache
+                    if (!customShaderCache.TryGetValue(matPack.src, out Shader customShader))
                     {
-                        if (matPack.shaderConfig[i])
-                            mat.EnableKeyword(SceneManager.shaderKeywords[i]);
-                        else
-                            mat.DisableKeyword(SceneManager.shaderKeywords[i]);
+                        customShader = Shader.Find(matPack.src);
+                        customShaderCache[matPack.src] = customShader;
                     }
 
-                    // shader parameters
+                    if (customShader == null) continue;
+
+                    Material mat = new Material(customShader);
+                    mat.name = matPack.name;
+
+                    // Apply shader configurations safely
+                    if (matPack.shaderConfig != null && matPack.shaderConfig.Length > 4 && matPack.shaderConfig[4])
+                    {
+                        mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    }
+
+                    if (matPack.shaderConfig != null && SceneManager.shaderKeywords != null)
+                    {
+                        int configLoopLength = Mathf.Min(matPack.shaderConfig.Length, SceneManager.shaderKeywords.Length);
+                        for (int i = 0; i < configLoopLength; i++)
+                        {
+                            if (matPack.shaderConfig[i])
+                                mat.EnableKeyword(SceneManager.shaderKeywords[i]);
+                            else
+                                mat.DisableKeyword(SceneManager.shaderKeywords[i]);
+                        }
+                    }
+
                     int dataIdx = 0;
                     int texIdx = 0;
-                    for (int i = 0; i < mat.shader.GetPropertyCount(); i++)
+                    ReadOnlySpan<byte> propertiesSpan = matPack.shaderProperties;
+                    Shader targetShader = mat.shader;
+                    int propertyCount = targetShader.GetPropertyCount();
+
+                    for (int i = 0; i < propertyCount; i++)
                     {
-                        int shaderPropertyId = mat.shader.GetPropertyNameId(i);
+                        if (matPack.shaderPropertyTypes == null || i >= matPack.shaderPropertyTypes.Length) break;
+
+                        int shaderPropertyId = targetShader.GetPropertyNameId(i);
+
                         switch (matPack.shaderPropertyTypes[i])
                         {
-                            // color
+                            // Color (Requires exactly 4 floats = 16 bytes)
                             case 0:
-                                float r = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                float g = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                float b = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                float a = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                mat.SetColor(shaderPropertyId, new Color(r, g, b, a));
+                                if (dataIdx + 16 <= propertiesSpan.Length)
+                                {
+                                    // Cast the 16-byte slice directly into a Color struct without any loops or BitConverter overhead
+                                    ReadOnlySpan<Color> colorCast = MemoryMarshal.Cast<byte, Color>(propertiesSpan.Slice(dataIdx, 16));
+                                    mat.SetColor(shaderPropertyId, colorCast[0]);
+                                    dataIdx += 16;
+                                }
                                 break;
-                            // vector 4
+
+                            // Vector4 (Requires exactly 4 floats = 16 bytes)
                             case 1:
-                                float x = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                float y = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                float z = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                float w = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                mat.SetVector(shaderPropertyId, new Vector4(x, y, z, w));
+                                if (dataIdx + 16 <= propertiesSpan.Length)
+                                {
+                                    // Cast the 16-byte slice directly into a Vector4 struct
+                                    ReadOnlySpan<Vector4> vectorCast = MemoryMarshal.Cast<byte, Vector4>(propertiesSpan.Slice(dataIdx, 16));
+                                    mat.SetVector(shaderPropertyId, vectorCast[0]);
+                                    dataIdx += 16;
+                                }
                                 break;
-                            // float, range
+
+                            // Float, Range (Requires exactly 1 float = 4 bytes)
                             case 2:
                             case 3:
-                                float f = BitConverter.ToSingle(matPack.shaderProperties, dataIdx);
-                                dataIdx += SceneManager.SceneDataHandler.size_float;
-                                mat.SetFloat(shaderPropertyId, f);
-                                // chenge render queue order for transparent materials (i=23 is mode, f=3 is trasparent, f=2 is cutout)
-                                if (i == 23 && (f == 3 || f == 2))
-                                    mat.renderQueue = 3000;
-                                break;
-                            // Texture
-                            case 4:
-                                int texID = matPack.textureIds[texIdx];
-                                if (texID > -1 && texID < SceneTextureList.Count)
+                                if (dataIdx + 4 <= propertiesSpan.Length)
                                 {
-                                    mat.SetTexture(shaderPropertyId, SceneTextureList[texID]);
-                                    mat.SetTextureOffset(shaderPropertyId, new Vector2(matPack.textureOffsets[texIdx * 2], matPack.textureOffsets[texIdx * 2 + 1]));
-                                    mat.SetTextureScale(shaderPropertyId, new Vector2(matPack.textureScales[texIdx * 2], matPack.textureScales[texIdx * 2 + 1]));
+                                    // Cast the 4-byte slice directly into a float value
+                                    ReadOnlySpan<float> floatCast = MemoryMarshal.Cast<byte, float>(propertiesSpan.Slice(dataIdx, 4));
+                                    float f = floatCast[0];
+                                    mat.SetFloat(shaderPropertyId, f);
+                                    dataIdx += 4;
+
+                                    // Change render queue order for transparent or cutout materials
+                                    if (i == 23 && (f == 3f || f == 2f))
+                                    {
+                                        mat.renderQueue = 3000;
+                                    }
                                 }
-                                texIdx++;
+                                break;
+
+                            // Texture maps
+                            case 4:
+                                if (matPack.textureIds != null && texIdx < matPack.textureIds.Length)
+                                {
+                                    int texID = matPack.textureIds[texIdx];
+                                    if (texID > -1 && texID < SceneTextureList.Count)
+                                    {
+                                        mat.SetTexture(shaderPropertyId, SceneTextureList[texID]);
+
+                                        int offsetScaleIdx = texIdx * 2;
+                                        if (matPack.textureOffsets != null && offsetScaleIdx + 1 < matPack.textureOffsets.Length)
+                                        {
+                                            mat.SetTextureOffset(shaderPropertyId, new Vector2(matPack.textureOffsets[offsetScaleIdx], matPack.textureOffsets[offsetScaleIdx + 1]));
+                                        }
+                                        if (matPack.textureScales != null && offsetScaleIdx + 1 < matPack.textureScales.Length)
+                                        {
+                                            mat.SetTextureScale(shaderPropertyId, new Vector2(matPack.textureScales[offsetScaleIdx], matPack.textureScales[offsetScaleIdx + 1]));
+                                        }
+                                    }
+                                    texIdx++;
+                                }
                                 break;
                         }
                     }
@@ -322,27 +378,32 @@ namespace tracer
         //!
         private void createTextures(ref SceneManager.SceneDataHandler.SceneData sceneData)
         {
+            if (sceneData.textureList == null || sceneData.textureList.Count == 0) return;
+
+            SceneTextureList.Capacity = Math.Max(SceneTextureList.Capacity, SceneTextureList.Count + sceneData.textureList.Count);
+
             foreach (SceneManager.TexturePackage texPack in sceneData.textureList)
             {
+                if (texPack.colorMapData == null || texPack.colorMapData.Length == 0) continue;
+
+                Texture2D tex_2d;
+
                 if (texPack.format != 0)
                 {
-                    Texture2D tex_2d = new Texture2D(texPack.width, texPack.height, texPack.format, false);
+                    tex_2d = new Texture2D(texPack.width, texPack.height, texPack.format, false);
                     tex_2d.LoadRawTextureData(texPack.colorMapData);
-                    tex_2d.Apply();
-                    SceneTextureList.Add(tex_2d);
+
+                    tex_2d.Apply(updateMipmaps: false, makeNoLongerReadable: true);
                 }
                 else
                 {
-#if UNITY_IOS
-                    Texture2D tex_2d = new Texture2D(16, 16, TextureFormat.PVRTC_RGBA4, false);
-#else
-                    Texture2D tex_2d = new Texture2D(16, 16, TextureFormat.DXT5Crunched, false);
-#endif
-                    // only supports PNG and JPEG
-                    tex_2d.LoadImage(texPack.colorMapData);
-                    SceneTextureList.Add(tex_2d);
+                    tex_2d = new Texture2D(2, 2);
+
+                    if (tex_2d.LoadImage(texPack.colorMapData))
+                        tex_2d.Apply(updateMipmaps: false, makeNoLongerReadable: true);
                 }
 
+                SceneTextureList.Add(tex_2d);
             }
         }
 
@@ -353,56 +414,90 @@ namespace tracer
         //!
         private void createMeshes(ref SceneManager.SceneDataHandler.SceneData sceneData)
         {
+            if (sceneData.objectList == null || sceneData.objectList.Count == 0) return;
+
+            // Adjust the destination list capacity upfront to prevent resizing
+            SceneMeshList.Capacity = Math.Max(SceneMeshList.Capacity, SceneMeshList.Count + sceneData.objectList.Count);
+
             foreach (SceneManager.ObjectPackage objPack in sceneData.objectList)
             {
-                Vector3[] vertices = new Vector3[objPack.vSize];
-                Vector3[] normals = new Vector3[objPack.nSize];
-                Vector2[] uv = new Vector2[objPack.uvSize];
-                BoneWeight[] weights = new BoneWeight[objPack.bWSize];
-
-                for (int i = 0; i < objPack.bWSize; i++)
-                {
-                    BoneWeight b = new BoneWeight();
-                    b.weight0 = objPack.boneWeights[i * 4 + 0];
-                    b.weight1 = objPack.boneWeights[i * 4 + 1];
-                    b.weight2 = objPack.boneWeights[i * 4 + 2];
-                    b.weight3 = objPack.boneWeights[i * 4 + 3];
-                    b.boneIndex0 = objPack.boneIndices[i * 4 + 0];
-                    b.boneIndex1 = objPack.boneIndices[i * 4 + 1];
-                    b.boneIndex2 = objPack.boneIndices[i * 4 + 2];
-                    b.boneIndex3 = objPack.boneIndices[i * 4 + 3];
-                    weights[i] = b;
-                }
-
-                for (int i = 0; i < objPack.vSize; i++)
-                {
-                    Vector3 v = new Vector3(objPack.vertices[i * 3 + 0], objPack.vertices[i * 3 + 1], objPack.vertices[i * 3 + 2]);
-                    vertices[i] = v;
-                }
-
-                for (int i = 0; i < objPack.nSize; i++)
-                {
-                    Vector3 v = new Vector3(objPack.normals[i * 3 + 0], objPack.normals[i * 3 + 1], objPack.normals[i * 3 + 2]);
-                    normals[i] = v;
-                }
-
-                for (int i = 0; i < objPack.uvSize; i++)
-                {
-                    Vector2 v2 = new Vector2(objPack.uvs[i * 2 + 0], objPack.uvs[i * 2 + 1]);
-                    uv[i] = v2;
-                }
-
                 Mesh mesh = new Mesh();
                 mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-                mesh.vertices = vertices;
-                mesh.normals = normals;
-                mesh.uv = uv;
-                mesh.triangles = objPack.indices;
-                mesh.boneWeights = weights;
+
+                // Vertices: Fast memory copy using NativeArray.AsSpan()
+                if (objPack.vSize > 0 && objPack.vertices != null)
+                {
+                    using (NativeArray<Vector3> nativeVertices = new NativeArray<Vector3>(objPack.vSize, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+                    {
+                        ReadOnlySpan<Vector3> sourceSpan = MemoryMarshal.Cast<float, Vector3>(objPack.vertices);
+                        // AsSpan() provides a writeable Span<Vector3> which accepts the ReadOnlySpan copy
+                        sourceSpan.CopyTo(nativeVertices.AsSpan());
+
+                        mesh.SetVertices(nativeVertices);
+                    }
+                }
+
+                // Normals: Fast memory copy using NativeArray.AsSpan()
+                if (objPack.nSize > 0 && objPack.normals != null)
+                {
+                    using (NativeArray<Vector3> nativeNormals = new NativeArray<Vector3>(objPack.nSize, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+                    {
+                        ReadOnlySpan<Vector3> sourceSpan = MemoryMarshal.Cast<float, Vector3>(objPack.normals);
+                        sourceSpan.CopyTo(nativeNormals.AsSpan());
+
+                        mesh.SetNormals(nativeNormals);
+                    }
+                }
+
+                // UVs: Fast memory copy using NativeArray.AsSpan()
+                if (objPack.uvSize > 0 && objPack.uvs != null)
+                {
+                    using (NativeArray<Vector2> nativeUVs = new NativeArray<Vector2>(objPack.uvSize, Allocator.Temp, NativeArrayOptions.UninitializedMemory))
+                    {
+                        ReadOnlySpan<Vector2> sourceSpan = MemoryMarshal.Cast<float, Vector2>(objPack.uvs);
+                        sourceSpan.CopyTo(nativeUVs.AsSpan());
+
+                        mesh.SetUVs(0, nativeUVs);
+                    }
+                }
+
+                // Triangles / Indices
+                if (objPack.indices != null)
+                {
+                    mesh.triangles = objPack.indices;
+                }
+
+                // Bone Weights: Optimized struct assignment loop
+                if (objPack.bWSize > 0 && objPack.boneWeights != null && objPack.boneIndices != null)
+                {
+                    BoneWeight[] weights = new BoneWeight[objPack.bWSize];
+                    for (int i = 0; i < objPack.bWSize; i++)
+                    {
+                        int idx4 = i * 4;
+                        weights[i] = new BoneWeight
+                        {
+                            weight0 = objPack.boneWeights[idx4 + 0],
+                            weight1 = objPack.boneWeights[idx4 + 1],
+                            weight2 = objPack.boneWeights[idx4 + 2],
+                            weight3 = objPack.boneWeights[idx4 + 3],
+                            boneIndex0 = objPack.boneIndices[idx4 + 0],
+                            boneIndex1 = objPack.boneIndices[idx4 + 1],
+                            boneIndex2 = objPack.boneIndices[idx4 + 2],
+                            boneIndex3 = objPack.boneIndices[idx4 + 3]
+                        };
+                    }
+                    mesh.boneWeights = weights;
+                }
+
+                // Recalculate bounds for accurate camera culling since SetVertices was used
+                mesh.RecalculateBounds();
 
                 SceneMeshList.Add(mesh);
             }
         }
+
+        // Cache the layer index globally to eliminate heavy string-lookups inside the recursive loop
+        private static readonly int LodMixedLayer = LayerMask.NameToLayer("LodMixed");
 
         //!
         //! Function that recusively creates the gameObjects in the Unity scene.
@@ -413,32 +508,43 @@ namespace tracer
         //!
         private int createSceneGraphIter(ref SceneManager.SceneDataHandler.SceneData sceneData, Transform parent, int idx = 0, bool isRoot = true)
         {
-            if (sceneData.nodeList.Count > 0)
-            {
+            // Perform bounds check immediately to safeguard memory access
+            if (sceneData.nodeList == null || idx >= sceneData.nodeList.Count) return idx;
 
             SceneManager.SceneNode node = sceneData.nodeList[idx];
-
-            // process all registered build callbacks
             GameObject obj = CreateObject(node, parent);
-            obj.layer = LayerMask.NameToLayer("LodMixed");
+
+            // Optimized to use the globally cached int instead of NameToLayer string lookups
+            obj.layer = LodMixedLayer;
 
             gameObjectList.Add(obj);
 
-            // recursive call
             int idxChild = idx;
-            for (int k = 1; k <= node.childCount; k++)
-            {
-                idxChild = createSceneGraphIter(ref sceneData, obj.transform, idxChild + 1, false);
-            }
+            Transform currentTransform = obj.transform;
 
-            // if there are more nodes on one level
-            if (isRoot && idxChild + 1 < sceneData.nodeList.Count)
-                idxChild = createSceneGraphIter(ref sceneData, parent, idxChild + 1);
+            for (int k = 1; k <= node.childCount; k++)
+                idxChild = createSceneGraphIter(ref sceneData, currentTransform, idxChild + 1, false);
+
+            if (isRoot)
+            {
+                while (idxChild + 1 < sceneData.nodeList.Count)
+                    idxChild = createSceneGraphIter(ref sceneData, parent, idxChild + 1, true);
+            }
 
             return idxChild;
-                            
+        }
+
+        private static readonly string[] CachedHumanBodyBoneNames = InitHumanBodyBoneNames();
+
+        private static string[] InitHumanBodyBoneNames()
+        {
+            var enums = (HumanBodyBones[])Enum.GetValues(typeof(HumanBodyBones));
+            string[] names = new string[enums.Length];
+            for (int i = 0; i < enums.Length; i++)
+            {
+                names[i] = enums[i].ToString();
             }
-            else return 0;
+            return names;
         }
 
         //!
@@ -451,26 +557,40 @@ namespace tracer
         {
             List<SceneManager.CharacterPackage> characterList = sceneData.characterList;
 
-            if (characterList.Count > 0)
-                createSkinnedRendererIter(ref sceneData);
+            if (characterList == null || characterList.Count == 0) return;
 
-            //setup characters
+            createSkinnedRendererIter(ref sceneData);
+
+            // Find the target scene parent once before entering the loop to avoid severe performance drops
+            GameObject sceneObj = GameObject.Find("Scene");
+            Transform globalTargetParent = sceneObj != null ? sceneObj.transform.parent : null;
+
             foreach (SceneManager.CharacterPackage cp in characterList)
             {
                 GameObject obj = gameObjectList[cp.characterRootId];
                 Transform parentBackup = obj.transform.parent;
-                obj.transform.parent = GameObject.Find("Scene").transform.parent;
+
+                if (globalTargetParent != null)
+                {
+                    obj.transform.parent = globalTargetParent;
+                }
+
+                // Setup HumanBone mapping using pre-cached string names
                 HumanBone[] human = new HumanBone[cp.bMSize];
                 for (int i = 0; i < human.Length; i++)
                 {
                     int boneMapping = cp.boneMapping[i];
-                    if (boneMapping == -1)
-                        continue;
+                    if (boneMapping == -1) continue;
+
                     GameObject boneObj = gameObjectList[boneMapping];
                     human[i].boneName = boneObj.name;
-                    human[i].humanName = ((HumanBodyBones)i).ToString();
+
+                    // Replaced the heavy reflection .ToString() with our zero-allocation cached array
+                    human[i].humanName = i < CachedHumanBodyBoneNames.Length ? CachedHumanBodyBoneNames[i] : ((HumanBodyBones)i).ToString();
                     human[i].limit.useDefaultValues = true;
                 }
+
+                // Setup SkeletonBone data
                 SkeletonBone[] skeleton = new SkeletonBone[cp.sSize];
                 skeleton[0].name = obj.name;
                 skeleton[0].position = new Vector3(cp.bonePosition[0], cp.bonePosition[1], cp.bonePosition[2]);
@@ -479,50 +599,35 @@ namespace tracer
 
                 for (int i = 1; i < cp.skeletonMapping.Length; i++)
                 {
-                    if (cp.skeletonMapping[i] != -1)
+                    int mappingIdx = cp.skeletonMapping[i];
+                    if (mappingIdx != -1)
                     {
-                        skeleton[i].name = gameObjectList[cp.skeletonMapping[i]].name;
-                        skeleton[i].position = new Vector3(cp.bonePosition[i * 3], cp.bonePosition[i * 3 + 1], cp.bonePosition[i * 3 + 2]);
-                        skeleton[i].rotation = new Quaternion(cp.boneRotation[i * 4], cp.boneRotation[i * 4 + 1], cp.boneRotation[i * 4 + 2], cp.boneRotation[i * 4 + 3]);
-                        skeleton[i].scale = new Vector3(cp.boneScale[i * 3], cp.boneScale[i * 3 + 1], cp.boneScale[i * 3 + 2]);
+                        int idx3 = i * 3;
+                        int idx4 = i * 4;
+
+                        skeleton[i].name = gameObjectList[mappingIdx].name;
+                        skeleton[i].position = new Vector3(cp.bonePosition[idx3], cp.bonePosition[idx3 + 1], cp.bonePosition[idx3 + 2]);
+                        skeleton[i].rotation = new Quaternion(cp.boneRotation[idx4], cp.boneRotation[idx4 + 1], cp.boneRotation[idx4 + 2], cp.boneRotation[idx4 + 3]);
+                        skeleton[i].scale = new Vector3(cp.boneScale[idx3], cp.boneScale[idx3 + 1], cp.boneScale[idx3 + 2]);
                     }
                 }
-                
-                
-                
-                /*
-                HumanDescription humanDescription = new HumanDescription();
-                humanDescription.human = human;
-                humanDescription.skeleton = skeleton;
-                humanDescription.upperArmTwist = 0.5f;
-                humanDescription.lowerArmTwist = 0.5f;
-                humanDescription.upperLegTwist = 0.5f;
-                humanDescription.lowerLegTwist = 0.5f;
-                humanDescription.armStretch = 0.05f;
-                humanDescription.legStretch = 0.05f;
-                humanDescription.feetSpacing = 0.0f;
-                humanDescription.hasTranslationDoF = false;
-                */
 
+                // Build avatar, attach animator and enforce root motion
                 Avatar avatar = AvatarBuilder.BuildGenericAvatar(obj, "hip");
-                //Avatar avatar = AvatarBuilder.BuildHumanAvatar(obj, humanDescription);
-                
-                /*if (avatar.isValid == false || avatar.isHuman == false)
-                {
-                    Helpers.Log(GetType().FullName + ": Unable to create source Avatar for retargeting. Check that your Skeleton Asset Name and Bone Naming Convention are configured correctly.", Helpers.logMsgType.ERROR);
-                    return;
-                }*/
-
                 avatar.name = obj.name;
+
                 Animator animator = obj.AddComponent<Animator>();
                 animator.avatar = avatar;
                 animator.applyRootMotion = true;
 
+                // Restore original parenting state and bind the animation hierarchy
                 obj.transform.parent = parentBackup;
                 animator.Rebind();
             }
-
         }
+
+        // Cache the shader globally to eliminate severe performance degradation from Shader.Find inside loops
+        private static readonly Shader StandardShader = Shader.Find("Standard");
 
         //!
         //! Creates an GameObject from an TRACER SceneNode beneath the _parent transform.
@@ -532,56 +637,58 @@ namespace tracer
         //!
         private GameObject CreateObject(SceneManager.SceneNode node, Transform parentTransform)
         {
-            GameObject objMain;
-
-            // Transform / convert handiness
             Vector3 pos = new Vector3(node.position[0], node.position[1], node.position[2]);
-
-            // Rotation / convert handiness
             Quaternion rot = new Quaternion(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
-
-            // Scale
             Vector3 scl = new Vector3(node.scale[0], node.scale[1], node.scale[2]);
 
-            //if(true){
-            //if (!parentTransform.Find(Encoding.ASCII.GetString(node.name))){
-            // set up object basics
-            objMain = new GameObject();
-            objMain.name = Encoding.ASCII.GetString(node.name);
+            // Setup basic object properties
+            GameObject objMain = new GameObject();
+
+            // 1. Temporäres managed Array erstellen
+            byte[] managedBytes = new byte[64];
+
+            // 2. Daten über den Indexer aus der Struktur kopieren
+            for (int i = 0; i < 64; i++)
+            {
+                managedBytes[i] = node.name[i];
+            }
+
+            // 3. String konvertieren und an den Namen übergeben (Trim entfernt eventuelle Null-Bytes am Ende)
+            objMain.name = Encoding.ASCII.GetString(managedBytes).TrimEnd('\0');
 
             //place object
-            objMain.transform.parent = parentTransform; // GameObject.Find( "Scene" ).transform;
-            objMain.transform.localPosition = pos;
-            objMain.transform.localRotation = rot;
-            objMain.transform.localScale = scl;
+            Transform mainTransform = objMain.transform;
+            mainTransform.parent = parentTransform; // GameObject.Find( "Scene" ).transform;
+            mainTransform.localPosition = pos;
+            mainTransform.localRotation = rot;
+            mainTransform.localScale = scl;
 
-
-            if (node.GetType() == typeof(SceneManager.SceneNodeGeo) || node.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
+            // Use pattern matching to handle geometry nodes elegantly
+            if (node is SceneManager.SceneNodeGeo nodeGeo)
             {
-                SceneManager.SceneNodeGeo nodeGeo = (SceneManager.SceneNodeGeo)node;
-                // Material Properties and Textures
                 Material mat;
-                // assign material from material list
                 if (nodeGeo.materialId > -1 && nodeGeo.materialId < SceneMaterialList.Count)
                 {
                     mat = SceneMaterialList[nodeGeo.materialId];
                 }
-                else // or set standard
+                else
                 {
-                    mat = new Material(Shader.Find("Standard"));
+                    // Replaced Shader.Find with our globally cached static shader reference
+                    mat = new Material(StandardShader);
                     mat.color = new Color(nodeGeo.color[0], nodeGeo.color[1], nodeGeo.color[2], nodeGeo.color[3]);
                 }
 
-                // Add Material
+                // Add correct renderer type using modern C# type checks
                 Renderer renderer;
-                if (nodeGeo.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
+                bool isSkinned = node is SceneManager.SceneNodeSkinnedGeo;
+
+                if (isSkinned)
                     renderer = objMain.AddComponent<SkinnedMeshRenderer>();
                 else
                     renderer = objMain.AddComponent<MeshRenderer>();
 
                 renderer.material = mat;
 
-                // Add Mesh
                 if (nodeGeo.geoId > -1 && nodeGeo.geoId < SceneMeshList.Count)
                 {
                     Mesh mesh = SceneMeshList[nodeGeo.geoId];
@@ -589,45 +696,50 @@ namespace tracer
                     manager.sceneBoundsMax = Vector3.Max(manager.sceneBoundsMax, renderer.bounds.max);
                     manager.sceneBoundsMin = Vector3.Min(manager.sceneBoundsMin, renderer.bounds.min);
 
-                    if (node.GetType() == typeof(SceneManager.SceneNodeSkinnedGeo))
+                    if (isSkinned && node is SceneManager.SceneNodeSkinnedGeo sNodeGeo)
                     {
                         SkinnedMeshRenderer sRenderer = (SkinnedMeshRenderer)renderer;
-                        SceneManager.SceneNodeSkinnedGeo sNodeGeo = (SceneManager.SceneNodeSkinnedGeo)node;
-                        Bounds bounds = new Bounds(new Vector3(sNodeGeo.boundCenter[0], sNodeGeo.boundCenter[1], sNodeGeo.boundCenter[2]),
-                                                new Vector3(sNodeGeo.boundExtents[0] * 2f, sNodeGeo.boundExtents[1] * 2f, sNodeGeo.boundExtents[2] * 2f));
-                        sRenderer.localBounds = bounds;
+                        sRenderer.localBounds = new Bounds(
+                            new Vector3(sNodeGeo.boundCenter[0], sNodeGeo.boundCenter[1], sNodeGeo.boundCenter[2]),
+                            new Vector3(sNodeGeo.boundExtents[0] * 2f, sNodeGeo.boundExtents[1] * 2f, sNodeGeo.boundExtents[2] * 2f)
+                        );
+
+                        // Precompute parent transformation matrix once outside the bone loop to save CPU cycles
+                        Matrix4x4 parentMatrix = Matrix4x4.Scale(parentTransform.localScale) * Matrix4x4.Rotate(parentTransform.localRotation);
                         Matrix4x4[] bindposes = new Matrix4x4[sNodeGeo.bindPoseLength];
+
                         for (int i = 0; i < sNodeGeo.bindPoseLength; i++)
                         {
-                            bindposes[i] = new Matrix4x4();
-                            bindposes[i][0, 0] = sNodeGeo.bindPoses[i * 16];
-                            bindposes[i][0, 1] = sNodeGeo.bindPoses[i * 16 + 1];
-                            bindposes[i][0, 2] = sNodeGeo.bindPoses[i * 16 + 2];
-                            bindposes[i][0, 3] = sNodeGeo.bindPoses[i * 16 + 3];
-                            bindposes[i][1, 0] = sNodeGeo.bindPoses[i * 16 + 4];
-                            bindposes[i][1, 1] = sNodeGeo.bindPoses[i * 16 + 5];
-                            bindposes[i][1, 2] = sNodeGeo.bindPoses[i * 16 + 6];
-                            bindposes[i][1, 3] = sNodeGeo.bindPoses[i * 16 + 7];
-                            bindposes[i][2, 0] = sNodeGeo.bindPoses[i * 16 + 8];
-                            bindposes[i][2, 1] = sNodeGeo.bindPoses[i * 16 + 9];
-                            bindposes[i][2, 2] = sNodeGeo.bindPoses[i * 16 + 10];
-                            bindposes[i][2, 3] = sNodeGeo.bindPoses[i * 16 + 11];
-                            bindposes[i][3, 0] = sNodeGeo.bindPoses[i * 16 + 12];
-                            bindposes[i][3, 1] = sNodeGeo.bindPoses[i * 16 + 13];
-                            bindposes[i][3, 2] = sNodeGeo.bindPoses[i * 16 + 14];
-                            bindposes[i][3, 3] = sNodeGeo.bindPoses[i * 16 + 15];
+                            int idx16 = i * 16;
+                            Matrix4x4 bp = new Matrix4x4();
+                            bp[0, 0] = sNodeGeo.bindPoses[idx16];
+                            bp[0, 1] = sNodeGeo.bindPoses[idx16 + 1];
+                            bp[0, 2] = sNodeGeo.bindPoses[idx16 + 2];
+                            bp[0, 3] = sNodeGeo.bindPoses[idx16 + 3];
+                            bp[1, 0] = sNodeGeo.bindPoses[idx16 + 4];
+                            bp[1, 1] = sNodeGeo.bindPoses[idx16 + 5];
+                            bp[1, 2] = sNodeGeo.bindPoses[idx16 + 6];
+                            bp[1, 3] = sNodeGeo.bindPoses[idx16 + 7];
+                            bp[2, 0] = sNodeGeo.bindPoses[idx16 + 8];
+                            bp[2, 1] = sNodeGeo.bindPoses[idx16 + 9];
+                            bp[2, 2] = sNodeGeo.bindPoses[idx16 + 10];
+                            bp[2, 3] = sNodeGeo.bindPoses[idx16 + 11];
+                            bp[3, 0] = sNodeGeo.bindPoses[idx16 + 12];
+                            bp[3, 1] = sNodeGeo.bindPoses[idx16 + 13];
+                            bp[3, 2] = sNodeGeo.bindPoses[idx16 + 14];
+                            bp[3, 3] = sNodeGeo.bindPoses[idx16 + 15];
 
-                            bindposes[i] = Matrix4x4.Scale(parentTransform.localScale) * Matrix4x4.Rotate(parentTransform.localRotation) * bindposes[i];
+                            bindposes[i] = parentMatrix * bp;
                         }
-                            
+
                         mesh.bindposes = bindposes;
                         sRenderer.sharedMesh = mesh;
-                            
                     }
                     else
                     {
-                        objMain.AddComponent<MeshFilter>();
-                        objMain.GetComponent<MeshFilter>().mesh = mesh;
+                        // Optimized to use the direct return value instead of redundant GetComponent calls
+                        MeshFilter filter = objMain.AddComponent<MeshFilter>();
+                        filter.mesh = mesh;
                     }
                 }
 
@@ -638,21 +750,17 @@ namespace tracer
                     manager.simpleSceneObjectList.Add(sco);
                 }
             }
-            else if (node.GetType() == typeof(SceneManager.SceneNodeLight))
+            else if (node is SceneManager.SceneNodeLight nodeLight)
             {
-                SceneManager.SceneNodeLight nodeLight = (SceneManager.SceneNodeLight)node;
-
                 Light lightComponent = objMain.AddComponent<Light>();
-                   
-                lightComponent.type = (UnityEngine.LightType) nodeLight.lightType;
+
+                lightComponent.type = (UnityEngine.LightType)nodeLight.lightType;
                 lightComponent.color = new Color(nodeLight.color[0], nodeLight.color[1], nodeLight.color[2]);
                 lightComponent.intensity = nodeLight.intensity * m_LightScale;
                 lightComponent.spotAngle = nodeLight.angle;
                 lightComponent.shadowBias = 0f;
                 lightComponent.shadowNormalBias = 1f;
                 lightComponent.range = nodeLight.range * manager.settings.sceneScale;
-
-                // Debug.Log("Create Light: " + nodeLight.name + " of type: " + nodeLight.lightType.ToString() + " Intensity: " + nodeLight.intensity + " Pos: " + pos);
 
                 if (nodeLight.editable)
                 {
@@ -687,18 +795,15 @@ namespace tracer
                             break;
                         default:
                             sco = SceneObjectLight.Attach(objMain, m_senderID);
-                            Debug.Log("Unknown Light Type " + nodeLight.lightType.ToString() + " in NodeBuilderBasic::CreateLight");
-                        break;
+                            Debug.Log($"Unknown Light Type {nodeLight.lightType} in NodeBuilderBasic::CreateLight");
+                            break;
                     }
                     manager.sceneLightList.Add(sco);
                 }
             }
-            else if (node.GetType() == typeof(SceneManager.SceneNodeCam))
+            else if (node is SceneManager.SceneNodeCam nodeCam)
             {
-                SceneManager.SceneNodeCam nodeCam = (SceneManager.SceneNodeCam)node;
-
                 Camera camera = objMain.AddComponent<Camera>();
-
                 camera.fieldOfView = nodeCam.fov;
                 camera.aspect = nodeCam.aspect;
                 camera.nearClipPlane = nodeCam.near;
@@ -715,7 +820,8 @@ namespace tracer
                     manager.sceneCameraList.Add(sco);
                 }
             }
-            else if (node.GetType() == typeof(SceneManager.SceneNodeCharacter))
+            // Optimized type check using modern pattern matching
+            else if (node is SceneManager.SceneNodeCharacter)
             {
                 if (node.editable)
                 {
@@ -723,28 +829,22 @@ namespace tracer
                     SceneObject sdo = SceneCharacterObject.Attach(objMain, m_senderID);
                 }
             }
-            //ADD SCENE OBJECT PATH
+            // Handle default scene object path
             else
             {
                 if (node.editable)
                 {
                     objMain.tag = "editable";
-
                     SceneObject sdo = SceneObject.Attach(objMain, m_senderID);
                     manager.simpleSceneObjectList.Add(sdo);
                 }
             }
 
+            // Update scene global extents calculations
             Vector3 sceneExtends = manager.sceneBoundsMax - manager.sceneBoundsMin;
             manager.maxExtend = Mathf.Max(Mathf.Max(sceneExtends.x, sceneExtends.y), sceneExtends.z);
-            //}
-            //else
-            //{
-            //    objMain = parentTransform.Find(Encoding.ASCII.GetString(node.name)).gameObject;
-            //}
 
             return objMain;
-
         }
 
         //!
@@ -771,35 +871,60 @@ namespace tracer
         //!
         private void createSkinnedRendererIter(ref SceneManager.SceneDataHandler.SceneData sceneData)
         {
+            if (sceneData.nodeList == null || sceneData.nodeList.Count == 0) return;
+
             int characterRootID = -1;
             int skinnedRendererCount = 0;
-            SkinnedMeshRenderer[] renderers = new SkinnedMeshRenderer[0];
+            SkinnedMeshRenderer[] renderers = System.Array.Empty<SkinnedMeshRenderer>();
 
             for (int it = 0; it < sceneData.nodeList.Count; it++)
             {
-                SceneManager.SceneNodeSkinnedGeo node = sceneData.nodeList[it] as SceneManager.SceneNodeSkinnedGeo;
-                if (node != null)
+                // Use pattern matching for safe and performant type casting
+                if (sceneData.nodeList[it] is SceneManager.SceneNodeSkinnedGeo node)
                 {
+                    // Update and fetch components only when shifting to a new character root hierarchy
                     if (characterRootID != node.characterRootID)
                     {
                         characterRootID = node.characterRootID;
                         skinnedRendererCount = 0;
-                        renderers = gameObjectList[characterRootID].GetComponentsInChildren<SkinnedMeshRenderer>();
+
+                        if (characterRootID >= 0 && characterRootID < gameObjectList.Count && gameObjectList[characterRootID] != null)
+                        {
+                            renderers = gameObjectList[characterRootID].GetComponentsInChildren<SkinnedMeshRenderer>();
+                        }
+                        else
+                        {
+                            renderers = System.Array.Empty<SkinnedMeshRenderer>();
+                        }
                     }
-                    if (renderers.Length >= skinnedRendererCount)
+
+                    // Fixed bounds check to prevent IndexOutOfRangeException (strictly less than length)
+                    if (skinnedRendererCount < renderers.Length)
                     {
                         SkinnedMeshRenderer renderer = renderers[skinnedRendererCount];
-                        if (renderer)
+                        if (renderer != null)
                         {
                             renderer.rootBone = renderer.gameObject.transform;
-                            Transform[] meshBones = new Transform[node.skinnedMeshBoneIDs.Length];
-                            for (int i = 0; i < node.skinnedMeshBoneIDs.Length; i++)
+                            List<Transform> validBones = new List<Transform>();
+
+                            // Int99 hat eine feste Größe von 99 Elementen
+                            for (int i = 0; i < 99; i++)
                             {
-                                if (node.skinnedMeshBoneIDs[i] != -1)
-                                    meshBones[i] = gameObjectList[node.skinnedMeshBoneIDs[i]].transform;
+                                int boneID = node.skinnedMeshBoneIDs[i];
+                                if (boneID >= 0 && boneID < gameObjectList.Count)
+                                {
+                                    GameObject boneObj = gameObjectList[boneID];
+                                    if (boneObj != null)
+                                        validBones.Add(boneObj.transform);
+                                    else
+                                        validBones.Add(null);
+                                }
+                                else if (boneID == -1)
+                                    break;
                             }
 
-                            renderer.bones = meshBones;
+                            // 2. Das bereinigte Array an den Renderer übergeben
+                            renderer.bones = validBones.ToArray();
                             renderer.updateWhenOffscreen = true;
                         }
                         skinnedRendererCount++;

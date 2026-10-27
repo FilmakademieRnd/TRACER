@@ -32,6 +32,7 @@ using NetMQ;
 using NetMQ.Sockets;
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -47,12 +48,12 @@ namespace tracer
     {
         private readonly struct BufferedMessage
         {
-            public readonly NetMQFrame Frame; // Das gemietete Array aus dem ArrayPool
-            public readonly int Length;   // Die tatsächliche Datengröße
+            public readonly byte[] Buffer; 
+            public readonly int Length;   
 
-            public BufferedMessage(NetMQFrame frame, int length)
+            public BufferedMessage(byte[] buffer, int length)
             {
-                Frame = frame;
+                Buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));
                 Length = length;
             }
         }
@@ -60,7 +61,7 @@ namespace tracer
         //!
         //! Buffer for storing incoming message by time (array of lists of bytes).
         //!
-        private readonly List<BufferedMessage>[] m_messageBuffer = new List<BufferedMessage>[256];
+        private readonly List<BufferedMessage>[] m_messageBuffer;
 
         //!
         //! Event emitted when parameter change should be added to undo/redo history
@@ -85,6 +86,7 @@ namespace tracer
         //!
         public UpdateReceiverModule(string name, Manager manager) : base(name, manager)
         {
+            m_messageBuffer = new List<BufferedMessage>[core.timesteps];
         }
 
         //!
@@ -107,10 +109,8 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             // initialize message buffer
-            for (int i = 0; i < 256; i++)
-            {
-                m_messageBuffer[i] = new List<BufferedMessage>(capacity: 32); // Startkapazität nach Bedarf
-            }
+            for (int i = 0; i < core.timesteps; i++)
+                m_messageBuffer[i] = new List<BufferedMessage>(capacity: 16);
 
             m_sceneManager = core.getManager<SceneManager>();
             m_sceneManager.sceneReady += connectAndStart;
@@ -149,7 +149,7 @@ namespace tracer
         protected override void run()
         {
             m_isRunning = true;
-            
+
             AsyncIO.ForceDotNet.Force();
             using var receiver = new SubscriberSocket();
             m_socket = receiver;
@@ -159,54 +159,56 @@ namespace tracer
             Helpers.Log($"Update receiver connected: {connectionString}");
 
             NetMQMessage multipartMessage = new NetMQMessage();
-            
+
             while (m_isRunning)
             {
                 try
                 {
                     if (receiver.TryReceiveMultipartMessage(System.TimeSpan.FromSeconds(1), ref multipartMessage))
                     {
-                        lock (_lock)
+                        for (int i = 0; i < multipartMessage.FrameCount; i++)
                         {
-                            for (int i = 0; i < multipartMessage.FrameCount; i++)
-                            {
-                                NetMQFrame frame = multipartMessage[i];
-                                byte[] buffer = frame.Buffer;
-                                if (buffer != null && buffer[0] != manager.cID)
-                                {
-                                    switch ((MessageType)buffer[2])
-                                    {
-                                        case MessageType.LOCK:
-                                            decodeLockMessage(buffer);
-                                            break;
-                                        case MessageType.SYNC:
-                                            decodeSyncMessage(buffer);
-                                            break;
-                                        case MessageType.RESETOBJECT:
-                                            decodeResetMessage(buffer);
-                                            break;
-                                        case MessageType.UNDOREDOADD:
-                                            decodeUndoRedoMessage(buffer);
-                                            break;
-                                        case MessageType.DATAHUB:
-                                            decodeDataHubMessage(buffer);
-                                            break;
-                                        case MessageType.RPC:
-                                        case MessageType.PARAMETERUPDATE:
-                                            //int time = (message[1] + (Mathf.RoundToInt((float)manager.pingRTT * 0.5f))) % core.timesteps;
-                                            int messageSize = frame.MessageSize;
-                                            int timeSlot = buffer[1]; // buffer[1] corresponds to the message time byte
-                                            // Rent an array from the pool to safely isolate the streaming data
-                                            byte[] rentedArray = ArrayPool<byte>.Shared.Rent(messageSize);
-                                            frame.Buffer.AsSpan(0, messageSize).CopyTo(rentedArray);
-                                            // Wrap the rented array into a NetMQFrame and push it onto the ringbuffer slot
-                                            var pooledFrame = new NetMQFrame(rentedArray);
-                                            m_messageBuffer[timeSlot].Add(new BufferedMessage(pooledFrame, messageSize));
-                                            break;
-                                        default:
-                                            break;
-                                    }
+                            NetMQFrame frame = multipartMessage[i];
+                            byte[] buffer = frame.Buffer;
 
+                            if (buffer != null && buffer.Length > 2 && buffer[0] != manager.cID)
+                            {
+                                MessageType msgType = (MessageType)buffer[2];
+
+                                // Execute decoding outside of the global lock to prevent blocking the network thread
+                                switch (msgType)
+                                {
+                                    case MessageType.LOCK:
+                                        lock (_lock) { decodeLockMessage(buffer); }
+                                        break;
+                                    case MessageType.SYNC:
+                                        lock (_lock) { decodeSyncMessage(buffer); }
+                                        break;
+                                    case MessageType.RESETOBJECT:
+                                        lock (_lock) { decodeResetMessage(buffer); }
+                                        break;
+                                    case MessageType.UNDOREDOADD:
+                                        lock (_lock) { decodeUndoRedoMessage(buffer); }
+                                        break;
+                                    case MessageType.DATAHUB:
+                                        lock (_lock) { decodeDataHubMessage(buffer); }
+                                        break;
+                                    case MessageType.RPC:
+                                    case MessageType.PARAMETERUPDATE:
+                                        int messageSize = frame.MessageSize;
+                                        int timeSlot = buffer[1];
+
+                                        // Rent from pool and copy the span immediately
+                                        byte[] rentedArray = ArrayPool<byte>.Shared.Rent(messageSize);
+                                        frame.Buffer.AsSpan(0, messageSize).CopyTo(rentedArray);
+
+                                        lock (_lock)
+                                        {
+                                            m_messageBuffer[timeSlot].Add(new BufferedMessage(rentedArray, messageSize));
+                                        }
+                                        break;
+                                    default:
+                                        break;
                                 }
                             }
                         }
@@ -214,7 +216,12 @@ namespace tracer
                         multipartMessage.Clear();
                     }
                 }
-                catch (Exception e) { Helpers.Log(e.Message, Helpers.logMsgType.WARNING); }
+                catch (Exception e)
+                {
+                    Helpers.Log(e.Message, Helpers.logMsgType.WARNING);
+                }
+
+                // Yield execution to allow other threads to process without heavy context-switching overhead
                 Thread.Yield();
             }
             m_thredEnded.TrySetResult(true);
@@ -250,40 +257,37 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void decodeLockMessage(byte[] message)
         {
-            bool lockState = BitConverter.ToBoolean(message, 6);
+            bool lockState = message[6] != 0;
 
             if (lockState)
             {
                 byte sceneID = message[3];
-                short sceneObjectID = BitConverter.ToInt16(message, 4);
+                short sceneObjectID = BinaryPrimitives.ReadInt16LittleEndian(message.AsSpan(4, 2));
 
                 SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, sceneObjectID);
-                sceneObject._lock = lockState;
-               
-                if(sceneObject.playedByTimeline)
-                {   //if we are animating the object, lock it!
-                    sceneObject.lockObject(true);
-                    Debug.Log("instantly lock unlocked object we received because its playing!");
+                if (sceneObject != null)
+                {
+                    sceneObject._lock = lockState;
+
+                    if (sceneObject.playedByTimeline)
+                    {
+                        // If we are animating the object, lock it!
+                        sceneObject.lockObject(true);
+                        Debug.Log("Instantly lock unlocked object we received because its playing!");
+                    }
                 }
-                
             }
-            // delay unlock message
+            // Delay unlock message
             else
             {
+                // Add a 1/4 second delay (framerate / 4) into the future
                 int bufferTime = (((message[1] + core.settings.framerate / 4) + core.timesteps) % core.timesteps);
-                
-                // A standard LOCK message has a fixed size of 7 bytes (Header: 3 + SceneID: 1 + ObjectID: 2 + State: 1)
+
                 const int lockMessageSize = 7;
-
-                // Rent a safe, isolated array from the pool
                 byte[] rentedArray = ArrayPool<byte>.Shared.Rent(lockMessageSize);
-
-                // Copy the exact 7 bytes of the lock message into the rented array using Span
                 message.AsSpan(0, lockMessageSize).CopyTo(rentedArray);
 
-                // Wrap into a NetMQFrame and store it inside the ringbuffer as a BufferedMessage struct
-                var pooledFrame = new NetMQFrame(rentedArray);
-                m_messageBuffer[bufferTime].Add(new BufferedMessage(pooledFrame, lockMessageSize));
+                m_messageBuffer[bufferTime].Add(new BufferedMessage(rentedArray, lockMessageSize));
             }
         }
 
@@ -338,7 +342,6 @@ namespace tracer
 
             lock (_lock)
             {
-                // Caching variables for the ParameterObject
                 byte oldSceneID = 0;
                 short oldParameterObjectID = 0;
                 bool paraObjectNotFound = true;
@@ -350,23 +353,32 @@ namespace tracer
                 {
                     BufferedMessage bufferedMsg = timeSlotBuffer[i];
 
-                    ReadOnlySpan<byte> message = new ReadOnlySpan<byte>(bufferedMsg.Frame.Buffer, 0, bufferedMsg.Length);
+                    // Create a read-only view of the message buffer safely
+                    ReadOnlySpan<byte> message = new ReadOnlySpan<byte>(bufferedMsg.Buffer, 0, bufferedMsg.Length);
 
                     try
                     {
+                        // Basic boundary check to ensure header data exists
+                        if (message.Length < 3) continue;
+
                         if ((MessageType)message[2] == MessageType.LOCK)
                         {
+                            // Ensure the LOCK message has the required minimum length (7 bytes)
+                            if (message.Length < 7) continue;
+
                             byte sceneID = message[3];
-                            short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(4));
-                            bool lockState = MemoryMarshal.Read<bool>(message.Slice(6));
+                            short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(4, 2));
+                            bool lockState = MemoryMarshal.Read<bool>(message.Slice(6, 1));
 
                             SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, parameterObjectID);
-                            sceneObject._lock = lockState;
-
-                            if (sceneObject.playedByTimeline)
+                            if (sceneObject != null)
                             {
-                                // If we are animating the object, lock it
-                                sceneObject.lockObject(true);
+                                sceneObject._lock = lockState;
+
+                                if (sceneObject.playedByTimeline)
+                                {
+                                    sceneObject.lockObject(true);
+                                }
                             }
                         }
                         else
@@ -375,12 +387,18 @@ namespace tracer
                             paraObjectNotFound = true;
                             int start = 3;
 
-                            while (start < message.Length)
+                            while (start + 10 <= message.Length)
                             {
                                 byte sceneID = message[start];
-                                short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(start + 1));
-                                short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3));
-                                int length = MemoryMarshal.Read<int>(message.Slice(start + 6));
+                                short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(start + 1, 2));
+                                short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3, 2));
+                                int length = MemoryMarshal.Read<int>(message.Slice(start + 6, 4));
+
+                                // Prevent infinite loop if a corrupted message has length <= 0
+                                if (length <= 0) break;
+
+                                // Safeguard against corrupted data exceeding total buffer length
+                                if (start + length > message.Length) break;
 
                                 if (paraObjectNotFound ||
                                     sceneID != oldSceneID ||
@@ -392,27 +410,29 @@ namespace tracer
                                 if (parameterObject != null)
                                 {
                                     paraObjectNotFound = false;
-                                    AbstractParameter parameter = parameterObject.parameterList[parameterID];
 
-                                    // Check update if animation is incoming and change parameter type if required.
-                                    // 10 is the size of the parameter fixed field.
-                                    if (parameter._isAnimated)
+                                    if (parameterObject.parameterList != null && parameterID < parameterObject.parameterList.Count)
                                     {
-                                        if (length == 10 + parameter.defaultDataSize())
-                                            parameter.reset();
-                                    }
-                                    else
-                                    {
-                                        if (length > 10 + parameter.dataSize())
-                                            parameter.InitAnimation();
-                                    }
+                                        AbstractParameter parameter = parameterObject.parameterList[parameterID];
 
-                                    parameter.deSerialize(message.Slice(start + 10));
+                                        if (parameter._isAnimated)
+                                        {
+                                            if (length == 10 + parameter.defaultDataSize())
+                                                parameter.reset();
+                                        }
+                                        else
+                                        {
+                                            if (length > 10 + parameter.dataSize())
+                                                parameter.InitAnimation();
+                                        }
+
+                                        // FIXED: Sliced with exact payload length to prevent reading into subsequent messages
+                                        int payloadLength = length - 10;
+                                        parameter.deSerialize(message.Slice(start + 10, payloadLength));
+                                    }
                                 }
                                 else
-                                {
                                     paraObjectNotFound = true;
-                                }
 
                                 start += length;
                                 oldSceneID = sceneID;
@@ -420,12 +440,18 @@ namespace tracer
                             }
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"Error parsing network message: {ex.Message}");
+                    }
                     finally
                     {
-                        ArrayPool<byte>.Shared.Return(bufferedMsg.Frame.Buffer, clearArray: false);
+                        // Recycle the byte array buffer back into the shared pool
+                        ArrayPool<byte>.Shared.Return(bufferedMsg.Buffer, clearArray: false);
                     }
                 }
-                // Clear the slot list. The internal list capacity is preserved.
+
+                // Clear the slot list while keeping its allocated capacity for future updates
                 timeSlotBuffer.Clear();
             }
         }

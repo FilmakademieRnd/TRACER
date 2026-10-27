@@ -26,8 +26,9 @@ https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 11.03.2022
 
-using UnityEngine;
+using System.IO;
 using System.Runtime.InteropServices;
+using UnityEngine;
 
 namespace tracer
 {
@@ -45,68 +46,129 @@ namespace tracer
         //!
         public enum LightType { SPOT, DIRECTIONAL, POINT, AREA, DISC, SUN }
 
-        //[StructLayout(LayoutKind.Sequential, Pack = 4)]
-        //public struct Float3
-        //{
-        //    public float x, y, z;
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct Float3
+        {
+            public float x, y, z;
 
-        //    // Praktischer Indexer, damit dein restlicher Code float[index] weiterhin nutzen kann!
-        //    public float this[int index]
-        //    {
-        //        get => index == 0 ? x : index == 1 ? y : z;
-        //        set { if (index == 0) x = value; else if (index == 1) y = value; else z = value; }
-        //    }
-        //}
+            // Praktischer Indexer, damit dein restlicher Code float[index] weiterhin nutzen kann!
+            public float this[int index]
+            {
+                get => index == 0 ? x : index == 1 ? y : z;
+                set { if (index == 0) x = value; else if (index == 1) y = value; else z = value; }
+            }
+        }
 
-        //[StructLayout(LayoutKind.Sequential, Pack = 4)]
-        //public struct Float4
-        //{
-        //    public float x, y, z, w;
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct Float4
+        {
+            public float x, y, z, w;
 
-        //    public float this[int index]
-        //    {
-        //        get => index == 0 ? x : index == 1 ? y : index == 2 ? z : w;
-        //        set { if (index == 0) x = value; else if (index == 1) y = value; else if (index == 2) z = value; else w = value; }
-        //    }
-        //}
+            public float this[int index]
+            {
+                get => index == 0 ? x : index == 1 ? y : index == 2 ? z : w;
+                set { if (index == 0) x = value; else if (index == 1) y = value; else if (index == 2) z = value; else w = value; }
+            }
+        }
 
-        //[StructLayout(LayoutKind.Sequential, Pack = 1)]
-        //public unsafe struct Byte64
-        //{
-        //    // Erstellt exakt 64 Bytes sequentiellen Speicher
-        //    private fixed byte data[64];
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct Byte64
+        {
+            // Erstellt exakt 64 Bytes sequentiellen Speicher
+            private fixed byte data[64];
 
-        //    public byte this[int index]
-        //    {
-        //        get { unsafe { fixed (byte* p = data) return p[index]; } }
-        //        set { unsafe { fixed (byte* p = data) p[index] = value; } }
-        //    }
-        //}
+            public byte this[int index]
+            {
+                get { unsafe { fixed (byte* p = data) return p[index]; } }
+                set { unsafe { fixed (byte* p = data) p[index] = value; } }
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct Float1584
+        {
+            // Reserviert exakt 1584 * 4 Bytes im Speicher
+            private unsafe fixed float data[1584];
+
+            public float this[int index]
+            {
+                get { unsafe { fixed (float* p = data) return p[index]; } }
+                set { unsafe { fixed (float* p = data) p[index] = value; } }
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        public struct Int99
+        {
+            // Reserviert exakt 99 * 4 Bytes im Speicher
+            private unsafe fixed int data[99];
+
+            public int this[int index]
+            {
+                get { unsafe { fixed (int* p = data) return p[index]; } }
+                set { unsafe { fixed (int* p = data) p[index] = value; } }
+            }
+        }
+        
+        public interface IBinarySerializable
+        {
+            int FileStructureSize { get; }
+            void Populate(BinaryReader reader);
+            void Serialize(BinaryWriter writer);
+        }
 
         //!
         //! Data structure for serialising basic SceneNodes.
         //! The struct layout and array size for marshaling has to be fixed
         //! to be compatible with unmanaged code.
         //!
-        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
-        public class SceneNode
+        [System.Serializable]
+        public class SceneNode : IBinarySerializable
         {
             //! Flag that determines whether a node is editable or not. 
             public bool editable;
             //! The Number of childes the node have. 
             public int childCount;
             //! The position of the node in world space, stored as float array with the length of 3.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-            public float[] position;
+            public Float3 position;
             //! The scale of the node in world space, stored as float array with the length of 3.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-            public float[] scale;
+            public Float3 scale;
             //! The rotation of the node in world space, stored as float array with the length of 4.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-            public float[] rotation;
+            public Float4 rotation;
             //! The name of the node, stored as byte array with the length of 64.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
-            public byte[] name;
+            public Byte64 name;
+
+            // Basisgröße: bool(4) + childCount(4) + pos(12) + scale(12) + rot(16) + name(64) = 112
+            public virtual int FileStructureSize => 112;
+
+            public virtual void Populate(BinaryReader reader)
+            {
+                editable = reader.ReadInt32() != 0; // Mono-4-Byte-Bool
+                childCount = reader.ReadInt32();
+
+                position.x = reader.ReadSingle(); position.y = reader.ReadSingle(); position.z = reader.ReadSingle();
+                scale.x = reader.ReadSingle(); scale.y = reader.ReadSingle(); scale.z = reader.ReadSingle();
+
+                rotation.x = reader.ReadSingle(); rotation.y = reader.ReadSingle();
+                rotation.z = reader.ReadSingle(); rotation.w = reader.ReadSingle();
+
+                byte[] nameBytes = reader.ReadBytes(64);
+                for (int i = 0; i < 64; i++) name[i] = nameBytes[i]; // Über Indexer
+            }
+
+            public virtual void Serialize(BinaryWriter writer)
+            {
+                writer.Write(editable ? 1 : 0); // Legacy Mono 4-byte boolean
+                writer.Write(childCount);
+
+                writer.Write(position.x); writer.Write(position.y); writer.Write(position.z);
+                writer.Write(scale.x); writer.Write(scale.y); writer.Write(scale.z);
+
+                writer.Write(rotation.x); writer.Write(rotation.y);
+                writer.Write(rotation.z); writer.Write(rotation.w);
+
+                for (int i = 0; i < 64; i++) writer.Write(name[i]);
+            }
         };
 
         //!
@@ -123,80 +185,190 @@ namespace tracer
         //! Data structure for serialising SceneNodes representing Unity
         //! game objects containing 3d scene components like meshes and materials.
         //!
-        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
+        [System.Serializable]
         public class SceneNodeGeo : SceneNode
         {
-            //! The ID for referencing the associated geometry data.
             public int geoId;
-            //! The ID for referencing the associated material data.
             public int materialId;
-            //! The color if the node has no material assigned, stored as float array with the length of 4.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-            public float[] color;
-        };
+            public Float4 color;
+
+            // Basis(112) + geoId(4) + matId(4) + color(16) = 136
+            public override int FileStructureSize => 136;
+
+            public override void Populate(BinaryReader reader)
+            {
+                base.Populate(reader); // Liest die ersten 112 Bytes
+                geoId = reader.ReadInt32();
+                materialId = reader.ReadInt32();
+
+                color.x = reader.ReadSingle(); color.y = reader.ReadSingle();
+                color.z = reader.ReadSingle(); color.w = reader.ReadSingle();
+            }
+
+            public override void Serialize(BinaryWriter writer)
+            {
+                base.Serialize(writer); // Writes the 112 bytes base
+                writer.Write(geoId);
+                writer.Write(materialId);
+
+                writer.Write(color.x); writer.Write(color.y);
+                writer.Write(color.z); writer.Write(color.w);
+            }
+        }
 
         //!
         //! Data structure for serialising SceneNodes representing Unity
         //! game objects containing skinned mesh components.
         //!
-        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
+        [System.Serializable]
         public class SceneNodeSkinnedGeo : SceneNodeGeo
         {
             //! The length of the array storing the bind poses.
             public int bindPoseLength;
             //! The ID for referencing the associated character root.
             public int characterRootID;
-            //! The bounds of the skinned mesh in world space, stored as float array with the length of 3.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-            public float[] boundExtents;
-            //! The center of the skinned mesh in world space, stored as float array with the length of 3.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-            public float[] boundCenter;
-            //! The bind poses of the skinned mesh stored as 99 4x4 matrices in a float array.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16 * 99)]
-            public float[] bindPoses;
+            //! The bounds of the skinned mesh in world space.
+            public Float3 boundExtents;
+            //! The center of the skinned mesh in world space.
+            public Float3 boundCenter;
+            //! The bind poses of the skinned mesh stored as 99 4x4 matrices.
+            public Float1584 bindPoses;
             //! The bone IDs for referencing the associated skeleton bones.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 99)]
-            public int[] skinnedMeshBoneIDs;
-        };
+            public Int99 skinnedMeshBoneIDs;
+
+            // Berechnung: Basis Geo(136) + bindPoseLength(4) + characterRootID(4) 
+            // + boundExtents(12) + boundCenter(12) + bindPoses(1584 * 4 = 6336) 
+            // + skinnedMeshBoneIDs(99 * 4 = 396) = 136 + 6740 = 6876 Bytes
+            public override int FileStructureSize => 6876;
+
+            public override void Populate(BinaryReader reader)
+            {
+                base.Populate(reader);
+                bindPoseLength = reader.ReadInt32();
+                characterRootID = reader.ReadInt32();
+
+                boundExtents.x = reader.ReadSingle();
+                boundExtents.y = reader.ReadSingle();
+                boundExtents.z = reader.ReadSingle();
+
+                boundCenter.x = reader.ReadSingle();
+                boundCenter.y = reader.ReadSingle();
+                boundCenter.z = reader.ReadSingle();
+
+                for (int i = 0; i < 1584; i++)
+                    bindPoses[i] = reader.ReadSingle();
+
+                for (int i = 0; i < 99; i++)
+                    skinnedMeshBoneIDs[i] = reader.ReadInt32();
+            }
+
+            public override void Serialize(BinaryWriter writer)
+            {
+                base.Serialize(writer);
+
+                writer.Write(bindPoseLength);
+                writer.Write(characterRootID);
+
+                writer.Write(boundExtents.x);
+                writer.Write(boundExtents.y);
+                writer.Write(boundExtents.z);
+
+                writer.Write(boundCenter.x);
+                writer.Write(boundCenter.y);
+                writer.Write(boundCenter.z);
+
+                for (int i = 0; i < 1584; i++)
+                    writer.Write(bindPoses[i]);
+
+                // 5. Write bone IDs (Fixed loop for 99 ints)
+                for (int i = 0; i < 99; i++)
+                    writer.Write(skinnedMeshBoneIDs[i]);
+            }
+        }
 
         //!
         //!
         //!
-        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
+        [System.Serializable]
         public class SceneNodeGS : SceneNode
         {
             //! The ID for referencing the associated geometry data.
             public int gsId;
             public int shDegree;
             public int sortMode;
-        };
+
+            // Berechnung: Basis SceneNode(112) + gsId(4) + shDegree(4) + sortMode(4) = 124 Bytes
+            public override int FileStructureSize => 124;
+
+            public override void Populate(BinaryReader reader)
+            {
+                base.Populate(reader);
+
+                gsId = reader.ReadInt32();
+                shDegree = reader.ReadInt32();
+                sortMode = reader.ReadInt32();
+            }
+
+            public override void Serialize(BinaryWriter writer)
+            {
+                base.Serialize(writer);
+
+                writer.Write(gsId);
+                writer.Write(shDegree);
+                writer.Write(sortMode);
+            }
+        }
 
         //!
         //! Data structure for serialising SceneNodes representing Unity
         //! game objects containing light components.
         //!
-        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
+        [System.Serializable]
         public class SceneNodeLight : SceneNode
         {
-            //! Enumeration storing the Unity light type.
             public LightType lightType;
-            //! The intensity value of the light.
             public float intensity;
-            //! The beam angle of the light. (Only used if LightType is spot.)
             public float angle;
-            //! The range value of the light.
             public float range;
-            //! The color of the light, stored as float array with the legth of 3.
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-            public float[] color;
-        };
+            public Float3 color;
+
+            // Basis(112) + lightType(4) + intensity(4) + angle(4) + range(4) + RGB-Farbkanäle(12) = 140
+            public override int FileStructureSize => 140;
+
+            public override void Populate(BinaryReader reader)
+            {
+                base.Populate(reader);
+                lightType = (LightType)reader.ReadInt32();
+                intensity = reader.ReadSingle();
+                angle = reader.ReadSingle();
+                range = reader.ReadSingle();
+
+                // Die gelöste RGB-Falle: Nur 3 Floats aus der Datei lesen!
+                color.x = reader.ReadSingle();
+                color.y = reader.ReadSingle();
+                color.z = reader.ReadSingle();
+            }
+
+            public override void Serialize(BinaryWriter writer)
+            {
+                base.Serialize(writer); // Writes the 112 bytes base
+                writer.Write((int)lightType);
+                writer.Write(intensity);
+                writer.Write(angle);
+                writer.Write(range);
+
+                // The solved RGB trap: Write ONLY 3 floats to file for legacy desktop compatibility!
+                writer.Write(color.x); // R
+                writer.Write(color.y); // G
+                writer.Write(color.z); // B
+            }
+        }
 
         //!
         //! Data structure for serialising SceneNodes representing Unity
         //! game objects containing camera components.
         //!
-        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
+        [System.Serializable]
         public class SceneNodeCam : SceneNode
         {
             //! The field of view of the camera. 
@@ -211,14 +383,45 @@ namespace tracer
             public float focalDist;
             //! The aperture of the camera. 
             public float aperture;
-        };
+
+            // Berechnung: Basis SceneNode(112) + 6 * float(24) = 136 Bytes
+            public override int FileStructureSize => 136;
+
+            public override void Populate(BinaryReader reader)
+            {
+                // 1. Zuerst die 112 Bytes der Basisklasse einlesen
+                base.Populate(reader);
+
+                // 2. Die spezifischen Kamera-Daten nahtlos dahinter auslesen
+                fov = reader.ReadSingle();
+                aspect = reader.ReadSingle();
+                near = reader.ReadSingle();
+                far = reader.ReadSingle();
+                focalDist = reader.ReadSingle();
+                aperture = reader.ReadSingle();
+            }
+
+            public override void Serialize(BinaryWriter writer)
+            {
+                // 1. Write the 112 bytes from the base class first
+                base.Serialize(writer);
+
+                // 2. Write the specific camera data seamlessly right after
+                writer.Write(fov);
+                writer.Write(aspect);
+                writer.Write(near);
+                writer.Write(far);
+                writer.Write(focalDist);
+                writer.Write(aperture);
+            }
+        }
 
         //!
         //! Data structure for serialising the TRACER header,
         //! containing scene relevant informations.
         //!
-        [StructLayout(LayoutKind.Sequential, Pack = 4, CharSet = CharSet.Auto)]
-        public class TracerHeader
+        [System.Serializable]
+        public class TracerHeader : IBinarySerializable
         {
             //! Global factor for light intensity scaling. 
             public float lightIntensityFactor;
@@ -226,6 +429,26 @@ namespace tracer
             public byte senderID;
             //! The current framerate in fps.
             public byte frameRate;
+
+            // File layout size: float(4) + byte(1) + byte(1) + legacy 4-byte-alignment padding(2) = 8 bytes
+            public int FileStructureSize => 8;
+
+            public void Populate(BinaryReader reader)
+            {
+                lightIntensityFactor = reader.ReadSingle();
+                senderID = reader.ReadByte();
+                frameRate = reader.ReadByte();
+
+                // Skip the 2 padding bytes at the end of the header to keep the data stream synchronized
+                reader.ReadBytes(2);
+            }
+            public void Serialize(BinaryWriter writer)
+            {
+                writer.Write(lightIntensityFactor);
+                writer.Write(senderID);
+                writer.Write(frameRate);
+                writer.Write(new byte[2]); // 2 empty bytes for compatibility with old format!
+            }
         }
 
         //!
