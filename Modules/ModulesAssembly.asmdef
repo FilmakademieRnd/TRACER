@@ -9,7 +9,8 @@
         "Unity.Splines",
         "Unity.Mathematics",
         "glTFast",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "unity.webp"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

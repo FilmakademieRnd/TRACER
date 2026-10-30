@@ -30,11 +30,9 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace tracer
 {
@@ -767,7 +765,9 @@ namespace tracer
                 {
                     GaussianSpaltPackage gsPack = new GaussianSpaltPackage();
 
-                    // 1. Die 10 Integer-Werte via BinaryPrimitives auslesen
+                    // 1. Die 11 Integer-Werte via BinaryPrimitives auslesen
+                    gsPack.version = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
                     gsPack.count = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
                     dataIdx += 4;
                     gsPack.shNcount = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
@@ -1366,7 +1366,7 @@ namespace tracer
                 int totalSize = 0;
                 foreach (var gsPack in gaussianSplatList)
                 {
-                    totalSize += sizeof(int) * 10 +                  // all TryWriteBytes (10)
+                    totalSize += sizeof(int) * 11 +                  // all TryWriteBytes (11)
                                  sizeof(float) * 3 +                  // min
                                  sizeof(float) * 3 +                  // max
                                  sizeof(float) * 256 +                // scalesCodebook
@@ -1389,6 +1389,9 @@ namespace tracer
                 foreach (GaussianSpaltPackage gsPack in gaussianSplatList)
                 {
                     // --- INTEGERS WRITE (TryWriteBytes) ---
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.version);
+                    dstIdx += sizeof(int);
+
                     BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.count);
                     dstIdx += sizeof(int);
 
