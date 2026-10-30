@@ -32,10 +32,6 @@ using NetMQ;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-#if UNITY_STANDALONE_WIN
-using System.Net.NetworkInformation;
-using System.Net;
-#endif
 
 namespace tracer
 {
@@ -165,7 +161,7 @@ namespace tracer
         }
 
         //!
-        //! Function for creating a new pseudo random MAC address.
+        //! Function for creating a new pleudo random MAC address.
         //!
         private byte[] createVID()
         {
@@ -224,7 +220,6 @@ namespace tracer
                 //var hostName = Dns.GetHostName();
                 //var host = Dns.GetHostEntry(hostName);
 
-#if UNITY_IOS || UNITY_ANDROID
                 byte[] mac = createVID();
                 Helpers.Log("Requesting ID for MAC: " + BitConverter.ToString(mac));
 
@@ -238,37 +233,7 @@ namespace tracer
                     m_cID = responses[0][0];
                     Helpers.Log("Got ID from DataHub. vID is: " + m_cID, Helpers.logMsgType.NONE);
                 }
-#else
 
-                foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if ((ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet) && ni.OperationalStatus == OperationalStatus.Up)
-                    {
-                        foreach (var uni in ni.GetIPProperties().UnicastAddresses)
-                        {
-                            IPAddress ipAddress = uni.Address;
-
-                            if (ipAddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                            {
-                                byte[] mac = ni.GetPhysicalAddress().GetAddressBytes();
-                                Helpers.Log("Requesting ID for IP: "+ ipAddress.ToString() + " at MAC: " + ni.GetPhysicalAddress().ToString());
-                                List<byte[]> responses = await SendServerCommand(
-                                    new byte[] { (byte)NetworkManagerModule.DataHubMessageType.ID, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] },
-                                    2f);
-
-                                //fallback if no correct response or 255(ip aready taken)
-                                if (responses.Count > 0 && responses[0][0] != 255)
-                                {
-                                    m_cID = responses[0][0];
-                                    Helpers.Log("Got ID from DataHub. vID is: " + m_cID, Helpers.logMsgType.NONE);
-                                    core.StartSync();
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-#endif
             }
             Helpers.Log("Set vID to: " + m_cID);
             

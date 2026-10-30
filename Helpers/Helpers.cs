@@ -149,7 +149,8 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void copyArray(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length)
         {
-            src.AsSpan(srcOffset, length).CopyTo(dst.AsSpan(dstOffset, length));
+            for (int i = 0; i < length; i++)
+                dst[dstOffset + i] = src[srcOffset + i];
         }
         //!
         //! Copys a byte array into another using spans.
@@ -164,8 +165,8 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void copyArray(Span<byte> src, int srcOffset, Span<byte> dst, int dstOffset)
         {
-            int length = src.Length - srcOffset;
-            src.Slice(srcOffset, length).CopyTo(dst.Slice(dstOffset, length));
+            for (int i = 0; i < src.Length; i++)
+                dst[dstOffset + i] = src[srcOffset + i];
         }
         
         //!

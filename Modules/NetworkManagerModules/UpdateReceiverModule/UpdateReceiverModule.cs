@@ -28,16 +28,14 @@ if not go to https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 19.06.2024
 
-using NetMQ;
-using NetMQ.Sockets;
-using System;
-using System.Buffers;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+using System;
 using System.Threading;
+using NetMQ;
+using NetMQ.Sockets;
 using UnityEngine;
+using System.Runtime.InteropServices;
 
 namespace tracer
 {
@@ -46,22 +44,10 @@ namespace tracer
     //!
     public class UpdateReceiverModule : NetworkManagerModule
     {
-        private readonly struct BufferedMessage
-        {
-            public readonly byte[] Buffer; 
-            public readonly int Length;   
-
-            public BufferedMessage(byte[] buffer, int length)
-            {
-                Buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));
-                Length = length;
-            }
-        }
-
         //!
         //! Buffer for storing incoming message by time (array of lists of bytes).
         //!
-        private readonly List<BufferedMessage>[] m_messageBuffer;
+        private List<byte[]>[] m_messageBuffer;
 
         //!
         //! Event emitted when parameter change should be added to undo/redo history
@@ -86,7 +72,6 @@ namespace tracer
         //!
         public UpdateReceiverModule(string name, Manager manager) : base(name, manager)
         {
-            m_messageBuffer = new List<BufferedMessage>[core.timesteps];
         }
 
         //!
@@ -109,8 +94,12 @@ namespace tracer
         protected override void Init(object sender, EventArgs e)
         {
             // initialize message buffer
-            for (int i = 0; i < core.timesteps; i++)
-                m_messageBuffer[i] = new List<BufferedMessage>(capacity: 16);
+            lock (_lock)
+            {
+                m_messageBuffer = new List<byte[]>[core.timesteps];
+                for (int i = 0; i < core.timesteps; i++)
+                    m_messageBuffer[i] = new List<byte[]>(64);
+            }
 
             m_sceneManager = core.getManager<SceneManager>();
             m_sceneManager.sceneReady += connectAndStart;
@@ -149,79 +138,66 @@ namespace tracer
         protected override void run()
         {
             m_isRunning = true;
-
             AsyncIO.ForceDotNet.Force();
-            using var receiver = new SubscriberSocket();
+            var receiver = new SubscriberSocket();
             m_socket = receiver;
             receiver.SubscribeToAnyTopic();
-            string connectionString = $"tcp://{m_ip}:{m_port}";
-            receiver.Connect(connectionString);
-            Helpers.Log($"Update receiver connected: {connectionString}");
-
-            NetMQMessage multipartMessage = new NetMQMessage();
-
+            receiver.Connect("tcp://" + m_ip + ":" + m_port);
+            Helpers.Log("Update receiver connected: " + "tcp://" + m_ip + ":" + m_port);
+            byte[] message = null;
+            List<byte[]> messages = new List<byte[]>();
+           
             while (m_isRunning)
             {
                 try
                 {
-                    if (receiver.TryReceiveMultipartMessage(System.TimeSpan.FromSeconds(1), ref multipartMessage))
+                    if (receiver.TryReceiveMultipartBytes(System.TimeSpan.FromSeconds(1), ref messages))
                     {
-                        for (int i = 0; i < multipartMessage.FrameCount; i++)
+                        for (int i = 0; i < messages.Count; i++)
                         {
-                            NetMQFrame frame = multipartMessage[i];
-                            byte[] buffer = frame.Buffer;
-
-                            if (buffer != null && buffer.Length > 2 && buffer[0] != manager.cID)
+                            message = messages[i];
+                            if (message != null)
                             {
-                                MessageType msgType = (MessageType)buffer[2];
-
-                                // Execute decoding outside of the global lock to prevent blocking the network thread
-                                switch (msgType)
+                                if (message[0] != manager.cID)
                                 {
-                                    case MessageType.LOCK:
-                                        lock (_lock) { decodeLockMessage(buffer); }
-                                        break;
-                                    case MessageType.SYNC:
-                                        lock (_lock) { decodeSyncMessage(buffer); }
-                                        break;
-                                    case MessageType.RESETOBJECT:
-                                        lock (_lock) { decodeResetMessage(buffer); }
-                                        break;
-                                    case MessageType.UNDOREDOADD:
-                                        lock (_lock) { decodeUndoRedoMessage(buffer); }
-                                        break;
-                                    case MessageType.DATAHUB:
-                                        lock (_lock) { decodeDataHubMessage(buffer); }
-                                        break;
-                                    case MessageType.RPC:
-                                    case MessageType.PARAMETERUPDATE:
-                                        int messageSize = frame.MessageSize;
-                                        int timeSlot = buffer[1];
-
-                                        // Rent from pool and copy the span immediately
-                                        byte[] rentedArray = ArrayPool<byte>.Shared.Rent(messageSize);
-                                        frame.Buffer.AsSpan(0, messageSize).CopyTo(rentedArray);
-
-                                        lock (_lock)
+                                    lock (_lock)
+                                    {
+                                        switch ((MessageType)message[2])
                                         {
-                                            m_messageBuffer[timeSlot].Add(new BufferedMessage(rentedArray, messageSize));
+                                            case MessageType.LOCK:
+                                                decodeLockMessage(message);
+                                                break;
+                                            case MessageType.SYNC:
+                                                decodeSyncMessage(message);
+                                                break;
+                                            case MessageType.RESETOBJECT:
+                                                decodeResetMessage(message);
+                                                break;
+                                            case MessageType.UNDOREDOADD:
+                                                decodeUndoRedoMessage(message);
+                                                break;
+                                            case MessageType.DATAHUB:
+                                                decodeDataHubMessage(message);
+                                                break;
+                                            case MessageType.RPC:
+                                            case MessageType.PARAMETERUPDATE:
+                                                // make sure that producer and consumer exclude eachother
+                                                // message[1] is time
+                                                //int time = (message[1] + (Mathf.RoundToInt((float)manager.pingRTT * 0.5f))) % core.timesteps;
+                                                //m_messageBuffer[time].Add(message);
+                                                m_messageBuffer[message[1]].Add(message);
+                                                break;
+                                            default:
+                                                break;
                                         }
-                                        break;
-                                    default:
-                                        break;
+                                    }
                                 }
                             }
                         }
-                        // Clear the message container for reuse in the next network cycle
-                        multipartMessage.Clear();
+                        messages.Clear();
                     }
                 }
-                catch (Exception e)
-                {
-                    Helpers.Log(e.Message, Helpers.logMsgType.WARNING);
-                }
-
-                // Yield execution to allow other threads to process without heavy context-switching overhead
+                catch (Exception e) { Helpers.Log(e.Message, Helpers.logMsgType.WARNING); }
                 Thread.Yield();
             }
             m_thredEnded.TrySetResult(true);
@@ -240,7 +216,8 @@ namespace tracer
             int syncTime = message[1] + runtime;
             int deltaTime = Helpers.DeltaTime(core.time, message[1], core.timesteps);
 
-            if (deltaTime > 10 || deltaTime > 3 && runtime < 8)
+            if (deltaTime > 10 ||
+                 deltaTime > 3 && runtime < 8)
             {
                 core.time = (byte)(Mathf.RoundToInt(syncTime) % core.timesteps);
                // UnityEngine.Debug.Log("Core time updated to: " + coreTime);
@@ -257,37 +234,26 @@ namespace tracer
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void decodeLockMessage(byte[] message)
         {
-            bool lockState = message[6] != 0;
+            bool lockState = BitConverter.ToBoolean(message, 6);
 
             if (lockState)
             {
                 byte sceneID = message[3];
-                short sceneObjectID = BinaryPrimitives.ReadInt16LittleEndian(message.AsSpan(4, 2));
+                short sceneObjectID = BitConverter.ToInt16(message, 4);
 
                 SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, sceneObjectID);
-                if (sceneObject != null)
-                {
-                    sceneObject._lock = lockState;
-
-                    if (sceneObject.playedByTimeline)
-                    {
-                        // If we are animating the object, lock it!
-                        sceneObject.lockObject(true);
-                        Debug.Log("Instantly lock unlocked object we received because its playing!");
-                    }
+                sceneObject._lock = lockState;
+                if(sceneObject.playedByTimeline){   //if we are animating the object, lock it!
+                    sceneObject.lockObject(true);
+                    Debug.Log("instantly lock unlocked object we received because its playing!");
                 }
+                
             }
-            // Delay unlock message
+            // delay unlock message
             else
             {
-                // Add a 1/4 second delay (framerate / 4) into the future
                 int bufferTime = (((message[1] + core.settings.framerate / 4) + core.timesteps) % core.timesteps);
-
-                const int lockMessageSize = 7;
-                byte[] rentedArray = ArrayPool<byte>.Shared.Rent(lockMessageSize);
-                message.AsSpan(0, lockMessageSize).CopyTo(rentedArray);
-
-                m_messageBuffer[bufferTime].Add(new BufferedMessage(rentedArray, lockMessageSize));
+                m_messageBuffer[bufferTime].Add(message);
             }
         }
 
@@ -335,123 +301,88 @@ namespace tracer
         //!
         private void consumeMessages(object o, EventArgs e)
         {
-            // Define the buffer size by defining the time offset in the ringbuffer
+            // define the buffer size by defining the time offset in the ringbuffer
             // % time steps to take ring (0 to _core.timesteps) into account
-            // Set to 1/10 second
+            // set to 1/10 second
             int bufferTime = (((core.time - core.settings.framerate / 6) + core.timesteps) % core.timesteps);
-
             lock (_lock)
             {
+                // caching the ParameterObject
                 byte oldSceneID = 0;
                 short oldParameterObjectID = 0;
                 bool paraObjectNotFound = true;
                 ParameterObject parameterObject = null;
-
-                List<BufferedMessage> timeSlotBuffer = m_messageBuffer[bufferTime];
+                List<byte[]> timeSlotBuffer = m_messageBuffer[bufferTime];
 
                 for (int i = 0; i < timeSlotBuffer.Count; i++)
                 {
-                    BufferedMessage bufferedMsg = timeSlotBuffer[i];
+                    ReadOnlySpan<byte> message = timeSlotBuffer[i];
 
-                    // Create a read-only view of the message buffer safely
-                    ReadOnlySpan<byte> message = new ReadOnlySpan<byte>(bufferedMsg.Buffer, 0, bufferedMsg.Length);
-
-                    try
+                    if ((MessageType)message[2] == MessageType.LOCK)
                     {
-                        // Basic boundary check to ensure header data exists
-                        if (message.Length < 3) continue;
+                        byte sceneID = message[3];
+                        short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(4));
+                        bool lockState = MemoryMarshal.Read<bool>(message.Slice(6));
 
-                        if ((MessageType)message[2] == MessageType.LOCK)
-                        {
-                            // Ensure the LOCK message has the required minimum length (7 bytes)
-                            if (message.Length < 7) continue;
+                        //Debug.Log("<color=blue>received lock on sceneId "+sceneID+" paraObjectId "+parameterObjectID+" with state "+lockState+"</color>");
 
-                            byte sceneID = message[3];
-                            short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(4, 2));
-                            bool lockState = MemoryMarshal.Read<bool>(message.Slice(6, 1));
-
-                            SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, parameterObjectID);
-                            if (sceneObject != null)
-                            {
-                                sceneObject._lock = lockState;
-
-                                if (sceneObject.playedByTimeline)
-                                {
-                                    sceneObject.lockObject(true);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            parameterObject = null;
-                            paraObjectNotFound = true;
-                            int start = 3;
-
-                            while (start + 10 <= message.Length)
-                            {
-                                byte sceneID = message[start];
-                                short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(start + 1, 2));
-                                short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3, 2));
-                                int length = MemoryMarshal.Read<int>(message.Slice(start + 6, 4));
-
-                                // Prevent infinite loop if a corrupted message has length <= 0
-                                if (length <= 0) break;
-
-                                // Safeguard against corrupted data exceeding total buffer length
-                                if (start + length > message.Length) break;
-
-                                if (paraObjectNotFound ||
-                                    sceneID != oldSceneID ||
-                                    parameterObjectID != oldParameterObjectID)
-                                {
-                                    parameterObject = core.getParameterObject(sceneID, parameterObjectID);
-                                }
-
-                                if (parameterObject != null)
-                                {
-                                    paraObjectNotFound = false;
-
-                                    if (parameterObject.parameterList != null && parameterID < parameterObject.parameterList.Count)
-                                    {
-                                        AbstractParameter parameter = parameterObject.parameterList[parameterID];
-
-                                        if (parameter._isAnimated)
-                                        {
-                                            if (length == 10 + parameter.defaultDataSize())
-                                                parameter.reset();
-                                        }
-                                        else
-                                        {
-                                            if (length > 10 + parameter.dataSize())
-                                                parameter.InitAnimation();
-                                        }
-
-                                        // FIXED: Sliced with exact payload length to prevent reading into subsequent messages
-                                        int payloadLength = length - 10;
-                                        parameter.deSerialize(message.Slice(start + 10, payloadLength));
-                                    }
-                                }
-                                else
-                                    paraObjectNotFound = true;
-
-                                start += length;
-                                oldSceneID = sceneID;
-                                oldParameterObjectID = parameterObjectID;
-                            }
+                        SceneObject sceneObject = m_sceneManager.getSceneObject(sceneID, parameterObjectID);
+                        sceneObject._lock = lockState;
+                        if(sceneObject.playedByTimeline){   //if we are animating the object, lock it!
+                            sceneObject.lockObject(true);
+                            Debug.Log("instantly lock unlocked object we received because its playing!");
                         }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Debug.LogError($"Error parsing network message: {ex.Message}");
-                    }
-                    finally
-                    {
-                        // Recycle the byte array buffer back into the shared pool
-                        ArrayPool<byte>.Shared.Return(bufferedMsg.Buffer, clearArray: false);
+                        parameterObject = null;
+                        paraObjectNotFound = true;
+                        int start = 3;
+                        while (start < message.Length)
+                        {
+                            byte sceneID = message[start];
+                            short parameterObjectID = MemoryMarshal.Read<short>(message.Slice(start + 1));
+                            short parameterID = MemoryMarshal.Read<short>(message.Slice(start + 3));
+                            int length = MemoryMarshal.Read<int>(message.Slice(start + 6));
+
+                            //Debug.Log("<color=green>received normalMsg on sceneId "+sceneID+" paraObjectId "+parameterObjectID+" parameterID "+parameterID+" length "+length+"</color>");
+
+                            if (paraObjectNotFound ||
+                                sceneID != oldSceneID ||
+                                parameterObjectID != oldParameterObjectID)
+                                parameterObject = core.getParameterObject(sceneID, parameterObjectID);
+
+                            if (parameterObject != null)
+                            {
+                                paraObjectNotFound = false;
+                                AbstractParameter  parameter = parameterObject.parameterList[parameterID];
+
+                                // check update if animation is incoming and change parameter type if required 
+                                // 10 is the size of the parameter fixed field
+                                if (parameter._isAnimated)
+                                {
+                                    if (length == 10 + parameter.defaultDataSize())
+                                        parameter.reset();
+                                }
+                                else 
+                                {
+                                    if (length > 10 + parameter.dataSize())
+                                        parameter.InitAnimation();
+                                }
+                                parameter.deSerialize(message.Slice(start + 10));
+                            }
+                            else
+                            {
+                                paraObjectNotFound = true;
+                            }
+
+                            start += length;
+                            oldSceneID = sceneID;
+                            oldParameterObjectID = parameterObjectID;
+                        }
                     }
                 }
 
-                // Clear the slot list while keeping its allocated capacity for future updates
                 timeSlotBuffer.Clear();
             }
         }

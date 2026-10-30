@@ -23,17 +23,15 @@ if not go to https://opensource.org/licenses/MIT
 
 //! @file "SceneStorageModule.cs"
 //! @brief implementation of TRACER scene I/O
-//! @author Simon Spielmann, Jonas Trottnow
-//! @version 1.0
+//! @author Simon Spielmann
+//! @version 0
 //! @date 16.08.2022
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -45,19 +43,7 @@ namespace tracer
     //!
     public class SceneStorageModule : SceneManagerModule
     {
-        // Constants for glTF import
-        private const float DEFAULT_SCALE = 1.0f;
-
         private MenuTree m_menu;
-
-        // Scene selection dropdown
-        private ListParameter m_sceneListParameter;
-
-        // glTF import state
-        private GLTFLoader m_gltfLoader;
-        private bool m_isLoadingGLTF = false;
-        private ClassParameter<string> m_gltfFilePathParameter;
-        private Parameter<float> m_gltfScaleParameter;
 
         //!
         //! constructor
@@ -74,60 +60,23 @@ namespace tracer
             manager.loadDemoSceneUsingQr += QrSceneLoad;
             base.Start(sender, e);
 
-            // Initialize glTF loader
-            m_gltfLoader = new GLTFLoader(core, manager as SceneManager);
-
-            // Initialize scene list dropdown
-            m_sceneListParameter = new ListParameter("SceneList", null);
-            m_sceneListParameter.hasChanged += OnSceneSelected;
-            RefreshSceneList();
-
-            // TRACER scene buttons
             ClassParameter<Action> loadButton = new ClassParameter<Action>(LoadScene, "Load");
             ClassParameter<Action> saveButton = new ClassParameter<Action>(SaveScene, "Save");
             ClassParameter<Action> loadDemoButton = new ClassParameter<Action>(LoadDemoScene, "Load Demo");
             ClassParameter<Action> saveDatahubButton = new ClassParameter<Action>(DataHubSaveScene, "DataHub Save");
             ClassParameter<Action> loadDatahubButton = new ClassParameter<Action>(DataHubLoadScene, "DataHub Load");
             ClassParameter<Action> infoDatahubButton = new ClassParameter<Action>(DataHubInfoScene, "DataHub Info");
-            ClassParameter<Action> refreshButton = new ClassParameter<Action>(RefreshSceneList, "Refresh");
-
-            // glTF import parameters
-            m_gltfFilePathParameter = new ClassParameter<string>("No file selected", "gltfFilePath");
-            m_gltfScaleParameter = new Parameter<float>(DEFAULT_SCALE, "gltfScale");
-            ClassParameter<Action> browseGLTFButton = new ClassParameter<Action>(BrowseForGLTFFile, "Browse");
-            ClassParameter<Action> importGLTFButton = new ClassParameter<Action>(ImportGLTF, "Import glTF");
 
             m_menu = new MenuTree()
               .Begin(MenuItem.IType.VSPLIT)
-                   // === Chapter 1: Load Local Scene ===
-                   .Add("Load Local Scene")
                    .Begin(MenuItem.IType.HSPLIT)
-                       .Add(m_sceneListParameter)
-                       .Add(refreshButton)
-                       .Add(loadButton)
-                   .End()
-
-                   // === Chapter 2: Load glTF Scene ===
-                   .Add("Load glTF Scene")
-                   .Begin(MenuItem.IType.HSPLIT)
-                       .Add(m_gltfFilePathParameter)
-                       .Add(browseGLTFButton)
-                   .End()
-                   .Begin(MenuItem.IType.HSPLIT)
-                       .Add("Scale:")
-                       .Add(m_gltfScaleParameter)
-                       .Add(importGLTFButton)
-                   .End()
-
-                   // === Chapter 3: Save Scene ===
-                   .Add("Save Scene")
-                   .Begin(MenuItem.IType.HSPLIT)
+                       .Add("Scene name: ")
                        .Add(manager.settings.sceneFilepath)
+                   .End()
+                   .Begin(MenuItem.IType.HSPLIT)
+                       .Add(loadButton)
                        .Add(saveButton)
                    .End()
-
-                   // === Chapter 4: DataHub & Demo ===
-                   .Add("DataHub & Demo")
                    .Begin(MenuItem.IType.HSPLIT)
                        .Add(loadDemoButton)
                        .Add(saveDatahubButton)
@@ -148,61 +97,6 @@ namespace tracer
                 .End();
 
             //uiManager.showMenu(m_menu);
-        }
-
-        //!
-        //! Function to scan the persistent data path for existing scenes and update the scene list dropdown.
-        //!
-        private void RefreshSceneList()
-        {
-            List<AbstractParameter> sceneList = new List<AbstractParameter>();
-
-            try
-            {
-                string[] headerFiles = Directory.GetFiles(Application.persistentDataPath, "*.header");
-
-                foreach (string headerFile in headerFiles)
-                {
-                    string sceneName = Path.GetFileNameWithoutExtension(headerFile);
-                    sceneList.Add(new ClassParameter<string>(sceneName, sceneName));
-                }
-
-                // Sort alphabetically
-                sceneList.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.OrdinalIgnoreCase));
-            }
-            catch (Exception ex)
-            {
-                Helpers.Log($"Error scanning for scenes: {ex.Message}", Helpers.logMsgType.WARNING);
-            }
-
-            // Update the list parameter
-            if (m_sceneListParameter != null)
-            {
-                m_sceneListParameter.parameterList.Clear();
-                foreach (var scene in sceneList)
-                {
-                    m_sceneListParameter.addParameter(scene);
-                }
-            }
-        }
-
-        //!
-        //! Event handler called when a scene is selected from the dropdown.
-        //!
-        //! @param sender The sender of the event.
-        //! @param selectedIndex The index of the selected scene.
-        //!
-        private void OnSceneSelected(object sender, int selectedIndex)
-        {
-            if (m_sceneListParameter != null && m_sceneListParameter.parameterList.Count > 0)
-            {
-                if (selectedIndex >= 0 && selectedIndex < m_sceneListParameter.parameterList.Count)
-                {
-                    string selectedScene = m_sceneListParameter.parameterList[selectedIndex].name;
-                    manager.settings.sceneFilepath.setValue(selectedScene);
-                    Helpers.Log($"Selected scene: {selectedScene}");
-                }
-            }
         }
 
         //!
@@ -228,7 +122,6 @@ namespace tracer
         private void SaveScene()
         {
             SaveScene(manager.settings.sceneFilepath.value);
-            RefreshSceneList();
             core.getManager<UIManager>().hideMenu();
         }
 
@@ -241,9 +134,8 @@ namespace tracer
             List<byte[]> responses = await networkManager.SendServerCommand(new byte[] { (byte)NetworkManagerModule.DataHubMessageType.FILEINFO });
 
             MenuTree serverSceneMenu = new MenuTree();
-            
             serverSceneMenu.Begin(MenuItem.IType.VSPLIT);
-            
+
             int infoNBR = 0;
             for (int i = 0; i < responses.Count - 1; i += 2)
             {
@@ -263,7 +155,8 @@ namespace tracer
             serverSceneMenu.caption = "Scenes on Server";
             //serverSceneMenu.iconResourceLocation = "Images/button_save";
             UIManager uiManager = core.getManager<UIManager>();
-            
+            uiManager.addMenu(serverSceneMenu);
+
             uiManager.showMenu(serverSceneMenu);
         }
 
@@ -530,57 +423,6 @@ namespace tracer
             manager.emitSceneNew(true);
             UImanager.showDialog(null);
         }
-
-        #region glTF Import
-
-        //!
-        //! Function to browse for a glTF file using the native file picker.
-        //!
-        private void BrowseForGLTFFile()
-        {
-            GLTFLoader.BrowseForFile(SelectGLTFFile);
-        }
-
-        //!
-        //! Callback function called when a glTF file is selected.
-        //!
-        //! @param filePath The path to the selected glTF file.
-        //!
-        private void SelectGLTFFile(string filePath)
-        {
-            m_gltfFilePathParameter.setValue(filePath);
-            string fileName = Path.GetFileNameWithoutExtension(filePath);
-            manager.settings.sceneFilepath.setValue(fileName);
-            Helpers.Log($"glTF Loader: Selected file {filePath}");
-            UIManager uiManager = core.getManager<UIManager>();
-            uiManager.hideMenu();
-            uiManager.showMenu(m_menu);
-        }
-
-        //!
-        //! Function to import a glTF file with the specified scale.
-        //!
-        private async void ImportGLTF()
-        {
-            if (m_isLoadingGLTF)
-            {
-                Helpers.Log("glTF Loader: Already importing a file...", Helpers.logMsgType.WARNING);
-                return;
-            }
-
-            m_isLoadingGLTF = true;
-
-            try
-            {
-                await m_gltfLoader.ImportWithDialog(core, m_gltfFilePathParameter.value, m_gltfScaleParameter.value);
-            }
-            finally
-            {
-                m_isLoadingGLTF = false;
-            }
-        }
-
-        #endregion
     }
 
 }

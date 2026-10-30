@@ -630,7 +630,7 @@ namespace tracer
                         case AbstractParameter.ParameterType.ACTION:
                             {
                                 //Button button = newObject.GetComponent<Button>();
-                                //Action parameterAction = ((ClassParameter<Action>)item.Parameter).value;
+                                //Action parameterAction = ((ClassClassParameter<Action>)item.Parameter).value;
                                 //button.onClick.AddListener(() => parameterAction());
                                 //TextMeshProUGUI textComponent = newObject.GetComponentInChildren<TextMeshProUGUI>();
                                 //textComponent.text = item.Parameter.name;

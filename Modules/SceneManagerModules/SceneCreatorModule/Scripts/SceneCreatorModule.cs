@@ -30,15 +30,12 @@ if not go to https://opensource.org/licenses/MIT
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-using Unity.Collections;
-using UnityEditor.PackageManager;
+
 using UnityEngine;
-using WebP;
+using Unity.Collections;
 using static tracer.AbstractParameter;
-using static tracer.SceneManager;
 
 namespace tracer
 {
@@ -67,37 +64,6 @@ namespace tracer
 
         //! The scene senders framerate in fps.
         private byte m_frameRate;
-
-        private readonly struct Rgba32
-        {
-            public readonly byte R, G, B, A;
-            public Rgba32(byte r, byte g, byte b, byte a) { R = r; G = g; B = b; A = a; }
-        }
-
-        private readonly struct DecodedGSImage
-        {
-            public readonly int Width;
-            public readonly int Height;
-            readonly byte[] m_rgba;
-
-            public DecodedGSImage(int width, int height, byte[] rgba)
-            {
-                Width = width;
-                Height = height;
-                m_rgba = rgba;
-                if (rgba == null || rgba.Length < width * height * 4)
-                    throw new InvalidDataException("Decoded WebP buffer is smaller than its dimensions.");
-            }
-
-            public Rgba32 Pixel(int x, int y, bool flipRows)
-            {
-                if ((uint)x >= (uint)Width || (uint)y >= (uint)Height)
-                    throw new IndexOutOfRangeException($"SOG pixel ({x},{y}) is outside {Width}x{Height}.");
-                int row = flipRows ? Height - 1 - y : y;
-                int offset = (row * Width + x) * 4;
-                return new Rgba32(m_rgba[offset], m_rgba[offset + 1], m_rgba[offset + 2], m_rgba[offset + 3]);
-            }
-        }
 
 
         //!
@@ -659,201 +625,6 @@ namespace tracer
                 animator.Rebind();
             }
         }
-
-        private void createGaussianSplats(ref SceneManager.SceneDataHandler.SceneData sceneData, Transform root)
-        {
-            // Ensure we actually have splat package data to process
-            if (sceneData.gaussianSpaltList == null || sceneData.gaussianSpaltList.Count == 0)
-            {
-                return;
-            }
-
-            foreach (GaussianSpaltPackage gsPack in sceneData.gaussianSpaltList)
-            {
-                if (gsPack == null) continue;
-
-                int version = gsPack.version;
-                if (version != 1 && version != 2)
-                {
-                    Debug.LogError($"[SplatParser] SOG version {version} is not supported (expected 1 or 2).");
-                    continue;
-                }
-
-                int count = gsPack.count;
-                if (count <= 0)
-                {
-                    Debug.LogError("[SplatParser] SOG splat count must be positive.");
-                    continue;
-                }
-
-                int shBands = gsPack.shNbands;
-                int shCoefficients = (shBands + 1) * (shBands + 1) - 1;
-
-                // --- 1. NATIVE WEBGL DECOMPRESSION VIA WEBP WRAPPER ---
-                int width = 0, height = 0;
-
-                NativeArray<Rgba32> meansLow = DecompressWebPToNativeArray(gsPack.c_meansL, ref width, ref height);
-                NativeArray<Rgba32> meansHigh = DecompressWebPToNativeArray(gsPack.c_meansU, ref width, ref height);
-                NativeArray<Rgba32> scales = DecompressWebPToNativeArray(gsPack.c_scales, ref width, ref height);
-                NativeArray<Rgba32> quats = DecompressWebPToNativeArray(gsPack.c_quads, ref width, ref height);
-                NativeArray<Rgba32> sh0 = DecompressWebPToNativeArray(gsPack.c_sh0, ref width, ref height);
-
-                NativeArray<Rgba32> shCentroids = default;
-                NativeArray<Rgba32> shLabels = default;
-                if (shBands > 0)
-                {
-                    int dummyW = 0, dummyH = 0;
-                    shCentroids = DecompressWebPToNativeArray(gsPack.c_shNcentroids, ref dummyW, ref dummyH);
-                    shLabels = DecompressWebPToNativeArray(gsPack.c_shNlables, ref dummyW, ref dummyH);
-                }
-
-                // Initialize target container data layout for Unity
-                var resultData = new GsplatDecodedData(count, (byte)shBands) { Antialiased = false };
-
-                // Setup coordinate conversion factors (Assuming RUB format)
-                var (px, py, pz) = (1f, 1f, -1f);
-                float qxSign = py * pz;
-                float qySign = px * pz;
-                float qzSign = px * py;
-
-                Vector3 boundsMin = Vector3.positiveInfinity;
-                Vector3 boundsMax = Vector3.negativeInfinity;
-
-                // Extract cached codebook and bounds arrays from the binary package
-                float[] meansMin = gsPack.min;
-                float[] meansMax = gsPack.max;
-                float[] scaleCodebook = gsPack.scalesCodebook;
-                float[] sh0Codebook = gsPack.sh0Codebook;
-                float[] shCodebook = gsPack.shNcodebook;
-
-                // --- 2. THE MAIN EXTRACTION LOOP  ---
-                for (int i = 0; i < count; i++)
-                {
-                    int x = i % width;
-                    int iY = i / width;
-                    int pixelIdx = iY * width + x;
-
-                    Rgba32 low = meansLow[pixelIdx];
-                    Rgba32 high = meansHigh[pixelIdx];
-                    Rgba32 scalePixel = scales[pixelIdx];
-                    Rgba32 quatPixel = quats[pixelIdx];
-                    Rgba32 colorPixel = sh0[pixelIdx];
-
-                    // Decode positions (FIXED: Using the correct 3-tuple array indices, [1], [2])
-                    float nx = Mathf.Lerp(meansMin[0], meansMax[0], ((high.R << 8) | low.R) / 65535f);
-                    float ny = Mathf.Lerp(meansMin[1], meansMax[1], ((high.G << 8) | low.G) / 65535f);
-                    float nz = Mathf.Lerp(meansMin[2], meansMax[2], ((high.B << 8) | low.B) / 65535f);
-
-                    Vector3 position = new Vector3(px * Unlog(nx), py * Unlog(ny), pz * Unlog(nz));
-                    resultData.Positions[i] = position;
-                    boundsMin = Vector3.Min(boundsMin, position);
-                    boundsMax = Vector3.Max(boundsMax, position);
-
-                    // Decode scales (FIXED: Using correct array slot dimensions for V1 fallback lerps)
-                    float sx = version == 2 ? scaleCodebook[scalePixel.R] : Mathf.Lerp(meansMin[0], meansMax[0], scalePixel.R / 255f);
-                    float sy = version == 2 ? scaleCodebook[scalePixel.G] : Mathf.Lerp(meansMin[1], meansMax[1], scalePixel.G / 255f);
-                    float sz = version == 2 ? scaleCodebook[scalePixel.B] : Mathf.Lerp(meansMin[2], meansMax[2], scalePixel.B / 255f);
-                    resultData.Scales[i] = new Vector3(Mathf.Exp(sx), Mathf.Exp(sy), Mathf.Exp(sz));
-
-                    // Decode rotations
-                    Quaternion q = DecodeQuaternion(quatPixel);
-                    var qWxyz = new Vector4(q.w, qxSign * q.x, qySign * q.y, qzSign * q.z).normalized;
-                    resultData.Rotations[i] = qWxyz;
-
-                    // Decode colors & alpha
-                    float dcR = version == 2 ? sh0Codebook[colorPixel.R] : Mathf.Lerp(meansMin[0], meansMax[0], colorPixel.R / 255f);
-                    float dcG = version == 2 ? sh0Codebook[colorPixel.G] : Mathf.Lerp(meansMin[1], meansMax[1], colorPixel.G / 255f);
-                    float dcB = version == 2 ? sh0Codebook[colorPixel.B] : Mathf.Lerp(meansMin[2], meansMax[2], colorPixel.B / 255f);
-                    float alpha = version == 2 ? colorPixel.A / 255f : Sigmoid(Mathf.Lerp(meansMin[3], meansMax[3], colorPixel.A / 255f));
-                    resultData.Colors[i] = new Vector4(dcR, dcG, dcB, alpha);
-
-                    // Decode secondary spherical harmonics (SHN)
-                    if (shBands > 0)
-                    {
-                        Rgba32 labelPixel = shLabels[pixelIdx];
-                        int label = labelPixel.R | (labelPixel.G << 8);
-                        int paletteX = label % 64;
-                        int paletteY = label / 64;
-
-                        for (int k = 0; k < shCoefficients; k++)
-                        {
-                            int coeffX = paletteX * shCoefficients + k;
-                            int centroidPixelIdx = paletteY * width + coeffX;
-
-                            Rgba32 coefficient = shCentroids[centroidPixelIdx];
-                            float r = version == 2 ? shCodebook[coefficient.R] : Mathf.Lerp(meansMin[0], meansMax[0], coefficient.R / 255f); // Safe bound mapping
-                            float g = version == 2 ? shCodebook[coefficient.G] : Mathf.Lerp(meansMin[1], meansMax[1], coefficient.G / 255f);
-                            float b = version == 2 ? shCodebook[coefficient.B] : Mathf.Lerp(meansMin[2], meansMax[2], coefficient.B / 255f);
-
-                            float sign = (((k & 1) == 1) ^ (k >= 3 && k <= 7)) ? -1f : 1f;
-                            resultData.SHs[i * shCoefficients + k] = sign * new Vector3(r, g, b);
-                        }
-                    }
-                }
-
-                resultData.Bounds = new Bounds((boundsMin + boundsMax) * 0.5f, boundsMax - boundsMin);
-
-                // --- 3. PERSIST THE GENERATED OBJECT INSIDE UNITY'S SCENE GRAPH ---
-                CreateNativeSplatComponent(resultData, root);
-
-                // --- 4. SAFE WEBGL MEMORY CLEANUP (Prevent persistent leaks) ---
-                meansLow.Dispose(); meansHigh.Dispose(); scales.Dispose(); quats.Dispose(); sh0.Dispose();
-                if (shBands > 0) { shCentroids.Dispose(); shLabels.Dispose(); }
-            }
-        }
-
-        // Low-level helper method integrating your Texture2DExt library cleanly into NativeArrays
-        private static NativeArray<Rgba32> DecompressWebPToNativeArray(byte[] packedBytes, ref int width, ref int height)
-        {
-            if (packedBytes == null || packedBytes.Length == 0) return default;
-
-            Texture2DExt.GetWebPDimensions(packedBytes, out width, out height);
-            byte[] rawRgbaBytes = Texture2DExt.LoadRGBAFromWebP(packedBytes, ref width, ref height, false, out WebP.Error error);
-
-            if (error != WebP.Error.Success || rawRgbaBytes == null)
-                throw new InvalidDataException($"[SplatParser] Could not decode SOG WebP asset chunk: {error}.");
-
-            int pixelCount = width * height;
-            NativeArray<Rgba32> nativePixels = new NativeArray<Rgba32>(pixelCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-
-            ReadOnlySpan<byte> byteSpan = rawRgbaBytes;
-            Span<Rgba32> targetSpan = nativePixels.AsSpan();
-            MemoryMarshal.Cast<byte, Rgba32>(byteSpan).CopyTo(targetSpan);
-
-            return nativePixels;
-        }
-
-        const float Sqrt2 = 1.4142135623730951f;
-
-        static Quaternion DecodeQuaternion(Rgba32 pixel)
-        {
-            float a = (pixel.R / 255f - 0.5f) * Sqrt2;
-            float b = (pixel.G / 255f - 0.5f) * Sqrt2;
-            float c = (pixel.B / 255f - 0.5f) * Sqrt2;
-            float missing = Mathf.Sqrt(Mathf.Max(0f, 1f - a * a - b * b - c * c));
-            return (pixel.A - 252) switch
-            {
-                0 => new Quaternion(a, b, c, missing),
-                1 => new Quaternion(missing, b, c, a),
-                2 => new Quaternion(b, missing, c, a),
-                3 => new Quaternion(b, c, missing, a),
-                _ => throw new FormatException($"Invalid SOG quaternion mode byte {pixel.A}.")
-            };
-        }
-
-        static float ShSign(int coordinates, int coefficient)
-        {
-            int band = coefficient < 3 ? 1 : coefficient < 8 ? 2 : 3;
-            int bandStart = band * band - 1;
-
-            // Direct inline evaluation of the odd/even bit pattern
-            return ((coefficient - bandStart) & 1) == 1 ? -1f : 1f;
-        }
-
-        static float Unlog(float value) => Mathf.Sign(value) * (Mathf.Exp(Mathf.Abs(value)) - 1f);
-        static float Sigmoid(float value) => value >= 0f
-            ? 1f / (1f + Mathf.Exp(-value))
-            : Mathf.Exp(value) / (1f + Mathf.Exp(value));
 
         // Cache the shader globally to eliminate severe performance degradation from Shader.Find inside loops
         private static readonly Shader StandardShader = Shader.Find("Standard");

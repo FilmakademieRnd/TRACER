@@ -26,7 +26,6 @@ https://opensource.org/licenses/MIT
 //! @version 0
 //! @date 11.03.2022
 
-using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
@@ -110,7 +109,7 @@ namespace tracer
                 set { unsafe { fixed (int* p = data) p[index] = value; } }
             }
         }
-
+        
         public interface IBinarySerializable
         {
             int FileStructureSize { get; }
@@ -513,7 +512,6 @@ namespace tracer
         //!
         public class GaussianSpaltPackage
         {
-            public int version;
             public int count;
             public int shNcount;
             public int shNbands;
