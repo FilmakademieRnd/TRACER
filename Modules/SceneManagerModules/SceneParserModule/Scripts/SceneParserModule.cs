@@ -111,7 +111,6 @@ namespace tracer
 
             foreach (GameObject gameObject in gameObjects)
             {
-                // OPTIMIZATION: Declare the reference as null first. 
                 // This avoids creating a useless 'new SceneNode()' object on the heap for every single iteration.
                 SceneManager.SceneNode node = null;
 
@@ -145,7 +144,7 @@ namespace tracer
                 }
                 else if (trans.GetComponent<Camera>() != null)
                 {
-                    node = ParseCamera(trans.GetComponent<Camera>()); // Returns a SceneNodeCam instance
+                    node = ParseCamera(trans.GetComponent<Camera>()); 
                     if (core.isServer && !sceneObject)
                     {
                         sceneObject = SceneObjectCamera.Attach(gameObject, networkManager.cID);
@@ -155,7 +154,7 @@ namespace tracer
                 }
                 else if (trans.GetComponent<MeshFilter>() != null)
                 {
-                    node = ParseMesh(trans, ref sceneData); // Returns a SceneNodeGeo instance
+                    node = ParseMesh(trans, ref sceneData); 
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
                         {
@@ -165,7 +164,7 @@ namespace tracer
                 }
                 else if (trans.GetComponent<SkinnedMeshRenderer>() != null)
                 {
-                    node = ParseSkinnedMesh(trans, ref gameObjects, ref sceneData); // Returns a SceneNodeSkinnedGeo instance
+                    node = ParseSkinnedMesh(trans, ref gameObjects, ref sceneData); 
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
                             sceneObject = SceneCharacterObject.Attach(gameObject, networkManager.cID);
@@ -179,7 +178,7 @@ namespace tracer
                 }
                 else
                 {
-                    node = new SceneManager.SceneNode(); // Fallback to base node only if no component matches
+                    node = new SceneManager.SceneNode(); 
                     if (gameObject.tag == "editable")
                         if (core.isServer && !sceneObject)
                         {
@@ -578,7 +577,7 @@ namespace tracer
         {
             if (mesh == null) return -1;
 
-            // 1. Check if the mesh is already stored to prevent duplication
+            // Check if the mesh is already stored to prevent duplication
             for (int i = 0; i < sceneData.objectList.Count; i++)
             {
                 if (sceneData.objectList[i].mesh == mesh)
@@ -598,7 +597,7 @@ namespace tracer
             {
                 var meshData = meshDataArray[0];
 
-                // --- 2. VERTICES BLITTING (0% GC Garbage) ---
+                // --- VERTICES BLITTING  ---
                 int vertexElements = objPack.vSize * 3;
                 if (vertexElements > 0)
                 {
@@ -615,7 +614,7 @@ namespace tracer
                     objPack.vertices = Array.Empty<float>();
                 }
 
-                // --- 3. NORMALS BLITTING (0% GC Garbage) ---
+                // --- NORMALS BLITTING  ---
                 if (mesh.HasVertexAttribute(UnityEngine.Rendering.VertexAttribute.Normal))
                 {
                     objPack.nSize = objPack.vSize;
@@ -635,7 +634,7 @@ namespace tracer
                     objPack.normals = Array.Empty<float>();
                 }
 
-                // --- 4. UVS BLITTING (0% GC Garbage) ---
+                // --- UVS BLITTING  ---
                 if (mesh.HasVertexAttribute(UnityEngine.Rendering.VertexAttribute.TexCoord0))
                 {
                     objPack.uvSize = objPack.vSize;
@@ -655,7 +654,7 @@ namespace tracer
                     objPack.uvs = Array.Empty<float>();
                 }
 
-                // --- 5. TRIANGLE INDICES (0% GC Garbage) ---
+                // --- TRIANGLE INDICES  ---
                 if (objPack.iSize > 0)
                 {
                     objPack.indices = new int[objPack.iSize];
@@ -671,7 +670,7 @@ namespace tracer
                 }
             }
 
-            // --- 6. BONE WEIGHTS & INDICES ---
+            // --- BONE WEIGHTS & INDICES ---
             // Bone weights are extracted via a managed list configuration to stay safe and flexible
             List<BoneWeight> tempWeights = new List<BoneWeight>();
             mesh.GetBoneWeights(tempWeights);

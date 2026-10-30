@@ -767,7 +767,9 @@ namespace tracer
                 {
                     GaussianSpaltPackage gsPack = new GaussianSpaltPackage();
 
-                    // 1. Die 10 Integer-Werte via BinaryPrimitives auslesen
+                    // 1. Die 11 Integer-Werte via BinaryPrimitives auslesen
+                    gsPack.version = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
                     gsPack.count = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
                     dataIdx += 4;
                     gsPack.shNcount = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
@@ -1366,7 +1368,7 @@ namespace tracer
                 int totalSize = 0;
                 foreach (var gsPack in gaussianSplatList)
                 {
-                    totalSize += sizeof(int) * 10 +                  // all TryWriteBytes (10)
+                    totalSize += sizeof(int) * 11 +                  // all TryWriteBytes (11)
                                  sizeof(float) * 3 +                  // min
                                  sizeof(float) * 3 +                  // max
                                  sizeof(float) * 256 +                // scalesCodebook

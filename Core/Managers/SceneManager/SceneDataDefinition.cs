@@ -512,6 +512,7 @@ namespace tracer
         //!
         public class GaussianSpaltPackage
         {
+            public int version;
             public int count;
             public int shNcount;
             public int shNbands;
