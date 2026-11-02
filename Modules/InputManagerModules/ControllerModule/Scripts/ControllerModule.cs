@@ -27,9 +27,10 @@ if not go to https://opensource.org/licenses/MIT
 //! @author Alexandru Schwartz
 //! @author Thomas Krüger
 //! @version 1
-//! @date 25.06.2026
+//! @date 02.11.2026
 //! @note revise behaviour, should be implemented more convenient and abstract with our new input behaviour
 //! @note2 should the controller be an equal input behaviour as mouse/touch or just implement generics (move, look, select)?
+//! @changed doxygen style documentation
 
 using System;
 using System.Collections.Generic;
@@ -98,21 +99,30 @@ namespace tracer{
 
         #region NEW INPUT MANAGER ADJUSTMENT
 
+        //!
+        //! Enum Class for controller modification setup
+        //!
         private enum ControllerModeEnum {
-            Viewing = 0,
-            Manipulation = 1,
+            Viewing = 0,            //looking around
+            Manipulation = 1,       //fallback: no specific manipulation mode set
             //could be very abstract and simply check if manipulation parameter is float, v2, v3, color and use the sticks according to it
             //right now: do the simple manual way, until we know how the ui will be
-            Manip_Translate = 10,
-            Manip_Rotate = 11,
-            Manip_Scale = 12,
-            Manip_Cam = 20,
-            Manip_Light = 30,
-            Manip_Color = 40,
-            Manip_SingleValue = 50,  //hovered over e.g. the x value from position
-            Manip_Vec2 = 53,    //e.g. sensorSize
-            Manip_ListParameter = 56    //e.g. SensorSizes
+            
+            Manip_Translate = 10,   //manipulate the positon, depending on the state if local, global, viewport-specific
+            Manip_Rotate = 11,      //manipulate the rotation, depending on the state if local, global, viewport-specific
+            Manip_Scale = 12,       //manipulate the localScale
+            Manip_Cam = 20,         //not used (has very different sub-states)
+            Manip_Light = 30,       //not used (has very different sub-states)
+            Manip_Color = 40,       //manipulate a color value
+            Manip_SingleValue = 50, //manipulate intensity, range, aperture, aspectRatio, radius, fov, farClipPlane, nearClipPlane, focalDistance (NOT USED FOR hovering over e.g. the x value from position yet)
+            Manip_Vec2 = 53,        //manipulate the sensorSize
+            Manip_ListParameter = 56//manipulate FocalLengths and SensorSizes by going back or forth in the list
         }
+
+        //!
+        //! modification setup enum
+        //! depending in which state we are, the input is handled differently
+        //!
         private ControllerModeEnum controlMode = ControllerModeEnum.Viewing;
         
         //!
@@ -120,25 +130,62 @@ namespace tracer{
         //!
         private Inputs m_inputs;
         
-        //! left and right sticks
+        //!
+        //! left and right sticks Deadzone below we ignore its input
+        //!
         private float stickDeadzone = 0.15f; 
-        // Converts normalized stick input (-1 to 1) into simulated pixel deltas.
+        //!
+        //! Converts normalized stick input (-1 to 1) into simulated pixel deltas.
+        //!
         private float syntheticSensitivity = 500f; 
+        //!
+        //! state bools to gracefully handel start, ongoing and end behaviours of the sticks input
+        //!
         private bool _isLeftStickDragging, _isRightStickDragging = false;
-        //! dpad
+        //!
+        //! Deadzone of dpad to ignore its input
+        //!
         private float dpadDeadzone = 0.5f;
+        //!
+        //! reference to the current selection
+        //!
         private Selectable _currentSelection;
+        //!
+        //! reference to the current selection's image (for color change)
+        //!
         private Image _currentSelectionImage;
+        //!
+        //! reference to the current selection's image original color
+        //!
         private Color _selectionColorWas;
+        //!
+        //! bool state to change behaviour if dpad is in use
+        //!
         private bool _dpadInUse = false;
-        //! triggers
+        //!
+        //! Deadzone of the controller trigger to ignore its input
+        //!
         private float triggerDeadzone = 0.1f;
+        //!
+        //! bool state to change behaviour if left or right trigger is hold
+        //!
         private bool _isLeftTriggerHold, _isRightTriggerHold = false;
+        //!
+        //! bool state to change behaviour if we are in orbit-rotation (view) mode
+        //!
         private bool inOrbitMode = false;
-        //! our input trackers for abstract utilization
+        //!
+        //! our primary input tracker for abstract utilization (right controller stick)
+        //!
         private InputTracker _primary   = new InputTracker(InputManager.InputLevel.Primary);
+        //!
+        //! our secondary input tracker for abstract utilization (left controller stick and both trigger)
+        //!
         private InputTracker _secondary   = new InputTracker(InputManager.InputLevel.Secondary);
-        private InputTracker _tertiary   = new InputTracker(InputManager.InputLevel.Tertiary);
+        //!
+        //! our tertiary input tracker for abstract utilization (right controller stick if in orbit mode)
+        //!
+        private InputTracker _tertiary = new InputTracker(InputManager.InputLevel.Tertiary);
         #endregion
 
 
@@ -169,13 +216,13 @@ namespace tracer{
             //enable input
             m_inputs = new Inputs();
             //doing this in the update!
-            m_inputs.VPETMap.Controller_South.canceled   += PressConfirm;
-            m_inputs.VPETMap.Controller_East.canceled    += PressCancel;
-            m_inputs.VPETMap.Controller_Select.canceled  += PressSelect;
-            m_inputs.VPETMap.Controller_Left_Shoulder.canceled    += PressLeftShoulder;
-            m_inputs.VPETMap.Controller_Right_Shoulder.canceled   += PressRightShoulder;
-            m_inputs.VPETMap.Controller_Left_Stick_Press.canceled += PressLeftStick;
-            m_inputs.VPETMap.Controller_Right_Stick_Press.canceled += PressRightStick;
+            m_inputs.VPETMap.Controller_South.canceled              += PressConfirm;
+            m_inputs.VPETMap.Controller_East.canceled               += PressCancel;
+            m_inputs.VPETMap.Controller_Select.canceled             += PressSelect;
+            m_inputs.VPETMap.Controller_Left_Shoulder.canceled      += PressLeftShoulder;
+            m_inputs.VPETMap.Controller_Right_Shoulder.canceled     += PressRightShoulder;
+            m_inputs.VPETMap.Controller_Left_Stick_Press.canceled   += PressLeftStick;
+            m_inputs.VPETMap.Controller_Right_Stick_Press.canceled  += PressRightStick;
             m_inputs.VPETMap.Enable();
 
             // Subscribe to UI manager events.
@@ -191,23 +238,11 @@ namespace tracer{
         public override void Dispose(){
             base.Dispose();
 
-            // Unsubscribe from controller button events.
-/*          manager.buttonNorth -= PressNorth;
-            manager.buttonSouth -= PressSouth;
-            manager.buttonEast -= PressEast;
-            manager.buttonWest -= PressWest;
-            manager.buttonUp -= PressUp;
-            manager.buttonDown -= PressDown;
-            manager.buttonLeft -= PressLeft;
-            manager.buttonRight -= PressRight;
-            manager.buttonLeftTrigger -= PressLeftTrigger;
-            manager.buttonRightTrigger -= PressRightTrigger;
-            manager.buttonLeftShoulder -= PressLeftShoulder;
-            manager.buttonRighrShoulder -= PressRightShoulder;
-            manager.leftControllerStick -= MoveLeftStick;
-            manager.rightControllerStick -= MoveRightStick;
-            manager.ControllerStickCanceled -= DoneEditing;
-*/
+            if(m_inputs != null) {
+                m_inputs.Dispose(); //destroys asset instance with actions and callbacks (no unsubscribe necessary)
+                m_inputs = null;
+            }
+
             if(_selectorSnapSelect)
                 _selectorSnapSelect.parameterChanged -= ParamChange;
 
@@ -227,10 +262,19 @@ namespace tracer{
             //ControllerdoneEditing -= _sceneManager.getModule<UndoRedoModule>().addHistoryStep;
         }
     
-
+        //!
+        //! necessary constructor
+        //!
         public ControllerModule(string name, Manager manager) : base(name, manager){}
 
         #region PROCESSING
+        //!
+        //! function to calculate correct input values (right stick) and decide over the triggered behaviour
+        //!     e.g. LookAround in our SceneCam
+        //!
+        //! @param _tracker the specified input class containing necessary data to maintain
+        //! @param rawStickInput from Unity's input action
+        //!
         private void ProcessRightStick(InputTracker _tracker, Vector2 rawStickInput) {
             // Evaluate Deadzone
             if (rawStickInput.magnitude > stickDeadzone) {
@@ -273,8 +317,11 @@ namespace tracer{
         }
 
         //!
-        //! similiar to ProcessLeftStick, but
-        //! hor input is left/right move, ver is fwd/back (pinch)
+        //! function to calculate correct input values (left stick) and decide over the triggered behaviour
+        //!     e.g. moving our left/right & fwd/bck or manipulating the position of an object
+        //!
+        //! @param _tracker the specified input class containing necessary data to maintain
+        //! @param rawStickInput from Unity's input action
         //!
         private void ProcessLeftStick(InputTracker _tracker, Vector2 rawStickInput) {
             Vector2 syntheticDelta;
@@ -405,8 +452,11 @@ namespace tracer{
             }
         }
 
+        
+        //! function to calculate correct input values (both triggers) and decide over the executed behaviour
         //!
-        //! left and right trigger, delta is inverse
+        //! @param _tracker the specified input class containing necessary data to maintain
+        //! @param delta (inverse!) from Unity's input action
         //!
         private void ProcessTrigger(InputTracker _tracker, float delta) {
             
@@ -523,8 +573,9 @@ namespace tracer{
                     break;
             }
         }
-
-        //! cycle through ui and 'select' it
+        //!
+        //! function to gather correct input values (dpad) and decide over the executed behaviour
+        //!
         private void ProcessDPad() {
             // 1. Read the raw D-pad Vector
             Vector2 dpadInput = m_inputs.VPETMap.Controller_Dpad.ReadValue<Vector2>();
@@ -557,6 +608,11 @@ namespace tracer{
         #endregion
 
         #region BTN EVENTS
+        //!
+        //! button confirm callback from unitys input action (see Init function, most likely on the canceled listener)
+        //!
+        //! @param ctx unity's callback context: not used here
+        //!
         private void PressConfirm(InputAction.CallbackContext ctx) {
             //Debug.Log("PressConfirm<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
             if(_currentSelection != null) {
@@ -576,7 +632,11 @@ namespace tracer{
             }
         }
 
-
+        //!
+        //! button cancel callback from unitys input action (see Init function, most likely on the canceled listener)
+        //!
+        //! @param ctx unity's callback context: not used here
+        //!
         private void PressCancel(InputAction.CallbackContext ctx) {
             if(_currentSelection != null) {
                 EventSystem.current.SetSelectedGameObject(null);
@@ -594,7 +654,12 @@ namespace tracer{
             }
         }
 
-        //handles re-select (was Joystick Button 6)
+        //!
+        //! button select callback from unitys input action (see Init function, most likely on the canceled listener)
+        //!     e.g. used for reselecting the previous object when in Viewing-Mode
+        //!
+        //! @param ctx unity's callback context: not used here
+        //!
         private void PressSelect(InputAction.CallbackContext ctx) {
             switch (controlMode) {
                 case ControllerModeEnum.Viewing:
@@ -611,17 +676,32 @@ namespace tracer{
             }
             
         }
-
+        //!
+        //! button callback from unitys input action (see Init function, most likely on the canceled listener)
+        //!     e.g. cycling through scene objects and select them
+        //!
+        //! @param ctx unity's callback context: not used here
+        //!
         private void PressLeftShoulder(InputAction.CallbackContext ctx){
             //cycle through selectables all the time (no difference)
             CycleThroughSceneObjects(EvaluationHelper.NavDirection.Left);
         }
-
+         //!
+        //! button callback from unitys input action (see Init function, most likely on the canceled listener)
+        //!     e.g. cycling through scene objects and select them
+        //!
+        //! @param ctx unity's callback context: not used here
+        //!
         private void PressRightShoulder(InputAction.CallbackContext ctx){
             //cycle through selectables all the time (no difference)
             CycleThroughSceneObjects(EvaluationHelper.NavDirection.Right);
         }
-
+        //!
+        //! pressed left stick callback from unitys input action (see Init function, most likely on the canceled listener)
+        //!     e.g. cycling through manipulation-mode (local, global, viewport)
+        //!
+        //! @param ctx unity's callback context: not used here
+        //!
         private void PressLeftStick(InputAction.CallbackContext ctx) {
             //switch local <> global manipulation axis
             switch (controlMode) {
@@ -633,13 +713,23 @@ namespace tracer{
             }
             
         }
-
+        //!
+        //! pressed right stick callback from unitys input action (see Init function, most likely on the canceled listener)
+        //!     e.g. switching orbit-mode (orbit view mode <> standard view mode)
+        //!
+        //! @param ctx unity's callback context: not used here
+        //!
         private void PressRightStick(InputAction.CallbackContext ctx) {
             inOrbitMode = !inOrbitMode;
             core.StartCoroutine(AnimateFloatingText(inOrbitMode ? "Orbit View Mode" : "Standard View Mode", new Vector2(Screen.width / 2, Screen.height / 2)));
         }
         #endregion
 
+        //!
+        //! function to cycle through currently visible scene objects and select the nearest next one
+        //!
+        //! @param direction tells left or right
+        //!
         private void CycleThroughSceneObjects(EvaluationHelper.NavDirection direction) {
             //we do a check with role here too - ignore the overhead...
             SceneObject nextSceneObject = EvaluationHelper.Instance.FindNextVisibleObject(core.getManager<SceneManager>().getAllSceneObjects(), _currentSelectedSceneObject, Camera.main, direction, _uiManager.activeRole);
@@ -658,7 +748,14 @@ namespace tracer{
         }
 
         #region CALLBACK EVENTS
-
+        //!
+        //! input event drag-other event to set the data accordingly and raise the event
+        //!
+        //! @param tracker our data container for the specified input to hold on to
+        //! @param state the current input state to modify depending on its state
+        //! @param position here its always screenCenter
+        //! @param delta calculated delta of the drag
+        //!
         private void FireDragOtherEvent(InputTracker tracker, InputManager.InputState state, Vector2 position, Vector2 delta) {
             // Construct your InputData payload exactly as you do in the UnityInputModule
             tracker.CurrentPosition = position;
@@ -671,6 +768,14 @@ namespace tracer{
             var data = new InputManager.DragEventArgs(tracker.Level, state, position, delta, tracker.StartPosition);
             manager.RaiseDragOther(this, data); 
         }
+        //!
+        //! input event pinch-other event to set the data accordingly and raise the event
+        //!
+        //! @param tracker our data container for the specified input to hold on to
+        //! @param state the current input state to modify depending on its state
+        //! @param position here its always screenCenter
+        //! @param delta calculated delta of the drag
+        //!
         private void FirePinchOtherEvent(InputTracker tracker, InputManager.InputState state, Vector2 position, float delta) {
             // Construct your InputData payload exactly as you do in the UnityInputModule
             tracker.CurrentPosition = position;
@@ -707,6 +812,11 @@ namespace tracer{
             // if (_currentSelection == null)
             //     SelectFallbackTopLeft();
         }
+        //!
+        //! navigating ui elements via a (dpad) direction
+        //!
+        //! @param rawDirection to check whether we want to go horizontal or vertical and in which sign
+        //!
         private void NavigateUI(Vector2 rawDirection){
             // 1. Ensure we have a starting point
             if (_currentSelection == null || !_currentSelection.gameObject.activeInHierarchy){
@@ -736,6 +846,11 @@ namespace tracer{
             
         }
 
+        //!
+        //! set the current selection to new selection, revert if applicable, all via ui-navigation
+        //!
+        //! @param newSelection new element we want to select
+        //!
         private void SetSelection(Selectable newSelection){
             if(_currentSelection && _currentSelectionImage)
                 _currentSelectionImage.color = _selectionColorWas;
@@ -754,9 +869,9 @@ namespace tracer{
             Debug.Log("Selected "+_currentSelection.name);
         }
 
-        /// <summary>
-        /// Finds the interactable UI element closest to the Top-Left of the screen.
-        /// </summary>
+        //!
+        //! Finds the interactable UI element closest to the Top-Left of the screen, if nothing was selected prior
+        //!
         private void SelectFallbackTopLeft(){
             Debug.Log("Select Fallback Top Left");
 
@@ -793,7 +908,11 @@ namespace tracer{
         //******* TWO AXIS VIA STICK
 
         //! 
-        //! Pitches and rolls the object around its own internal axes.
+        //! Pitches and rolls the object around its own internal axes
+        //!
+        //! @param currentRotation the current local rotation of the selected object
+        //! @param stickAxis calculated stick delta used for rotation
+        //! @param speed given manipulation speed
         //!
         private Quaternion CalculateLocalRotation(Quaternion currentRotation, Vector2 stickAxis, float speed) {
             // Positive X pitches forward. Negative Z rolls clockwise.
@@ -805,7 +924,12 @@ namespace tracer{
         }
 
         //! 
-        //! Pitches and rolls the object around the absolute world axes (World X and World Z).
+        //! Pitches and rolls the object around the absolute world axes (World X and World Z)
+        //!
+        //! @param currentLocalRot the current local rotation of the selected object
+        //! @param parentRot the parents rotation we want to calculate the rotation against
+        //! @param stickAxis calculated stick delta used for rotation
+        //! @param speed given manipulation speed
         //!
         private Quaternion CalculateGlobalRotation(Quaternion currentLocalRot, Quaternion parentRot, Vector2 stickAxis, float speed) {
             float pitchAngle = -stickAxis.x * speed;
@@ -819,7 +943,13 @@ namespace tracer{
         }
 
         //!
-        //! Pitches and rolls the object perfectly aligned with the screen, regardless of where the camera is looking.
+        //! Pitches and rolls the object perfectly aligned with the screen, regardless of where the camera is looking
+        //!
+        //! @param currentLocalRot the current local rotation of the selected object
+        //! @param parentRot the parents rotation we want to calculate the rotation against
+        //! @param stickAxis calculated stick delta used for rotation
+        //! @param cameraTransform camTr we need to rotate the object in dependence of the viewport
+        //! @param speed given manipulation speed
         //!
         private Quaternion CalculateCameraRelativeRotation(Quaternion currentLocalRot, Quaternion parentRot, Vector2 stickAxis, Transform cameraTransform, float speed) {
             float pitchAngle = -stickAxis.x * speed;
@@ -840,54 +970,16 @@ namespace tracer{
             return Quaternion.Inverse(parentRot) * cameraDelta * parentRot * currentLocalRot;
         }
         
-        /*private void RotateLocal(Transform target, Vector2 stickInput, float rotationSpeed){
-            if (target == null || stickInput.sqrMagnitude < 0.001f) return;
-
-            // Calculate degrees for this frame
-            float pitchDelta = stickInput.y * rotationSpeed * Time.deltaTime;
-            
-            // Notice the negative sign on X: In Unity's left-handed system, positive Z rotation 
-            // tilts counter-clockwise. Negating it ensures pushing Right on the stick rolls Clockwise.
-            float rollDelta = -stickInput.x * rotationSpeed * Time.deltaTime;
-
-            // Space.Self applies the rotation along the object's local X and Z axes
-            target.Rotate(pitchDelta, 0f, rollDelta, Space.Self);
-        }
-
-        private void RotateGlobal(Transform target, Vector2 stickInput, float rotationSpeed){
-            if (target == null || stickInput.sqrMagnitude < 0.001f) return;
-
-            float pitchDelta = stickInput.y * rotationSpeed * Time.deltaTime;
-            float rollDelta = -stickInput.x * rotationSpeed * Time.deltaTime;
-
-            // Space.World applies the rotation strictly along the absolute World X and Z axes,
-            // ignoring how the object is currently tilted.
-            target.Rotate(pitchDelta, 0f, rollDelta, Space.World);
-        }
-
-        public void RotateCameraRelative(Transform target, Vector2 stickInput, Transform cameraTransform, float rotationSpeed){
-            if (target == null || cameraTransform == null || stickInput.sqrMagnitude < 0.001f) return;
-
-            float pitchDelta = stickInput.y * rotationSpeed * Time.deltaTime;
-            float rollDelta = -stickInput.x * rotationSpeed * Time.deltaTime;
-
-            // Grab the camera's right and forward axes, but flatten them to the floor (ignore camera tilt)
-            Vector3 camRight = cameraTransform.right;
-            Vector3 camForward = cameraTransform.forward;
-            camRight.y = 0f;
-            camForward.y = 0f;
-            camRight.Normalize();
-            camForward.Normalize();
-
-            // Rotate around the camera's horizontal axis for Pitch, and camera's forward axis for Roll
-            target.Rotate(camRight, pitchDelta, Space.World);
-            target.Rotate(camForward, rollDelta, Space.World);
-        }*/
+        
 
         //******** ONE AXIS VIA BUMPER
         
         //!
-        //! Spins the object around its own internal spine (like a spinning top).
+        //! Spins the object around its own internal spine (like a spinning top)
+        //!
+        //! @param currentRotation the current local rotation of the selected object
+        //! @param axisInput calculated stick delta used for local yaw rotation
+        //! @param speed given manipulation speed
         //!
         public Quaternion CalculateLocalYaw(Quaternion currentRotation, float axisInput, float speed) {
             float yawAngle = axisInput * speed;
@@ -897,19 +989,30 @@ namespace tracer{
         }
 
         //!
-        //! Spins the object around the absolute world center axis (like a carousel).
+        //! Spins the object around the absolute world center axis (like a carousel)
+        //!
+        //! @param currentRotation the current local rotation of the selected object
+        //! @param parentRot parent rotation used for calculating global yaw rotation
+        //! @param axisInput calculated stick delta used for yaw rotation
+        //! @param speed given manipulation speed
         //!
         public Quaternion CalculateGlobalYaw(Quaternion currentRotation, Quaternion parentRot, float axisInput, float speed) {
             float yawAngle = axisInput * speed;
             Quaternion globalDelta = Quaternion.Euler(0f, yawAngle, 0f);
             // MULTIPLY ON LEFT: Extrinsic world rotation
-            //return globalDelta * currentRotation;
+            // return globalDelta * currentRotation;
             // bugfix: Wrap the world delta in the parent's space.
             return Quaternion.Inverse(parentRot) * globalDelta * parentRot * currentRotation;
         }
 
         //!
-        //! Spins the object perfectly upright relative to your screen view.
+        //! Spins the object perfectly upright relative to your screen view
+        //!
+        //! @param currentRotation the current local rotation of the selected object
+        //! @param parentRot parent rotation used for calculating global yaw rotation
+        //! @param cameraTransform camTr we need to rotate the object in dependence of the viewport
+        //! @param axisInput calculated stick delta used for yaw rotation
+        //! @param speed given manipulation speed
         //!
         public Quaternion CalculateCameraRelativeYaw(Quaternion currentRotation, Quaternion parentRot, Transform cameraTransform, float axisInput, float speed) {
             float yawAngle = axisInput * speed;
@@ -928,7 +1031,12 @@ namespace tracer{
         //******** TWO AXIS VIA STICK
 
         //!
-        //! Moves the object strictly along its own Forward (Z) and Right (X) axes.
+        //! Moves the object strictly along its own Forward (Z) and Right (X) axes
+        //!
+        //! @param currentPosition the current local position of the selected object
+        //! @param currentRotation the current local rotation we want to calculate the position against
+        //! @param stickAxis calculated stick delta used for position manipulation
+        //! @param speed given manipulation speed
         //!
         public Vector3 CalculateLocalPosition(Vector3 currentPosition, Quaternion currentRotation, Vector2 stickAxis, float speed) {
             // local movement vector
@@ -940,7 +1048,12 @@ namespace tracer{
         }
 
         //!
-        //! Moves the object along the absolute World X and World Z axes, ignoring how the object is rotated.
+        //! Moves the object along the absolute World X and World Z axes, ignoring how the object is rotated
+        //!
+        //! @param currentPosition the current local position of the selected object
+        //! @param parentRot the rotation of the parent we want to calculate the global position change against
+        //! @param stickAxis calculated stick delta used for position manipulation
+        //! @param speed given manipulation speed
         //!
         public Vector3 CalculateGlobalPosition(Vector3 currentPosition, Quaternion parentRot, Vector2 stickAxis, float speed) {
             // No rotation math required. We just directly map the stick to world coordinates.
@@ -953,7 +1066,13 @@ namespace tracer{
         }
 
         //!
-        //! Moves the object relative to the screen, but locks the movement to the X/Z floor plane.
+        //! Moves the object relative to the screen, but locks the movement to the X/Z floor plane
+        //!
+        //! @param currentPosition the current local position of the selected object
+        //! @param parentRot the rotation of the parent we want to calculate the global position change against
+        //! @param stickAxis calculated stick delta used for position manipulation
+        //! @param cameraTransform camTr we need to move the object in dependence of the viewport
+        //! @param speed given manipulation speed
         //!
         public Vector3 CalculateCameraRelativePosition(Vector3 currentPosition, Quaternion parentRot, Vector2 stickAxis, Transform cameraTransform, float speed) {
             // the camera's raw directional vectors
@@ -980,7 +1099,12 @@ namespace tracer{
 
         //*********** ONE AXIS VIA BUMPER
         //!
-        //! Moves the object strictly out of its own "roof" or "floor" based on its tilt.
+        //! Moves the object strictly out of its own "roof" or "floor" based on its tilt
+        //!
+        //! @param currentPosition the current local position of the selected object
+        //! @param currentRotation the current local rotation we want to calculate the position against
+        //! @param axisInput calculated stick delta used for y position manipulation
+        //! @param speed given manipulation speed
         //!
         public Vector3 CalculateLocalYPosition(Vector3 currentPosition, Quaternion currentRotation, float axisInput, float speed) {
             // Move strictly along local Y
@@ -992,6 +1116,12 @@ namespace tracer{
         //!
         //! Moves the object strictly up toward the sky or down toward the world floor, ignoring object rotation.
         //!
+        //! @param currentPosition the current local position of the selected object
+        //! @param parentRot the rotation of the parent we want to calculate the global position change against
+        //! @param axisInput calculated stick delta used for y position manipulation
+        //! @param cameraTransform camTr we need to move the object in dependence of the viewport
+        //! @param speed given manipulation speed
+        //!
         public Vector3 CalculateGlobalYPosition(Vector3 currentPosition, Quaternion parentRot, float axisInput, float speed) {
             Vector3 globalDelta = new Vector3(0f, axisInput, 0f) * speed;
             
@@ -1002,7 +1132,13 @@ namespace tracer{
         }
 
         //!
-        //! Moves the object up or down relative to your monitor screen.
+        //! Moves the object up or down relative to your monitor screen
+        //!
+        //! @param currentPosition the current local position of the selected object
+        //! @param parentRot the rotation of the parent we want to calculate the global position change against
+        //! @param axisInput calculated stick delta used for y position manipulation
+        //! @param cameraTransform camTr we need to move the object in dependence of the viewport
+        //! @param speed given manipulation speed
         //!
         public Vector3 CalculateCameraRelativeYPosition(Vector3 currentPosition, Quaternion parentRot, Transform cameraTransform, float axisInput, float speed) {
             // Use the camera's raw Up vector (no floor projection needed here, as we want vertical screen movement)
@@ -1108,7 +1244,12 @@ namespace tracer{
             }
         }
 
-        // called when the ui has been (re)created
+        //!
+        //! This method responds to finished (re)creation of the ui from within the UI manager.
+        //!
+        //! @param sender where does it got called from
+        //! @param uib the UIBehaviour that
+        //!
         private void UiCreationFinished(object sender, UIBehaviour uib) {
             // we have to call GetCurrentSelector here, because we instantly want to select something, but the order of events 
             // from selection-changed is random!
@@ -1131,7 +1272,9 @@ namespace tracer{
         #region ManipulationModeRegion
         
         //!
-        //! This method retrieves the current selector when not in MAIN_VIEW_MODE.
+        //! This method retrieves the current selector when not in MAIN_VIEW_MODE
+        //!
+        //! @param uib the UIBehaviour we want to get the current selector from
         //!
         private void GetCurrentSelector(UIBehaviour uib){
             //remove if already available!
@@ -1157,7 +1300,10 @@ namespace tracer{
         }
 
         //!
-        //! This method responds to parameter changes in the manipulation mode.
+        //! This method responds to parameter changes in the manipulation mode
+        //!
+        //! @param sender where does it got called from
+        //! @param the manipulatorMode as index
         //!
         private void ParamChange(object sender, int manipulatorMode)
         {
@@ -1165,7 +1311,9 @@ namespace tracer{
         }
 
         //!
-        //! This method switches to the next available manipulation mode.
+        //! This method switches to the next available manipulation mode
+        //!
+        //! @param dir the direction to next or previous
         //!
         private void SwitchManipulationMode(int dir = 1){
             int prevNextElement = _selectorCurrentSelectedSnapSelectElement + dir;
@@ -1181,7 +1329,9 @@ namespace tracer{
             SetManipulationMode();
         }
     
-
+        //!
+        //! sets the gathered/changed manipulation mode 
+        //!
         private void SetManipulationMode() {
             //see UICreator2DModule
             Debug.Log("Set Manipulation Mode for name: "+_selectedAbstractParam.name);
@@ -1232,22 +1382,26 @@ namespace tracer{
         //!
         //! This method invokes the doneEditing event for undo/redo when an editing operation is completed.
         //!
-        private void DoneEditing(object sender, Vector2 value)
-        {
+        /*private void DoneEditing(object sender, Vector2 value){
             if (_selectedAbstractParam != null)
             {
                 Debug.Log("ControllerModule: DoneEditing");
                 ControllerdoneEditing?.Invoke(this, _selectedAbstractParam);
             }
-        }
+        }*/
         #endregion
 
         // --- HELPER METHODS FOR FIRING EVENTS ---
         
 
         #region DEBUGGING
+        //!
+        //! reference to our debug ui container for debug ui text and images
+        //!
         private GameObject mainUIContainer;
-        // Ensures we always have a canvas to draw on
+        //!
+        //! function to  ensures we always have a canvas to draw on
+        //!
         private void EnsureMainCanvasExists(){
             if (mainUIContainer != null) return;
             mainUIContainer = new GameObject("ControllerModuleUI");
@@ -1255,6 +1409,12 @@ namespace tracer{
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 999;
         }
+        //!
+        //! helper coroutine to animate a floating text
+        //!
+        //! @param message text to show
+        //! @param startPos ui pos to show the text at
+        //!
         private System.Collections.IEnumerator AnimateFloatingText(string message, Vector2 startPos){
             EnsureMainCanvasExists();
             GameObject textGO = new GameObject("InputText");

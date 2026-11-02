@@ -434,15 +434,11 @@ namespace tracer{
 
             m_manager.core.updateEvent -= OnCoreUpdateEvent;
 
-            // --- PRIMARY (1-Finger / Left Mouse) ---
-            m_inputs.VPETMap.OnPrimaryInputClick.started -= ctx => OnPointerDown(_primary);
-            m_inputs.VPETMap.OnPrimaryInputClick.canceled -= ctx => OnPointerUp(_primary);
-
-            m_inputs.VPETMap.OnSecondaryInputClick.started -= ctx => OnPointerDown(_secondary);
-            m_inputs.VPETMap.OnSecondaryInputClick.canceled -= ctx => OnPointerUp(_secondary);
-
-            m_inputs.VPETMap.OnTertiaryInputClick.started -= ctx => OnPointerDown(_tertiary);
-            m_inputs.VPETMap.OnTertiaryInputClick.canceled -= ctx => OnPointerUp(_tertiary);
+            if(m_inputs != null) {
+                m_inputs.VPETMap.Disable();
+                m_inputs.Dispose(); //destroys asset instance with actions and callbacks
+                m_inputs = null;
+            }
             
             //clean the unity any-input action
             // Always clean up dynamic actions to prevent memory leaks

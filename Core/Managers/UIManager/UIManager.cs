@@ -333,12 +333,6 @@ namespace tracer
 
             CreateSettingsMenu();
             createStartMenu();
-
-            startMenu
-                .Begin(MenuItem.IType.HSPLIT)
-                    .Add("Role")
-                    .Add(settings.roles)
-                .End();
         }
 
         private void SceneReadyEvent(object sender, EventArgs e) {
@@ -653,9 +647,14 @@ namespace tracer
                 .Begin(MenuItem.IType.VSPLIT)
                     .Begin(MenuItem.IType.VSPLIT)
                         .Add("Connect to a server or load the demo scene...", true)
+                    .End()
+                    .Begin(MenuItem.IType.HSPLIT)
+                        .Add("Role")
+                        .Add(settings.roles)
                     .End();
 
-            m_startMenu.caption = "TRACER";
+
+            m_startMenu.caption = "TRACER";                
         }
 
         //!
