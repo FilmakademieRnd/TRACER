@@ -112,7 +112,7 @@ namespace tracer
         //!
         private StaticMeshQuadtree meshQuadtree;
 
-        public StaticMeshQuadtree GetStaticMashQuadTree(){ return meshQuadtree;}
+        public StaticMeshQuadtree GetStaticMeshQuadTree(){ return meshQuadtree;}
 
         //!
         //! Areference to the About Menu prefab.
