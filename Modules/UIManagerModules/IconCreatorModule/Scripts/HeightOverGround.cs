@@ -146,7 +146,11 @@ public class HeightOverGround : MonoBehaviour{
     //! tweakable value for all colors (line, marker, text)
     //!
     private readonly Color materialColor = new Color(0.2f, 0.6f, 1f, 0.8f) ;
-
+    //!
+    //! how accurate should the mesh check run. set as variable to iterate over it
+    //! TODO: add cycle ability at runtime to check performance
+    //!
+    private RayMeshUtility.Accuracy meshCheckAccuracy = RayMeshUtility.Accuracy.NearestVertex;
     //!
     //! Call this to initialize the visualization on a specific transform.
     //!
@@ -160,7 +164,7 @@ public class HeightOverGround : MonoBehaviour{
         lastTargetY = target.position.y;
 
         if (manager.GetStaticMeshQuadTree() != null){
-            groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
+            groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
         }
         lastGroundY = groundY;
 
@@ -206,7 +210,7 @@ public class HeightOverGround : MonoBehaviour{
 
         //calculate height via given settings
         if (manager.GetStaticMeshQuadTree() != null){
-            groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
+            groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
         }
 
         //set active
@@ -266,7 +270,7 @@ public class HeightOverGround : MonoBehaviour{
             //for now, just assume we ware selected
             if (SHOW_ONLY_SELECTED) {
                 if (manager.GetStaticMeshQuadTree() != null){
-                    groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(RayMeshUtility.Accuracy.NearestVertex, target.position, 0f);
+                    groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
                 }   
             }
             // Only update the line math and text value if the heights physically changed
