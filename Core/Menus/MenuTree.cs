@@ -187,7 +187,7 @@ namespace tracer
         //!
         public enum IType
         {
-            HSPLIT, VSPLIT, SPACE, TEXT, TEXTSECTION, TEXTBOX, PARAMETER
+            HSPLIT, VSPLIT, SPACE, TEXT, TEXTSECTION, TEXTBOX, PARAMETER, IMAGE
         }
         //!
         //! The type of the menu item.

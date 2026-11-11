@@ -83,6 +83,24 @@ namespace tracer
         public float maxExtend = 1f;
 
         //!
+        //! List of AbstractParameter containing the available scenes a user can load
+        //!
+        private List<AbstractParameter> availableScenesForLoggedInUser = null;
+        
+        //!
+        //! [!REVEIEW] correct flow? User logs in > SceneStorageModule should load possibles scenes (local or server) and updates SceneManager with it
+        //!
+        //! Function return all available scenes for the user to load
+        //!
+        //! //@param role logged in user role
+        //!
+        //! @return sceneList List of AbstractParameter (should become a scene list with images, names and infos)
+        //!
+        public List<AbstractParameter> GetAvailableScenesForUserToLoad(/*userRole*/) {
+            return availableScenesForLoggedInUser;
+        }
+
+        //!
         //! Function that returns a list containing all scene objects.
         //!
         //! @return The list containing all scene objects.

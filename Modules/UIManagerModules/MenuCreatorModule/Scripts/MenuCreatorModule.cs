@@ -34,17 +34,14 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-namespace tracer
-{
-    public class MenuCreatorModule : UIManagerModule
-    {
+namespace tracer {
+    public class MenuCreatorModule : UIManagerModule {
         //!
         //! Constructor
         //! @param name Name of this module
         //! @param _core Reference to the TRACER _core
         //!
-        public MenuCreatorModule(string name, Manager manager) : base(name, manager)
-        {
+        public MenuCreatorModule(string name, Manager manager) : base(name, manager) {
         }
         private DynamicParameterObject m_dynPo = null;
         //!
@@ -92,6 +89,10 @@ namespace tracer
         //!
         private GameObject m_dropdown;
         //!
+        //! Prefab for the Unity img object, used as UI element for an image.
+        //!
+        private GameObject m_img;
+        //!
         //! The list containing all UI elemets of the current menu.
         //!
         private List<GameObject> m_uiElements;
@@ -103,8 +104,7 @@ namespace tracer
         //!
         //! Init Function
         //!
-        protected override void Init(object sender, EventArgs e)
-        {
+        protected override void Init(object sender, EventArgs e) {
             m_uiElements = new List<GameObject>();
             m_parameterObjects = new List<ParameterObject>();
             m_parameterMapping = new Dictionary<AbstractParameter, List<GameObject>>();
@@ -119,6 +119,7 @@ namespace tracer
             m_inputField = Resources.Load("Prefabs/MenuInputField") as GameObject;
             m_numberInputField = Resources.Load("Prefabs/MenuNumberInputField") as GameObject;
             m_dropdown = Resources.Load("Prefabs/MenuDropdown") as GameObject;
+            m_img = Resources.Load("Prefabs/MenuImg") as GameObject;
 
             manager.menuSelected += createMenu;
             manager.menuDeselected += hideMenu;
@@ -131,8 +132,7 @@ namespace tracer
         //! @param e Arguments for these event. 
         //! 
         //!
-        public override void Dispose()
-        {
+        public override void Dispose() {
             base.Dispose();
             manager.menuSelected -= createMenu;
             manager.menuDeselected -= hideMenu;
@@ -144,20 +144,17 @@ namespace tracer
         //! @param sender A reference to the UI manager.
         //! @param menu A reference to the MenuTree used to create the UI elements of a menu.
         //!
-        void createMenu(object sender, MenuTree menu)
-        {
+        void createMenu(object sender, MenuTree menu) {
             destroyMenu();
 
-            if (menu == null)
-            {
+            if (menu == null) {
                 m_oldMenu.visible = false;
                 return;
             }
 
             if (menu.visible && m_oldMenu == menu)
                 menu.visible = false;
-            else
-            {
+            else {
                 GameObject menuCanvas = GameObject.Instantiate(m_canvas);
                 menuCanvas.GetComponent<Canvas>().sortingOrder = 15;
                 m_uiElements.Add(menuCanvas);
@@ -176,8 +173,7 @@ namespace tracer
                 button.GetComponent<Button>().onClick.AddListener(() => manager.hideMenu());
 
                 ScrollRect rect = rootPanel.GetComponent<ScrollRect>();
-                foreach (MenuItem p in menu.Items)
-                {
+                foreach (MenuItem p in menu.Items) {
                     GameObject gameObject = createMenufromTree(p, rootPanel)[0];
                     m_uiElements.Add(gameObject);
                     if (menu.scrollable)
@@ -199,12 +195,10 @@ namespace tracer
         //! @param item The start item for the tree traversal.
         //! @param parentObject The items _parent Unity GameObject.
         //!
-        private List<GameObject> createMenufromTree(MenuItem item, GameObject parentObject)
-        {
+        private List<GameObject> createMenufromTree(MenuItem item, GameObject parentObject) {
             List<GameObject> newObjects = new List<GameObject>(4);
 
-            switch (item.Type)
-            {
+            switch (item.Type) {
                 case MenuItem.IType.HSPLIT:
                     newObjects.Add(GameObject.Instantiate(m_panel, parentObject.transform));
                     HorizontalLayoutGroup horizontalLayout = newObjects[0].AddComponent<HorizontalLayoutGroup>();
@@ -227,19 +221,17 @@ namespace tracer
                     verticalLayout.padding.top = 3;
                     verticalLayout.padding.bottom = 3;
                     break;
-                case MenuItem.IType.SPACE:
-                    {
+                case MenuItem.IType.SPACE: {
                         newObjects.Add(GameObject.Instantiate(m_panel, parentObject.transform));
                     }
                     break;
-                case MenuItem.IType.TEXT:
-                    {
+                case MenuItem.IType.TEXT: {
                         // prevent wrong scaling if two or more textfields are present 
                         HorizontalLayoutGroup hlGroup = parentObject.transform.GetComponent<HorizontalLayoutGroup>();
                         if (parentObject.transform.childCount > 0)
                             if (hlGroup && parentObject.transform.GetChild(0).GetComponent<TextMeshProUGUI>() != null)
                                 hlGroup.childControlWidth = true;
-                        
+
                         newObjects.Add(GameObject.Instantiate(m_text, parentObject.transform));
                         TextMeshProUGUI textComponent = newObjects[0].GetComponent<TextMeshProUGUI>();
                         textComponent.text = ((ClassParameter<string>)item.Parameter).value;
@@ -249,8 +241,7 @@ namespace tracer
                         textComponent.fontStyle = FontStyles.Normal;
                     }
                     break;
-                case MenuItem.IType.TEXTSECTION:
-                    {
+                case MenuItem.IType.TEXTSECTION: {
                         newObjects.Add(GameObject.Instantiate(m_text, parentObject.transform));
                         TextMeshProUGUI textComponent = newObjects[0].GetComponent<TextMeshProUGUI>();
                         textComponent.text = ((ClassParameter<string>)item.Parameter).value;
@@ -262,8 +253,7 @@ namespace tracer
                         textComponent.enableWordWrapping = true;
                     }
                     break;
-                case MenuItem.IType.TEXTBOX:
-                    {
+                case MenuItem.IType.TEXTBOX: {
                         newObjects.Add(GameObject.Instantiate(m_textBox, parentObject.transform));
                         TextMeshProUGUI textComponent = newObjects[0].GetComponentInChildren<TextMeshProUGUI>();
                         textComponent.text = ((ClassParameter<string>)item.Parameter).value;
@@ -273,11 +263,21 @@ namespace tracer
                         textComponent.fontStyle = FontStyles.Normal;
                     }
                     break;
+                case MenuItem.IType.IMAGE: {
+                        newObjects.Add(GameObject.Instantiate(m_img, parentObject.transform));
+                        Image img = newObjects[0].GetComponentInChildren<Image>();
+                        if (item.iconData != null) {
+                            Texture2D tex = new Texture2D(2, 2);
+                            ImageConversion.LoadImage(tex, item.iconData);
+                            img.sprite = Sprite.Create(tex, new Rect(0.0f, 0.0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                            RectTransform rectTransform = img.GetComponent<RectTransform>();
+                            rectTransform.sizeDelta = new Vector2(rectTransform.rect.height, rectTransform.rect.height);
+                        }
+                    }
+                    break;
                 case MenuItem.IType.PARAMETER:
-                    switch (item.Parameter.tracerType)
-                    {
-                        case AbstractParameter.ParameterType.ACTION:
-                            {
+                    switch (item.Parameter.tracerType) {
+                        case AbstractParameter.ParameterType.ACTION: {
                                 newObjects.Add(GameObject.Instantiate(m_button, parentObject.transform));
                                 Button button = newObjects[0].GetComponentInChildren<Button>();
                                 ColorBlock buttonColors = button.colors;
@@ -294,8 +294,7 @@ namespace tracer
                                 textComponent.fontSize = manager.uiAppearanceSettings.defaultFontSize;
                             }
                             break;
-                        case AbstractParameter.ParameterType.BOOL:
-                            {
+                        case AbstractParameter.ParameterType.BOOL: {
                                 newObjects.Add(GameObject.Instantiate(m_toggle, parentObject.transform));
                                 Toggle toggle = newObjects[0].GetComponent<Toggle>();
                                 toggle.isOn = ((Parameter<bool>)item.Parameter).value;
@@ -313,10 +312,8 @@ namespace tracer
                                 toggle.colors = toggleColors;
                             }
                             break;
-                        case AbstractParameter.ParameterType.INT:
-                            {
-                                if (item.Parameter.GetType() == typeof(RPCParameter<int>))
-                                {
+                        case AbstractParameter.ParameterType.INT: {
+                                if (item.Parameter.GetType() == typeof(RPCParameter<int>)) {
                                     newObjects.Add(GameObject.Instantiate(m_buttonList, parentObject.transform));
                                     Button button = newObjects[0].GetComponentInChildren<Button>();
                                     ColorBlock buttonColors = button.colors;
@@ -334,8 +331,7 @@ namespace tracer
                                     hlGroup.childForceExpandWidth = true;
                                     hlGroup.childControlWidth = true;
 
-                                    if (item.iconData != null)
-                                    {
+                                    if (item.iconData != null) {
                                         Image imgButton = button.transform.GetChild(0).GetComponent<Image>();
                                         Texture2D tex = new Texture2D(2, 2);
                                         ImageConversion.LoadImage(tex, item.iconData);
@@ -343,9 +339,7 @@ namespace tracer
                                         RectTransform buttonTransform = button.GetComponent<RectTransform>();
                                         buttonTransform.sizeDelta = new Vector2(buttonTransform.rect.height, buttonTransform.rect.height);
                                     }
-                                }
-                                else
-                                {
+                                } else {
                                     newObjects.Add(GameObject.Instantiate(m_numberInputField, parentObject.transform));
                                     TMP_InputField numberInputField = newObjects[0].GetComponent<TMP_InputField>();
                                     numberInputField.text = ((Parameter<int>)item.Parameter).value.ToString();
@@ -361,8 +355,7 @@ namespace tracer
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.FLOAT:
-                            {
+                        case AbstractParameter.ParameterType.FLOAT: {
                                 newObjects.Add(GameObject.Instantiate(m_numberInputField, parentObject.transform));
                                 TMP_InputField numberInputField = newObjects[0].GetComponent<TMP_InputField>();
                                 numberInputField.text = ((Parameter<float>)item.Parameter).value.ToString();
@@ -375,12 +368,10 @@ namespace tracer
                                 numberInputField.caretPosition = numberInputField.text.Length;
                             }
                             break;
-                        case AbstractParameter.ParameterType.VECTOR2:
-                            {
+                        case AbstractParameter.ParameterType.VECTOR2: {
                                 TMP_InputField[] numberInputFields = new TMP_InputField[2];
 
-                                for (int i = 0; i < 2; i++)
-                                {
+                                for (int i = 0; i < 2; i++) {
                                     GameObject go = GameObject.Instantiate(m_numberInputField, parentObject.transform);
                                     numberInputFields[i] = go.GetComponent<TMP_InputField>();
                                     newObjects.Add(go);
@@ -388,13 +379,11 @@ namespace tracer
 
                                 Vector2 vectorValue = ((Parameter<Vector2>)item.Parameter).value;
 
-                                for (int i = 0; i < 2; i++)
-                                {
+                                for (int i = 0; i < 2; i++) {
                                     numberInputFields[i].text = vectorValue[i].ToString();
                                     int index = i; // Capture current index for delegate
 
-                                    numberInputFields[i].onEndEdit.AddListener(delegate
-                                    {
+                                    numberInputFields[i].onEndEdit.AddListener(delegate {
                                         vectorValue[index] = float.Parse(numberInputFields[index].text);
                                         ((Parameter<Vector2>)item.Parameter).setValue(vectorValue);
                                     });
@@ -409,12 +398,10 @@ namespace tracer
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.VECTOR3:
-                            {
+                        case AbstractParameter.ParameterType.VECTOR3: {
                                 TMP_InputField[] numberInputFields = new TMP_InputField[3];
 
-                                for (int i = 0; i < 3; i++)
-                                {
+                                for (int i = 0; i < 3; i++) {
                                     GameObject go = GameObject.Instantiate(m_numberInputField, parentObject.transform);
                                     numberInputFields[i] = go.GetComponent<TMP_InputField>();
                                     newObjects.Add(go);
@@ -422,13 +409,11 @@ namespace tracer
 
                                 Vector3 vectorValue = ((Parameter<Vector3>)item.Parameter).value;
 
-                                for (int i = 0; i < 3; i++)
-                                {
+                                for (int i = 0; i < 3; i++) {
                                     numberInputFields[i].text = vectorValue[i].ToString();
                                     int index = i; // Capture current index for delegate
 
-                                    numberInputFields[i].onEndEdit.AddListener(delegate
-                                    {
+                                    numberInputFields[i].onEndEdit.AddListener(delegate {
                                         vectorValue[index] = float.Parse(numberInputFields[index].text);
                                         ((Parameter<Vector3>)item.Parameter).setValue(vectorValue);
                                     });
@@ -443,12 +428,10 @@ namespace tracer
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.VECTOR4:
-                            {
+                        case AbstractParameter.ParameterType.VECTOR4: {
                                 TMP_InputField[] numberInputFields = new TMP_InputField[4];
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     GameObject go = GameObject.Instantiate(m_numberInputField, parentObject.transform);
                                     numberInputFields[i] = go.GetComponent<TMP_InputField>();
                                     newObjects.Add(go);
@@ -456,13 +439,11 @@ namespace tracer
 
                                 Vector4 vectorValue = ((Parameter<Vector4>)item.Parameter).value;
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     numberInputFields[i].text = vectorValue[i].ToString();
                                     int index = i; // Capture current index for delegate
 
-                                    numberInputFields[i].onEndEdit.AddListener(delegate
-                                    {
+                                    numberInputFields[i].onEndEdit.AddListener(delegate {
                                         vectorValue[index] = float.Parse(numberInputFields[index].text);
                                         ((Parameter<Vector4>)item.Parameter).setValue(vectorValue);
                                     });
@@ -477,12 +458,10 @@ namespace tracer
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.QUATERNION:
-                            {
+                        case AbstractParameter.ParameterType.QUATERNION: {
                                 TMP_InputField[] numberInputFields = new TMP_InputField[4];
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     GameObject go = GameObject.Instantiate(m_numberInputField, parentObject.transform);
                                     numberInputFields[i] = go.GetComponent<TMP_InputField>();
                                     newObjects.Add(go);
@@ -490,13 +469,11 @@ namespace tracer
 
                                 Quaternion quaternionValue = ((Parameter<Quaternion>)item.Parameter).value;
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     numberInputFields[i].text = quaternionValue[i].ToString();
                                     int index = i; // Capture current index for delegate
 
-                                    numberInputFields[i].onEndEdit.AddListener(delegate
-                                    {
+                                    numberInputFields[i].onEndEdit.AddListener(delegate {
                                         quaternionValue[index] = float.Parse(numberInputFields[index].text);
                                         ((Parameter<Quaternion>)item.Parameter).setValue(quaternionValue);
                                     });
@@ -511,12 +488,10 @@ namespace tracer
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.COLOR:
-                            {
+                        case AbstractParameter.ParameterType.COLOR: {
                                 TMP_InputField[] numberInputFields = new TMP_InputField[4];
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     GameObject go = GameObject.Instantiate(m_numberInputField, parentObject.transform);
                                     numberInputFields[i] = go.GetComponent<TMP_InputField>();
                                     newObjects.Add(go);
@@ -524,13 +499,11 @@ namespace tracer
 
                                 Color colorValue = ((Parameter<Color>)item.Parameter).value;
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     numberInputFields[i].text = colorValue[i].ToString();
                                     int index = i; // Capture current index for delegate
 
-                                    numberInputFields[i].onEndEdit.AddListener(delegate
-                                    {
+                                    numberInputFields[i].onEndEdit.AddListener(delegate {
                                         float parsedValue = float.Parse(numberInputFields[index].text);
                                         float clampedValue = Mathf.Clamp(parsedValue, 0, 255);
                                         colorValue[index] = clampedValue;
@@ -548,8 +521,7 @@ namespace tracer
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.STRING:
-                            {
+                        case AbstractParameter.ParameterType.STRING: {
                                 newObjects.Add(GameObject.Instantiate(m_inputField, parentObject.transform));
                                 TMP_InputField inputField = newObjects[0].GetComponent<TMP_InputField>();
                                 inputField.text = ((ClassParameter<string>)item.Parameter).value;
@@ -562,8 +534,7 @@ namespace tracer
                                 inputField.selectionColor = manager.uiAppearanceSettings.colors.ElementSelection_Highlight;
                             }
                             break;
-                        case AbstractParameter.ParameterType.LIST:
-                            {
+                        case AbstractParameter.ParameterType.LIST: {
                                 newObjects.Add(GameObject.Instantiate(m_dropdown, parentObject.transform));
                                 TMP_Dropdown dropDown = newObjects[0].GetComponent<TMP_Dropdown>();
                                 List<string> names = new List<string>();
@@ -593,20 +564,15 @@ namespace tracer
                     break;
             }
 
-            if (item.Parameter != null)
-            {
+            if (item.Parameter != null) {
                 ParameterObject parameterObject = item.Parameter._parent;
-                if (parameterObject != null)
-                {
-                    if (!m_parameterObjects.Contains(parameterObject))
-                    {
+                if (parameterObject != null) {
+                    if (!m_parameterObjects.Contains(parameterObject)) {
                         parameterObject.hasChanged += updateItem;
                         m_parameterObjects.Add(parameterObject);
                         m_parameterMapping.Add(item.Parameter, newObjects);
                     }
-                }
-                else
-                {
+                } else {
                     m_dynPo.AddParameter(item.Parameter);
                     m_parameterMapping.Add(item.Parameter, newObjects);
                 }
@@ -618,17 +584,12 @@ namespace tracer
             return newObjects;
         }
 
-        private void updateItem(object sender, ParameterObject.ChangedArgs e)
-        {
-            foreach (AbstractParameter parameter in e.Parameters)
-            {
+        private void updateItem(object sender, ParameterObject.ChangedArgs e) {
+            foreach (AbstractParameter parameter in e.Parameters) {
                 List<GameObject> gameObjects;
-                if (m_parameterMapping.TryGetValue(parameter, out gameObjects))
-                {
-                    switch (parameter.tracerType)
-                    {
-                        case AbstractParameter.ParameterType.ACTION:
-                            {
+                if (m_parameterMapping.TryGetValue(parameter, out gameObjects)) {
+                    switch (parameter.tracerType) {
+                        case AbstractParameter.ParameterType.ACTION: {
                                 //Button button = newObject.GetComponent<Button>();
                                 //Action parameterAction = ((ClassParameter<Action>)item.Parameter).value;
                                 //button.onClick.AddListener(() => parameterAction());
@@ -641,95 +602,77 @@ namespace tracer
                                 //imgButton.color = manager.uiAppearanceSettings.colors.ButtonBG;
                             }
                             break;
-                        case AbstractParameter.ParameterType.BOOL:
-                            {
+                        case AbstractParameter.ParameterType.BOOL: {
                                 Toggle toggle = gameObjects[0].GetComponent<Toggle>();
                                 toggle.isOn = ((Parameter<bool>)parameter).value;
                             }
                             break;
-                        case AbstractParameter.ParameterType.INT:
-                            {
+                        case AbstractParameter.ParameterType.INT: {
                                 TMP_InputField numberInputField = gameObjects[0].GetComponent<TMP_InputField>();
                                 numberInputField.text = ((Parameter<int>)parameter).value.ToString();
                             }
                             break;
-                        case AbstractParameter.ParameterType.FLOAT:
-                            {
+                        case AbstractParameter.ParameterType.FLOAT: {
                                 TMP_InputField numberInputField = gameObjects[0].GetComponent<TMP_InputField>();
                                 numberInputField.text = ((Parameter<float>)parameter).value.ToString();
                             }
                             break;
-                        case AbstractParameter.ParameterType.VECTOR2:
-                            {
+                        case AbstractParameter.ParameterType.VECTOR2: {
                                 Vector2 vectorValue = ((Parameter<Vector2>)parameter).value;
 
-                                for (int i = 0; i < 2; i++)
-                                {
+                                for (int i = 0; i < 2; i++) {
                                     TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
                                     numberInputField.text = vectorValue[i].ToString();
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.VECTOR3:
-                            {
+                        case AbstractParameter.ParameterType.VECTOR3: {
                                 Vector3 vectorValue = ((Parameter<Vector3>)parameter).value;
 
-                                for (int i = 0; i < 3; i++)
-                                {
+                                for (int i = 0; i < 3; i++) {
                                     TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
                                     numberInputField.text = vectorValue[i].ToString();
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.VECTOR4:
-                            {
+                        case AbstractParameter.ParameterType.VECTOR4: {
                                 Vector4 vectorValue = ((Parameter<Vector4>)parameter).value;
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
                                     numberInputField.text = vectorValue[i].ToString();
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.QUATERNION:
-                            {
+                        case AbstractParameter.ParameterType.QUATERNION: {
                                 Quaternion vectorValue = ((Parameter<Quaternion>)parameter).value;
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
                                     numberInputField.text = vectorValue[i].ToString();
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.COLOR:
-                            {
+                        case AbstractParameter.ParameterType.COLOR: {
                                 Color vectorValue = ((Parameter<Color>)parameter).value;
 
-                                for (int i = 0; i < 4; i++)
-                                {
+                                for (int i = 0; i < 4; i++) {
                                     TMP_InputField numberInputField = gameObjects[i].GetComponent<TMP_InputField>();
                                     numberInputField.text = vectorValue[i].ToString();
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.STRING:
-                            {
+                        case AbstractParameter.ParameterType.STRING: {
                                 TextMeshProUGUI textComponent = gameObjects[0].GetComponentInChildren<TextMeshProUGUI>();
-                                if (textComponent)
-                                {
+                                if (textComponent) {
                                     textComponent.text = ((ClassParameter<string>)parameter).value;
-                                }
-                                else
-                                {
+                                } else {
                                     TMP_InputField inputField = gameObjects[0].GetComponent<TMP_InputField>();
                                     inputField.text = ((ClassParameter<string>)parameter).value;
                                 }
                             }
                             break;
-                        case AbstractParameter.ParameterType.LIST:
-                            {
+                        case AbstractParameter.ParameterType.LIST: {
                                 TMP_Dropdown dropDown = gameObjects[0].GetComponent<TMP_Dropdown>();
                                 List<string> names = new List<string>();
                                 dropDown.value = ((ListParameter)parameter).value;
@@ -743,8 +686,7 @@ namespace tracer
         //!
         //! Function to destroy all created UI elements of a menu.
         //!
-        private void hideMenu(object sender, EventArgs e)
-        {
+        private void hideMenu(object sender, EventArgs e) {
             m_oldMenu.visible = false;
             destroyMenu();
         }
@@ -752,8 +694,7 @@ namespace tracer
         //!
         //! Function to destroy all created UI elements of a menu.
         //!
-        private void destroyMenu()
-        {
+        private void destroyMenu() {
             foreach (ParameterObject parameterObject in m_parameterObjects)
                 parameterObject.hasChanged -= updateItem;
 
@@ -762,10 +703,10 @@ namespace tracer
 
             if (m_dynPo != null)
                 core.removeParameterObject(m_dynPo);
-         
+
             foreach (GameObject uiElement in m_uiElements)
                 UnityEngine.Object.Destroy(uiElement);
-            
+
             m_uiElements.Clear();
 
         }
