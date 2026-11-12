@@ -208,6 +208,13 @@ namespace tracer {
                     horizontalLayout.childControlHeight = false;
                     horizontalLayout.childControlWidth = false;
                     horizontalLayout.spacing = 2;
+
+                    switch (item.genericActionType) {
+                        case MenuItem.GenericActionEnum.ONCLICK:
+                            newObjects[^1].AddComponent<GenericMenuClickListener>().InitListener(item.genericMenuAction);
+                        break;
+                    }
+                    
                     break;
                 case MenuItem.IType.VSPLIT:
                     newObjects.Add(GameObject.Instantiate(m_panel, parentObject.transform));

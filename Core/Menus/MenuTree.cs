@@ -95,27 +95,43 @@ namespace tracer
         }
 
         //!
+        //! Adds a new menu item with a given type and action as branch into the menu tree
+        //! 
+        //! @param type The type of the new item.
+        //! @param actionType When the generic action will be executed
+        //! @param action What generic action will be executed
+        //! @param iconData what image the menu item should have
+        //! 
+        public MenuTree Begin(MenuItem.IType type, MenuItem.GenericActionEnum actionType, Action action, byte[] iconData = null)
+        {
+            return Begin(type, null, iconData, actionType, action);
+        }
+
+        //!
         //! Adds a new parameter item with a given type as branch into the menu tree.
         //! 
         //! @param type The type of the new item.
         //! @param param The parameter stored in the menue item.
         //! 
-        private MenuTree Begin(MenuItem.IType type, AbstractParameter param = null, byte[] iconData = null)
+        private MenuTree Begin(MenuItem.IType type, AbstractParameter param = null, byte[] iconData = null, MenuItem.GenericActionEnum actionType = MenuItem.GenericActionEnum.NONE, Action action = null)
         {
             if (m_stack.Count == 0)
             {
                 MenuItem item = new MenuItem(type, param, null, iconData);
+                item.SetGenericAction(action, actionType);
                 Items.Add(item);
                 m_stack.Push(item);
             }
             else
             {
                 MenuItem item = m_stack.Peek().Add(type, param, iconData );
+                item.SetGenericAction(action, actionType);
                 m_stack.Push(item);
             }
 
             return this;
         }
+
 
         //!
         //! Adds a new item with a given type into the current branch.
@@ -168,6 +184,20 @@ namespace tracer
         }
 
         //!
+        //! Adds a new menu item with a given type to the current branch and an action
+        //! 
+        //! @param type The type of the new item.
+        //! @param actionType When the generic action will be executed
+        //! @param action What generic action will be executed
+        //! @param iconData what image the menu item should have
+        //! 
+        public MenuTree Add(MenuItem.IType type, MenuItem.GenericActionEnum actionType, Action action, byte[] iconData = null)
+        {
+            m_stack.Peek().Add(type, null, iconData).SetGenericAction(action, actionType);
+            return this;
+        }
+
+        //!
         //! Finalizes the current branch in the menu tree.
         //!
         public MenuTree End()
@@ -197,6 +227,19 @@ namespace tracer
         //! The parameter stored in the menu item.
         //!
         public AbstractParameter Parameter { get; }
+        //!
+        //! Possibility to add generic Actions to execute onClick or onHover
+        //!
+        public Action genericMenuAction;
+        //!
+        //! Enumeration for generic action trigger types
+        //!
+        public enum GenericActionEnum{ NONE, ONCLICK, ONHOVER};
+        //!
+        //! The generic action type of the menu item.
+        //!
+        public GenericActionEnum genericActionType = GenericActionEnum.NONE;
+
         //!
         //! The _parent of the menu item.
         //!
@@ -243,6 +286,13 @@ namespace tracer
             MenuItem item = new MenuItem(type, param, this, iconData);
             Children.Add(item);
             return item;
+        }
+        //!
+        //! add a generic action to a menu type
+        //!
+        public void SetGenericAction(Action a, GenericActionEnum actionType) {
+            genericMenuAction = a;
+            genericActionType = actionType;
         }
     }
 

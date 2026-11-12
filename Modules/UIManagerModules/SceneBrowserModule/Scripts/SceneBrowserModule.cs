@@ -80,14 +80,16 @@ namespace tracer
                    // === Chapter 1: User Info (Pic, Name, Online, Logout-Button) ===
                    .Add("User Info")
                    .Begin(MenuItem.IType.HSPLIT)
-                       .Add(userName)
+                       //.Add(userName) "Ludwig Mies van der Rohe"
+                       .Add("Ludwig Mies van der Rohe")
                        .Add(logoutButton)
                    .End();
 
             // === Chapter 1: Scene List
             m_menu.Add("Scene List");
             for(int x = 0; x<5; x++) {
-                m_menu.Begin(MenuItem.IType.HSPLIT)
+                //create a test HSPLIT MenuItem item with a Paramater from type Action to execute a function on click
+                m_menu.Begin(MenuItem.IType.HSPLIT, MenuItem.GenericActionEnum.ONCLICK, delegate{ UnityEngine.Debug.Log("HSPLIT PRESSED"); })
                     .Add(MenuItem.IType.IMAGE, null, DynamicImageGenerator.GenerateAbstractLandscape32x32())
                     //.Begin(MenuItem.IType.VSPLIT)
                         .Add(sceneNames[x])
