@@ -30,6 +30,7 @@ if not go to https://opensource.org/licenses/MIT
 
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 
 namespace tracer
@@ -68,7 +69,7 @@ namespace tracer
 
             //Scene List
             List<string> sceneNames = new();
-            List<ClassParameter<string>> sceneInfos = new();
+            List<string> sceneInfos = new();
             //scene currently being edited (round image with color)
             List<ClassParameter<Action>> sceneLoadButton = new();          
             
@@ -91,10 +92,10 @@ namespace tracer
                 //create a test HSPLIT MenuItem item with a Paramater from type Action to execute a function on click
                 m_menu.Begin(MenuItem.IType.HSPLIT, MenuItem.GenericActionEnum.ONCLICK, delegate{ UnityEngine.Debug.Log("HSPLIT PRESSED"); })
                     .Add(MenuItem.IType.IMAGE, null, DynamicImageGenerator.GenerateAbstractLandscape32x32())
-                    //.Begin(MenuItem.IType.VSPLIT)
+                    .Begin(MenuItem.IType.VSPLIT)
                         .Add(sceneNames[x])
                         //.Add(sceneInfos[x])
-                    //.End()
+                    .End()
                     .Add(sceneLoadButton[x])
                 .End();
             }
@@ -116,7 +117,7 @@ namespace tracer
         //!
         //! Function to grab scene data from SceneManager
         //!
-        private void GatherSceneList(List<string> _sceneNames, List<ClassParameter<string>> _sceneInfos, List<ClassParameter<Action>> _sceneLoadButton){
+        private void GatherSceneList(List<string> _sceneNames, List<string> _sceneInfos, List<ClassParameter<Action>> _sceneLoadButton){
             List<AbstractParameter> sceneList = core.getManager<SceneManager>().GetAvailableScenesForUserToLoad();
 
             if(sceneList == null || sceneList.Count == 0) {
@@ -126,18 +127,26 @@ namespace tracer
                 _sceneNames.Add("Ruine");
                 _sceneNames.Add("Neubau B2");
 
-                _sceneInfos.Add(new ClassParameter<string>("Ort:Ludwigsburg, Created:2026-11-02, Modified:2026-11-11, Size:120mb, Version:1.4, ScanInfo:Drohne, Wetter:bewölkt & trocken, RechteInhaber:Firmen GmbH, Info:Erster Scan am Tag xyz von Person abc. Hat ungefähr 4 Stunden gedauert.", "sceneInfo"));
-                _sceneInfos.Add(new ClassParameter<string>("Ort:Stuttgart, Created:2026-10-15, Modified:2026-11-05, Size:340mb, Version:1.2, ScanInfo:Terrestrischer Laserscanner, Wetter:sonnig & windstill, RechteInhaber:GeoSpatial Media GmbH, Info:Innenbereich-Scan der Haupthalle von Person dfe. Scanzeit betrug etwa 2,5 Stunden.", "sceneInfo"));
-                _sceneInfos.Add(new ClassParameter<string>("Ort:Kornwestheim, Created:2026-11-04, Modified:2026-11-08, Size:85mb, Version:1.0, ScanInfo:Handheld LiDAR, Wetter:bedeckt & trocken, RechteInhaber:TwinWorks AG, Info:Fassadenerfassung Westflügel von Person ghi. Aufnahme innerhalb von 90 Minuten abgeschlossen.", "sceneInfo"));
-                _sceneInfos.Add(new ClassParameter<string>("Ort:Bietigheim-Bissingen, Created:2026-09-28, Modified:2026-10-12, Size:520mb, Version:2.0, ScanInfo:Drohne & Photogrammetrie, Wetter:heiter & klar, RechteInhaber:Firmen GmbH, Info:Flächendeckender Geländescan von Person jkl. Gesamtdauer rund 5 Stunden inklusive Akkuwechsel.", "sceneInfo"));
-                _sceneInfos.Add(new ClassParameter<string>("Ort:Ludwigsburg, Created:2026-11-07, Modified:2026-11-10, Size:1.1gb, Version:1.1, ScanInfo:Mobiles Mapping-System, Wetter:leicht bewölkt & trocken, RechteInhaber:InfraScan Solutions, Info:Straßenzug und Bürgersteige erfasst von Person mno. Fahrzeit lag bei circa 3 Stunden.", "sceneInfo"));
+                _sceneInfos.Add("Ort:Ludwigsburg, Created:2026-11-02, Modified:2026-11-11, Size:120mb, Version:1.4, ScanInfo:Drohne, Wetter:bewölkt & trocken, RechteInhaber:Firmen GmbH, Info:Erster Scan am Tag xyz von Person abc. Hat ungefähr 4 Stunden gedauert.");
+                _sceneInfos.Add("Ort:Stuttgart, Created:2026-10-15, Modified:2026-11-05, Size:340mb, Version:1.2, ScanInfo:Terrestrischer Laserscanner, Wetter:sonnig & windstill, RechteInhaber:GeoSpatial Media GmbH, Info:Innenbereich-Scan der Haupthalle von Person dfe. Scanzeit betrug etwa 2,5 Stunden.");
+                _sceneInfos.Add("Ort:Kornwestheim, Created:2026-11-04, Modified:2026-11-08, Size:85mb, Version:1.0, ScanInfo:Handheld LiDAR, Wetter:bedeckt & trocken, RechteInhaber:TwinWorks AG, Info:Fassadenerfassung Westflügel von Person ghi. Aufnahme innerhalb von 90 Minuten abgeschlossen.");
+                _sceneInfos.Add("Ort:Bietigheim-Bissingen, Created:2026-09-28, Modified:2026-10-12, Size:520mb, Version:2.0, ScanInfo:Drohne & Photogrammetrie, Wetter:heiter & klar, RechteInhaber:Firmen GmbH, Info:Flächendeckender Geländescan von Person jkl. Gesamtdauer rund 5 Stunden inklusive Akkuwechsel.");
+                _sceneInfos.Add("Ort:Ludwigsburg, Created:2026-11-07, Modified:2026-11-10, Size:1.1gb, Version:1.1, ScanInfo:Mobiles Mapping-System, Wetter:leicht bewölkt & trocken, RechteInhaber:InfraScan Solutions, Info:Straßenzug und Bürgersteige erfasst von Person mno. Fahrzeit lag bei circa 3 Stunden.");
 
                 //either has to become a dynamic call or grab the current scene data via click
-                _sceneLoadButton.Add( new ClassParameter<Action>(LoadScene, "Load") );
-                _sceneLoadButton.Add( new ClassParameter<Action>(LoadScene, "Load") );
-                _sceneLoadButton.Add( new ClassParameter<Action>(LoadScene, "Load") );
-                _sceneLoadButton.Add( new ClassParameter<Action>(LoadScene, "Load") );
-                _sceneLoadButton.Add( new ClassParameter<Action>(LoadScene, "Load") );
+                string scenePath = core.getManager<SceneManager>().settings.sceneFilepath.value;
+                
+                string locallySavedScenesFolder = Application.persistentDataPath;
+                //search for *.header (the name before is the saved scene name)
+                //extract data an save into SceneClass (header and image, not the data itself [yet!])
+                //-> this should happen within the SceneStorageModule?
+                //-> or do we request a "search for local files"?
+                
+                _sceneLoadButton.Add( new ClassParameter<Action>(delegate {LoadScene("Load Demo"); }, "Open Demo") );
+                _sceneLoadButton.Add( new ClassParameter<Action>(delegate {LoadScene(System.IO.Path.Combine(Application.persistentDataPath, "VPETdefaultDemoScene")); }, "Load Demo") );
+                _sceneLoadButton.Add( new ClassParameter<Action>(delegate {LoadScene(scenePath); }, "Load") );
+                _sceneLoadButton.Add( new ClassParameter<Action>(delegate {LoadScene(scenePath); }, "Load") );
+                _sceneLoadButton.Add( new ClassParameter<Action>(delegate {LoadScene(scenePath); }, "Load") );
             } else {
                 /*
                 // Sort by something (created date? name? )
@@ -152,6 +161,8 @@ namespace tracer
 
         private void OnSceneHovered(object sender, int selectedIndex){
             //we need a "rect" around the scene image, name and info so it can be hovered
+            //->    this will be accomplished by creating menu items with MenuItem.GenericActionEnum.ONHOVER
+            //      and will not be taken care of here, but executed
         }
         
         //!
@@ -166,9 +177,13 @@ namespace tracer
         //!
         //! Function that determines the current scene filepath and calls the load function.
         //!
-        private void LoadScene(){
+        private void LoadScene(string path){
             //how to call this one on the SceneManager so it will trigger the actual load via its module?
             //listerner for onLoadScene(string path) ?
+            //or do we transfer the SceneClass ?
+            UnityEngine.Debug.Log("Load Scene at "+path);
+            core.getManager<SceneManager>().RaiseSceneLoadDemand(this, path);
+            manager.hideMenu();
         }
     }
 

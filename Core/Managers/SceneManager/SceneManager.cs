@@ -99,6 +99,15 @@ namespace tracer
         public List<AbstractParameter> GetAvailableScenesForUserToLoad(/*userRole*/) {
             return availableScenesForLoggedInUser;
         }
+        //! 
+        //! Consumers that want scenePath (will become SceneClass) fired via `RaiseSceneLoadDemand` to request
+        //!
+        public event EventHandler<string> onSceneLoadDemandEvent;
+        //!
+        //! call this from any module to trigger (if available) the RaiseGPS function here from the GPSModule
+        //!
+        public void RaiseSceneLoadDemand(object sender, string scenePath) { onSceneLoadDemandEvent?.Invoke(sender, scenePath); }
+
 
         //!
         //! Function that returns a list containing all scene objects.
