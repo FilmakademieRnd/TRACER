@@ -38,6 +38,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using tracer.spatial;
 
 namespace tracer
 {
@@ -110,9 +111,9 @@ namespace tracer
         //! holds all (static) renderers for other evaluations
         //! e.g. the HeightOverGround check
         //!
-        private StaticMeshQuadtree meshQuadtree;
+        private StaticMeshBvh meshBvh;
 
-        public StaticMeshQuadtree GetStaticMeshQuadTree(){ return meshQuadtree;}
+        public StaticMeshBvh GetMeshBvh(){ return meshBvh;}
 
         //!
         //! Areference to the About Menu prefab.
@@ -336,8 +337,8 @@ namespace tracer
         }
 
         private void SceneReadyEvent(object sender, EventArgs e) {
-            meshQuadtree = new StaticMeshQuadtree();
-            meshQuadtree.BuildTree();
+            meshBvh = new StaticMeshBvh();
+            meshBvh.BuildTree();
         }
 
         public void ColorGameObjectActive(GameObject go)

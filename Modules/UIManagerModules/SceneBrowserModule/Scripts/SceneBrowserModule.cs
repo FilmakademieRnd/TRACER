@@ -40,7 +40,14 @@ namespace tracer
     //!
     public class SceneBrowserModule : UIManagerModule{
         
+        //!
+        //! MenuTree containing all available scene (info data)
+        //!
         private MenuTree m_menu;
+        //!
+        //! MenuTree for loading all available scene info data
+        //!
+        private MenuTree m_loadingDataMenu;
 
         //!
         //! constructor
@@ -59,6 +66,8 @@ namespace tracer
         //!
         protected override void Start(object sender, EventArgs e){
             base.Start(sender, e);
+
+            CreateLoadingDataMenuTree();
 
             //Mockup User Info
             //IMAGE/PIC TODO: implement simple class to do so
@@ -112,6 +121,15 @@ namespace tracer
                     .Add(openMenuButton)
                 .End();
 
+        }
+
+        private void CreateLoadingDataMenuTree() {
+            m_loadingDataMenu = new MenuTree();
+            m_loadingDataMenu.Begin(MenuItem.IType.VSPLIT)
+                .Add("Loading Scene Info Data") //example #2: cannot simply and easy have an animated text for loading "..."
+            .End();
+            m_loadingDataMenu.caption = "Scene Browser";
+            manager.addMenu(m_loadingDataMenu);            
         }
 
         //!
@@ -168,10 +186,14 @@ namespace tracer
         //!
         //! Callback function to open this menu
         //!
-        private void OpenSceneBrowserMenu()
-        {
+        private void OpenSceneBrowserMenu(){
             manager.hideMenu();
-            manager.showMenu(m_menu);
+
+            //check if we already have sceneData received
+            //manager.showMenu(m_menu);
+
+            //otherwise add listener and show loading menu
+            manager.showMenu(m_loadingDataMenu);
         }
 
         //!

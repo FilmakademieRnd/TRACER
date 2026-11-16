@@ -163,8 +163,8 @@ public class HeightOverGround : MonoBehaviour{
         cam = Camera.main;
         lastTargetY = target.position.y;
 
-        if (manager.GetStaticMeshQuadTree() != null){
-            groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
+        if (manager.GetMeshBvh() != null){
+            groundY = manager.GetMeshBvh().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
         }
         lastGroundY = groundY;
 
@@ -209,8 +209,8 @@ public class HeightOverGround : MonoBehaviour{
             return;
 
         //calculate height via given settings
-        if (manager.GetStaticMeshQuadTree() != null){
-            groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
+        if (manager.GetMeshBvh() != null){
+            groundY = manager.GetMeshBvh().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
         }
 
         //set active
@@ -269,8 +269,8 @@ public class HeightOverGround : MonoBehaviour{
         if (ONGOING_SELF_UPDATE){
             //for now, just assume we ware selected
             if (SHOW_ONLY_SELECTED) {
-                if (manager.GetStaticMeshQuadTree() != null){
-                    groundY = manager.GetStaticMeshQuadTree().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
+                if (manager.GetMeshBvh() != null){
+                    groundY = manager.GetMeshBvh().GetHeightOverGround(meshCheckAccuracy, target.position, 0f);
                 }   
             }
             // Only update the line math and text value if the heights physically changed
