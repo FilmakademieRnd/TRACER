@@ -164,6 +164,11 @@ namespace tracer
         public override void Dispose(){
             base.Dispose();
 
+            if(m_inputs != null) {
+                m_inputs.Dispose(); //destroys asset instance with actions and callbacks
+                m_inputs = null;
+            }
+
             // Unsubscribe
             UIManager uiManager = core.getManager<UIManager>();
             uiManager.selectionChanged -= SelectionUpdate;

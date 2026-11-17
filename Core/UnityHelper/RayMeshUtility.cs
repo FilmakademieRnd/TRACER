@@ -1,15 +1,51 @@
+/*
+-----------------------------------------------------------------------------------
+TRACER FOUNDATION -
+Toolset for Realtime Animation, Collaboration & Extended Reality
+
+Copyright (c) 2024 Filmakademie Baden-Wuerttemberg, Animationsinstitut R&D Labs
+https://research.animationsinstitut.de/tracer 
+https://github.com/FilmakademieRnd/TRACER
+
+TRACER FOUNDATION is a development by Filmakademie Baden-Wuerttemberg,
+Animationsinstitut R&D Labs in the scope of the EU funded project
+MAX-R (101070072) and funding on the own behalf of Filmakademie Baden-Wuerttemberg.
+Former EU projects Dreamspace (610005) and SAUCE (780470) have inspired the
+TRACER FOUNDATION development.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the MIT License for more details.
+You should have received a copy of the MIT License along with this program;
+if not go to https://opensource.org/licenses/MIT
+-----------------------------------------------------------------------------------
+*/
+
+
+//! @file "RayMeshUtility.cs"
+//! @brief Helper for Raycasts
+//! @author Thomas Krüger
+//! @version 1
+//! @date 13.11.2026
+//! @changed doxygen style documentation
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 public static class RayMeshUtility{
+    //!
+    //! enum to specific the accuracy we want to achieve, with performance costs
+    //!
     public enum Accuracy{
         BoundingBox,    // Fastest, least accurate
         NearestVertex,  // Medium speed, snaps to points
         ExactMesh       // Slowest, perfectly accurate
     }
 
-    // A simple struct to sort our child meshes by how close their bounding box is
+    //!
+    //! Simple struct to sort our child meshes by how close their bounding box is
+    //!
     private struct HitCandidate : IComparable<HitCandidate>{
         public MeshFilter filter;
         public float boundsDistance;
@@ -22,6 +58,12 @@ public static class RayMeshUtility{
     //! APPROACH 1: MOST EFFICIENT (Fast Hierarchy)
     //! Checks all children, sorts by closest bounding box, and stops at the FIRST valid mesh hit.
     //! Fast, but might pick the wrong mesh if two objects' bounding boxes heavily intersect.
+    //!
+    //! @param worldRay the ray we shoot for testing
+    //! @param rootTarget the root containing all our MeshRenderer
+    //! @param accuracy the accuracy we want to achieve
+    //! @param out hitPoint where did we hit?
+    //! @return bool did we hit?
     //!
     public static bool GetHitPointFast(Ray worldRay, GameObject rootTarget, Accuracy accuracy, out Vector3 hitPoint){
         hitPoint = Vector3.zero;
@@ -58,6 +100,12 @@ public static class RayMeshUtility{
     //! Checks all children whose bounding boxes are hit, calculates exact hits for ALL of them, 
     //! and returns the absolute mathematically closest point.
     //!
+    //! @param worldRay the ray we shoot for testing
+    //! @param rootTarget the root containing all our MeshRenderer
+    //! @param accuracy the accuracy we want to achieve
+    //! @param out hitPoint where did we hit?
+    //! @return bool did we hit?
+    //!
     public static bool GetHitPointPrecise(Ray worldRay, GameObject rootTarget, Accuracy accuracy, out Vector3 hitPoint){
         hitPoint = Vector3.zero;
         if(!rootTarget) return false;
@@ -92,6 +140,12 @@ public static class RayMeshUtility{
     //!
     //! Core calculation where we have hit in world
     //!
+    //! @param worldRay the ray we shoot for testing
+    //! @param filter the MeshFilter we use for calculations
+    //! @param accuracy the accuracy we want to achieve
+    //! @param out hitPoint where did we hit?
+    //! @return bool did we hit?
+    //!
     private static bool CalculateHit(Ray worldRay, MeshFilter filter, Accuracy accuracy, out Vector3 hitPoint){
         hitPoint = Vector3.zero;
         Transform objTransform = filter.transform;
@@ -111,6 +165,15 @@ public static class RayMeshUtility{
         return false;
     }
 
+    //!
+    //! Calculation of the nearest vertex hit
+    //!
+    //! @param worldRay the ray we shoot for testing
+    //! @param objTransform the objects transform to inverse the worldray
+    //! @param filter the MeshFilter we use for calculations
+    //! @param out hitPoint where did we hit?
+    //! @return bool did we hit?
+    //!
     private static bool GetNearestVertexHit(Ray worldRay, Transform objTransform, MeshFilter filter, out Vector3 hitPoint){
         hitPoint = Vector3.zero;
         if (filter == null || filter.sharedMesh == null) return false;
@@ -147,6 +210,15 @@ public static class RayMeshUtility{
         return false;
     }
 
+    //!
+    //! Calculation of the nearest triangle hit
+    //!
+    //! @param worldRay the ray we shoot for testing
+    //! @param filter the MeshFilter we use for calculations
+    //! @param accuracy the accuracy we want to achieve
+    //! @param out hitPoint where did we hit?
+    //! @return bool did we hit?
+    //!
     private static bool GetExactTriangleHit(Ray worldRay, Transform objTransform, MeshFilter filter, out Vector3 hitPoint){
         hitPoint = Vector3.zero;
         if (filter == null || filter.sharedMesh == null) return false;
@@ -183,6 +255,15 @@ public static class RayMeshUtility{
     #region FOR STATIC MESH QUADTREE
     // they already get cached vertices/triangles
     
+    //!
+    //! External call to get a nearest vertex it for a ray
+    //!
+    //! @param worldRay the ray we shoot for testing
+    //! @param objTransform the objects transform to inverse the worldray
+    //! @param vertices the cached vertices of the StaticMeshQuadTree to use for calcualtion
+    //! @param out hitPoint where did we hit?
+    //! @return bool did we hit?
+    //!
     public static bool GetNearestVertexHit(Ray worldRay, Transform objTransform, Vector3[] vertices, out Vector3 hitPoint){
         hitPoint = Vector3.zero;
         if (vertices == null) return false;
@@ -217,7 +298,17 @@ public static class RayMeshUtility{
         }
         return false;
     }
-
+    
+    //!
+    //! External call to get a nearest, exact triangle it for a ray
+    //!
+    //! @param worldRay the ray we shoot for testing
+    //! @param objTransform the objects transform to inverse the worldray
+    //! @param vertices the cached vertices of the StaticMeshQuadTree to use for calcualtion
+    //! @param triangles the cached triangles of the StaticMeshQuadTree to use for calcualtion
+    //! @param out hitPoint where did we hit?
+    //! @return bool did we hit?
+    //!
     public static bool GetExactTriangleHit(Ray worldRay, Transform objTransform, Vector3[] vertices, int[] triangles, out Vector3 hitPoint){
         hitPoint = Vector3.zero;
 
@@ -248,7 +339,16 @@ public static class RayMeshUtility{
     }
     #endregion
 
-    // Standard Möller–Trumbore ray-triangle intersection
+    //!
+    //! Standard Möller–Trumbore ray-triangle intersection
+    //! @wiki: s a fast method for calculating the intersection of a ray and a triangle in three 
+    //! dimensions without needing precomputation of the plane equation of the plane containing the triangle
+    //!
+    //! @param ray the ray we shoot
+    //! @param v0, v1, v2 our 3 vectors
+    //! @param out t the intersection value
+    //! @return bool did we intersect?
+    //!
     private static bool IntersectTriangle(Ray ray, Vector3 v0, Vector3 v1, Vector3 v2, out float t){
         t = 0;
         const float EPSILON = 0.0000001f;

@@ -219,6 +219,9 @@ namespace tracer{
         //!
         private void disposeIcons(object sender, EventArgs e){
             foreach(SceneObject sceneObject in m_lightAndCamSceneObjects){
+                if(!sceneObject)
+                    continue;
+                    
                 if (sceneObject.GetType().BaseType == typeof(SceneObjectLight)){
                     sceneObject.getParameter<Color>("color").hasChanged -= updateIconColor;
                 }

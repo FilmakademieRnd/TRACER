@@ -38,6 +38,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using tracer.spatial;
 
 namespace tracer
 {
@@ -110,9 +111,9 @@ namespace tracer
         //! holds all (static) renderers for other evaluations
         //! e.g. the HeightOverGround check
         //!
-        private StaticMeshQuadtree meshQuadtree;
+        private StaticMeshBvh meshBvh;
 
-        public StaticMeshQuadtree GetStaticMeshQuadTree(){ return meshQuadtree;}
+        public StaticMeshBvh GetMeshBvh(){ return meshBvh;}
 
         //!
         //! Areference to the About Menu prefab.
@@ -333,17 +334,11 @@ namespace tracer
 
             CreateSettingsMenu();
             createStartMenu();
-
-            startMenu
-                .Begin(MenuItem.IType.HSPLIT)
-                    .Add("Role")
-                    .Add(settings.roles)
-                .End();
         }
 
         private void SceneReadyEvent(object sender, EventArgs e) {
-            meshQuadtree = new StaticMeshQuadtree();
-            meshQuadtree.BuildTree();
+            meshBvh = new StaticMeshBvh();
+            meshBvh.BuildTree();
         }
 
         public void ColorGameObjectActive(GameObject go)
@@ -653,9 +648,14 @@ namespace tracer
                 .Begin(MenuItem.IType.VSPLIT)
                     .Begin(MenuItem.IType.VSPLIT)
                         .Add("Connect to a server or load the demo scene...", true)
+                    .End()
+                    .Begin(MenuItem.IType.HSPLIT)
+                        .Add("Role")
+                        .Add(settings.roles)
                     .End();
 
-            m_startMenu.caption = "TRACER";
+
+            m_startMenu.caption = "TRACER";                
         }
 
         //!

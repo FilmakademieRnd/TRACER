@@ -72,6 +72,9 @@ namespace tracer
             manager.loadDemoSceneUsingQr += QrSceneLoad;
             base.Start(sender, e);
 
+            // listening on request to load a scene
+            manager.onSceneLoadDemandEvent += LoadSceneEvent;
+
             // Initialize glTF loader
             m_gltfLoader = new GLTFLoader(core, manager as SceneManager);
 
@@ -318,6 +321,16 @@ namespace tracer
         {
             LoadScene(manager.settings.sceneFilepath.value);
             core.getManager<UIManager>().hideMenu();
+        }
+
+        //!
+        //! Function that gets executed via event raised by the manager to ask to load the scene at given path
+        //!
+        private void LoadSceneEvent(object sender, string path) {
+            if (path.Equals("Load Demo"))
+                LoadDemoScene();
+            else
+                LoadScene(path);
         }
 
         //!

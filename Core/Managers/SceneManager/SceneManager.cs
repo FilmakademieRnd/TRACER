@@ -252,6 +252,34 @@ namespace tracer
         //!
         public event EventHandler<SceneObject> sceneObjectUnlocked;
 
+        //!
+
+        //! List of AbstractParameter containing the available scenes a user can load
+        //!
+        private List<AbstractParameter> availableScenesForLoggedInUser = null;
+
+        //!
+        //! [!REVEIEW] correct flow? User logs in > SceneStorageModule should load possibles scenes (local or server) and updates SceneManager with it
+        //!
+        //! Function return all available scenes for the user to load
+        //!
+        //! //@param role logged in user role
+        //!
+        //! @return sceneList List of AbstractParameter (should become a scene list with images, names and infos)
+        //!
+        public List<AbstractParameter> GetAvailableScenesForUserToLoad(/*userRole*/)
+        {
+            return availableScenesForLoggedInUser;
+        }
+        //! 
+        //! Consumers that want scenePath (will become SceneClass) fired via `RaiseSceneLoadDemand` to request
+        //!
+        public event EventHandler<string> onSceneLoadDemandEvent;
+        //!
+        //! call this from any module to trigger (if available) the RaiseGPS function here from the GPSModule
+        //!
+        public void RaiseSceneLoadDemand(object sender, string scenePath) { onSceneLoadDemandEvent?.Invoke(sender, scenePath); }
+
         public event EventHandler<string> loadDemoSceneUsingQr;
 
         public void InvokeQrLoadEvent(string loadScene)

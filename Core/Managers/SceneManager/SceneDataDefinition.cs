@@ -51,7 +51,6 @@ namespace tracer
         {
             public float x, y, z;
 
-            // Praktischer Indexer, damit dein restlicher Code float[index] weiterhin nutzen kann!
             public float this[int index]
             {
                 get => index == 0 ? x : index == 1 ? y : z;
@@ -74,7 +73,6 @@ namespace tracer
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public unsafe struct Byte64
         {
-            // Erstellt exakt 64 Bytes sequentiellen Speicher
             private fixed byte data[64];
 
             public byte this[int index]
@@ -87,7 +85,6 @@ namespace tracer
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct Float1584
         {
-            // Reserviert exakt 1584 * 4 Bytes im Speicher
             private unsafe fixed float data[1584];
 
             public float this[int index]
@@ -100,7 +97,6 @@ namespace tracer
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct Int99
         {
-            // Reserviert exakt 99 * 4 Bytes im Speicher
             private unsafe fixed int data[99];
 
             public int this[int index]

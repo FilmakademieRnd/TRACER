@@ -24,8 +24,9 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "GPSModule.cs"
 //! @brief implementation of TRACER device specific gps data to InputManager
 //! @author Thomas Krüger
-//! @version 0
-//! @date 19.05.2026
+//! @version 1
+//! @date 06.11.2026
+//! @changed doxygen style documentation
 
 using System;
 using System.Collections;
@@ -34,29 +35,55 @@ using UnityEngine.InputSystem;
 
 namespace tracer{
     //!
-    //! implementation of TRACER attitude sensore navigation
+    //! implementation of TRACER GPS capacity
     //!
     public class GPSModule : InputManagerModule{
 
-        //Settings
-        // The service accuracy you want to use, in meters. 
-        // This determines the accuracy of the device's last location coordinates. 
-        // Higher values like 500 don't require the device to use its GPS chip and thus save battery power. 
-        // Lower values like 5-10 provide the best accuracy but require the GPS chip and thus use more battery power. 
-        // The default value is 10 meters.
+        #region Settings
+        //!
+        //! The service accuracy you want to use (in meters)
+        //! Determines the accuracy of the device's last location coordinates. 
+        //! values > 500 don't require the device to use its GPS chip and thus save battery power. 
+        //! Lower values like 5-10 provide the best accuracy but require the GPS chip and thus use more battery power. 
+        //! The default value is 10 meters.
+        //!
         private const float DESIRED_ACCURACY_M = 10;
-        // The minimum distance, in meters, that the device must move laterally before Unity updates Input.location. 
-        // Higher values like 500 produce fewer updates and are less resource intensive to process. 
-        // The default is 10 meters.
+        //!
+        //! The minimum distance, in meters, that the device must move laterally before Unity updates Input.location. 
+        //! Higher values like 500 produce fewer updates and are less resource intensive to process. 
+        //! The default is 10 meters.
+        //!
         private const float UPDATE_DISTANCE_M = 10f;
-        private const float DEFAULT_LAT = 48.8894f; // Fallback (Ludwigsburg) if hardware fails/isn't present
+        //!
+        //! default latitude value we use as fallback (set to Ludwigsburg: 48.8894f) if hardware is not present or enabled
+        //!
+        private const float DEFAULT_LAT = 48.8894f;
+        //!
+        //! default longitude value we use as fallback (set to Ludwigsburg: 9.1943f) if hardware is not present or enabled
+        //!
         private const float DEFAULT_LON = 9.1943f;
-        private const float LOCATION_UPDATE_EVERY = 1f; //broadcast every seconds (0 means time.deltatime as wait)
+        //!
+        //! broadcast frequency of update events in seconds
+        //!
+        private const float LOCATION_UPDATE_EVERY = 1f;
 
+        #endregion
+
+        //!
+        //! reference of currently stacked events raised from the InputManager (onGPSDemandChangedEvent)
+        //!
         private int _continuousDemandCount = 0;
+        //!
+        //! reference of whether we are already started our gps service and are tracking our location
+        //!
         private bool _isLocating = false;
+        //!
+        //! coroutine reference for starting and stoping it instead of using a name (ContinuousLoopRoutine)
+        //!
         private Coroutine _gpsLoopRoutine;
-
+        //!
+        //! struct for our gps info with minimal functionality to convert double timestamp into specific int values
+        //!
         private struct TimeDataStruct
         {
             public readonly int minute;
@@ -99,7 +126,7 @@ namespace tracer{
         public GPSModule(string name, Manager manager) : base(name, manager) {}
 
         //! 
-        //! Init m_callback
+        //! Init m_callback. Add listener at InputManager and register a handler to use specific call to start gps
         //! 
         //! @param sender A reference to the TRACER _core.
         //! @param e Arguments for these event. 
@@ -109,9 +136,12 @@ namespace tracer{
             manager.RegisterHandler<InputManager.StartGPSCommand>(startGPS);
         }
 
-        private void startGPS(InputManager.StartGPSCommand c)
-        {
-            // do funny thniks here!
+        private void startGPS(InputManager.StartGPSCommand c){
+            //can this be started from within this function?
+            // _continuousDemandCount++;
+            // if (_continuousDemandCount == 1 && !_isLocating){
+            //     _gpsLoopRoutine = core.StartCoroutine(ContinuousLoopRoutine());
+            // }
         }
 
         //!
@@ -124,6 +154,13 @@ namespace tracer{
             StopGPSHardware(false);
         }
 
+        //!
+        //! This method responds a gps demand from any module via an InputManager event
+        //! will trigger a single gps update, start/stop gps continous update coro
+        //!
+        //! @param sender where does it got called from
+        //! @param demandType the type of gps signal request
+        //!
         private void HandleGPSDemandEvent(object sender, InputManager.GPSDemandType demandType){
             switch (demandType){
                 case InputManager.GPSDemandType.OneShot:
@@ -153,6 +190,9 @@ namespace tracer{
         }
 
         // --- COROUTINES & HARDWARE ---
+        //!
+        //! try to initialize the gps hardware, if not already done
+        //!
         private IEnumerator InitializeGPSHardware(){
             if (_isLocating) 
                 yield break;
@@ -177,6 +217,9 @@ namespace tracer{
             }
         }
 
+        //!
+        //! execute initializeing, wait for a valid update to be sent and stop gps loop again
+        //!
         private IEnumerator OneShotRoutine(){
             yield return core.StartCoroutine(InitializeGPSHardware());
 
@@ -186,7 +229,9 @@ namespace tracer{
             if (_continuousDemandCount == 0) 
                 StopGPSHardware(false);
         }
-
+        //!
+        //! execute a continous gps update and broadcast
+        //!
         private IEnumerator ContinuousLoopRoutine(){
             yield return core.StartCoroutine(InitializeGPSHardware());
 
@@ -201,7 +246,10 @@ namespace tracer{
             StopGPSHardware(true);
         }
 
-
+        //!
+        //! stop the gps (unity input)
+        //! also sends and update if we were locating
+        //!
         private void StopGPSHardware(bool _broadcastEnded){
             if (_isLocating){
                 if(_broadcastEnded)
@@ -212,6 +260,12 @@ namespace tracer{
             }
         }
 
+        //!
+        //! broadcast the current gps location as InputManager event to be raised
+        //! if hardeware failed, send a fallback
+        //!
+        //! @param _state state of our "input" (started, ongoing, ended)
+        //!
         private void BroadcastCurrentLocation(InputManager.InputState _state){
             if (Input.location.status == LocationServiceStatus.Running){
                 var info = Input.location.lastData;
