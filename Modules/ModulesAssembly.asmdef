@@ -9,11 +9,13 @@
         "Unity.Splines",
         "Unity.Mathematics",
         "glTFast",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "unity.webp",
+        "Unity.Burst"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,

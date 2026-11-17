@@ -917,7 +917,7 @@ namespace tracer{
             if (tracker.State == InteractionState.Pinching || tracker.State == InteractionState.Rotating) { return; }
 
             // DEBUG
-             Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
+            // Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
             // -----
 
             // Fetch the exact position right now, bypassing the Update loop delay
@@ -940,7 +940,7 @@ namespace tracer{
         //! @param tracker primary, secondary and tertiary tracker
         //!
         private void OnPointerUp(InputTracker tracker) {
-            Debug.Log("<color=yellow>OnPointerUp "+tracker.Level+" / "+tracker.State+"</color>");
+            //Debug.Log("<color=yellow>OnPointerUp "+tracker.Level+" / "+tracker.State+"</color>");
 
             if (tracker.State == InteractionState.Idle) { return; }
 

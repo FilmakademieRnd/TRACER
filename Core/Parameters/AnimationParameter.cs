@@ -32,6 +32,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
+using static tracer.AbstractKey;
 
 namespace tracer
 {
@@ -377,10 +378,10 @@ namespace tracer
         //! @param o A reference to the Animation Manager.
         //! @param time The given time used to calulate the parameters new value.
         //!
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void updateParameterValue(object o, float time)
         {
-            // OPTIMIZATION: Avoid casting _parent every frame. 
-            // Ideally, cache 'SceneObject parentSceneObject' once in Start/Init instead of doing this cast!
+            // Avoid casting _parent every frame. 
             if (!(_parent is SceneObject parentSceneObject) || parentSceneObject._lock || !_isAnimated)
                 return;
 
@@ -390,7 +391,7 @@ namespace tracer
             {
                 if (_prevIdx < count && _nextIdx < count && _keyList[_prevIdx].time <= time && time <= _keyList[_nextIdx].time)
                 {
-                    value = interpolateLinear(time);
+                    value = interpolate(time);
                 }
                 else
                 {
@@ -416,7 +417,7 @@ namespace tracer
                     {
                         _nextIdx = i;
                         _prevIdx = i - 1;
-                        value = interpolateLinear(time);
+                        value = interpolate(time);
                     }
                 }
             }
@@ -431,17 +432,19 @@ namespace tracer
             }
         }
 
-
-        //!
-        //! Function for searching the next bigger key index in the key list.
-        //!
-        //! @param key The key on which the index is to be searched.
-        //! @return The next bigger index in the keylist.
-        //!
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int findNextKeyIndex(Key<T> key)
+        private T interpolate(float time)
         {
-            return findNextKeyIndex(key.time);
+            // Der Start-Key (_prevIdx) bestimmt die Interpolationsart bis zum nächsten Key
+            switch (_keyList[_prevIdx].interpolation)
+            {
+                case InterplolationTypes.BEZIER: // Passe den Enum-Namen ggf. an deine Definition an
+                    return interpolateBezier(time);
+
+                case InterplolationTypes.LINEAR:
+                default:
+                    return interpolateLinear(time);
+            }
         }
 
         //!
@@ -512,6 +515,15 @@ namespace tracer
                     }
                     break;
 
+                case ParameterType.INT:
+                    if (pv is int iPv && nv is int iNv)
+                    {
+                        float fResult = iPv * (1.0f - inBetween) + iNv * inBetween;
+                        int iResult = (int)Math.Round(fResult);
+                        return (T)(object)iResult;
+                    }
+                    break;
+
                 case ParameterType.VECTOR3:
                     if (pv is Vector3 vPv && nv is Vector3 vNv)
                     {
@@ -532,6 +544,89 @@ namespace tracer
                     if (pv is Color cPv && nv is Color cNv)
                     {
                         Color cResult = Color.LerpUnclamped(cPv, cNv, inBetween);
+                        return (T)(object)cResult;
+                    }
+                    break;
+            }
+            return default;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private T interpolateBezier(float time)
+        {
+            var prevKey = _keyList[_prevIdx];
+            var nextKey = _keyList[_nextIdx];
+
+            float prevTime = prevKey.time;
+            float nextTime = nextKey.time;
+
+            if (!(prevKey is Key<T> prevGenericKey) || !(nextKey is Key<T> nextGenericKey))
+                return default;
+
+            T pv = prevGenericKey.value;
+            T nv = nextGenericKey.value;
+
+            float dt = nextTime - prevTime;
+            if (dt == 0f)
+                return nv;
+
+            float t = (time - prevTime) / dt;
+            float t2 = t * t;
+            float t3 = t2 * t;
+
+            // Kubische Hermite-Basisfunktionen (identisch zu Unitys AnimationCurve)
+            float h00 = 2f * t3 - 3f * t2 + 1f; // Gewicht für Startwert (pv)
+            float h10 = t3 - 2f * t2 + t;       // Gewicht für Ausgangstangente (outTangent)
+            float h01 = -2f * t3 + 3f * t2;     // Gewicht für Zielwert (nv)
+            float h11 = t3 - t2;                // Gewicht für Eingangstangente (inTangent)
+
+            float m0 = prevKey.outTangent;
+            float m1 = nextKey.inTangent;
+
+            switch (_type)
+            {
+                case ParameterType.FLOAT:
+                    if (pv is float fPv && nv is float fNv)
+                    {
+                        // Tangenten sind Steigungen (Wertänderung pro Sekunde), daher * dt
+                        float fResult = h00 * fPv + h10 * dt * m0 + h01 * fNv + h11 * dt * m1;
+                        return (T)(object)fResult;
+                    }
+                    break;
+
+                case ParameterType.INT:
+                    if (pv is int iPv && nv is int iNv)
+                    {
+                        float fResult = h00 * iPv + h10 * dt * m0 + h01 * iNv + h11 * dt * m1;
+                        int iResult = (int)Math.Round(fResult);
+                        return (T)(object)iResult;
+                    }
+                    break;
+
+                case ParameterType.VECTOR3:
+                    if (pv is Vector3 vPv && nv is Vector3 vNv)
+                    {
+                        // Easing-Kurve von 0.0 bis 1.0 basierend auf den Tangenten
+                        float easedT = h10 * m0 + h01 + h11 * m1;
+                        Vector3 vResult = Vector3.LerpUnclamped(vPv, vNv, easedT);
+                        return (T)(object)vResult;
+                    }
+                    break;
+
+                case ParameterType.QUATERNION:
+                    if (pv is Quaternion qPv && nv is Quaternion qNv)
+                    {
+                        float easedT = h10 * m0 + h01 + h11 * m1;
+                        Quaternion qResult = Quaternion.SlerpUnclamped(qPv, qNv, easedT);
+                        return (T)(object)qResult;
+                    }
+                    break;
+
+                case ParameterType.COLOR:
+                    if (pv is Color cPv && nv is Color cNv)
+                    {
+                        float easedT = h10 * m0 + h01 + h11 * m1;
+                        Color cResult = Color.LerpUnclamped(cPv, cNv, easedT);
                         return (T)(object)cResult;
                     }
                     break;

@@ -31,9 +31,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -344,6 +342,8 @@ namespace tracer
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".objects"), manager.sceneDataHandler.objectsByteDataRef);
                 if (manager.sceneDataHandler.characterByteDataRef != null)
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".characters"), manager.sceneDataHandler.characterByteDataRef);
+                if (manager.sceneDataHandler.gaussianSplatByteDataRef != null)
+                    File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".splats"), manager.sceneDataHandler.gaussianSplatByteDataRef);
                 if (manager.sceneDataHandler.texturesByteDataRef != null)
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".textures"), manager.sceneDataHandler.texturesByteDataRef);
                 if (manager.sceneDataHandler.materialsByteDataRef != null)
@@ -381,6 +381,10 @@ namespace tracer
                 filepath = Path.Combine(Application.persistentDataPath, sceneName + ".characters");
                 if (File.Exists(filepath))
                     manager.sceneDataHandler.characterByteData = File.ReadAllBytes(filepath);
+
+                filepath = Path.Combine(Application.persistentDataPath, sceneName + ".splats");
+                if (File.Exists(filepath))
+                    manager.sceneDataHandler.gaussianSplatByteData = File.ReadAllBytes(filepath);
 
                 filepath = Path.Combine(Application.persistentDataPath, sceneName + ".textures");
                 if (File.Exists(filepath))

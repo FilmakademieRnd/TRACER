@@ -32,7 +32,12 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
+using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace tracer
@@ -42,6 +47,18 @@ namespace tracer
     //!
     public class SceneParserModule : SceneManagerModule
     {
+#if (UNITY_IOS || UNITY_WEBGL) && !UNITY_EDITOR
+private const string WEBP_DLL = "__Internal";
+#else
+        private const string WEBP_DLL = "webp";
+#endif
+
+        [DllImport(WEBP_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern UIntPtr WebPEncodeLosslessRGBA(IntPtr rgba, int width, int height, int stride, out IntPtr output);
+
+        [DllImport(WEBP_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void WebPFree(IntPtr ptr);
+
         //!
         //! The scenes root transform.
         //!
@@ -397,6 +414,7 @@ namespace tracer
             return nodeGeo;
         }
 
+
         //!
         //! Fills a given list with Unity Game Objects by traversing the scene object tree.
         //!
@@ -710,6 +728,314 @@ namespace tracer
             return sceneData.objectList.Count - 1;
         }
 
+        [StructLayout(LayoutKind.Sequential, Size = 4)]
+        public struct Rgba32
+        {
+            public byte R, G, B, A;
+            public Rgba32(byte r, byte g, byte b, byte a) { R = r; G = g; B = b; A = a; }
+        }
+
+        private static unsafe byte[] EncodeNativeArrayToLosslessWebP(NativeArray<Rgba32> pixels, int width, int height)
+        {
+            if (!pixels.IsCreated || pixels.Length == 0)
+                return Array.Empty<byte>();
+
+            void* srcPtr = pixels.GetUnsafeReadOnlyPtr();
+            int stride = width * 4;
+
+            UIntPtr encodedSize = WebPEncodeLosslessRGBA((IntPtr)srcPtr, width, height, stride, out IntPtr outputPtr);
+            if (encodedSize == UIntPtr.Zero || outputPtr == IntPtr.Zero)
+                throw new InvalidOperationException("[SplatExporter] Failed to encode lossless WebP stream.");
+
+            try
+            {
+                int size = (int)encodedSize;
+                byte[] managedBytes = new byte[size];
+                Marshal.Copy(outputPtr, managedBytes, 0, size);
+                return managedBytes;
+            }
+            finally
+            {
+                WebPFree(outputPtr);
+            }
+        }
+
+        [BurstCompile(FloatPrecision = FloatPrecision.Standard, FloatMode = FloatMode.Fast)]
+        private struct UnpackSplatsToWebPJob : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<uint4> PackedSplats;
+
+            public float3 BoundsMin;
+            public float3 BoundsMax;
+
+            [WriteOnly] public NativeArray<Rgba32> MeansLow;
+            [WriteOnly] public NativeArray<Rgba32> MeansHigh;
+            [WriteOnly] public NativeArray<Rgba32> Scales;
+            [WriteOnly] public NativeArray<Rgba32> Quats;
+            [WriteOnly] public NativeArray<Rgba32> Sh0;
+
+            public void Execute(int i)
+            {
+                uint4 word = PackedSplats[i];
+
+                // 1. Base Colors & Alpha (Direct 1:1 mapping with identity SH0 codebook)
+                byte r = (byte)(word.x & 0xFFu);
+                byte g = (byte)((word.x >> 8) & 0xFFu);
+                byte b = (byte)((word.x >> 16) & 0xFFu);
+                byte a = (byte)((word.x >> 24) & 0xFFu);
+                Sh0[i] = new Rgba32 { R = r, G = g, B = b, A = a };
+
+                // 2. Positions: Half-float -> Unity Space -> SOG Right-Handed -> Log-Space -> 16-bit Quantized
+                uint3 halfPos = new uint3(word.y & 0xFFFFu, (word.y >> 16) & 0xFFFFu, word.z & 0xFFFFu);
+                float3 unityPos = math.f16tof32(halfPos);
+                float3 sogPos = new float3(unityPos.x, unityPos.y, -unityPos.z);
+
+                // Forward SOG v2 log-transform: sign(v) * ln(|v| + 1)
+                float3 logPos = math.sign(sogPos) * math.log(math.abs(sogPos) + 1.0f);
+                float3 extent = math.max(BoundsMax - BoundsMin, new float3(1e-6f));
+                float3 normPos = math.clamp((logPos - BoundsMin) / extent, 0.0f, 1.0f);
+
+                uint3 qPos = (uint3)math.round(normPos * 65535.0f);
+                MeansLow[i] = new Rgba32 { R = (byte)(qPos.x & 0xFFu), G = (byte)(qPos.y & 0xFFu), B = (byte)(qPos.z & 0xFFu), A = 255 };
+                MeansHigh[i] = new Rgba32 { R = (byte)((qPos.x >> 8) & 0xFFu), G = (byte)((qPos.y >> 8) & 0xFFu), B = (byte)((qPos.z >> 8) & 0xFFu), A = 255 };
+
+                // 3. Scales (Direct 1:1 mapping with linear log-scale codebook)
+                byte sx = (byte)(word.w & 0xFFu);
+                byte sy = (byte)((word.w >> 8) & 0xFFu);
+                byte sz = (byte)((word.w >> 16) & 0xFFu);
+                Scales[i] = new Rgba32 { R = sx, G = sy, B = sz, A = 255 };
+
+                // 4. Quaternions: Decode WXYZ -> Undo Z-flip -> Re-encode SOG v2 Smallest-Three
+                float qR = ((word.z >> 16) & 0xFFu) / 255.0f;
+                float qG = ((word.z >> 24) & 0xFFu) / 255.0f;
+                float qB = ((word.w >> 24) & 0x3Fu) / 63.0f;
+                uint mode = (word.w >> 30) & 0x03u;
+
+                const float invSqrt2 = 0.70710678118f;
+                float qa = (qR * 2.0f - 1.0f) * invSqrt2;
+                float qb = (qG * 2.0f - 1.0f) * invSqrt2;
+                float qc = (qB * 2.0f - 1.0f) * invSqrt2;
+                float qd = math.sqrt(math.max(0.0f, 1.0f - (qa * qa + qb * qb + qc * qc)));
+
+                float qw, qx, qy, qz;
+                if (mode == 0u) { qw = qd; qx = qa; qy = qb; qz = qc; }
+                else if (mode == 1u) { qw = qa; qx = qd; qy = qb; qz = qc; }
+                else if (mode == 2u) { qw = qa; qx = qb; qy = qd; qz = qc; }
+                else { qw = qa; qx = qb; qy = qc; qz = qd; }
+
+                // Undo Unity Z-mirror conjugation (-qx, -qy, qz -> native qx, qy, qz)
+                qx = -qx;
+                qy = -qy;
+
+                // Find largest absolute component in native SOG (w, x, y, z) order
+                float4 nativeQ = new float4(qw, qx, qy, qz);
+                float4 absQ = math.abs(nativeQ);
+
+                uint outMode = 0u;
+                float maxVal = absQ.x;
+                if (absQ.y > maxVal) { maxVal = absQ.y; outMode = 1u; }
+                if (absQ.z > maxVal) { maxVal = absQ.z; outMode = 2u; }
+                if (absQ.w > maxVal) { maxVal = absQ.w; outMode = 3u; }
+
+                // Ensure omitted largest component is positive (q == -q)
+                float signFlip = (nativeQ[(int)outMode] < 0.0f) ? -1.0f : 1.0f;
+                nativeQ *= signFlip;
+
+                float c0, c1, c2;
+                if (outMode == 0u) { c0 = nativeQ.y; c1 = nativeQ.z; c2 = nativeQ.w; }
+                else if (outMode == 1u) { c0 = nativeQ.x; c1 = nativeQ.z; c2 = nativeQ.w; }
+                else if (outMode == 2u) { c0 = nativeQ.x; c1 = nativeQ.y; c2 = nativeQ.w; }
+                else { c0 = nativeQ.x; c1 = nativeQ.y; c2 = nativeQ.z; }
+
+                const float sqrt2 = 1.41421356237f;
+                byte outR = (byte)math.clamp(math.round((c0 * sqrt2 * 0.5f + 0.5f) * 255.0f), 0.0f, 255.0f);
+                byte outG = (byte)math.clamp(math.round((c1 * sqrt2 * 0.5f + 0.5f) * 255.0f), 0.0f, 255.0f);
+                byte outB = (byte)math.clamp(math.round((c2 * sqrt2 * 0.5f + 0.5f) * 255.0f), 0.0f, 255.0f);
+                byte outA = (byte)(252u + outMode);
+
+                Quats[i] = new Rgba32 { R = outR, G = outG, B = outB, A = outA };
+            }
+        }
+
+        private int processGaussianSplats(GsplatRenderer splatRenderer, ref SceneManager.SceneDataHandler.SceneData sceneData)
+        {
+            if (splatRenderer == null || splatRenderer.GpuResource == null || splatRenderer.GpuResource.SplatCount == 0)
+                return -1;
+
+            GsplatRenderer.RenderResource gpuRes = splatRenderer.GpuResource;
+
+            SceneManager.GaussianSpaltPackage gsPack = new SceneManager.GaussianSpaltPackage();
+            gsPack.version = 2;
+            gsPack.count = (int)gpuRes.SplatCount;
+            gsPack.shNbands = splatRenderer.SHBands;
+
+            const float lnScaleMin = -12.0f;
+            const float lnScaleMax = 9.0f;
+            const float lnScaleStep = (lnScaleMax - lnScaleMin) / 254.0f;
+            const float SH_C0 = 0.28209479177387814f;
+
+            // --- TEXTURE DIMENSIONS & BOUNDS ---
+            int texWidth = Mathf.CeilToInt(Mathf.Sqrt(gsPack.count));
+            texWidth = ((texWidth + 63) / 64) * 64;
+            int texHeight = (gsPack.count + texWidth - 1) / texWidth;
+            int totalPixels = texWidth * texHeight;
+
+            Bounds b = gpuRes.Bounds;
+            float3 sogMin = new float3(b.min.x, b.min.y, -b.max.z);
+            float3 sogMax = new float3(b.max.x, b.max.y, -b.min.z);
+
+            float3 logMin = math.sign(sogMin) * math.log(math.abs(sogMin) + 1.0f);
+            float3 logMax = math.sign(sogMax) * math.log(math.abs(sogMax) + 1.0f);
+
+            gsPack.min = new float[] { logMin.x, logMin.y, logMin.z };
+            gsPack.max = new float[] { logMax.x, logMax.y, logMax.z };
+
+            // --- CODEBOOKS RECONSTRUCTION ---
+            gsPack.scalesCodebook = new float[256];
+            gsPack.sh0Codebook = new float[256];
+            gsPack.scalesCodebook[0] = -30.0f;
+
+            for (int k = 0; k < 256; k++)
+            {
+                if (k > 0) gsPack.scalesCodebook[k] = lnScaleMin + (k - 1) * lnScaleStep;
+                gsPack.sh0Codebook[k] = ((k / 255.0f) - 0.5f) / SH_C0;
+            }
+
+            // --- PRIMARY ATTRIBUTES GPU READBACK & UNPACKING ---
+            using (NativeArray<uint4> packedSplats = new NativeArray<uint4>(gsPack.count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory))
+            using (NativeArray<Rgba32> meansLow = new NativeArray<Rgba32>(totalPixels, Allocator.TempJob, NativeArrayOptions.ClearMemory))
+            using (NativeArray<Rgba32> meansHigh = new NativeArray<Rgba32>(totalPixels, Allocator.TempJob, NativeArrayOptions.ClearMemory))
+            using (NativeArray<Rgba32> scales = new NativeArray<Rgba32>(totalPixels, Allocator.TempJob, NativeArrayOptions.ClearMemory))
+            using (NativeArray<Rgba32> quats = new NativeArray<Rgba32>(totalPixels, Allocator.TempJob, NativeArrayOptions.ClearMemory))
+            using (NativeArray<Rgba32> sh0 = new NativeArray<Rgba32>(totalPixels, Allocator.TempJob, NativeArrayOptions.ClearMemory))
+            {
+                //gpuRes.PositionBuffer.GetData(packedSplats); [SEIM]
+
+                var unpackJob = new UnpackSplatsToWebPJob
+                {
+                    PackedSplats = packedSplats,
+                    BoundsMin = logMin,
+                    BoundsMax = logMax,
+                    MeansLow = meansLow,
+                    MeansHigh = meansHigh,
+                    Scales = scales,
+                    Quats = quats,
+                    Sh0 = sh0
+                };
+                unpackJob.Schedule(gsPack.count, 4096).Complete();
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        gsPack.c_meansL = EncodeNativeArrayToLosslessWebP(meansLow, texWidth, texHeight);
+        gsPack.c_meansU = EncodeNativeArrayToLosslessWebP(meansHigh, texWidth, texHeight);
+        gsPack.c_scales = EncodeNativeArrayToLosslessWebP(scales, texWidth, texHeight);
+        gsPack.c_quats  = EncodeNativeArrayToLosslessWebP(quats, texWidth, texHeight);
+        gsPack.c_sh0    = EncodeNativeArrayToLosslessWebP(sh0, texWidth, texHeight);
+#else
+                byte[] bMeansL = null, bMeansU = null, bScales = null, bQuats = null, bSh0 = null;
+                Parallel.Invoke(
+                    () => bMeansL = EncodeNativeArrayToLosslessWebP(meansLow, texWidth, texHeight),
+                    () => bMeansU = EncodeNativeArrayToLosslessWebP(meansHigh, texWidth, texHeight),
+                    () => bScales = EncodeNativeArrayToLosslessWebP(scales, texWidth, texHeight),
+                    () => bQuats = EncodeNativeArrayToLosslessWebP(quats, texWidth, texHeight),
+                    () => bSh0 = EncodeNativeArrayToLosslessWebP(sh0, texWidth, texHeight)
+                );
+                gsPack.c_meansL = bMeansL;
+                gsPack.c_meansU = bMeansU;
+                gsPack.c_scales = bScales;
+                gsPack.c_quats = bQuats;
+                gsPack.c_sh0 = bSh0;
+#endif
+            }
+
+            // Set exact byte sizes for primary streams
+            gsPack.meansLSize = gsPack.c_meansL.Length;
+            gsPack.meansUSize = gsPack.c_meansU.Length;
+            gsPack.scalesSize = gsPack.c_scales.Length;
+            gsPack.quatsSize = gsPack.c_quats.Length;
+            gsPack.sh0Size = gsPack.c_sh0.Length;
+
+            // --- HIGHER SPHERICAL HARMONICS (BANDS 1-3) ---
+            if (gsPack.shNbands > 0 && gpuRes.ScaleBuffer != null && gpuRes.SHCentroidsBuffer != null)
+            {
+                int coeffsPerSplat = (gsPack.shNbands == 1) ? 3 : (gsPack.shNbands == 2) ? 8 : 15;
+                int totalCentroidFloats = gpuRes.SHCentroidsBuffer.count;
+                gsPack.shNcount = totalCentroidFloats / coeffsPerSplat;
+
+                int centW = 64 * coeffsPerSplat;
+                int centH = (gsPack.shNcount + 63) / 64;
+
+                uint[] rawLabels = new uint[gsPack.count];
+                float4[] rawCentroids = new float4[totalCentroidFloats];
+
+                gpuRes.ScaleBuffer.GetData(rawLabels);
+                gpuRes.SHCentroidsBuffer.GetData(rawCentroids);
+
+                NativeArray<Rgba32> centPixels = new NativeArray<Rgba32>(centW * centH, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                NativeArray<Rgba32> labelPixels = new NativeArray<Rgba32>(totalPixels, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+
+                try
+                {
+                    float shMin = float.MaxValue;
+                    float shMax = float.MinValue;
+                    for (int c = 0; c < totalCentroidFloats; c++)
+                    {
+                        float3 v = rawCentroids[c].xyz;
+                        shMin = Mathf.Min(shMin, Mathf.Min(v.x, Mathf.Min(v.y, v.z)));
+                        shMax = Mathf.Max(shMax, Mathf.Max(v.x, Mathf.Max(v.y, v.z)));
+                    }
+                    if (shMax <= shMin) shMax = shMin + 1e-5f;
+
+                    gsPack.shNcodebook = new float[256];
+                    float shStep = (shMax - shMin) / 255.0f;
+                    for (int k = 0; k < 256; k++) gsPack.shNcodebook[k] = shMin + k * shStep;
+
+                    float[] shRubSigns = { 1f, -1f, 1f, 1f, -1f, 1f, -1f, 1f, 1f, -1f, 1f, -1f, 1f, -1f, 1f };
+                    for (int cluster = 0; cluster < gsPack.shNcount; cluster++)
+                    {
+                        int py = cluster / 64;
+                        int px = cluster % 64;
+                        for (int k = 0; k < coeffsPerSplat; k++)
+                        {
+                            float3 val = rawCentroids[cluster * coeffsPerSplat + k].xyz * shRubSigns[k];
+                            byte cr = (byte)Mathf.Clamp(Mathf.RoundToInt((val.x - shMin) / shStep), 0, 255);
+                            byte cg = (byte)Mathf.Clamp(Mathf.RoundToInt((val.y - shMin) / shStep), 0, 255);
+                            byte cb = (byte)Mathf.Clamp(Mathf.RoundToInt((val.z - shMin) / shStep), 0, 255);
+                            centPixels[py * centW + (px * coeffsPerSplat + k)] = new Rgba32(cr, cg, cb, 255);
+                        }
+                    }
+
+                    for (int i = 0; i < gsPack.count; i++)
+                    {
+                        uint lbl = rawLabels[i];
+                        labelPixels[i] = new Rgba32((byte)(lbl & 0xFFu), (byte)((lbl >> 8) & 0xFFu), 0, 255);
+                    }
+
+                    gsPack.c_shNcentroids = EncodeNativeArrayToLosslessWebP(centPixels, centW, centH);
+                    gsPack.c_shNlables = EncodeNativeArrayToLosslessWebP(labelPixels, texWidth, texHeight);
+                    gsPack.shNcentroidsSize = gsPack.c_shNcentroids.Length;
+                    gsPack.shNlablesSize = gsPack.c_shNlables.Length;
+                }
+                finally
+                {
+                    if (centPixels.IsCreated) centPixels.Dispose();
+                    if (labelPixels.IsCreated) labelPixels.Dispose();
+                }
+            }
+            else
+            {
+                gsPack.shNcount = 0;
+                gsPack.shNcodebook = Array.Empty<float>();
+                gsPack.c_shNcentroids = Array.Empty<byte>();
+                gsPack.c_shNlables = Array.Empty<byte>();
+                gsPack.shNcentroidsSize = 0;
+                gsPack.shNlablesSize = 0;
+            }
+
+            sceneData.gaussianSpaltList.Add(gsPack);
+
+            return sceneData.gaussianSpaltList.Count - 1;
+        }
+
         //!
         //! Serialises a Unity texture into a TRACER Texture Package and adds it to the given 
         //! list, if it does not already contain the texture. Otherwise returns the reference ID of the
@@ -721,36 +1047,73 @@ namespace tracer
         //!
         private int processTexture(Texture2D texture, ref List<SceneManager.TexturePackage> textureList)
         {
+            if (texture == null) return -1;
+
+            // check if this exact texture instance has already been processed to prevent duplication
             for (int i = 0; i < textureList.Count; i++)
-            {
                 if (textureList[i].texture == texture)
-                {
                     return i;
-                }
-            }
 
             SceneManager.TexturePackage texPack = new SceneManager.TexturePackage();
-
             texPack.width = texture.width;
             texPack.height = texture.height;
             texPack.format = texture.format;
+            texPack.texture = texture;
 
+            // Using the modern Unity 6 NativeArray overload to completely bypass managed heap allocations
             try
             {
-                texPack.colorMapData = texture.GetRawTextureData();
-                texPack.colorMapDataSize = texPack.colorMapData.Length;
+                // Get zero-allocation direct native access to the texture VRAM buffer
+                NativeArray<byte> nativeData = texture.GetRawTextureData<byte>();
+                texPack.colorMapDataSize = nativeData.Length;
+
+                if (texPack.colorMapDataSize > 0)
+                {
+                    texPack.colorMapData = new byte[texPack.colorMapDataSize];
+
+                    // memory blit
+                    ReadOnlySpan<byte> sourceSpan = nativeData.AsReadOnlySpan();
+                    sourceSpan.CopyTo(texPack.colorMapData);
+                }
+                else
+                {
+                    texPack.colorMapData = Array.Empty<byte>();
+                }
+            }
+            catch (UnityException)
+            {
+                // WEBGL FALLBACK: Handle "Texture not readable" state automatically
+                // if texture configuration resists direct CPU-read, read it back safely via a temporary RenderTexture
+                Helpers.Log($"Texture '{texture.name}' is not readable. Triggering GPU blit fallback pass.", Helpers.logMsgType.WARNING);
+
+                RenderTexture tempRT = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.ARGB32);
+                Graphics.Blit(texture, tempRT);
+
+                RenderTexture previousActive = RenderTexture.active;
+                RenderTexture.active = tempRT;
+
+                Texture2D readableTex = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false);
+                readableTex.ReadPixels(new Rect(0, 0, tempRT.width, tempRT.height), 0, 0);
+                readableTex.Apply();
+
+                NativeArray<byte> fallbackNativeData = readableTex.GetRawTextureData<byte>();
+                texPack.colorMapDataSize = fallbackNativeData.Length;
+                texPack.colorMapData = new byte[texPack.colorMapDataSize];
+                fallbackNativeData.AsReadOnlySpan().CopyTo(texPack.colorMapData);
+
+                // Clean up temporary objects instantly to prevent unmanaged VRAM memory leaks in the browser sandbox
+                RenderTexture.active = previousActive;
+                RenderTexture.ReleaseTemporary(tempRT);
+                UnityEngine.Object.DestroyImmediate(readableTex);
             }
             catch (System.Exception e)
             {
-                Helpers.Log($"Failed to get texture data: {e.Message}", Helpers.logMsgType.ERROR);
-                texPack.colorMapData = new byte[0];
+                Helpers.Log($"Failed to extract texture payload: {e.Message}", Helpers.logMsgType.ERROR);
+                texPack.colorMapData = Array.Empty<byte>();
                 texPack.colorMapDataSize = 0;
             }
 
-            texPack.texture = texture;
-
             textureList.Add(texPack);
-
             return textureList.Count - 1;
         }
 

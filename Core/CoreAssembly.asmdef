@@ -5,7 +5,8 @@
         "Unity.InputSystem",
         "UnityEngine.UI",
         "Unity.TextMeshPro",
-        "HelperAssembly"
+        "HelperAssembly",
+        "Unity.Mathematics"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

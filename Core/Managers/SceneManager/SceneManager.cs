@@ -83,6 +83,16 @@ namespace tracer
         public float maxExtend = 1f;
 
         //!
+        //! Funtion to cleanup scene before SceneManager will be destroyed
+        //!
+        public override void Cleanup()
+        {
+            base.Cleanup();
+
+            ResetScene();
+        }
+
+        //!
         //! Function that returns a list containing all scene objects.
         //!
         //! @return The list containing all scene objects.
@@ -365,7 +375,7 @@ namespace tracer
                 }
             }
 
-            // Remove all Tracer SceneObjects from the core simulation
+            // Remove all Tracer SceneObjects from the core database
             if (core != null && core.parameterObjectList != null)
             {
                 foreach (SortedList<short, ParameterObject> sceneObjects in core.parameterObjectList.Values)
@@ -380,6 +390,8 @@ namespace tracer
                     }
                 }
             }
+
+            GsplatRenderer.SortResource.Dispose();
 
             // Clear runtime tracking lists
             m_sceneCameraList?.Clear();

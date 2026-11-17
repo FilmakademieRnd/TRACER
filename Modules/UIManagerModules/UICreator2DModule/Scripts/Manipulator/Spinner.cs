@@ -130,6 +130,13 @@ namespace tracer
                             break;
                     }                    
                 break;
+                case AbstractParameter.ParameterType.INT:
+                    Parameter<int> paramInt = (Parameter<int>)abstractParam;
+                    paramInt.hasChanged += _snapSelect.setParam;
+                    _snapSelect.setSensitivity(100f);
+                    _snapSelect.addElement("",(float) paramInt.value);
+                    _snapSelect._loop = false;
+                    break;
                 case AbstractParameter.ParameterType.VECTOR2:
                     Parameter<Vector2> paramVec2 = (Parameter<Vector2>)abstractParam;
                     paramVec2.hasChanged += _snapSelect.setParam;
@@ -198,12 +205,17 @@ namespace tracer
         //!
         private void setValue(object sender, float val)
         {
+            val = val * Time.deltaTime;
             AbstractParameter.ParameterType type = abstractParam.tracerType;
             switch (type)
             {
                 case AbstractParameter.ParameterType.FLOAT:
                     Parameter<float> paramFloat = (Parameter<float>)abstractParam;
                     paramFloat.setValue(paramFloat.value + val);
+                    break;
+                case AbstractParameter.ParameterType.INT:
+                    Parameter<int> paramInt = (Parameter<int>)abstractParam;
+                    paramInt.setValue(Mathf.RoundToInt(paramInt.value + val*50.0f));
                     break;
                 case AbstractParameter.ParameterType.VECTOR2:
                     Parameter<Vector2> paramVec2 = (Parameter<Vector2>)abstractParam;
