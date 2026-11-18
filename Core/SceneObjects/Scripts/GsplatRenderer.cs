@@ -260,11 +260,11 @@ public class GsplatRenderer : MonoBehaviour
 
         if (SortCompute != null)
         {
-            var vulkanKeyword = new UnityEngine.Rendering.LocalKeyword(SortCompute, "VULKAN");
-            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Vulkan)
-                SortCompute.EnableKeyword(vulkanKeyword);
-            else
-                SortCompute.DisableKeyword(vulkanKeyword);
+            //var vulkanKeyword = new UnityEngine.Rendering.LocalKeyword(SortCompute, "VULKAN");
+            //if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Vulkan)
+            //    SortCompute.EnableKeyword(vulkanKeyword);
+            //else
+            //    SortCompute.DisableKeyword(vulkanKeyword);
         }
 
         SetupPropertyBlock();
