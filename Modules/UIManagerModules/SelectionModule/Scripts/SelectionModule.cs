@@ -123,7 +123,7 @@ namespace tracer{
 
                 manager.addSelectedObject(sceneObject);
             }else{
-                Debug.Log("<color=red>no valid SceneObject to select</color>");
+                //Debug.Log("<color=red>no valid SceneObject to select</color>");
                 manager.clearSelectedObjects();
             }
         }

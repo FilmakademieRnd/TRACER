@@ -565,31 +565,6 @@ private const string WEBP_DLL = "__Internal";
             }
         }
 
-        //private static NativeArray<Rgba32> DecompressWebPToNativeArray(byte[] packedBytes, ref int width, ref int height)
-        //{
-        //    if (packedBytes == null || packedBytes.Length == 0)
-        //        return default;
-
-        //    // Retrieve the native image dimensions from the WebP header
-        //    Texture2DExt.GetWebPDimensions(packedBytes, out width, out height);
-
-        //    byte[] rawRgbaBytes = Texture2DExt.LoadRGBAFromWebP(packedBytes, ref width, ref height, false, out WebP.Error error);
-
-        //    if (error != WebP.Error.Success || rawRgbaBytes == null)
-        //        throw new InvalidDataException($"[SplatParser] Could not decode SOG WebP asset chunk: {error}.");
-
-        //    int pixelCount = width * height;
-
-        //    // Allocate persistent unmanaged memory matching the pixel count
-        //    NativeArray<Rgba32> nativePixels = new NativeArray<Rgba32>(pixelCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
-
-        //    // This executes as a single native C++ memcpy operation under WebGL/IL2CPP
-        //    ReadOnlySpan<byte> byteSpan = rawRgbaBytes;
-        //    Span<Rgba32> targetSpan = nativePixels.AsSpan();
-        //    MemoryMarshal.Cast<byte, Rgba32>(byteSpan).CopyTo(targetSpan);
-
-        //    return nativePixels;
-        //}
 
         //!
         //!

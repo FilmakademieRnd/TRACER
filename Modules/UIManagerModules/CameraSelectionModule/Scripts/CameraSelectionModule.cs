@@ -189,7 +189,7 @@ namespace tracer
             
             RemoveSafeFrameButton();
 
-            Debug.Log("CameraSelectionModule selection call > 0 "+(sceneObjects.Count > 0));
+            //Debug.Log("CameraSelectionModule selection call > 0 "+(sceneObjects.Count > 0));
 
             if (sceneObjects.Count > 0){
                 m_selectedObject = sceneObjects[0];

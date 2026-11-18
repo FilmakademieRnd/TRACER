@@ -191,6 +191,7 @@ namespace tracer
             m_responses.Add("parameterobjects", dataHandler.parameterObjectsByteDataRef);
             m_responses.Add("objects", dataHandler.objectsByteDataRef);
             m_responses.Add("characters", dataHandler.characterByteDataRef);
+            m_responses.Add("splats", dataHandler.gaussianSplatByteDataRef);
             m_responses.Add("textures", dataHandler.texturesByteDataRef);
             m_responses.Add("materials", dataHandler.materialsByteDataRef);
 

@@ -13,6 +13,10 @@ public class SplatSceneImporter : EditorWindow
     private string m_sourceSogPath = "";
     private string m_targetSceneName = "SplatScene";
     private int m_shDegree = 1;
+    private Vector3 m_importPosition = Vector3.zero;
+    private Vector3 m_importRotationEuler = new Vector3(90f, 180f, 0f);
+    private Vector3 m_importScale = Vector3.one;
+    private Vector2 m_scrollPos;
 
     [System.Serializable]
     private class SogMeansInfo
@@ -54,7 +58,11 @@ public class SplatSceneImporter : EditorWindow
 
     void OnGUI()
     {
+
+        m_scrollPos = EditorGUILayout.BeginScrollView(m_scrollPos);
+
         GUILayout.Label("TRACER ZIP/SOG Gaussian Splat Converter Tool", EditorStyles.boldLabel);
+        EditorGUILayout.Space(4);
 
         EditorGUILayout.BeginHorizontal();
         m_sourceSogPath = EditorGUILayout.TextField("Source SOG File", m_sourceSogPath);
@@ -67,11 +75,44 @@ public class SplatSceneImporter : EditorWindow
         m_targetSceneName = EditorGUILayout.TextField("Target Scene Name", m_targetSceneName);
         m_shDegree = EditorGUILayout.IntSlider("SH Degree Mapping", m_shDegree, 0, 4);
 
-        if (GUILayout.Button("Convert and Inject into TRACER Scene Files"))
+        EditorGUILayout.Space(8);
+        GUILayout.Label("Initial Node Transform", EditorStyles.boldLabel);
+
+        m_importPosition = DrawVerticalVector3("Position", m_importPosition);
+        m_importRotationEuler = DrawVerticalVector3("Rotation (Euler)", m_importRotationEuler);
+        m_importScale = DrawVerticalVector3("Scale", m_importScale);
+
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("Reset to Default (90, 180, 0)", GUILayout.Width(190)))
+        {
+            m_importPosition = Vector3.zero;
+            m_importRotationEuler = new Vector3(90f, 180f, 0f);
+            m_importScale = Vector3.one;
+        }
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space(10);
+        if (GUILayout.Button("Convert and Inject into TRACER Scene Files", GUILayout.Height(30)))
         {
             ConvertSogToTracer();
         }
+
+        EditorGUILayout.EndScrollView();
     }
+
+    private Vector3 DrawVerticalVector3(string label, Vector3 value)
+    {
+        EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
+        EditorGUI.indentLevel++;
+        value.x = EditorGUILayout.FloatField("X", value.x);
+        value.y = EditorGUILayout.FloatField("Y", value.y);
+        value.z = EditorGUILayout.FloatField("Z", value.z);
+        EditorGUI.indentLevel--;
+        EditorGUILayout.Space(2);
+        return value;
+    }
+
 
     private void ConvertSogToTracer()
     {
@@ -218,18 +259,18 @@ public class SplatSceneImporter : EditorWindow
             nIdx += 4;
 
             // 4. BASE NODE FIELD: position (3x float = 12 bytes)
-            Vector3 zeroPos = Vector3.zero;
-            MemoryMarshal.Write(nodeSpan.Slice(nIdx, 12), ref zeroPos);
+            Vector3 targetPos = m_importPosition;
+            MemoryMarshal.Write(nodeSpan.Slice(nIdx, 12), ref targetPos);
             nIdx += 12;
 
             // 5. BASE NODE FIELD: scale (3x float = 12 bytes)
-            Vector3 oneScale = Vector3.one;
-            MemoryMarshal.Write(nodeSpan.Slice(nIdx, 12), ref oneScale);
+            Vector3 targetScale = m_importScale;
+            MemoryMarshal.Write(nodeSpan.Slice(nIdx, 12), ref targetScale);
             nIdx += 12;
 
             // 6. BASE NODE FIELD: rotation (4x float = 16 bytes)
-            Quaternion identityRot = Quaternion.identity;
-            MemoryMarshal.Write(nodeSpan.Slice(nIdx, 16), ref identityRot);
+            Quaternion targetRot = Quaternion.Euler(m_importRotationEuler);
+            MemoryMarshal.Write(nodeSpan.Slice(nIdx, 16), ref targetRot);
             nIdx += 16;
 
             // 7. BASE NODE FIELD: name (64 bytes - completes the 112 bytes Base layout seamlessly!)
