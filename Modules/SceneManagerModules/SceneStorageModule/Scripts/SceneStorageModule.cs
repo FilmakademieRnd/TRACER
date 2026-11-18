@@ -504,13 +504,14 @@ namespace tracer
         //!
         private IEnumerator LoadHTTPCoroutine(string url = "")
         {
+            url = url.ToLower();
             Dialog statusDialog = new Dialog();
             UIManager UImanager = core.getManager<UIManager>();
             UImanager.showDialog(statusDialog);
 
             core.getManager<UIManager>().hideMenu();
 
-            string[] urls = new string[6];
+            string[] urls = new string[7];
             urls[0] = "header";
             urls[1] = "nodes";
             urls[2] = "objects";

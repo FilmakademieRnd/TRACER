@@ -1,7 +1,7 @@
 #define GROUP_SIZE 256
 #define KEY_FLOAT
 #define PAYLOAD_UINT
-// #define SHOULD_ASCEND  <-- Auskommentiert lassen! Original SortCommon sortiert dann automatisch Back-to-Front!
+// #define SHOULD_ASCEND  
 #define SORT_PAIRS
 
 #pragma kernel CalcDepth
@@ -12,9 +12,12 @@
 
 #pragma multi_compile _ VULKAN
 
-#pragma require wavebasic
-#pragma require waveballot
-#pragma use_dxc
+#pragma target 4.5
+
+#if !defined(SHADER_API_METAL) && !defined(SHADER_API_GLES3) && !defined(SHADER_API_WEBGL)
+    #pragma use_dxc
+    #pragma require wavebasic waveballot
+#endif
 
 uint _SplatCount;
 float4x4 _MatrixMV;
