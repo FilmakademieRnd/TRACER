@@ -199,6 +199,8 @@ namespace tracer
             return lightRoot;
         }
 
+        private System.Collections.IEnumerator Delay(float sec, System.Action action) { yield return new WaitForSeconds(sec); action?.Invoke(); }
+
         //!
         //! Function to copy the current local time to the parameters.
         //!
@@ -211,6 +213,12 @@ namespace tracer
             m_hour.value = dateTime.Hour;
             m_minute.value = dateTime.Minute;
 
+            core.StartCoroutine(Delay(.8f, () => UpdateMenu()));
+            manager.showMenu(m_sunMenu);
+        }
+
+        private void UpdateMenu()
+        {
             manager.hideMenu();
             manager.showMenu(m_sunMenu);
         }

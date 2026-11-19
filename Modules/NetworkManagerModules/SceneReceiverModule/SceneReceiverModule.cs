@@ -232,7 +232,7 @@ namespace tracer
                         case "nodes":
                             sceneDataHandler.nodesByteData = sceneReceiver.ReceiveFrameBytes();
                             Debug.Log(request + " received with " + sceneDataHandler.nodesByteDataRef.Length + " bytes.");
-                            m_loadProgress += 20;
+                            m_loadProgress += 15;
                             break;
                         case "parameterobjects":
                             sceneDataHandler.parameterObjectsByteData = sceneReceiver.ReceiveFrameBytes();
@@ -242,11 +242,16 @@ namespace tracer
                         case "objects":
                             sceneDataHandler.objectsByteData = sceneReceiver.ReceiveFrameBytes();
                             Debug.Log(request + " received with " + sceneDataHandler.objectsByteDataRef.Length + " bytes.");
-                            m_loadProgress += 20;
+                            m_loadProgress += 15;
                             break;
                         case "characters":
                             sceneDataHandler.characterByteData = sceneReceiver.ReceiveFrameBytes();
                             Debug.Log(request + " received with " + sceneDataHandler.characterByteDataRef.Length + " bytes.");
+                            m_loadProgress += 10;
+                            break;
+                        case "splats":
+                            sceneDataHandler.gaussianSplatByteData = sceneReceiver.ReceiveFrameBytes();
+                            Debug.Log(request + " received with " + sceneDataHandler.gaussianSplatByteDataRef.Length + " bytes.");
                             m_loadProgress += 10;
                             break;
                         case "textures":
@@ -274,7 +279,7 @@ namespace tracer
         //! 
         public void receiveScene(string ip, string port, bool emitSceneReady)
         {
-            m_requests = new List<string>() { "header", "nodes", "parameterobjects", "objects", "characters", "textures", "materials"  };
+            m_requests = new List<string>() { "header", "nodes", "parameterobjects", "objects", "characters", "splats", "textures", "materials"  };
             start(ip, port, emitSceneReady);
         }
 

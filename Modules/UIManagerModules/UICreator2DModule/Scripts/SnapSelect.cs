@@ -710,6 +710,17 @@ namespace tracer
         }
 
         //!
+        //! Function receiving an updated float when it changed (usually called e.g. by Spinner caused by OnValueChange of Parameter)
+        //! @param sender Sender of the event
+        //! @param f float to be set
+        //!
+        public void setParam(object sender, int f)
+        {
+            _elementValues[0] = f;
+            setText(_elementValues[_currentAxis]);
+        }
+
+        //!
         //! Function receiving an updated Vector2 when it changed (usually called e.g. by Spinner caused by OnValueChange of Parameter)
         //! @param sender Sender of the event
         //! @param v2 Vector2 to be set

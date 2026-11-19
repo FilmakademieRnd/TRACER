@@ -31,9 +31,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -357,6 +355,8 @@ namespace tracer
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".objects"), manager.sceneDataHandler.objectsByteDataRef);
                 if (manager.sceneDataHandler.characterByteDataRef != null)
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".characters"), manager.sceneDataHandler.characterByteDataRef);
+                if (manager.sceneDataHandler.gaussianSplatByteDataRef != null)
+                    File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".splats"), manager.sceneDataHandler.gaussianSplatByteDataRef);
                 if (manager.sceneDataHandler.texturesByteDataRef != null)
                     File.WriteAllBytes(Path.Combine(Application.persistentDataPath, sceneName + ".textures"), manager.sceneDataHandler.texturesByteDataRef);
                 if (manager.sceneDataHandler.materialsByteDataRef != null)
@@ -395,6 +395,10 @@ namespace tracer
                 if (File.Exists(filepath))
                     manager.sceneDataHandler.characterByteData = File.ReadAllBytes(filepath);
 
+                filepath = Path.Combine(Application.persistentDataPath, sceneName + ".splats");
+                if (File.Exists(filepath))
+                    manager.sceneDataHandler.gaussianSplatByteData = File.ReadAllBytes(filepath);
+
                 filepath = Path.Combine(Application.persistentDataPath, sceneName + ".textures");
                 if (File.Exists(filepath))
                     manager.sceneDataHandler.texturesByteData = File.ReadAllBytes(filepath);
@@ -426,47 +430,64 @@ namespace tracer
             Dialog statusDialog = new Dialog();
             UIManager UImanager = core.getManager<UIManager>();
             UImanager.showDialog(statusDialog);
-            
+
             core.getManager<UIManager>().hideMenu();
 
             statusDialog.caption = "Load Header";
             yield return null;
-            manager.sceneDataHandler.headerByteData = (Resources.Load("Storage/VPETDemoSceneHeader") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.headerByteData = LoadBytesSafely("Storage/VPETDemoSceneHeader");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Scene Nodes";
             yield return null;
-            manager.sceneDataHandler.nodesByteData = (Resources.Load("Storage/VPETDemoSceneNodes") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.nodesByteData = LoadBytesSafely("Storage/VPETDemoSceneNodes");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Scene Objects";
             yield return null;
-            manager.sceneDataHandler.objectsByteData = (Resources.Load("Storage/VPETDemoSceneObjects") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.objectsByteData = LoadBytesSafely("Storage/VPETDemoSceneObjects");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Characters";
             yield return null;
-            manager.sceneDataHandler.characterByteData = (Resources.Load("Storage/VPETDemoSceneCharacters") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.characterByteData = LoadBytesSafely("Storage/VPETDemoSceneCharacters");
+            statusDialog.progress += 12;
+
+            statusDialog.caption = "Load Splats";
+            yield return null;
+            manager.sceneDataHandler.gaussianSplatByteData = LoadBytesSafely("Storage/VPETDemoSceneSplats");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Textures";
             yield return null;
-            manager.sceneDataHandler.texturesByteData = (Resources.Load("Storage/VPETDemoSceneTextures") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.texturesByteData = LoadBytesSafely("Storage/VPETDemoSceneTextures");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Materials";
             yield return null;
-            manager.sceneDataHandler.materialsByteData = (Resources.Load("Storage/VPETDemoSceneMaterials") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.materialsByteData = LoadBytesSafely("Storage/VPETDemoSceneMaterials");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Build Scene";
             yield return null;
             manager.emitSceneNew(true);
-            statusDialog.progress += 14;
+            statusDialog.progress += 12;
 
-            UImanager.showDialog(null);   
+            UImanager.showDialog(null);
         }
-        
+
+        private byte[] LoadBytesSafely(string resourcePath)
+        {
+            TextAsset asset = Resources.Load<TextAsset>(resourcePath);
+            if (asset != null)
+            {
+                return asset.bytes;
+            }
+
+            Debug.LogWarning($"File not Found: {resourcePath}");
+            return null; 
+        }
+
         //!
         //! Function that starts the coroutine to load and create the scene stored on an http space
         //!
@@ -489,13 +510,14 @@ namespace tracer
 
             core.getManager<UIManager>().hideMenu();
 
-            string[] urls = new string[6];
+            string[] urls = new string[7];
             urls[0] = "header";
             urls[1] = "nodes";
             urls[2] = "objects";
             urls[3] = "characters";
-            urls[4] = "textures";
-            urls[5] = "materials";
+            urls[4] = "splats";
+            urls[5] = "textures";
+            urls[6] = "materials";
 
             for (int i = 0; i < urls.Length; i++)
             {
@@ -528,15 +550,18 @@ namespace tracer
                                 manager.sceneDataHandler.characterByteData = webRequest.downloadHandler.data;
                                 break;
                             case 4:
-                                manager.sceneDataHandler.texturesByteData = webRequest.downloadHandler.data;
+                                manager.sceneDataHandler.gaussianSplatByteData = webRequest.downloadHandler.data;
                                 break;
                             case 5:
+                                manager.sceneDataHandler.texturesByteData = webRequest.downloadHandler.data;
+                                break;
+                            case 6:
                                 manager.sceneDataHandler.materialsByteData = webRequest.downloadHandler.data;
                                 break;
                             default:
                                 break;
                         }
-                        statusDialog.progress += 14;
+                        statusDialog.progress += 12;
                     }
                 }
             }

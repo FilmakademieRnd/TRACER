@@ -1,0 +1,53 @@
+#define GROUP_SIZE 256
+#define KEY_FLOAT
+#define PAYLOAD_UINT
+// #define SHOULD_ASCEND  
+#define SORT_PAIRS
+
+#pragma kernel CalcDepth
+#pragma kernel InitDeviceRadixSort
+#pragma kernel Upsweep
+#pragma kernel Scan
+#pragma kernel Downsweep
+
+//#pragma multi_compile _ VULKAN
+
+#pragma target 4.5
+
+#if !defined(SHADER_API_METAL)
+    #pragma use_dxc
+    #pragma require wavebasic waveballot
+#endif
+
+uint _SplatCount;
+float4x4 _MatrixMV;
+
+StructuredBuffer<uint4> _PositionBuffer;
+
+#include "DeviceRadixSort.hlsl"
+
+[numthreads(GROUP_SIZE, 1, 1)]
+void CalcDepth(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= _SplatCount)
+        return;
+
+    // 1. Read position directly by linear index idx
+    uint4 word = _PositionBuffer[idx];
+
+    float3 pos = float3(
+        f16tof32(word.y & 0xFFFFu),
+        f16tof32((word.y >> 16u) & 0xFFFFu),
+        f16tof32(word.z & 0xFFFFu)
+    );
+
+    // 2. Evaluate view-space depth
+    float3 viewPos = mul(_MatrixMV, float4(pos, 1.0)).xyz;
+    float distSqr = dot(viewPos, viewPos);
+
+    // 3. Write positive float distance directly (KEY_FLOAT mode in SortCommon expects raw float!)
+    // Since #define SHOULD_ASCEND is disabled, DeviceRadixSort automatically sorts descending (Back-to-Front)!
+    b_sort[idx] = distSqr;
+    b_sortPayload[idx] = idx;
+}

@@ -39,7 +39,7 @@ namespace tracer
         //!
         //! Enumeration defining TRACER node Types.
         //!
-        public enum NodeType { GROUP, GEO, LIGHT, CAMERA, SKINNEDMESH, CHARACTER }
+        public enum NodeType { GROUP, GEO, LIGHT, CAMERA, SKINNEDMESH, CHARACTER, SPLAT }
 
         //!
         //! Enumeration defining TRACER light Types.
@@ -51,7 +51,6 @@ namespace tracer
         {
             public float x, y, z;
 
-            // Praktischer Indexer, damit dein restlicher Code float[index] weiterhin nutzen kann!
             public float this[int index]
             {
                 get => index == 0 ? x : index == 1 ? y : z;
@@ -74,7 +73,6 @@ namespace tracer
         [StructLayout(LayoutKind.Sequential, Pack = 1)]
         public unsafe struct Byte64
         {
-            // Erstellt exakt 64 Bytes sequentiellen Speicher
             private fixed byte data[64];
 
             public byte this[int index]
@@ -87,7 +85,6 @@ namespace tracer
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct Float1584
         {
-            // Reserviert exakt 1584 * 4 Bytes im Speicher
             private unsafe fixed float data[1584];
 
             public float this[int index]
@@ -100,7 +97,6 @@ namespace tracer
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct Int99
         {
-            // Reserviert exakt 99 * 4 Bytes im Speicher
             private unsafe fixed int data[99];
 
             public int this[int index]
@@ -290,14 +286,14 @@ namespace tracer
         //!
         //!
         [System.Serializable]
-        public class SceneNodeGS : SceneNode
+        public class SceneNodeSplat : SceneNode
         {
             //! The ID for referencing the associated geometry data.
             public int gsId;
             public int shDegree;
             public int sortMode;
 
-            // Berechnung: Basis SceneNode(112) + gsId(4) + shDegree(4) + sortMode(4) = 124 Bytes
+            // base: SceneNode(112) + gsId(4) + shDegree(4) + sortMode(4) = 124 Bytes
             public override int FileStructureSize => 124;
 
             public override void Populate(BinaryReader reader)
@@ -519,7 +515,7 @@ namespace tracer
             public int meansLSize;
             public int meansUSize;
             public int scalesSize;
-            public int quadsSize;
+            public int quatsSize;
             public int sh0Size;
             public int shNcentroidsSize;
             public int shNlablesSize;
@@ -531,7 +527,7 @@ namespace tracer
             public byte[] c_meansL;
             public byte[] c_meansU;
             public byte[] c_scales;
-            public byte[] c_quads;
+            public byte[] c_quats;
             public byte[] c_sh0;
             public byte[] c_shNcentroids;
             public byte[] c_shNlables;

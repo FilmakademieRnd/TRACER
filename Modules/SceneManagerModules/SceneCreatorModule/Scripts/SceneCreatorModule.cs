@@ -30,12 +30,20 @@ if not go to https://opensource.org/licenses/MIT
 
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-
-using UnityEngine;
 using Unity.Collections;
+using Unity.Jobs;
+using Unity.Burst;
+using Unity.Mathematics;
+using UnityEngine;
+//using WebP;
+using Unity.Collections.LowLevel.Unsafe;
 using static tracer.AbstractParameter;
+using static tracer.SceneManager;
+
 
 namespace tracer
 {
@@ -44,6 +52,18 @@ namespace tracer
     //!
     public class SceneCreatorModule : SceneManagerModule
     {
+#if (UNITY_IOS || UNITY_WEBGL) && !UNITY_EDITOR
+private const string WEBP_DLL = "__Internal";
+#else
+        private const string WEBP_DLL = "webp";
+#endif
+
+        [DllImport(WEBP_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int WebPGetInfo(IntPtr data, UIntPtr dataSize, out int width, out int height);
+
+        [DllImport(WEBP_DLL, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr WebPDecodeRGBAInto(IntPtr data, UIntPtr dataSize, IntPtr outputBuffer, UIntPtr outputBufferSize, int outputStride);
+
         //! The list storing all Unity gameObjects in scene.
         private List<GameObject> gameObjectList = new List<GameObject>();
 
@@ -52,6 +72,8 @@ namespace tracer
 
         //! The list storing Unity textures in scene.
         private List<Texture2D> SceneTextureList = new List<Texture2D>();
+
+        private List<GsplatRenderer.RenderResource> SceneGplatResourceList = new List<GsplatRenderer.RenderResource>();
 
         //! The list storing Unity meshes in scene.
         private List<Mesh> SceneMeshList = new List<Mesh>();
@@ -86,8 +108,6 @@ namespace tracer
         {
             base.Dispose();
 
-            NetworkManager networkManager = core.getManager<NetworkManager>();
-           
             manager.sceneNew -= CreateScene;
         }
 
@@ -96,8 +116,6 @@ namespace tracer
         //!
         protected override void Init(object sender, EventArgs e)
         {
-            NetworkManager networkManager = core.getManager<NetworkManager>();
-
             manager.sceneNew += CreateScene;
         }
 
@@ -125,6 +143,8 @@ namespace tracer
 
             createMeshes(ref sceneData);
 
+            createGaussianSplats(ref sceneData);
+
             createSceneGraphIter(ref sceneData, manager.scnRoot.transform);
 
             createSkinnedMeshes(ref sceneData, manager.scnRoot.transform);
@@ -132,9 +152,7 @@ namespace tracer
             foreach (var sceneCharacterObject in manager.getAllSceneObjects())
             {
                 if (sceneCharacterObject is SceneCharacterObject character)
-                {
                     character.setBones();
-                }
             }
 
             sceneDataHandler.clearSceneByteData();
@@ -496,6 +514,325 @@ namespace tracer
             }
         }
 
+        readonly struct Rgba32
+        {
+            public readonly byte R, G, B, A;
+            public Rgba32(byte r, byte g, byte b, byte a) { R = r; G = g; B = b; A = a; }
+        }
+
+        const float Sqrt2 = 1.4142135623730951f;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static float Unlog(float value)
+        {
+            if (value == 0f) return 0f;
+
+            // Using positive/negative sign branching instead of heavy Mathf.Sign object boundary crossings
+            return value > 0f ? (Mathf.Exp(value) - 1f) : -(Mathf.Exp(-value) - 1f);
+        }
+
+        private static unsafe NativeArray<Rgba32> DecompressWebPToNativeArray(byte[] packedBytes, ref int width, ref int height)
+        {
+            if (packedBytes == null || packedBytes.Length == 0)
+                return default;
+
+            fixed (byte* srcPtr = packedBytes)
+            {
+                UIntPtr srcSize = (UIntPtr)packedBytes.Length;
+
+                // 1. Read exact dimensions directly from WebP header
+                if (WebPGetInfo((IntPtr)srcPtr, srcSize, out width, out height) == 0)
+                    throw new InvalidDataException("[SplatParser] Invalid WebP header.");
+
+                int pixelCount = width * height;
+                int stride = width * 4;
+                int totalBytes = pixelCount * 4;
+
+                // 2. Allocate persistent unmanaged NativeArray
+                NativeArray<Rgba32> nativePixels = new NativeArray<Rgba32>(pixelCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+                void* dstPtr = nativePixels.GetUnsafePtr();
+
+                // 3. Decode C++ libwebp stream directly into the NativeArray memory (Zero GC, Zero memcpy!)
+                IntPtr result = WebPDecodeRGBAInto((IntPtr)srcPtr, srcSize, (IntPtr)dstPtr, (UIntPtr)totalBytes, stride);
+
+                if (result == IntPtr.Zero)
+                {
+                    nativePixels.Dispose();
+                    throw new InvalidDataException("[SplatParser] Failed to decode WebP stream directly into NativeArray.");
+                }
+
+                return nativePixels;
+            }
+        }
+
+
+        //!
+        //!
+        //!
+        private void createGaussianSplats(ref SceneManager.SceneDataHandler.SceneData sceneData)
+        {
+            if (sceneData.gaussianSpaltList == null || sceneData.gaussianSpaltList.Count == 0)
+                return;
+
+            SceneGplatResourceList.Capacity = Math.Max(SceneGplatResourceList.Capacity, SceneGplatResourceList.Count + sceneData.gaussianSpaltList.Count);
+
+            const float lnScaleMin = -12.0f;
+            const float lnScaleMax = 9.0f;
+            const float invLnScaleStep = 254.0f / (lnScaleMax - lnScaleMin);
+            const float SH_C0 = 0.28209479177387814f;
+
+            foreach (GaussianSpaltPackage gsPack in sceneData.gaussianSpaltList)
+            {
+                if (gsPack == null || gsPack.count <= 0) continue;
+
+                int count = gsPack.count;
+                int version = gsPack.version;
+
+                // 1. Build 256-entry lookup tables for scales and SH0 base colors
+                NativeArray<byte> scaleRemapLUT = new NativeArray<byte>(256, Allocator.TempJob);
+                NativeArray<byte> colorRemapLUT = new NativeArray<byte>(256, Allocator.TempJob);
+
+                bool hasScaleCB = gsPack.scalesCodebook != null && gsPack.scalesCodebook.Length >= 256;
+                bool hasColorCB = gsPack.sh0Codebook != null && gsPack.sh0Codebook.Length >= 256;
+
+                for (int k = 0; k < 256; k++)
+                {
+                    if (hasScaleCB)
+                    {
+                        float logScale = gsPack.scalesCodebook[k];
+                        int mappedIdx = Mathf.RoundToInt((logScale - lnScaleMin) * invLnScaleStep) + 1;
+                        scaleRemapLUT[k] = (byte)Mathf.Clamp(mappedIdx, 1, 255);
+                    }
+                    else scaleRemapLUT[k] = (byte)k;
+
+                    if (hasColorCB)
+                    {
+                        float cVal = 0.5f + SH_C0 * gsPack.sh0Codebook[k];
+                        colorRemapLUT[k] = (byte)Mathf.Clamp(Mathf.RoundToInt(cVal * 255f), 0, 255);
+                    }
+                    else colorRemapLUT[k] = (byte)k;
+                }
+
+                // 2. Decompress primary WebP attribute textures into unmanaged native arrays
+                int width = 0, height = 0;
+                NativeArray<Rgba32> meansLow = DecompressWebPToNativeArray(gsPack.c_meansL, ref width, ref height);
+                NativeArray<Rgba32> meansHigh = DecompressWebPToNativeArray(gsPack.c_meansU, ref width, ref height);
+                NativeArray<Rgba32> scales = DecompressWebPToNativeArray(gsPack.c_scales, ref width, ref height);
+                NativeArray<Rgba32> quats = DecompressWebPToNativeArray(gsPack.c_quats, ref width, ref height);
+                NativeArray<Rgba32> sh0 = DecompressWebPToNativeArray(gsPack.c_sh0, ref width, ref height);
+
+                NativeArray<uint4> packedSplats = new NativeArray<uint4>(count, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+                NativeArray<float3> positionsOut = new NativeArray<float3>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+                float3 boundsMinVec = new float3(gsPack.min[0], gsPack.min[1], gsPack.min[2]);
+                float3 boundsMaxVec = new float3(gsPack.max[0], gsPack.max[1], gsPack.max[2]);
+
+                // 3. Schedule parallel worker job to pack 16-byte splat records across CPU cores
+                var packJob = new PackSplatsJob
+                {
+                    MeansLow = meansLow,
+                    MeansHigh = meansHigh,
+                    Scales = scales,
+                    Quats = quats,
+                    Sh0 = sh0,
+                    ScaleRemapLUT = scaleRemapLUT,
+                    ColorRemapLUT = colorRemapLUT,
+                    MeansMin = boundsMinVec,
+                    MeansMax = boundsMaxVec,
+                    IsVersion2 = (version == 2),
+                    PackedSplats = packedSplats,
+                };
+
+                JobHandle packHandle = packJob.Schedule(count, 4096);
+
+                // 4. Conditionally decode higher Spherical Harmonics (Bands 1 to 3) if present
+                NativeArray<uint> packedSHLabels = default;
+                NativeArray<float4> unpackedSHCentroids = default;
+                NativeArray<Rgba32> shLabels = default;
+                JobHandle shLabelsHandle = default;
+
+                if (gsPack.c_shNcentroids != null && gsPack.c_shNcentroids.Length > 0 &&
+                    gsPack.c_shNlables != null && gsPack.c_shNlables.Length > 0)
+                {
+                    int centW = 0, centH = 0, lblW = 0, lblH = 0;
+                    NativeArray<Rgba32> shCentroids = DecompressWebPToNativeArray(gsPack.c_shNcentroids, ref centW, ref centH);
+                    shLabels = DecompressWebPToNativeArray(gsPack.c_shNlables, ref lblW, ref lblH);
+
+                    // Detect SH degree from centroid atlas width
+                    int detectedShBands = centW switch { 192 => 1, 512 => 2, 960 => 3, _ => 0 };
+                    int coeffsPerSplat = (detectedShBands == 1) ? 3 : (detectedShBands == 2) ? 8 : (detectedShBands == 3) ? 15 : 0;
+
+                    if (detectedShBands > 0 && coeffsPerSplat > 0)
+                    {
+                        int totalPaletteEntries = 64 * centH;
+                        unpackedSHCentroids = new NativeArray<float4>(totalPaletteEntries * coeffsPerSplat, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+                        packedSHLabels = new NativeArray<uint>(count, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
+                        // Schedule parallel job for 16-bit cluster label extraction
+                        var labelsJob = new PackShLabelsJob
+                        {
+                            ShLabels = shLabels,
+                            PackedSHLabels = packedSHLabels
+                        };
+                        shLabelsHandle = labelsJob.Schedule(count, 4096);
+
+                        bool hasShNCB = gsPack.shNcodebook != null && gsPack.shNcodebook.Length >= 256;
+
+                        // Sign flips matching SourceCoordinates.RUB to Unity left-handed conversion
+                        float[] shRubSigns = { 1f, -1f, 1f, 1f, -1f, 1f, -1f, 1f, 1f, -1f, 1f, -1f, 1f, -1f, 1f };
+
+                        // Decode SH cluster centroids with vertical row flip matching WebP bottom-up layout
+                        for (int paletteY = 0; paletteY < centH; paletteY++)
+                        {
+                            for (int paletteX = 0; paletteX < 64; paletteX++)
+                            {
+                                int clusterIdx = paletteY * 64 + paletteX;
+                                for (int k = 0; k < coeffsPerSplat; k++)
+                                {
+                                    int srcPixelIdx = paletteY * centW + (paletteX * coeffsPerSplat + k);
+                                    if (srcPixelIdx >= shCentroids.Length) continue;
+
+                                    Rgba32 cp = shCentroids[srcPixelIdx];
+                                    float sign = shRubSigns[k];
+
+                                    float cx = sign * (hasShNCB ? gsPack.shNcodebook[cp.R] : (cp.R / 255f * 2f - 1f));
+                                    float cy = sign * (hasShNCB ? gsPack.shNcodebook[cp.G] : (cp.G / 255f * 2f - 1f));
+                                    float cz = sign * (hasShNCB ? gsPack.shNcodebook[cp.B] : (cp.B / 255f * 2f - 1f));
+
+                                    unpackedSHCentroids[clusterIdx * coeffsPerSplat + k] = new float4(cx, cy, cz, 0f);
+                                }
+                            }
+                        }
+                    }
+                    shCentroids.Dispose();
+                }
+
+                // Wait for all scheduled worker jobs to complete
+                packHandle.Complete();
+                if (shLabels.IsCreated)
+                {
+                    shLabelsHandle.Complete();
+                    shLabels.Dispose();
+                }
+
+                // 5. Compute world-space bounding box from header limits
+                float3 bMin = boundsMinVec;
+                float3 bMax = boundsMaxVec;
+                if (version == 2)
+                {
+                    bMin = math.sign(bMin) * (math.exp(math.abs(bMin)) - 1.0f);
+                    bMax = math.sign(bMax) * (math.exp(math.abs(bMax)) - 1.0f);
+                }
+                Vector3 finalMin = new Vector3(bMin.x, bMin.y, -bMax.z);
+                Vector3 finalMax = new Vector3(bMax.x, bMax.y, -bMin.z);
+                Bounds bounds = new Bounds((finalMin + finalMax) * 0.5f, finalMax - finalMin);
+
+                // 6. Upload packed buffers to GPU and dispose temporary unmanaged memory
+                GsplatRenderer.RenderResource gpuResource = new GsplatRenderer.RenderResource(packedSplats, packedSHLabels, unpackedSHCentroids, count, bounds);
+                SceneGplatResourceList.Add(gpuResource);
+
+                scaleRemapLUT.Dispose();
+                colorRemapLUT.Dispose();
+                meansLow.Dispose();
+                meansHigh.Dispose();
+                scales.Dispose();
+                quats.Dispose();
+                sh0.Dispose();
+                packedSplats.Dispose();
+                positionsOut.Dispose();
+
+                if (packedSHLabels.IsCreated) packedSHLabels.Dispose();
+                if (unpackedSHCentroids.IsCreated) unpackedSHCentroids.Dispose();
+            }
+        }
+
+        [BurstCompile(FloatPrecision.Standard, FloatMode.Fast)]
+        private struct PackSplatsJob : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<Rgba32> MeansLow;
+            [ReadOnly] public NativeArray<Rgba32> MeansHigh;
+            [ReadOnly] public NativeArray<Rgba32> Scales;
+            [ReadOnly] public NativeArray<Rgba32> Quats;
+            [ReadOnly] public NativeArray<Rgba32> Sh0;
+
+            [ReadOnly] public NativeArray<byte> ScaleRemapLUT;
+            [ReadOnly] public NativeArray<byte> ColorRemapLUT;
+
+            public float3 MeansMin;
+            public float3 MeansMax;
+            public bool IsVersion2;
+
+            [WriteOnly] public NativeArray<uint4> PackedSplats;
+
+            public void Execute(int i)
+            {
+                Rgba32 low = MeansLow[i];
+                Rgba32 high = MeansHigh[i];
+                Rgba32 scalePixel = Scales[i];
+                Rgba32 quatPixel = Quats[i];
+                Rgba32 colorPixel = Sh0[i];
+
+                // 1. Vectorized Position Reconstruction (SIMD)
+                float3 t = new float3(
+                    ((high.R << 8) | low.R) / 65535f,
+                    ((high.G << 8) | low.G) / 65535f,
+                    ((high.B << 8) | low.B) / 65535f
+                );
+
+                float3 n = math.lerp(MeansMin, MeansMax, t);
+
+                if (IsVersion2)
+                {
+                    // Fast vectorized Unlog: sign(n) * (exp(|n|) - 1)
+                    n = math.sign(n) * (math.exp(math.abs(n)) - 1.0f);
+                }
+
+                float3 position = new float3(n.x, n.y, -n.z);
+
+                // Hardware SIMD conversion from float3 to 16-bit half-floats
+                uint3 halfPos = math.f32tof16(position);
+
+                // 2. Word 0: Base colors via LUT + Alpha
+                byte r = ColorRemapLUT[colorPixel.R];
+                byte g = ColorRemapLUT[colorPixel.G];
+                byte b = ColorRemapLUT[colorPixel.B];
+                uint word0 = (uint)r | ((uint)g << 8) | ((uint)b << 16) | ((uint)colorPixel.A << 24);
+
+                // 3. Word 1 & Word 2: Half-float Positions + Quat R & G
+                uint word1 = halfPos.x | (halfPos.y << 16);
+                uint word2 = halfPos.z | ((uint)quatPixel.R << 16) | ((uint)quatPixel.G << 24);
+
+                // 4. Word 3: Exact Scale indices + Quat B (6-bit) + Quat Alpha-Mode (2-bit)
+                byte sx = ScaleRemapLUT[scalePixel.R];
+                byte sy = ScaleRemapLUT[scalePixel.G];
+                byte sz = ScaleRemapLUT[scalePixel.B];
+
+                uint quatB6 = ((uint)quatPixel.B >> 2) & 0x3Fu;
+                uint quatMode2 = (uint)quatPixel.A & 0x03u;
+
+                uint word3 = (uint)sx |
+                             ((uint)sy << 8) |
+                             ((uint)sz << 16) |
+                             (quatB6 << 24) |
+                             (quatMode2 << 30);
+
+                PackedSplats[i] = new uint4(word0, word1, word2, word3);
+            }
+        }
+
+        [BurstCompile]
+        private struct PackShLabelsJob : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<Rgba32> ShLabels;
+            [WriteOnly] public NativeArray<uint> PackedSHLabels;
+
+            public void Execute(int i)
+            {
+                Rgba32 lp = ShLabels[i];
+                PackedSHLabels[i] = (uint)lp.R | ((uint)lp.G << 8);
+            }
+        }
+
         // Cache the layer index globally to eliminate heavy string-lookups inside the recursive loop
         private static readonly int LodMixedLayer = LayerMask.NameToLayer("LodMixed");
 
@@ -750,6 +1087,32 @@ namespace tracer
                     manager.simpleSceneObjectList.Add(sco);
                 }
             }
+            else if (node is SceneManager.SceneNodeSplat nodeGS)
+            {
+                // 1. Instantly attach the standalone high-performance rendering component
+                var splatRenderer = objMain.AddComponent<GsplatRenderer>();
+
+                // 2. Resolve the pre-allocated GPU VRAM buffer from your global resource management list
+                if (nodeGS.gsId > -1 && nodeGS.gsId < SceneGplatResourceList.Count)
+                {
+                    GsplatRenderer.RenderResource gpuResource = SceneGplatResourceList[nodeGS.gsId];
+
+                    // Link the GPU buffers, automate material lookup, and execute the initial camera distance depth sort
+                    splatRenderer.Initialize(gpuResource, nodeGS.shDegree);
+                }
+                else
+                {
+                    Debug.LogError($"[CreateObject] Critical: Spark Splat GPU resource asset container is missing for GS ID: {nodeGS.gsId}");
+                }
+
+                // Maintain the standard editable engine state registration channel rules
+                if (nodeGS.editable)
+                {
+                    objMain.tag = "editable";
+                    SceneObjectGSplat sco = SceneObjectGSplat.Attach(objMain, m_senderID);
+                    manager.simpleSceneObjectList.Add(sco);
+                }
+            }
             else if (node is SceneManager.SceneNodeLight nodeLight)
             {
                 Light lightComponent = objMain.AddComponent<Light>();
@@ -942,6 +1305,7 @@ namespace tracer
             SceneTextureList.Clear();
             SceneMeshList.Clear();
             gameObjectList.Clear();
+            SceneGplatResourceList.Clear();
         }
 
     }
