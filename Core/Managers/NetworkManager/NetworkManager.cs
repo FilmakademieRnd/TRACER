@@ -238,7 +238,7 @@ namespace tracer
                     m_cID = responses[0][0];
                     Helpers.Log("Got ID from DataHub. vID is: " + m_cID, Helpers.logMsgType.NONE);
                 }
-#else
+#elif !UNITY_WEBGL
 
                 foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
                 {

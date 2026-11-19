@@ -102,7 +102,7 @@ namespace tracer{
         //! @param e Arguments for these event. 
         //!
         protected override void Init(object _sender, EventArgs _e){
-            Debug.Log("<color=orange>Init OnScreenNavigation Module</color>");
+            // Debug.Log("<color=orange>Init OnScreenNavigation Module</color>");
             onScreenNavigationMenuButton = new MenuButton("", ToggleOnScreenNavigation, new List<UIManager.Roles>() { UIManager.Roles.SET });
             onScreenNavigationMenuButton.setIcon("Images/button_onScreenNav_off");
             manager.addButton(onScreenNavigationMenuButton);
@@ -172,7 +172,7 @@ namespace tracer{
                 DisableOnScreenNavUI();
             }
 
-            Debug.Log("<color=orange>ToggleMeasureUI: "+isActive+"</color>");
+            // Debug.Log("<color=orange>ToggleMeasureUI: "+isActive+"</color>");
         }
 
         private void EnableOnScreenNavUI(){

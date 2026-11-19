@@ -141,7 +141,7 @@ namespace tracer{
         //!
         protected override void Init(object _sender, EventArgs _e)
         {
-            Debug.Log("<color=orange>Init MeasureModule</color>");
+            //Debug.Log("<color=orange>Init MeasureModule</color>");
             MenuButton measureUIMenuButton = new MenuButton("", ToggleMeasureUI, new List<UIManager.Roles>() { UIManager.Roles.SET });
             measureUIMenuButton.setIcon("Images/button_measure_off");
             manager.addButton(measureUIMenuButton);
@@ -195,7 +195,7 @@ namespace tracer{
                     manager.clearSelectedObjects();
                 }
             }
-            Debug.Log("<color=orange>ToggleMeasureUI: "+isActive+"</color>");
+            // Debug.Log("<color=orange>ToggleMeasureUI: "+isActive+"</color>");
         }
 
         private void CreateMeasureUI(){

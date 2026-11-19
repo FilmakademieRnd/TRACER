@@ -795,7 +795,7 @@ namespace tracer{
         //! ensures our current selection hasn't been disabled or destroyed.
         //!
         private void RevertUIElements(){
-            Debug.Log("RefreshUIElements");
+            //Debug.Log("RefreshUIElements");
             // If our selected object was destroyed or turned off, clear it.
             if (_currentSelection != null && (!_currentSelection.gameObject.activeInHierarchy || !_currentSelection.interactable)){
                 if(_currentSelectionImage)
@@ -803,7 +803,7 @@ namespace tracer{
 
                 _currentSelection = null;
                 _currentSelectionImage = null;
-                Debug.Log("set current selection to null");
+                //Debug.Log("set current selection to null");
             }
 
             //try reselecting previous element, if available!
@@ -841,8 +841,8 @@ namespace tracer{
 
             if (nextElement != null)
                 SetSelection(nextElement);
-            else
-                Debug.Log("no next selectable found in direction "+navDir);
+            // else
+            //     Debug.Log("no next selectable found in direction "+navDir);
             
         }
 
@@ -866,14 +866,14 @@ namespace tracer{
             // Tells the Unity EventSystem that this is the active object.
             // This triggers the Hover/Selected color changes on your Buttons automatically!
             _currentSelection.Select(); 
-            Debug.Log("Selected "+_currentSelection.name);
+            // Debug.Log("Selected "+_currentSelection.name);
         }
 
         //!
         //! Finds the interactable UI element closest to the Top-Left of the screen, if nothing was selected prior
         //!
         private void SelectFallbackTopLeft(){
-            Debug.Log("Select Fallback Top Left");
+            // Debug.Log("Select Fallback Top Left");
 
             // Selectable.allSelectabless is a built-in static list maintained by Unity!
             // No performance-heavy FindObjectsOfType needed.
@@ -1216,7 +1216,7 @@ namespace tracer{
 
                 _uiManager.addSelectedObject(sceneObject);
             }else{
-                Debug.Log("<color=red>no valid SceneObject to select</color>");
+                // Debug.Log("<color=red>no valid SceneObject to select</color>");
                 _uiManager.clearSelectedObjects();
             }
         }
@@ -1334,7 +1334,7 @@ namespace tracer{
         //!
         private void SetManipulationMode() {
             //see UICreator2DModule
-            Debug.Log("Set Manipulation Mode for name: "+_selectedAbstractParam.name);
+            // Debug.Log("Set Manipulation Mode for name: "+_selectedAbstractParam.name);
             switch (_selectedAbstractParam.name){
                 case "position":
                     controlMode = ControllerModeEnum.Manip_Translate;

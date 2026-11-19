@@ -42,6 +42,8 @@ namespace tracer{
     //!
     public class SelectionModule : UIManagerModule{
 
+        public const bool SHOW_DEBUG_LOG = false;
+
         //!
         //! A reference to the TRACER input manager.
         //!
@@ -123,7 +125,8 @@ namespace tracer{
 
                 manager.addSelectedObject(sceneObject);
             }else{
-                //Debug.Log("<color=red>no valid SceneObject to select</color>");
+                if(SHOW_DEBUG_LOG)
+                    Debug.Log("<color=red>no valid SceneObject to select</color>");
                 manager.clearSelectedObjects();
             }
         }

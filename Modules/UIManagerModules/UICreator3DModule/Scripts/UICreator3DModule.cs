@@ -446,7 +446,7 @@ namespace tracer
             // grab the hit manip
             manipulator = EvaluationHelper.Instance.EvaluateManipulator(point);
             if (manipulator){
-                Debug.Log("HIT MANIPULATOR");
+                // Debug.Log("HIT MANIPULATOR");
                 
                 // make a plane based on it
                 planeVec = manipulator.transform.forward;
@@ -699,7 +699,7 @@ namespace tracer
         //! @param e event reference
         //!
         private void FinalizeManipulatorTransformation(Vector2 point){
-            Debug.Log("FinalizeManipulatorTransformation");
+            // Debug.Log("FinalizeManipulatorTransformation");
             // Hack - restore scale
             // restore position instead
             if (modeTRS == 2){
