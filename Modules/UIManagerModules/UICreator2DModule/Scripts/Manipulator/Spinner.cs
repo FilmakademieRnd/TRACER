@@ -56,6 +56,8 @@ namespace tracer
         //!
         private UIManager _manager;
 
+        private float _intAccumulator = 0f;
+
 
         ~Spinner()
         {
@@ -215,8 +217,21 @@ namespace tracer
                     break;
                 case AbstractParameter.ParameterType.INT:
                     Parameter<int> paramInt = (Parameter<int>)abstractParam;
-                    paramInt.setValue(Mathf.RoundToInt(paramInt.value + val*50.0f));
+
+                    if (Mathf.RoundToInt(_intAccumulator) != paramInt.value)
+                    {
+                        _intAccumulator = paramInt.value;
+                    }
+
+                    _intAccumulator += val * 50.0f;
+                    int newIntValue = Mathf.RoundToInt(_intAccumulator);
+
+                    if (newIntValue != paramInt.value)
+                    {
+                        paramInt.setValue(newIntValue);
+                    }
                     break;
+
                 case AbstractParameter.ParameterType.VECTOR2:
                     Parameter<Vector2> paramVec2 = (Parameter<Vector2>)abstractParam;
                     Vector2 valVec2 = paramVec2.value;
