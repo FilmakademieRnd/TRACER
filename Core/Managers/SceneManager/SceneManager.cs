@@ -82,6 +82,43 @@ namespace tracer
         public Vector3 sceneBoundsMin = Vector3.negativeInfinity;
         public float maxExtend = 1f;
 
+        #region SceneInfos
+        public class SceneInfoClass{
+            //==== HAVE TO BE SET ====
+            public readonly ushort sceneUid;     //as primary key stored in online database
+            public readonly string sceneName;
+            public readonly string localPathToLoad; //if set, sccene is local, not online
+            //==== OPTIONAL ====
+            public readonly Dictionary<string,string> sceneInfo; //can contain user/permission (could also be a separate variable)
+            public SceneInfoClass(ushort _uid, string _name, Dictionary<string,string> _info) {
+                sceneUid = _uid; sceneName = _name; sceneInfo = _info;
+            }
+        }
+        //dict just to make sure we dont store them twice, hashset would also be fine, since the key is also within the sceneinfo
+        private Dictionary<ushort, SceneInfoClass> scenesReceived = new();
+
+        public bool AddReceivedSceneInfo(SceneInfoClass sceneInfo){ 
+            if(scenesReceived.ContainsKey(sceneInfo.sceneUid)) return false; 
+            scenesReceived.Add(sceneInfo.sceneUid,sceneInfo); 
+            return true;
+        }
+
+        public void AddReceivedSceneInfos(List<SceneInfoClass> sceneInfos){ 
+            foreach(SceneInfoClass _sceneInfo in sceneInfos) {
+                AddReceivedSceneInfo(_sceneInfo);
+            }
+            //may return list of duplicates!
+        }
+
+        public List<SceneInfoClass> GetAllScenesInfo(){ return scenesReceived.Values.ToList(); }
+
+        public event EventHandler onGetScenesInfoRequest;
+        public event EventHandler onScenesInfoReceived;
+
+        public void RaiseScenesInfoRequest(object sender) { onGetScenesInfoRequest.Invoke(sender, EventArgs.Empty); }
+        public void RaiseScenesInfoReceived(object sender) { onScenesInfoReceived.Invoke(sender, EventArgs.Empty); }
+
+
         //!
         //! List of AbstractParameter containing the available scenes a user can load
         //!
@@ -107,6 +144,8 @@ namespace tracer
         //! call this from any module to trigger (if available) the RaiseGPS function here from the GPSModule
         //!
         public void RaiseSceneLoadDemand(object sender, string scenePath) { onSceneLoadDemandEvent?.Invoke(sender, scenePath); }
+
+        #endregion
 
 
         //!

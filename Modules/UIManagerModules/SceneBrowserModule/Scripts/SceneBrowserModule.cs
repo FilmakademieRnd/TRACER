@@ -54,7 +54,9 @@ namespace tracer
         //! @param name The name of this module.
         //! @param Manager The manager (SceneManager) of this module.
         //!
-        public SceneBrowserModule(string name, Manager manager) : base(name, manager) { }
+        public SceneBrowserModule(string name, Manager manager) : base(name, manager) {
+            load = false;
+        }
 
         private void Logout() {
             //simple return to the login-screen/main menu
@@ -65,6 +67,7 @@ namespace tracer
         //! Init and setup of the module and it's UI.
         //!
         protected override void Start(object sender, EventArgs e){
+
             base.Start(sender, e);
 
             CreateLoadingDataMenuTree();
@@ -208,5 +211,4 @@ namespace tracer
             manager.hideMenu();
         }
     }
-
 }

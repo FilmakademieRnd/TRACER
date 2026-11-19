@@ -25,9 +25,9 @@ if not go to https://opensource.org/licenses/MIT
 //! @file "SceneBvhTests.cs"
 //! @brief EditMode tests for SceneBvh against an independent brute force reference
 //! @author Thomas Krüger
-//! @version 1
-//! @date 16.11.2026
-//! @changed initial tests
+//! @version 2
+//! @date 18.11.2026
+//! @changed test bugfixes and "loading anim"
 //!
 //! The reference is written independently of the bvh core: double precision, own Moeller-Trumbore, own
 //! point-triangle distance (plane projection + segments instead of Ericson regions), world space
@@ -555,7 +555,10 @@ namespace tracer.spatial.tests
                     {
                         // vertex, edge midpoint (x direction), diagonal midpoint
                         double x = (i - n / 2) * cell, z = (j - n / 2) * cell;
-                        if (kind == 1) { if (i == n) continue; x += cell * 0.5; }
+                        // Only targets inside the grid: a ray through a point on the OUTER border has no neighbour
+                        // triangle that could catch it, so a float rounding miss there is expected (BaryEps is 1e-6).
+                        if (kind == 0 && (i == 0 || i == n || j == 0 || j == n)) continue;
+                        if (kind == 1) { if (i == n || j == 0 || j == n) continue; x += cell * 0.5; }
                         if (kind == 2) { if (i == n || j == n) continue; x += cell * 0.5; z += cell * 0.5; }
                         D3 target = new D3(x, 0, z);
                         D3 origin = target + new D3(R(r, -1, 1), R(r, 2, 6), R(r, -1, 1));
@@ -572,13 +575,16 @@ namespace tracer.spatial.tests
         public void Raycast_OriginInsideClosedMesh_AndSidedness()
         {
             Random r = new Random(21);
-            Scn s = new Scn();
             RefMesh sphere = MakeSphere(5, 24, 16);
-            RefInst plain = s.Add(sphere, 1, Affine3x4.Identity, Exact());
-            RefInst ellipsoid = s.Add(sphere, 1, Trs(new D3(40, 0, 0), new D3(1, 2, 3), 0.7, 2.0, 0.5, 1.5), Exact());
-            RefInst mirrored = s.Add(sphere, 1, Trs(new D3(-40, 0, 0), new D3(3, 1, 2), 1.1, -1.0, 1.0, 1.0), Exact());
-            foreach (RefInst ri in new[] { plain, ellipsoid, mirrored })
+            Affine3x4[] matrices = {
+                Affine3x4.Identity,
+                Trs(new D3(40, 0, 0), new D3(1, 2, 3), 0.7, 2.0, 0.5, 1.5),      // ellipsoid
+                Trs(new D3(-40, 0, 0), new D3(3, 1, 2), 1.1, -1.0, 1.0, 1.0) };  // mirrored
+            foreach (Affine3x4 mat in matrices)
             {
+                // one instance per scene: a ray that leaves the sphere must not be able to hit a neighbouring one
+                Scn s = new Scn();
+                RefInst ri = s.Add(sphere, 1, mat, Exact());
                 for (int i = 0; i < 300; i++)
                 {
                     D3 inside = RandDir(r) * (4.0 * Math.Pow(r.NextDouble(), 1.0 / 3.0));
@@ -872,7 +878,7 @@ namespace tracer.spatial.tests
             RefInst near = s.Add(MakeQuad(2), 1, Translate(0, 1, 0), Exact());
             RefInst far = s.Add(MakeQuad(2), 1, Translate(0, -3, 0), Exact());
             RefInst notSnappable = s.Add(MakeQuad(2), 1, Translate(0, 0.5, 0), Exact(), InstanceFlags.None);
-            Float3 p = new Float3(0, 2, 0);
+            Float3 p = new Float3(1, 2, 0.3f);   // off the quad's diagonal (x = z), so the closest point is inside a face
             Assert.AreEqual(QueryStatus.Hit, s.Scene.ClosestPoint(p, float.PositiveInfinity, uint.MaxValue, default(InstanceHandle), out ClosestPointHit h));
             Assert.AreEqual(near.Id, h.UserData, "non snappable instances are no snap targets");
             Assert.AreEqual(1f, h.Distance, 1e-4f);
@@ -1161,6 +1167,28 @@ namespace tracer.spatial.tests
         }
 
         #endregion
+    }
+    //! Editor menu entries for the benchmark (the benchmark itself lives in SceneBvhUnity.cs so that it can
+    //! also run in a Development build, e.g. WebGL). Results: console, clipboard, Library/SceneBvhBenchmark.md
+    internal static class SceneBvhBenchmarkMenu
+    {
+        [UnityEditor.MenuItem("Tools/TRACER/SceneBvh Benchmark (full)")]
+        private static void Full() { Run(1f); }
+
+        [UnityEditor.MenuItem("Tools/TRACER/SceneBvh Benchmark (10 percent)")]
+        private static void Quick() { Run(0.1f); }
+
+        private static void Run(float scale)
+        {
+            BenchmarkConfig cfg = new BenchmarkConfig { Scale = scale };
+            System.Collections.IEnumerator e = SceneBvhBenchmark.Run(cfg, null, s => UnityEditor.EditorUtility.DisplayProgressBar("SceneBvh benchmark", s, 0.5f));
+            try { while (e.MoveNext()) { } }
+            finally { UnityEditor.EditorUtility.ClearProgressBar(); }
+            string report = SceneBvhBenchmark.LastReport;
+            UnityEngine.GUIUtility.systemCopyBuffer = report;
+            System.IO.File.WriteAllText(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "Library", "SceneBvhBenchmark.md"), report);
+            UnityEngine.Debug.Log(report);
+        }
     }
 }
 #endif

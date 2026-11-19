@@ -43,6 +43,8 @@ namespace tracer{
     //!
     public class UnityInputModule : InputManagerModule{
 
+        public const bool SHOW_DEBUG_LOG = false;
+
         #region VARIABLES
         //!
         //! The generated Unity input class defining all available user inputs.
@@ -913,7 +915,8 @@ namespace tracer{
             if (tracker.State == InteractionState.Pinching || tracker.State == InteractionState.Rotating) { return; }
 
             // DEBUG
-             Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
+            if(SHOW_DEBUG_LOG)
+                Debug.Log("<color=yellow>OnPointerDown "+tracker.Level+"</color> at "+tracker.CurrentPosition);
             // -----
 
             // Fetch the exact position right now, bypassing the Update loop delay
@@ -936,7 +939,8 @@ namespace tracer{
         //! @param tracker primary, secondary and tertiary tracker
         //!
         private void OnPointerUp(InputTracker tracker) {
-            Debug.Log("<color=yellow>OnPointerUp "+tracker.Level+" / "+tracker.State+"</color>");
+            if(SHOW_DEBUG_LOG)
+                Debug.Log("<color=yellow>OnPointerUp "+tracker.Level+" / "+tracker.State+"</color>");
 
             if (tracker.State == InteractionState.Idle) { return; }
 

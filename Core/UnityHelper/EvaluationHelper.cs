@@ -40,6 +40,8 @@ namespace tracer{
 
     public class EvaluationHelper : MonoBehaviour{
         
+        public const bool SHOW_DEBUG_LOG = false;
+
         #region SINGLETON
         private static EvaluationHelper _instance;
         private static readonly object _lock = new object();
@@ -121,8 +123,8 @@ namespace tracer{
                     core.getManager<InputManager>().anyInputEvent += OnAnyInputEvent;
                     break;
             }
-
-            Debug.Log("<color=green>OnSceneReady within EvaluationHelper initialized with settings <b>"+calcBehaviour.ToString()+"</b></color>");
+            if(SHOW_DEBUG_LOG)
+                Debug.Log("<color=green>OnSceneReady within EvaluationHelper initialized with settings <b>"+calcBehaviour.ToString()+"</b></color>");
         }
 
         private void OnDestroy(){
@@ -245,7 +247,8 @@ namespace tracer{
                 renderer.sharedMaterial = GetSelectableMaterial(renderer.sharedMaterial);
                 sceneObjectMatsChanged++;
             }
-            Debug.Log("<color=green>IDExtractorModule modified <b>"+sceneObjectMatsChanged+"</b> sceneObject materials and <b>"+nonSceneObjectMatsChanged+"</b> non-so materials</color>");
+            if(SHOW_DEBUG_LOG)
+                Debug.Log("<color=green>IDExtractorModule modified <b>"+sceneObjectMatsChanged+"</b> sceneObject materials and <b>"+nonSceneObjectMatsChanged+"</b> non-so materials</color>");
         }
         #endregion
 
@@ -462,16 +465,20 @@ namespace tracer{
         public OperationLayer EvaluateOperationLayer(Vector2 screenPos){
             //if in buffer, return this
             if(Is2DUI(screenPos)){
-                Debug.Log("OperationLayer <color=grey>2DUI</color>");
+                if(SHOW_DEBUG_LOG)
+                    Debug.Log("OperationLayer <color=grey>2DUI</color>");
                 return OperationLayer.UI2D;
             }else if(Is3DUI(screenPos)){
-                Debug.Log("OperationLayer <color=grey>3DUI</color>");
+                if(SHOW_DEBUG_LOG)
+                    Debug.Log("OperationLayer <color=grey>3DUI</color>");
                 return OperationLayer.UI3D;
             }else if (IsSceneObject(screenPos) || IsSceneObjectAtPixel(screenPos)) {
-                Debug.Log("OperationLayer <color=grey>SCENEOBJECT</color>");
+                if(SHOW_DEBUG_LOG)
+                    Debug.Log("OperationLayer <color=grey>SCENEOBJECT</color>");
                 return OperationLayer.SCENEOBJECT;
             }else{
-                Debug.Log("OperationLayer <color=grey>OTHER</color>");
+                if(SHOW_DEBUG_LOG)
+                    Debug.Log("OperationLayer <color=grey>OTHER</color>");
                 return OperationLayer.OTHER;
             }
         }
