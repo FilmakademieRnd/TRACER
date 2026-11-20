@@ -1,4 +1,5 @@
-﻿Shader "Gsplat/Standard"
+﻿
+Shader "Gsplat/Standard"
 {
     Properties {}
     SubShader
@@ -92,7 +93,7 @@
                 quat = DecodeQuatSogV2(packedData);
             }
 
-            v2f vert(appdata v)
+                        v2f vert(appdata v)
             {
                 v2f o;
                 o.vertex = float4(0.0, 0.0, 2.0, 1.0);
@@ -112,10 +113,24 @@
                 float4 quat, color;
                 UnpackSplat(packedSplat, color, modelCenter, scale, quat);
 
+                // Early alpha cull before any matrix or covariance math
+                if (color.a < (1.0 / 255.0))
+                    return o;
+
                 float4x4 modelView = mul(UNITY_MATRIX_V, _MATRIX_M);
                 SplatCenter center;
                 if (!InitCenter(modelView, modelCenter, center)) 
                     return o;
+
+                // --- EARLY FRUSTUM CULLING (Skips Covariance & 15x SH3 Buffer Lookups!) ---
+                // Guard-band of 1.25 prevents large splats near screen edges from popping
+                float guardW = center.proj.w * 1.25;
+                if (center.proj.w <= 0.0 ||
+                    abs(center.proj.x) > guardW ||
+                    abs(center.proj.y) > guardW)
+                {
+                    return o;
+                }
 
                 SplatCovariance cov = CalcCovariance(quat, scale);
                 SplatCorner corner;
@@ -126,7 +141,7 @@
                     return o;
 
             #ifndef SH_BANDS_0
-                  // Original Yize Wu view-direction transform (transposed mul flips sign natively)
+                // Original Yize Wu view-direction transform (transposed mul flips sign natively)
                 float3 dir = normalize(mul(center.view, (float3x3)center.modelView));
                 dir.z = -dir.z;
 
@@ -147,10 +162,11 @@
                 ClipCorner(corner, color.a);
 
                 o.vertex = center.proj + float4(corner.offset.x, _ProjectionParams.x * corner.offset.y, 0, 0);
-                o.color = color; // FIXED: _Brightness is already applied in frag()
+                o.color = color;
                 o.uv = corner.uv;
                 return o;
             }
+
 
             float4 frag(v2f i) : SV_Target
             {

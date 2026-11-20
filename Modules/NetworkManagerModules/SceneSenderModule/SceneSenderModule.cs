@@ -118,7 +118,8 @@ namespace tracer
 
                 if (sceneSender.TryReceiveFrameString(TimeSpan.FromSeconds(20), out received))
                 {
-                    if (received == "1")
+                    string cleanReceived = received.Trim(' ', '\r', '\n', '\0', '\uFEFF');
+                    if (cleanReceived == "1")
                         Debug.Log(package.Key + " stored on server: " + m_ip);
                     else
                         Debug.Log(package.Key + " not accepted by server: " + m_ip);
