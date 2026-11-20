@@ -10,11 +10,12 @@
         "Unity.Mathematics",
         "glTFast",
         "Unity.InputSystem",
-        "unity.webp"
+        "unity.webp",
+        "Unity.Burst"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,

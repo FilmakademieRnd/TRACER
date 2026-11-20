@@ -29,6 +29,7 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 29.03.2022
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -70,7 +71,9 @@ namespace tracer
         //!
         private GameObject m_sun = null;
         private SceneObjectSunLight m_sunLight = null;
-        
+        private Coroutine m_timeAnimationCoroutine;
+        private Coroutine m_locationAnimationCoroutine;
+
 
         //!
         //! Constructor
@@ -199,6 +202,8 @@ namespace tracer
             return lightRoot;
         }
 
+        private System.Collections.IEnumerator Delay(float sec, System.Action action) { yield return new WaitForSeconds(sec); action?.Invoke(); }
+
         //!
         //! Function to copy the current local time to the parameters.
         //!
@@ -206,11 +211,78 @@ namespace tracer
         {
             manager.SendCommand(new InputManager.StartGPSCommand());
             DateTime dateTime = DateTime.Now;
-            m_month.value = dateTime.Month;
-            m_day.value = dateTime.Day;
-            m_hour.value = dateTime.Hour;
-            m_minute.value = dateTime.Minute;
 
+            if (m_timeAnimationCoroutine != null)
+            {
+                core.StopCoroutine(m_timeAnimationCoroutine);
+            }
+           
+            m_timeAnimationCoroutine = core.StartCoroutine(AnimateTimeValues(
+                dateTime.Month,
+                dateTime.Day,
+                dateTime.Hour,
+                dateTime.Minute,
+                0.8f
+            ));
+            core.StartCoroutine(Delay(0.9f, () => UpdateMenu()));
+
+            UpdateMenu();
+        }
+
+        private IEnumerator AnimateTimeValues(int targetMonth, int targetDay, int targetHour, int targetMinute, float duration)
+        {
+            // Clamp initial and target date values to ensure valid DateTime construction
+            int startMonth = Mathf.Clamp(m_month.value, 1, 12);
+            int startDay = Mathf.Clamp(m_day.value, 1, DateTime.DaysInMonth(1900, startMonth));
+            targetMonth = Mathf.Clamp(targetMonth, 1, 12);
+            targetDay = Mathf.Clamp(targetDay, 1, DateTime.DaysInMonth(1900, targetMonth));
+
+            DateTime startDate = new DateTime(1900, startMonth, startDay);
+            DateTime targetDate = new DateTime(1900, targetMonth, targetDay);
+
+            // Direct day difference within the same year (no wrap-around across Dec/Jan)
+            int dayDiff = targetDate.DayOfYear - startDate.DayOfYear;
+
+            // Convert time to total minutes since midnight for continuous interpolation
+            float startTotalMinutes = m_hour.value * 60 + m_minute.value;
+            float targetTotalMinutes = targetHour * 60 + targetMinute;
+
+            float elapsedTime = 0f;
+
+            while (elapsedTime < duration)
+            {
+                elapsedTime += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsedTime / duration));
+
+                // 1. Add interpolated days within the year (automatically handles month lengths like 28/30/31)
+                int dayOffset = Mathf.RoundToInt(dayDiff * t);
+                DateTime currentDate = startDate.AddDays(dayOffset);
+
+                // 2. Interpolate total minutes and split back into hours and minutes
+                int currentTotalMinutes = Mathf.RoundToInt(Mathf.Lerp(startTotalMinutes, targetTotalMinutes, t));
+                int currentHour = Mathf.Clamp(currentTotalMinutes / 60, 0, 23);
+                int currentMinute = currentTotalMinutes % 60;
+
+                // Only update parameters when their integer values actually change
+                if (m_month.value != currentDate.Month) m_month.value = currentDate.Month;
+                if (m_day.value != currentDate.Day) m_day.value = currentDate.Day;
+                if (m_hour.value != currentHour) m_hour.value = currentHour;
+                if (m_minute.value != currentMinute) m_minute.value = currentMinute;
+
+                yield return null;
+            }
+
+            // Ensure exact target values are set at the end of the animation
+            m_month.value = targetMonth;
+            m_day.value = targetDay;
+            m_hour.value = targetHour;
+            m_minute.value = targetMinute;
+
+            m_timeAnimationCoroutine = null;
+        }
+
+        private void UpdateMenu()
+        {
             manager.hideMenu();
             manager.showMenu(m_sunMenu);
         }
@@ -222,7 +294,66 @@ namespace tracer
         {
             manager.SendCommand(new InputManager.StartGPSCommand());
 
-            // ...
+            // Retrieve GPS coordinates from Unity's location service (replace with your TRACER GPS data source if applicable)
+            int targetLongitude = Mathf.RoundToInt(Input.location.lastData.longitude);
+            int targetLatitude = Mathf.RoundToInt(Input.location.lastData.latitude);
+
+            // Stop any currently running location animation before starting a new one
+            if (m_locationAnimationCoroutine != null)
+            {
+                core.StopCoroutine(m_locationAnimationCoroutine);
+            }
+
+            m_locationAnimationCoroutine = core.StartCoroutine(AnimateLocationValues(
+                targetLongitude,
+                targetLatitude,
+                0.5f
+            ));
+
+            core.StartCoroutine(Delay(0.6f, () => UpdateMenu()));
+
+            manager.hideMenu();
+            manager.showMenu(m_sunMenu);
+        }
+
+        //!
+        //! Coroutine that smoothly interpolates longitude and latitude parameters over a given duration.
+        //!
+        //! @param targetLongitude Target geographical longitude (-180 to 180)
+        //! @param targetLatitude  Target geographical latitude (-90 to 90)
+        //! @param duration        Duration of the animation in seconds
+        //!
+        private IEnumerator AnimateLocationValues(int targetLongitude, int targetLatitude, float duration)
+        {
+            // Clamp targets to valid geographical coordinate bounds
+            targetLongitude = Mathf.Clamp(targetLongitude, -180, 180);
+            targetLatitude = Mathf.Clamp(targetLatitude, -90, 90);
+
+            float startLongitude = m_longitude.value;
+            float startLatitude = m_latitude.value;
+
+            float elapsedTime = 0f;
+
+            while (elapsedTime < duration)
+            {
+                elapsedTime += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsedTime / duration));
+
+                int currentLongitude = Mathf.RoundToInt(Mathf.Lerp(startLongitude, targetLongitude, t));
+                int currentLatitude = Mathf.RoundToInt(Mathf.Lerp(startLatitude, targetLatitude, t));
+
+                // Only update parameters when their integer values actually change
+                if (m_longitude.value != currentLongitude) m_longitude.value = currentLongitude;
+                if (m_latitude.value != currentLatitude) m_latitude.value = currentLatitude;
+
+                yield return null;
+            }
+
+            // Ensure exact target values are set at the end of the animation
+            m_longitude.value = targetLongitude;
+            m_latitude.value = targetLatitude;
+
+            m_locationAnimationCoroutine = null;
         }
 
         //!

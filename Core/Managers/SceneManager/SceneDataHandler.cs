@@ -493,6 +493,7 @@ namespace tracer
                             case NodeType.SKINNEDMESH: node = new SceneManager.SceneNodeSkinnedGeo(); break;
                             case NodeType.LIGHT: node = new SceneManager.SceneNodeLight(); break;
                             case NodeType.CAMERA: node = new SceneManager.SceneNodeCam(); break;
+                            case NodeType.SPLAT: node = new SceneManager.SceneNodeSplat(); break;
                             default:
                                 throw new InvalidOperationException($"Unbekannter Typ: {nodeType}");
                         }
@@ -767,7 +768,9 @@ namespace tracer
                 {
                     GaussianSpaltPackage gsPack = new GaussianSpaltPackage();
 
-                    // 1. Die 10 Integer-Werte via BinaryPrimitives auslesen
+                    // 1. Die 11 Integer-Werte via BinaryPrimitives auslesen
+                    gsPack.version = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    dataIdx += 4;
                     gsPack.count = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
                     dataIdx += 4;
                     gsPack.shNcount = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
@@ -780,7 +783,7 @@ namespace tracer
                     dataIdx += 4;
                     gsPack.scalesSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
                     dataIdx += 4;
-                    gsPack.quadsSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
+                    gsPack.quatsSize = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
                     dataIdx += 4;
                     gsPack.sh0Size = BinaryPrimitives.ReadInt32LittleEndian(sourceSpan.Slice(dataIdx, 4));
                     dataIdx += 4;
@@ -828,9 +831,9 @@ namespace tracer
                     sourceSpan.Slice(dataIdx, gsPack.scalesSize).CopyTo(gsPack.c_scales);
                     dataIdx += gsPack.scalesSize;
 
-                    gsPack.c_quads = new byte[gsPack.quadsSize];
-                    sourceSpan.Slice(dataIdx, gsPack.quadsSize).CopyTo(gsPack.c_quads);
-                    dataIdx += gsPack.quadsSize;
+                    gsPack.c_quats = new byte[gsPack.quatsSize];
+                    sourceSpan.Slice(dataIdx, gsPack.quatsSize).CopyTo(gsPack.c_quats);
+                    dataIdx += gsPack.quatsSize;
 
                     gsPack.c_sh0 = new byte[gsPack.sh0Size];
                     sourceSpan.Slice(dataIdx, gsPack.sh0Size).CopyTo(gsPack.c_sh0);
@@ -1151,6 +1154,7 @@ namespace tracer
                         else if (node is SceneManager.SceneNodeLight) nodeType = NodeType.LIGHT;
                         else if (node is SceneManager.SceneNodeCam) nodeType = NodeType.CAMERA;
                         else if (node is SceneManager.SceneNodeCharacter) nodeType = NodeType.CHARACTER;
+                        else if (node is SceneManager.SceneNodeSplat) nodeType = NodeType.SPLAT;
                         else nodeType = NodeType.GROUP;
 
                         // Write the 4-byte NodeType header
@@ -1366,7 +1370,7 @@ namespace tracer
                 int totalSize = 0;
                 foreach (var gsPack in gaussianSplatList)
                 {
-                    totalSize += sizeof(int) * 10 +                  // all TryWriteBytes (10)
+                    totalSize += sizeof(int) * 11 +                  // all TryWriteBytes (11)
                                  sizeof(float) * 3 +                  // min
                                  sizeof(float) * 3 +                  // max
                                  sizeof(float) * 256 +                // scalesCodebook
@@ -1375,7 +1379,7 @@ namespace tracer
                                  gsPack.meansLSize +
                                  gsPack.meansUSize +
                                  gsPack.scalesSize +
-                                 gsPack.quadsSize +
+                                 gsPack.quatsSize +
                                  gsPack.sh0Size +
                                  gsPack.shNcentroidsSize +
                                  gsPack.shNlablesSize;
@@ -1407,7 +1411,7 @@ namespace tracer
                     BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.scalesSize);
                     dstIdx += sizeof(int);
 
-                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.quadsSize);
+                    BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.quatsSize);
                     dstIdx += sizeof(int);
 
                     BitConverter.TryWriteBytes(targetSpan.Slice(dstIdx, sizeof(int)), gsPack.sh0Size);
@@ -1468,10 +1472,10 @@ namespace tracer
                     scalesSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.scalesSize));
                     dstIdx += gsPack.scalesSize;
 
-                    // compressed quads
-                    ReadOnlySpan<byte> quadsSpan = gsPack.c_quads;
-                    quadsSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.quadsSize));
-                    dstIdx += gsPack.quadsSize;
+                    // compressed quats
+                    ReadOnlySpan<byte> quatsSpan = gsPack.c_quats;
+                    quatsSpan.CopyTo(targetSpan.Slice(dstIdx, gsPack.quatsSize));
+                    dstIdx += gsPack.quatsSize;
 
                     // compressed sh0s
                     ReadOnlySpan<byte> sh0sSpan = gsPack.c_sh0;

@@ -338,6 +338,7 @@ namespace tracer
                         }
                     }
                     break;
+                case AbstractParameter.ParameterType.INT:
                 case AbstractParameter.ParameterType.FLOAT:
                 case AbstractParameter.ParameterType.VECTOR2:
                 case AbstractParameter.ParameterType.VECTOR3:
@@ -375,7 +376,7 @@ namespace tracer
                     }
                     break;
                 case AbstractParameter.ParameterType.ACTION:
-                case AbstractParameter.ParameterType.INT:
+                //case AbstractParameter.ParameterType.INT:
                 case AbstractParameter.ParameterType.STRING:
                 case AbstractParameter.ParameterType.VECTOR4:
                 default:

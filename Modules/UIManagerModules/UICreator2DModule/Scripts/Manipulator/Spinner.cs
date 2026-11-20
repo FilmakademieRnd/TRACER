@@ -56,6 +56,8 @@ namespace tracer
         //!
         private UIManager _manager;
 
+        private float _intAccumulator = 0f;
+
 
         ~Spinner()
         {
@@ -130,6 +132,13 @@ namespace tracer
                             break;
                     }                    
                 break;
+                case AbstractParameter.ParameterType.INT:
+                    Parameter<int> paramInt = (Parameter<int>)abstractParam;
+                    paramInt.hasChanged += _snapSelect.setParam;
+                    _snapSelect.setSensitivity(100f);
+                    _snapSelect.addElement("",(float) paramInt.value);
+                    _snapSelect._loop = false;
+                    break;
                 case AbstractParameter.ParameterType.VECTOR2:
                     Parameter<Vector2> paramVec2 = (Parameter<Vector2>)abstractParam;
                     paramVec2.hasChanged += _snapSelect.setParam;
@@ -198,6 +207,7 @@ namespace tracer
         //!
         private void setValue(object sender, float val)
         {
+            val = val * Time.deltaTime;
             AbstractParameter.ParameterType type = abstractParam.tracerType;
             switch (type)
             {
@@ -205,6 +215,23 @@ namespace tracer
                     Parameter<float> paramFloat = (Parameter<float>)abstractParam;
                     paramFloat.setValue(paramFloat.value + val);
                     break;
+                case AbstractParameter.ParameterType.INT:
+                    Parameter<int> paramInt = (Parameter<int>)abstractParam;
+
+                    if (Mathf.RoundToInt(_intAccumulator) != paramInt.value)
+                    {
+                        _intAccumulator = paramInt.value;
+                    }
+
+                    _intAccumulator += val * 50.0f;
+                    int newIntValue = Mathf.RoundToInt(_intAccumulator);
+
+                    if (newIntValue != paramInt.value)
+                    {
+                        paramInt.setValue(newIntValue);
+                    }
+                    break;
+
                 case AbstractParameter.ParameterType.VECTOR2:
                     Parameter<Vector2> paramVec2 = (Parameter<Vector2>)abstractParam;
                     Vector2 valVec2 = paramVec2.value;

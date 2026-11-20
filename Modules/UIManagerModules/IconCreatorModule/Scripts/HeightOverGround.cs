@@ -283,7 +283,7 @@ public class HeightOverGround : MonoBehaviour{
                 
                 UpdateLineTiling();
                 
-                textMesh.text = (worldTop.y - groundY).ToString("F2") + "m";
+                textMesh.text = ((worldTop.y - groundY)*10f).ToString("F2") + "m";
             }
         }
     }
@@ -361,7 +361,7 @@ public class HeightOverGround : MonoBehaviour{
             UpdateLineTiling();
             // Text visual updates
             textMesh.transform.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, easeT * 2f); // Pops in early
-            textMesh.text = (worldTop.y - currentY).ToString("F2") + "m";
+            textMesh.text = ((worldTop.y - currentY)*10f).ToString("F2") + "m";
             UpdateAlignments(currentY);
 
             yield return null;

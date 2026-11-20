@@ -123,8 +123,8 @@ namespace tracer
         //!
         void Update()
         {
-            if (!m_renderer.isVisible)
-                return;
+            //if (!m_renderer.isVisible)
+            //    return;
 
             UpdateTRS();
 

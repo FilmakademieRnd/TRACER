@@ -29,7 +29,8 @@ if not go to https://opensource.org/licenses/MIT
 //! @date 03.07.2026
 
 using System;
-using System.Xml.Serialization;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace tracer
@@ -40,37 +41,38 @@ namespace tracer
     public class SceneObjectSunLight : SceneObjectDirectionalLight
     {
         //!
-        //! The gegraphical longitude to calculate the sun position.
+        //! The geographical longitude to calculate the sun position.
         //!
         public Parameter<int> m_longitude { get; private set; }
         //!
-        //! The gegraphical latitude to calculate the sun position.
+        //! The geographical latitude to calculate the sun position.
         //!
         public Parameter<int> m_latitude { get; private set; }
         public DateTime m_date { get; private set; }
         //!
-        //! The the minunte of the time used to calculate the sun position.
+        //! The minute of the time used to calculate the sun position.
         //!
         private Parameter<int> m_minute;
         //!
-        //! The the minunte of the time used to calculate the sun position.
+        //! The hour of the time used to calculate the sun position.
         //!
         private Parameter<int> m_hour;
         //!
-        //! The the minunte of the time used to calculate the sun position.
+        //! The day of the time used to calculate the sun position.
         //!
         private Parameter<int> m_day;
         //!
-        //! The the minunte of the time used to calculate the sun position.
+        //! The month of the time used to calculate the sun position.
         //!
         private Parameter<int> m_month;
+
 
         //!
         //! Factory to create a new SceneObject and do it's initialisation.
         //! Use this function instead GameObject.AddComponen<>!
         //!
         //! @param gameObject The gameObject the new SceneObject will be attached to.
-        //! @sceneID The scene ID for the new SceneObject.
+        //! @param sceneID The scene ID for the new SceneObject.
         //!
         public static new SceneObjectSunLight Attach(GameObject gameObject, byte sceneID)
         {
@@ -79,6 +81,7 @@ namespace tracer
 
             return obj;
         }
+
         // Start is called before the first frame update
         public override void Awake()
         {
@@ -91,10 +94,13 @@ namespace tracer
             m_day = new Parameter<int>(10, "Day", this);
             m_month = new Parameter<int>(10, "Month", this);
 
+            m_hour.hasChanged += checkHour;
+
             m_longitude.hasChanged += updateSunPosition;
             m_latitude.hasChanged += updateSunPosition;
             m_minute.hasChanged += updateSunPosition;
             m_hour.hasChanged += updateSunPosition;
+            m_hour.hasChanged += checkHour;
             m_day.hasChanged += updateSunPosition;
             m_month.hasChanged += updateSunPosition;
 
@@ -105,13 +111,22 @@ namespace tracer
         public override void Update()
         {
             base.Update();
-
         }
 
         //!
-        //! canlculate the suns position and update the directional light.
-        //! @param   sender     Object calling the update function
-        //! @param   a          new color value
+        //! Clamps the hour parameter to a valid range (0-23) when modified externally.
+        //! @param sender Object calling the validation function
+        //! @param value  New hour value
+        //!
+        private void checkHour(object sender, int value)
+        {
+            Parameter<int> param = sender as Parameter<int>;
+            if (value > 23) param.value = 23;
+            if (value < 0) param.value = 0;
+        }
+
+        //!
+        //! Calculate the sun's position and update the directional light using smooth float values.
         //!
         private void updateSunPosition(object sender, int value)
         {
@@ -154,6 +169,5 @@ namespace tracer
                 return;
             }
         }
-
     }
 }
