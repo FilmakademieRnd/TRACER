@@ -52,7 +52,7 @@ namespace tracer
         private ListParameter m_sceneListParameter;
 
         // glTF import state
-        //private GLTFLoader m_gltfLoader;
+        private GLTFLoader m_gltfLoader;
         private bool m_isLoadingGLTF = false;
         private ClassParameter<string> m_gltfFilePathParameter;
         private Parameter<float> m_gltfScaleParameter;
@@ -72,8 +72,11 @@ namespace tracer
             manager.loadDemoSceneUsingQr += QrSceneLoad;
             base.Start(sender, e);
 
+            // listening on request to load a scene
+            manager.onSceneLoadDemandEvent += LoadSceneEvent;
+
             // Initialize glTF loader
-            //m_gltfLoader = new GLTFLoader(core, manager as SceneManager);
+            m_gltfLoader = new GLTFLoader(core, manager as SceneManager);
 
             // Initialize scene list dropdown
             m_sceneListParameter = new ListParameter("SceneList", null);
@@ -92,8 +95,8 @@ namespace tracer
             // glTF import parameters
             m_gltfFilePathParameter = new ClassParameter<string>("No file selected", "gltfFilePath");
             m_gltfScaleParameter = new Parameter<float>(DEFAULT_SCALE, "gltfScale");
-            //ClassParameter<Action> browseGLTFButton = new ClassParameter<Action>(BrowseForGLTFFile, "Browse");
-            //ClassParameter<Action> importGLTFButton = new ClassParameter<Action>(ImportGLTF, "Import glTF");
+            ClassParameter<Action> browseGLTFButton = new ClassParameter<Action>(BrowseForGLTFFile, "Browse");
+            ClassParameter<Action> importGLTFButton = new ClassParameter<Action>(ImportGLTF, "Import glTF");
 
             m_menu = new MenuTree()
               .Begin(MenuItem.IType.VSPLIT)
@@ -109,12 +112,12 @@ namespace tracer
                    .Add("Load glTF Scene")
                    .Begin(MenuItem.IType.HSPLIT)
                        .Add(m_gltfFilePathParameter)
-                     //  .Add(browseGLTFButton)
+                       .Add(browseGLTFButton)
                    .End()
                    .Begin(MenuItem.IType.HSPLIT)
                        .Add("Scale:")
                        .Add(m_gltfScaleParameter)
-                       //.Add(importGLTFButton)
+                       .Add(importGLTFButton)
                    .End()
 
                    // === Chapter 3: Save Scene ===
@@ -321,6 +324,16 @@ namespace tracer
         }
 
         //!
+        //! Function that gets executed via event raised by the manager to ask to load the scene at given path
+        //!
+        private void LoadSceneEvent(object sender, string path) {
+            if (path.Equals("Load Demo"))
+                LoadDemoScene();
+            else
+                LoadScene(path);
+        }
+
+        //!
         //! Function that parses the current scene, and stores it to the persistent data path under the given name.
         //!
         //! @param sceneName The name under which the scene files will be stored.
@@ -417,47 +430,64 @@ namespace tracer
             Dialog statusDialog = new Dialog();
             UIManager UImanager = core.getManager<UIManager>();
             UImanager.showDialog(statusDialog);
-            
+
             core.getManager<UIManager>().hideMenu();
 
             statusDialog.caption = "Load Header";
             yield return null;
-            manager.sceneDataHandler.headerByteData = (Resources.Load("Storage/VPETDemoSceneHeader") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.headerByteData = LoadBytesSafely("Storage/VPETDemoSceneHeader");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Scene Nodes";
             yield return null;
-            manager.sceneDataHandler.nodesByteData = (Resources.Load("Storage/VPETDemoSceneNodes") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.nodesByteData = LoadBytesSafely("Storage/VPETDemoSceneNodes");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Scene Objects";
             yield return null;
-            manager.sceneDataHandler.objectsByteData = (Resources.Load("Storage/VPETDemoSceneObjects") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.objectsByteData = LoadBytesSafely("Storage/VPETDemoSceneObjects");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Characters";
             yield return null;
-            manager.sceneDataHandler.characterByteData = (Resources.Load("Storage/VPETDemoSceneCharacters") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.characterByteData = LoadBytesSafely("Storage/VPETDemoSceneCharacters");
+            statusDialog.progress += 12;
+
+            statusDialog.caption = "Load Splats";
+            yield return null;
+            manager.sceneDataHandler.gaussianSplatByteData = LoadBytesSafely("Storage/VPETDemoSceneSplats");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Textures";
             yield return null;
-            manager.sceneDataHandler.texturesByteData = (Resources.Load("Storage/VPETDemoSceneTextures") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.texturesByteData = LoadBytesSafely("Storage/VPETDemoSceneTextures");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Load Materials";
             yield return null;
-            manager.sceneDataHandler.materialsByteData = (Resources.Load("Storage/VPETDemoSceneMaterials") as TextAsset).bytes;
-            statusDialog.progress += 14;
+            manager.sceneDataHandler.materialsByteData = LoadBytesSafely("Storage/VPETDemoSceneMaterials");
+            statusDialog.progress += 12;
 
             statusDialog.caption = "Build Scene";
             yield return null;
             manager.emitSceneNew(true);
-            statusDialog.progress += 14;
+            statusDialog.progress += 12;
 
-            UImanager.showDialog(null);   
+            UImanager.showDialog(null);
         }
-        
+
+        private byte[] LoadBytesSafely(string resourcePath)
+        {
+            TextAsset asset = Resources.Load<TextAsset>(resourcePath);
+            if (asset != null)
+            {
+                return asset.bytes;
+            }
+
+            Debug.LogWarning($"File not Found: {resourcePath}");
+            return null; 
+        }
+
         //!
         //! Function that starts the coroutine to load and create the scene stored on an http space
         //!
@@ -480,13 +510,14 @@ namespace tracer
 
             core.getManager<UIManager>().hideMenu();
 
-            string[] urls = new string[6];
+            string[] urls = new string[7];
             urls[0] = "header";
             urls[1] = "nodes";
             urls[2] = "objects";
             urls[3] = "characters";
-            urls[4] = "textures";
-            urls[5] = "materials";
+            urls[4] = "splats";
+            urls[5] = "textures";
+            urls[6] = "materials";
 
             for (int i = 0; i < urls.Length; i++)
             {
@@ -519,15 +550,18 @@ namespace tracer
                                 manager.sceneDataHandler.characterByteData = webRequest.downloadHandler.data;
                                 break;
                             case 4:
-                                manager.sceneDataHandler.texturesByteData = webRequest.downloadHandler.data;
+                                manager.sceneDataHandler.gaussianSplatByteData = webRequest.downloadHandler.data;
                                 break;
                             case 5:
+                                manager.sceneDataHandler.texturesByteData = webRequest.downloadHandler.data;
+                                break;
+                            case 6:
                                 manager.sceneDataHandler.materialsByteData = webRequest.downloadHandler.data;
                                 break;
                             default:
                                 break;
                         }
-                        statusDialog.progress += 14;
+                        statusDialog.progress += 12;
                     }
                 }
             }
@@ -537,52 +571,52 @@ namespace tracer
 
         #region glTF Import
 
-        ////!
-        ////! Function to browse for a glTF file using the native file picker.
-        ////!
-        //private void BrowseForGLTFFile()
-        //{
-        //    GLTFLoader.BrowseForFile(SelectGLTFFile);
-        //}
+        //!
+        //! Function to browse for a glTF file using the native file picker.
+        //!
+        private void BrowseForGLTFFile()
+        {
+            GLTFLoader.BrowseForFile(SelectGLTFFile);
+        }
 
-        ////!
-        ////! Callback function called when a glTF file is selected.
-        ////!
-        ////! @param filePath The path to the selected glTF file.
-        ////!
-        //private void SelectGLTFFile(string filePath)
-        //{
-        //    m_gltfFilePathParameter.setValue(filePath);
-        //    string fileName = Path.GetFileNameWithoutExtension(filePath);
-        //    manager.settings.sceneFilepath.setValue(fileName);
-        //    Helpers.Log($"glTF Loader: Selected file {filePath}");
-        //    UIManager uiManager = core.getManager<UIManager>();
-        //    uiManager.hideMenu();
-        //    uiManager.showMenu(m_menu);
-        //}
+        //!
+        //! Callback function called when a glTF file is selected.
+        //!
+        //! @param filePath The path to the selected glTF file.
+        //!
+        private void SelectGLTFFile(string filePath)
+        {
+            m_gltfFilePathParameter.setValue(filePath);
+            string fileName = Path.GetFileNameWithoutExtension(filePath);
+            manager.settings.sceneFilepath.setValue(fileName);
+            Helpers.Log($"glTF Loader: Selected file {filePath}");
+            UIManager uiManager = core.getManager<UIManager>();
+            uiManager.hideMenu();
+            uiManager.showMenu(m_menu);
+        }
 
-        ////!
-        ////! Function to import a glTF file with the specified scale.
-        ////!
-        //private async void ImportGLTF()
-        //{
-        //    if (m_isLoadingGLTF)
-        //    {
-        //        Helpers.Log("glTF Loader: Already importing a file...", Helpers.logMsgType.WARNING);
-        //        return;
-        //    }
+        //!
+        //! Function to import a glTF file with the specified scale.
+        //!
+        private async void ImportGLTF()
+        {
+            if (m_isLoadingGLTF)
+            {
+                Helpers.Log("glTF Loader: Already importing a file...", Helpers.logMsgType.WARNING);
+                return;
+            }
 
-        //    m_isLoadingGLTF = true;
+            m_isLoadingGLTF = true;
 
-        //    try
-        //    {
-        //        await m_gltfLoader.ImportWithDialog(core, m_gltfFilePathParameter.value, m_gltfScaleParameter.value);
-        //    }
-        //    finally
-        //    {
-        //        m_isLoadingGLTF = false;
-        //    }
-        //}
+            try
+            {
+                await m_gltfLoader.ImportWithDialog(core, m_gltfFilePathParameter.value, m_gltfScaleParameter.value);
+            }
+            finally
+            {
+                m_isLoadingGLTF = false;
+            }
+        }
 
         #endregion
     }

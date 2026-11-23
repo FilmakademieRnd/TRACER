@@ -462,16 +462,16 @@ namespace tracer{
         public OperationLayer EvaluateOperationLayer(Vector2 screenPos){
             //if in buffer, return this
             if(Is2DUI(screenPos)){
-                Debug.Log("OperationLayer <color=grey>2DUI</color>");
+                //Debug.Log("OperationLayer <color=grey>2DUI</color>");
                 return OperationLayer.UI2D;
             }else if(Is3DUI(screenPos)){
-                Debug.Log("OperationLayer <color=grey>3DUI</color>");
+                //Debug.Log("OperationLayer <color=grey>3DUI</color>");
                 return OperationLayer.UI3D;
             }else if (IsSceneObject(screenPos) || IsSceneObjectAtPixel(screenPos)) {
-                Debug.Log("OperationLayer <color=grey>SCENEOBJECT</color>");
+                //Debug.Log("OperationLayer <color=grey>SCENEOBJECT</color>");
                 return OperationLayer.SCENEOBJECT;
             }else{
-                Debug.Log("OperationLayer <color=grey>OTHER</color>");
+                //Debug.Log("OperationLayer <color=grey>OTHER</color>");
                 return OperationLayer.OTHER;
             }
         }

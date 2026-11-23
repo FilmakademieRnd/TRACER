@@ -1049,66 +1049,69 @@ private const string WEBP_DLL = "__Internal";
         {
             if (texture == null) return -1;
 
-            // check if this exact texture instance has already been processed to prevent duplication
+            // Prüfen, ob diese Textur-Instanz bereits verarbeitet wurde
             for (int i = 0; i < textureList.Count; i++)
+            {
                 if (textureList[i].texture == texture)
                     return i;
+            }
 
-            SceneManager.TexturePackage texPack = new SceneManager.TexturePackage();
-            texPack.width = texture.width;
-            texPack.height = texture.height;
-            texPack.format = texture.format;
-            texPack.texture = texture;
+            SceneManager.TexturePackage texPack = new SceneManager.TexturePackage
+            {
+                width = texture.width,
+                height = texture.height,
+                format = texture.format,
+                texture = texture
+            };
 
-            // Using the modern Unity 6 NativeArray overload to completely bypass managed heap allocations
             try
             {
-                // Get zero-allocation direct native access to the texture VRAM buffer
-                NativeArray<byte> nativeData = texture.GetRawTextureData<byte>();
-                texPack.colorMapDataSize = nativeData.Length;
-
-                if (texPack.colorMapDataSize > 0)
+                if (texture.isReadable)
                 {
-                    texPack.colorMapData = new byte[texPack.colorMapDataSize];
+                    // Direkter, schneller CPU-Zugriff (Zero-Allocation via NativeArray)
+                    NativeArray<byte> nativeData = texture.GetRawTextureData<byte>();
+                    texPack.colorMapDataSize = nativeData.Length;
 
-                    // memory blit
-                    ReadOnlySpan<byte> sourceSpan = nativeData.AsReadOnlySpan();
-                    sourceSpan.CopyTo(texPack.colorMapData);
+                    if (texPack.colorMapDataSize > 0)
+                    {
+                        texPack.colorMapData = new byte[texPack.colorMapDataSize];
+                        nativeData.AsReadOnlySpan().CopyTo(texPack.colorMapData);
+                    }
+                    else
+                    {
+                        texPack.colorMapData = Array.Empty<byte>();
+                    }
                 }
                 else
                 {
-                    texPack.colorMapData = Array.Empty<byte>();
+                    // GPU-Readback-Pfad für Texturen mit makeNoLongerReadable = true
+                    RenderTexture tempRT = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.ARGB32);
+                    Graphics.Blit(texture, tempRT);
+
+                    RenderTexture previousActive = RenderTexture.active;
+                    RenderTexture.active = tempRT;
+
+                    Texture2D readableTex = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false);
+                    readableTex.ReadPixels(new Rect(0, 0, tempRT.width, tempRT.height), 0, 0);
+                    // Kein readableTex.Apply() nötig! ReadPixels füllt bereits den CPU-Buffer für GetRawTextureData.
+
+                    // WICHTIG: Format im Paket aktualisieren, da die Daten jetzt unkomprimiertes RGBA32 sind
+                    texPack.format = TextureFormat.RGBA32;
+
+                    NativeArray<byte> fallbackNativeData = readableTex.GetRawTextureData<byte>();
+                    texPack.colorMapDataSize = fallbackNativeData.Length;
+                    texPack.colorMapData = new byte[texPack.colorMapDataSize];
+                    fallbackNativeData.AsReadOnlySpan().CopyTo(texPack.colorMapData);
+
+                    // Temporäre Ressourcen sofort wieder freigeben
+                    RenderTexture.active = previousActive;
+                    RenderTexture.ReleaseTemporary(tempRT);
+                    UnityEngine.Object.DestroyImmediate(readableTex);
                 }
-            }
-            catch (UnityException)
-            {
-                // WEBGL FALLBACK: Handle "Texture not readable" state automatically
-                // if texture configuration resists direct CPU-read, read it back safely via a temporary RenderTexture
-                Helpers.Log($"Texture '{texture.name}' is not readable. Triggering GPU blit fallback pass.", Helpers.logMsgType.WARNING);
-
-                RenderTexture tempRT = RenderTexture.GetTemporary(texture.width, texture.height, 0, RenderTextureFormat.ARGB32);
-                Graphics.Blit(texture, tempRT);
-
-                RenderTexture previousActive = RenderTexture.active;
-                RenderTexture.active = tempRT;
-
-                Texture2D readableTex = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false);
-                readableTex.ReadPixels(new Rect(0, 0, tempRT.width, tempRT.height), 0, 0);
-                readableTex.Apply();
-
-                NativeArray<byte> fallbackNativeData = readableTex.GetRawTextureData<byte>();
-                texPack.colorMapDataSize = fallbackNativeData.Length;
-                texPack.colorMapData = new byte[texPack.colorMapDataSize];
-                fallbackNativeData.AsReadOnlySpan().CopyTo(texPack.colorMapData);
-
-                // Clean up temporary objects instantly to prevent unmanaged VRAM memory leaks in the browser sandbox
-                RenderTexture.active = previousActive;
-                RenderTexture.ReleaseTemporary(tempRT);
-                UnityEngine.Object.DestroyImmediate(readableTex);
             }
             catch (System.Exception e)
             {
-                Helpers.Log($"Failed to extract texture payload: {e.Message}", Helpers.logMsgType.ERROR);
+                Helpers.Log($"Failed to extract texture payload for '{texture.name}': {e.Message}", Helpers.logMsgType.ERROR);
                 texPack.colorMapData = Array.Empty<byte>();
                 texPack.colorMapDataSize = 0;
             }

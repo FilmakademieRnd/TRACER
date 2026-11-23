@@ -165,18 +165,18 @@ namespace tracer
         void Awake()
         {
             // enable/disable logging
-#if UNITY_EDITOR
+//#if UNITY_EDITOR
             UnityEngine.Debug.unityLogger.logEnabled = true;
-#else
-            if(!UnityEngine.Debug.isDebugBuild){
-                Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
-                UnityEngine.Debug.unityLogger.logEnabled = false;
-            }else{
-                UnityEngine.Debug.unityLogger.logEnabled = true;
-                // Prevents the screen from dimming and turning off
-                Screen.sleepTimeout = SleepTimeout.NeverSleep;
-            }
-#endif
+//#else
+//            if(!UnityEngine.Debug.isDebugBuild){
+//                Helpers.Log("Warning, Unity Logging has been disabled, look at Core.cs!", Helpers.logMsgType.WARNING);
+//                UnityEngine.Debug.unityLogger.logEnabled = false;
+//            }else{
+//                UnityEngine.Debug.unityLogger.logEnabled = true;
+//                // Prevents the screen from dimming and turning off
+//                Screen.sleepTimeout = SleepTimeout.NeverSleep;
+//            }
+//#endif
 
             Application.logMessageReceived += updateLog;
             s_logParameter = new ClassParameter<string>("", "logParameter");
