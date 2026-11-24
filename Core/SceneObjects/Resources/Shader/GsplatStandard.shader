@@ -120,9 +120,10 @@
                 if (!InitCenter(modelView, modelCenter, center)) 
                     return o;
 
-                // 2. Early frustum culling (25% guard-band)
-                float guardW = center.proj.w * 1.25;
-                if (center.proj.w <= 0.0 ||
+                // 2. Near-lens cull & early frustum culling (skips splats directly inside the camera lens)
+                float w = center.proj.w;
+                float guardW = w * 1.25;
+                if (w <= 0.12 ||
                     abs(center.proj.x) > guardW ||
                     abs(center.proj.y) > guardW)
                 {
@@ -139,14 +140,25 @@
 
                 ClipCorner(corner, color.a);
 
-                // 3. Sub-pixel culling (skips splats smaller than ~0.7 pixels)
-                if (all(abs(corner.offset) * _ScreenParams.xy < (center.proj.w * 0.7)))
+                // 3. Safe radial sub-pixel culling (skips splats < ~0.8 pixels without clipping rotated ellipses)
+                float2 pixelOffset = corner.offset * _ScreenParams.xy * 0.5;
+                float pixelRadius = length(pixelOffset);
+                if (pixelRadius < (w * 0.8))
                 {
                     return o;
                 }
 
+                // 4. Close-up Overdraw Clamp: caps maximum quad radius to 12% of screen height (~120px at 1080p)
+                // Prevents close-up splats from covering the entire screen and stalling Apple Silicon TBDR tiles
+                float maxRadiusNDC = w * 0.24;
+                float currentRadiusNDC = length(corner.offset);
+                if (currentRadiusNDC > maxRadiusNDC)
+                {
+                    corner.offset *= (maxRadiusNDC / currentRadiusNDC);
+                }
+
             #ifndef SH_BANDS_0
-                // Read pre-evaluated 10-10-10 HDR color (1 single uint fetch instead of 15 float4 fetches!)
+                // Read pre-evaluated 10-10-10 HDR color
                 uint packedEvalColor = _EvaluatedColorBuffer[splatId];
                 color.rgb = float3(
                     (packedEvalColor & 0x3FFu),
@@ -161,6 +173,7 @@
                 o.uv = corner.uv;
                 return o;
             }
+
 
             // float4 frag(v2f i) : SV_Target
             // {
@@ -178,18 +191,17 @@
             //     return float4(color * alpha * _Brightness, alpha);
             // }
 
-            half4 frag(v2f i) : SV_Target
+           half4 frag(v2f i) : SV_Target
             {
                 half2 uv = (half2)i.uv;
                 half A = dot(uv, uv);
-                if (A > (half)1.0) discard;
 
-                // Single exp() with exact zero-cutoff at circle edge (exp(-4.0) = 0.0183156)
-                half gaussian = max((half)0.0, exp(-A * (half)4.0) - (half)0.0183156) * (half)1.018657;
+                // Pure FP16 Gaussian approximation (zero exp() SFU stalls, zero discard TBDR penalties)
+                half t = saturate((half)1.0 - A);
+                half t2 = t * t;
+                half gaussian = t2 * t2;
+
                 half alpha = gaussian * (half)i.color.a;
-
-                if (alpha < (half)(1.0 / 255.0)) discard;
-
                 return half4((half3)i.color.rgb * alpha, alpha);
             }
             ENDHLSL

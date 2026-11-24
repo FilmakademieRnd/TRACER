@@ -4,25 +4,7 @@
  *
  * SPDX-License-Identifier: MIT
  * Copyright Thomas Smith 5/17/2024
- * https://github.com/b0nes164/GPUSorting
- *  
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in all
- *  copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ * https://github.com
  ******************************************************************************/
 #define KEYS_PER_THREAD     15U 
 #define D_DIM               256U
@@ -94,10 +76,9 @@ struct DigitStruct
 //*****************************************************************************
 //HELPER FUNCTIONS
 //*****************************************************************************
-//Due to a bug with SPIRV pre 1.6, we cannot use WaveGetLaneCount() to get the currently active wavesize 
 inline uint getWaveSize()
 {
-#if defined(VULKAN)
+#if defined(VULKAN) || defined(SHADER_API_VULKAN)
     GroupMemoryBarrierWithGroupSync(); //Make absolutely sure the wave is not diverged here
     return dot(countbits(WaveActiveBallot(true)), uint4(1, 1, 1, 1));
 #else
@@ -110,8 +91,6 @@ inline uint getWaveIndex(uint gtid, uint waveSize)
     return gtid / waveSize;
 }
 
-//Radix Tricks by Michael Herf
-//http://stereopsis.com/radix.html
 inline uint FloatToUint(float f)
 {
     uint mask = -((int) (asuint(f) >> 31)) | 0x80000000;
@@ -214,9 +193,6 @@ inline uint WaveHistsSizeWLT16()
 //*****************************************************************************
 //FUNCTIONS COMMON TO THE DOWNSWEEP / DIGIT BINNING PASS
 //*****************************************************************************
-//If the size of  a wave is too small, we do not have enough space in
-//shared memory to assign a histogram to each wave, so instead,
-//some operations are peformed serially.
 inline uint SerialIterations(uint waveSize)
 {
     return (D_DIM / waveSize + 31) >> 5;
@@ -311,7 +287,7 @@ inline uint WaveFlagsWGE16(uint waveSize)
 
 inline uint WaveFlagsWLT16(uint waveSize)
 {
-    return (1U << waveSize) - 1;;
+    return (1U << waveSize) - 1;
 }
 
 inline void WarpLevelMultiSplitWGE16(uint key, inout uint4 waveFlags)
@@ -321,7 +297,7 @@ inline void WarpLevelMultiSplitWGE16(uint key, inout uint4 waveFlags)
     {
         const uint currentBit = 1u << (k + e_radixShift);
         const bool t = (key & currentBit) != 0;
-        GroupMemoryBarrierWithGroupSync(); //Play on the safe side, throw in a barrier for convergence
+        GroupMemoryBarrierWithGroupSync();
         const uint4 ballot = WaveActiveBallot(t);
         if (t)
             waveFlags &= ballot;
@@ -408,20 +384,17 @@ inline OffsetStruct RankKeysWLT16(uint waveSize, uint waveIndex, KeyStruct keys,
         {
             if (waveIndex % serialIterations == k)
                 offsets.o[i] = ExtractPackedValue(g_d[index], keys.k[i]) + peerBits;
-            
             GroupMemoryBarrierWithGroupSync();
             if (waveIndex % serialIterations == k && peerBits == 0)
             {
                 InterlockedAdd(g_d[index],
-                    countbits(waveFlags) << ExtractPackedShift(keys.k[i]));
+countbits(waveFlags) << ExtractPackedShift(keys.k[i]));
             }
             GroupMemoryBarrierWithGroupSync();
         }
     }
-    
     return offsets;
 }
-
 inline uint WaveHistInclusiveScanCircularShiftWGE16(uint gtid, uint waveSize)
 {
     uint histReduction = g_d[gtid];
@@ -432,7 +405,6 @@ inline uint WaveHistInclusiveScanCircularShiftWGE16(uint gtid, uint waveSize)
     }
     return histReduction;
 }
-
 inline uint WaveHistInclusiveScanCircularShiftWLT16(uint gtid)
 {
     uint histReduction = g_d[gtid];
@@ -443,7 +415,6 @@ inline uint WaveHistInclusiveScanCircularShiftWLT16(uint gtid)
     }
     return histReduction;
 }
-
 inline void WaveHistReductionExclusiveScanWGE16(uint gtid, uint waveSize, uint histReduction)
 {
     if (gtid < RADIX)
@@ -452,21 +423,16 @@ inline void WaveHistReductionExclusiveScanWGE16(uint gtid, uint waveSize, uint h
         g_d[((WaveGetLaneIndex() + 1) & laneMask) + (gtid & ~laneMask)] = histReduction;
     }
     GroupMemoryBarrierWithGroupSync();
-                
     if (gtid < RADIX / waveSize)
     {
         g_d[gtid * waveSize] =
-            WavePrefixSum(g_d[gtid * waveSize]);
+WavePrefixSum(g_d[gtid * waveSize]);
     }
     GroupMemoryBarrierWithGroupSync();
-    
     uint t = WaveReadLaneAt(g_d[gtid], 0);
     if (gtid < RADIX && WaveGetLaneIndex())
         g_d[gtid] += t;
 }
-
-//inclusive/exclusive prefix sum up the histograms,
-//use a blelloch scan for in place packed exclusive
 inline void WaveHistReductionExclusiveScanWLT16(uint gtid)
 {
     uint shift = 1;
@@ -476,15 +442,13 @@ inline void WaveHistReductionExclusiveScanWLT16(uint gtid)
         if (gtid < j)
         {
             g_d[((((gtid << 1) + 2) << shift) - 1) >> 1] +=
-                g_d[((((gtid << 1) + 1) << shift) - 1) >> 1] & 0xffff0000;
+g_d[((((gtid << 1) + 1) << shift) - 1) >> 1] & 0xffff0000;
         }
         shift++;
     }
     GroupMemoryBarrierWithGroupSync();
-                
     if (gtid == 0)
         g_d[HALF_RADIX - 1] &= 0xffff;
-                
     for (uint j = 1; j < RADIX >> 1; j <<= 1)
     {
         --shift;
@@ -498,7 +462,6 @@ inline void WaveHistReductionExclusiveScanWLT16(uint gtid)
             g_d[t2] += t3 & 0xffff0000;
         }
     }
-
     GroupMemoryBarrierWithGroupSync();
     if (gtid < HALF_RADIX)
     {
@@ -506,17 +469,16 @@ inline void WaveHistReductionExclusiveScanWLT16(uint gtid)
         g_d[gtid] = (t >> 16) + (t << 16) + (t & 0xffff0000);
     }
 }
-
 inline void UpdateOffsetsWGE16(
-    uint gtid,
-    uint waveSize,
-    inout OffsetStruct offsets,
-    KeyStruct keys)
+uint gtid,
+uint waveSize,
+inout OffsetStruct offsets,
+KeyStruct keys)
 {
     if (gtid >= waveSize)
     {
         const uint t = getWaveIndex(gtid, waveSize) * RADIX;
-        [unroll]
+[unroll]
         for (uint i = 0; i < KEYS_PER_THREAD; ++i)
         {
             const uint t2 = ExtractDigit(keys.k[i]);
@@ -525,23 +487,22 @@ inline void UpdateOffsetsWGE16(
     }
     else
     {
-        [unroll]
+[unroll]
         for (uint i = 0; i < KEYS_PER_THREAD; ++i)
             offsets.o[i] += g_d[ExtractDigit(keys.k[i])];
     }
 }
-
 inline void UpdateOffsetsWLT16(
-    uint gtid,
-    uint waveSize,
-    uint serialIterations,
-    inout OffsetStruct offsets,
-    KeyStruct keys)
+uint gtid,
+uint waveSize,
+uint serialIterations,
+inout OffsetStruct offsets,
+KeyStruct keys)
 {
     if (gtid >= waveSize * serialIterations)
     {
         const uint t = getWaveIndex(gtid, waveSize) / serialIterations * HALF_RADIX;
-        [unroll]
+[unroll]
         for (uint i = 0; i < KEYS_PER_THREAD; ++i)
         {
             const uint t2 = ExtractPackedIndex(keys.k[i]);
@@ -550,70 +511,61 @@ inline void UpdateOffsetsWLT16(
     }
     else
     {
-        [unroll]
+[unroll]
         for (uint i = 0; i < KEYS_PER_THREAD; ++i)
             offsets.o[i] += ExtractPackedValue(g_d[ExtractPackedIndex(keys.k[i])], keys.k[i]);
     }
 }
-
 inline void ScatterKeysShared(OffsetStruct offsets, KeyStruct keys)
 {
-    [unroll]
+[unroll]
     for (uint i = 0; i < KEYS_PER_THREAD; ++i)
         g_d[offsets.o[i]] = keys.k[i];
 }
-
 inline uint DescendingIndex(uint deviceIndex)
 {
     return e_numKeys - deviceIndex - 1;
 }
-
 inline void WriteKey(uint deviceIndex, uint groupSharedIndex)
 {
 #if defined(KEY_UINT)
-    b_alt[deviceIndex] = g_d[groupSharedIndex];
+b_alt[deviceIndex] = g_d[groupSharedIndex];
 #elif defined(KEY_INT)
-    b_alt[deviceIndex] = UintToInt(g_d[groupSharedIndex]);
+b_alt[deviceIndex] = UintToInt(g_d[groupSharedIndex]);
 #elif defined(KEY_FLOAT)
-    b_alt[deviceIndex] = UintToFloat(g_d[groupSharedIndex]);
+b_alt[deviceIndex] = UintToFloat(g_d[groupSharedIndex]);
 #endif
 }
-
 inline void LoadPayload(inout uint payload, uint deviceIndex)
 {
 #if defined(PAYLOAD_UINT)
-    payload = b_sortPayload[deviceIndex];
+payload = b_sortPayload[deviceIndex];
 #elif defined(PAYLOAD_INT) || defined(PAYLOAD_FLOAT)
-    payload = asuint(b_sortPayload[deviceIndex]);
+payload = asuint(b_sortPayload[deviceIndex]);
 #endif
 }
-
 inline void ScatterPayloadsShared(OffsetStruct offsets, KeyStruct payloads)
 {
     ScatterKeysShared(offsets, payloads);
 }
-
 inline void WritePayload(uint deviceIndex, uint groupSharedIndex)
 {
 #if defined(PAYLOAD_UINT)
-    b_altPayload[deviceIndex] = g_d[groupSharedIndex];
+b_altPayload[deviceIndex] = g_d[groupSharedIndex];
 #elif defined(PAYLOAD_INT)
-    b_altPayload[deviceIndex] = asint(g_d[groupSharedIndex]);
+b_altPayload[deviceIndex] = asint(g_d[groupSharedIndex]);
 #elif defined(PAYLOAD_FLOAT)
-    b_altPayload[deviceIndex] = asfloat(g_d[groupSharedIndex]);
+b_altPayload[deviceIndex] = asfloat(g_d[groupSharedIndex]);
 #endif
 }
-
 //*****************************************************************************
 //SCATTERING: FULL PARTITIONS
 //*****************************************************************************
-//KEYS ONLY
 inline void ScatterKeysOnlyDeviceAscending(uint gtid)
 {
     for (uint i = gtid; i < PART_SIZE; i += D_DIM)
         WriteKey(g_d[ExtractDigit(g_d[i]) + PART_SIZE] + i, i);
 }
-
 inline void ScatterKeysOnlyDeviceDescending(uint gtid)
 {
     if (e_radixShift == 24)
@@ -626,36 +578,32 @@ inline void ScatterKeysOnlyDeviceDescending(uint gtid)
         ScatterKeysOnlyDeviceAscending(gtid);
     }
 }
-
 inline void ScatterKeysOnlyDevice(uint gtid)
 {
 #if defined(SHOULD_ASCEND)
-    ScatterKeysOnlyDeviceAscending(gtid);
+ScatterKeysOnlyDeviceAscending(gtid);
 #else
     ScatterKeysOnlyDeviceDescending(gtid);
 #endif
 }
-
-//KEY VALUE PAIRS
 inline void ScatterPairsKeyPhaseAscending(
-    uint gtid,
-    inout DigitStruct digits)
+uint gtid,
+inout DigitStruct digits)
 {
-    [unroll]
+[unroll]
     for (uint i = 0, t = gtid; i < KEYS_PER_THREAD; ++i, t += D_DIM)
     {
         digits.d[i] = ExtractDigit(g_d[t]);
         WriteKey(g_d[digits.d[i] + PART_SIZE] + t, t);
     }
 }
-
 inline void ScatterPairsKeyPhaseDescending(
-    uint gtid,
-    inout DigitStruct digits)
+uint gtid,
+inout DigitStruct digits)
 {
     if (e_radixShift == 24)
     {
-        [unroll]
+[unroll]
         for (uint i = 0, t = gtid; i < KEYS_PER_THREAD; ++i, t += D_DIM)
         {
             digits.d[i] = ExtractDigit(g_d[t]);
@@ -667,50 +615,46 @@ inline void ScatterPairsKeyPhaseDescending(
         ScatterPairsKeyPhaseAscending(gtid, digits);
     }
 }
-
 inline void LoadPayloadsWGE16(
-    uint gtid,
-    uint waveSize,
-    uint partIndex,
-    inout KeyStruct payloads)
+uint gtid,
+uint waveSize,
+uint partIndex,
+inout KeyStruct payloads)
 {
-    [unroll]
+[unroll]
     for (uint i = 0, t = DeviceOffsetWGE16(gtid, waveSize, partIndex);
-        i < KEYS_PER_THREAD;
-        ++i, t += waveSize)
+i < KEYS_PER_THREAD;
+++i, t += waveSize)
     {
         LoadPayload(payloads.k[i], t);
     }
 }
-
 inline void LoadPayloadsWLT16(
-    uint gtid,
-    uint waveSize,
-    uint partIndex,
-    uint serialIterations,
-    inout KeyStruct payloads)
+uint gtid,
+uint waveSize,
+uint partIndex,
+uint serialIterations,
+inout KeyStruct payloads)
 {
-    [unroll]
+[unroll]
     for (uint i = 0, t = DeviceOffsetWLT16(gtid, waveSize, partIndex, serialIterations);
-        i < KEYS_PER_THREAD;
-        ++i, t += waveSize * serialIterations)
+i < KEYS_PER_THREAD;
+++i, t += waveSize * serialIterations)
     {
         LoadPayload(payloads.k[i], t);
     }
 }
-
 inline void ScatterPayloadsAscending(uint gtid, DigitStruct digits)
 {
-    [unroll]
+[unroll]
     for (uint i = 0, t = gtid; i < KEYS_PER_THREAD; ++i, t += D_DIM)
         WritePayload(g_d[digits.d[i] + PART_SIZE] + t, t);
 }
-
 inline void ScatterPayloadsDescending(uint gtid, DigitStruct digits)
 {
     if (e_radixShift == 24)
     {
-        [unroll]
+[unroll]
         for (uint i = 0, t = gtid; i < KEYS_PER_THREAD; ++i, t += D_DIM)
             WritePayload(DescendingIndex(g_d[digits.d[i] + PART_SIZE] + t), t);
     }
@@ -719,21 +663,19 @@ inline void ScatterPayloadsDescending(uint gtid, DigitStruct digits)
         ScatterPayloadsAscending(gtid, digits);
     }
 }
-
 inline void ScatterPairsDevice(
-    uint gtid,
-    uint waveSize,
-    uint partIndex,
-    OffsetStruct offsets)
+uint gtid,
+uint waveSize,
+uint partIndex,
+OffsetStruct offsets)
 {
     DigitStruct digits;
 #if defined(SHOULD_ASCEND)
-    ScatterPairsKeyPhaseAscending(gtid, digits);
+ScatterPairsKeyPhaseAscending(gtid, digits);
 #else
     ScatterPairsKeyPhaseDescending(gtid, digits);
 #endif
     GroupMemoryBarrierWithGroupSync();
-    
     KeyStruct payloads;
     if (waveSize >= 16)
         LoadPayloadsWGE16(gtid, waveSize, partIndex, payloads);
@@ -741,35 +683,31 @@ inline void ScatterPairsDevice(
         LoadPayloadsWLT16(gtid, waveSize, partIndex, SerialIterations(waveSize), payloads);
     ScatterPayloadsShared(offsets, payloads);
     GroupMemoryBarrierWithGroupSync();
-    
 #if defined(SHOULD_ASCEND)
-    ScatterPayloadsAscending(gtid, digits);
+ScatterPayloadsAscending(gtid, digits);
 #else
     ScatterPayloadsDescending(gtid, digits);
 #endif
 }
-
 inline void ScatterDevice(
-    uint gtid,
-    uint waveSize,
-    uint partIndex,
-    OffsetStruct offsets)
+uint gtid,
+uint waveSize,
+uint partIndex,
+OffsetStruct offsets)
 {
 #if defined(SORT_PAIRS)
-    ScatterPairsDevice(
-        gtid,
-        waveSize,
-        partIndex,
-        offsets);
+ScatterPairsDevice(
+gtid,
+waveSize,
+partIndex,
+offsets);
 #else
     ScatterKeysOnlyDevice(gtid);
 #endif
 }
-
 //*****************************************************************************
 //SCATTERING: PARTIAL PARTITIONS
 //*****************************************************************************
-//KEYS ONLY
 inline void ScatterKeysOnlyDevicePartialAscending(uint gtid, uint finalPartSize)
 {
     for (uint i = gtid; i < PART_SIZE; i += D_DIM)
@@ -778,7 +716,6 @@ inline void ScatterKeysOnlyDevicePartialAscending(uint gtid, uint finalPartSize)
             WriteKey(g_d[ExtractDigit(g_d[i]) + PART_SIZE] + i, i);
     }
 }
-
 inline void ScatterKeysOnlyDevicePartialDescending(uint gtid, uint finalPartSize)
 {
     if (e_radixShift == 24)
@@ -794,24 +731,21 @@ inline void ScatterKeysOnlyDevicePartialDescending(uint gtid, uint finalPartSize
         ScatterKeysOnlyDevicePartialAscending(gtid, finalPartSize);
     }
 }
-
 inline void ScatterKeysOnlyDevicePartial(uint gtid, uint partIndex)
 {
     const uint finalPartSize = e_numKeys - partIndex * PART_SIZE;
 #if defined(SHOULD_ASCEND)
-    ScatterKeysOnlyDevicePartialAscending(gtid, finalPartSize);
+ScatterKeysOnlyDevicePartialAscending(gtid, finalPartSize);
 #else
     ScatterKeysOnlyDevicePartialDescending(gtid, finalPartSize);
 #endif
 }
-
-//KEY VALUE PAIRS
 inline void ScatterPairsKeyPhaseAscendingPartial(
-    uint gtid,
-    uint finalPartSize,
-    inout DigitStruct digits)
+uint gtid,
+uint finalPartSize,
+inout DigitStruct digits)
 {
-    [unroll]
+[unroll]
     for (uint i = 0, t = gtid; i < KEYS_PER_THREAD; ++i, t += D_DIM)
     {
         if (t < finalPartSize)
@@ -821,15 +755,14 @@ inline void ScatterPairsKeyPhaseAscendingPartial(
         }
     }
 }
-
 inline void ScatterPairsKeyPhaseDescendingPartial(
-    uint gtid,
-    uint finalPartSize,
-    inout DigitStruct digits)
+uint gtid,
+uint finalPartSize,
+inout DigitStruct digits)
 {
     if (e_radixShift == 24)
     {
-        [unroll]
+[unroll]
         for (uint i = 0, t = gtid; i < KEYS_PER_THREAD; ++i, t += D_DIM)
         {
             if (t < finalPartSize)
@@ -844,61 +777,57 @@ inline void ScatterPairsKeyPhaseDescendingPartial(
         ScatterPairsKeyPhaseAscendingPartial(gtid, finalPartSize, digits);
     }
 }
-
 inline void LoadPayloadsPartialWGE16(
-    uint gtid,
-    uint waveSize,
-    uint partIndex,
-    inout KeyStruct payloads)
+uint gtid,
+uint waveSize,
+uint partIndex,
+inout KeyStruct payloads)
 {
-    [unroll]
+[unroll]
     for (uint i = 0, t = DeviceOffsetWGE16(gtid, waveSize, partIndex);
-        i < KEYS_PER_THREAD;
-        ++i, t += waveSize)
+i < KEYS_PER_THREAD;
+++i, t += waveSize)
     {
         if (t < e_numKeys)
             LoadPayload(payloads.k[i], t);
     }
 }
-
 inline void LoadPayloadsPartialWLT16(
-    uint gtid,
-    uint waveSize,
-    uint partIndex,
-    uint serialIterations,
-    inout KeyStruct payloads)
+uint gtid,
+uint waveSize,
+uint partIndex,
+uint serialIterations,
+inout KeyStruct payloads)
 {
-    [unroll]
+[unroll]
     for (uint i = 0, t = DeviceOffsetWLT16(gtid, waveSize, partIndex, serialIterations);
-        i < KEYS_PER_THREAD;
-        ++i, t += waveSize * serialIterations)
+i < KEYS_PER_THREAD;
+++i, t += waveSize * serialIterations)
     {
         if (t < e_numKeys)
             LoadPayload(payloads.k[i], t);
     }
 }
-
 inline void ScatterPayloadsAscendingPartial(
-    uint gtid,
-    uint finalPartSize,
-    DigitStruct digits)
+uint gtid,
+uint finalPartSize,
+DigitStruct digits)
 {
-    [unroll]
+[unroll]
     for (uint i = 0, t = gtid; i < KEYS_PER_THREAD; ++i, t += D_DIM)
     {
         if (t < finalPartSize)
             WritePayload(g_d[digits.d[i] + PART_SIZE] + t, t);
     }
 }
-
 inline void ScatterPayloadsDescendingPartial(
-    uint gtid,
-    uint finalPartSize,
-    DigitStruct digits)
+uint gtid,
+uint finalPartSize,
+DigitStruct digits)
 {
     if (e_radixShift == 24)
     {
-        [unroll]
+[unroll]
         for (uint i = 0, t = gtid; i < KEYS_PER_THREAD; ++i, t += D_DIM)
         {
             if (t < finalPartSize)
@@ -910,22 +839,20 @@ inline void ScatterPayloadsDescendingPartial(
         ScatterPayloadsAscendingPartial(gtid, finalPartSize, digits);
     }
 }
-
 inline void ScatterPairsDevicePartial(
-    uint gtid,
-    uint waveSize,
-    uint partIndex,
-    OffsetStruct offsets)
+uint gtid,
+uint waveSize,
+uint partIndex,
+OffsetStruct offsets)
 {
     DigitStruct digits;
     const uint finalPartSize = e_numKeys - partIndex * PART_SIZE;
 #if defined(SHOULD_ASCEND)
-    ScatterPairsKeyPhaseAscendingPartial(gtid, finalPartSize, digits);
+ScatterPairsKeyPhaseAscendingPartial(gtid, finalPartSize, digits);
 #else
     ScatterPairsKeyPhaseDescendingPartial(gtid, finalPartSize, digits);
 #endif
     GroupMemoryBarrierWithGroupSync();
-    
     KeyStruct payloads;
     if (waveSize >= 16)
         LoadPayloadsPartialWGE16(gtid, waveSize, partIndex, payloads);
@@ -933,26 +860,24 @@ inline void ScatterPairsDevicePartial(
         LoadPayloadsPartialWLT16(gtid, waveSize, partIndex, SerialIterations(waveSize), payloads);
     ScatterPayloadsShared(offsets, payloads);
     GroupMemoryBarrierWithGroupSync();
-    
 #if defined(SHOULD_ASCEND)
-    ScatterPayloadsAscendingPartial(gtid, finalPartSize, digits);
+ScatterPayloadsAscendingPartial(gtid, finalPartSize, digits);
 #else
     ScatterPayloadsDescendingPartial(gtid, finalPartSize, digits);
 #endif
 }
-
 inline void ScatterDevicePartial(
-    uint gtid,
-    uint waveSize,
-    uint partIndex,
-    OffsetStruct offsets)
+uint gtid,
+uint waveSize,
+uint partIndex,
+OffsetStruct offsets)
 {
 #if defined(SORT_PAIRS)
-    ScatterPairsDevicePartial(
-        gtid,
-        waveSize,
-        partIndex,
-        offsets);
+ScatterPairsDevicePartial(
+gtid,
+waveSize,
+partIndex,
+offsets);
 #else
     ScatterKeysOnlyDevicePartial(gtid, partIndex);
 #endif

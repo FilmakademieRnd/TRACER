@@ -1,0 +1,292 @@
+#define GROUP_SIZE      256u
+#define KEYS_PER_THREAD 15u
+#define PART_SIZE       3840u
+#define RADIX           256u
+
+#pragma kernel CalcDepth
+#pragma kernel InitDeviceRadixSort
+#pragma kernel Upsweep
+#pragma kernel Scan
+#pragma kernel Downsweep
+
+#pragma target 4.5
+#pragma only_renderers webgpu
+
+// --- RENDER & SH UNIFORMS ---
+uint _SplatCount;
+int _SHDegree;
+float4x4 _MatrixMV;
+
+StructuredBuffer<uint4> _PositionBuffer;
+StructuredBuffer<uint> _ScaleBuffer;
+StructuredBuffer<float4> _SHCentroidsBuffer;
+RWStructuredBuffer<uint> _EvaluatedColorBuffer;
+
+// --- SORTING UNIFORMS & BUFFERS (All pure uint - IEEE-754 positive floats sort identically as uint!) ---
+uint e_numKeys;
+uint e_radixShift;
+uint e_threadBlocks;
+uint padding;
+
+RWStructuredBuffer<uint> b_sort;
+RWStructuredBuffer<uint> b_alt;
+RWStructuredBuffer<uint> b_sortPayload;
+RWStructuredBuffer<uint> b_altPayload;
+RWStructuredBuffer<uint> b_globalHist;
+RWStructuredBuffer<uint> b_passHist;
+
+groupshared uint g_smem[GROUP_SIZE];
+
+
+// ============================================================================
+// 0. CALC DEPTH & PRE-EVALUATE SH (1x per splat)
+// ============================================================================
+half3 EvalSH_Compute(uint labelIdx, half3 dir, int degree)
+{
+    uint coeffsPerSplat = (degree == 1) ? 3u : ((degree == 2) ? 8u : 15u);
+    uint baseOffset = labelIdx * coeffsPerSplat;
+
+    half x = dir.x;
+    half y = dir.y;
+    half z = dir.z;
+
+    half3 result = (half) 0.4886025119 * (
+        -y * (half3) _SHCentroidsBuffer[baseOffset + 0].xyz +
+         z * (half3) _SHCentroidsBuffer[baseOffset + 1].xyz -
+         x * (half3) _SHCentroidsBuffer[baseOffset + 2].xyz
+    );
+
+    if (degree >= 2)
+    {
+        half xx = x * x, yy = y * y, zz = z * z;
+        half xy = x * y, yz = y * z, xz = x * z;
+
+        result +=
+             (half) 1.09254843059 * xy * (half3) _SHCentroidsBuffer[baseOffset + 3].xyz -
+             (half) 1.09254843059 * yz * (half3) _SHCentroidsBuffer[baseOffset + 4].xyz +
+             (half) 0.31539156525 * ((half) 2.0 * zz - xx - yy) * (half3) _SHCentroidsBuffer[baseOffset + 5].xyz -
+             (half) 1.09254843059 * xz * (half3) _SHCentroidsBuffer[baseOffset + 6].xyz +
+             (half) 0.54627421530 * (xx - yy) * (half3) _SHCentroidsBuffer[baseOffset + 7].xyz;
+
+        if (degree >= 3)
+        {
+            result +=
+                -(half) 0.59004358993 * y * ((half) 3.0 * xx - yy) * (half3) _SHCentroidsBuffer[baseOffset + 8].xyz +
+                 (half) 2.89061144264 * xy * z * (half3) _SHCentroidsBuffer[baseOffset + 9].xyz -
+                 (half) 0.45704579946 * y * ((half) 4.0 * zz - xx - yy) * (half3) _SHCentroidsBuffer[baseOffset + 10].xyz +
+                 (half) 0.37317633259 * z * ((half) 2.0 * zz - (half) 3.0 * xx - (half) 3.0 * yy) * (half3) _SHCentroidsBuffer[baseOffset + 11].xyz -
+                 (half) 0.45704579946 * x * ((half) 4.0 * zz - xx - yy) * (half3) _SHCentroidsBuffer[baseOffset + 12].xyz +
+                 (half) 1.44530572132 * z * (xx - yy) * (half3) _SHCentroidsBuffer[baseOffset + 13].xyz -
+                 (half) 0.59004358993 * x * (xx - (half) 3.0 * yy) * (half3) _SHCentroidsBuffer[baseOffset + 14].xyz;
+        }
+    }
+    return result;
+}
+
+[numthreads(GROUP_SIZE, 1, 1)]
+void CalcDepth(uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= _SplatCount)
+        return;
+
+    uint4 word = _PositionBuffer[idx];
+
+    float3 pos = float3(
+        f16tof32(word.y & 0xFFFFu),
+        f16tof32((word.y >> 16u) & 0xFFFFu),
+        f16tof32(word.z & 0xFFFFu)
+    );
+
+    float3 viewPos = mul(_MatrixMV, float4(pos, 1.0)).xyz;
+    float distSqr = max(0.0, dot(viewPos, viewPos));
+    b_sort[idx] = asuint(distSqr);
+    b_sortPayload[idx] = idx;
+
+    if (_SHDegree > 0)
+    {
+        half3 baseRgb = half3(
+            (word.x & 0xFFu),
+            ((word.x >> 8u) & 0xFFu),
+            ((word.x >> 16u) & 0xFFu)
+        ) * (half) (1.0 / 255.0);
+
+        half3 dir = (half3) normalize(mul(viewPos, (float3x3) _MatrixMV));
+        dir.z = -dir.z;
+
+        uint labelIdx = _ScaleBuffer[idx];
+        half3 finalRgb = max((half) 0.0, baseRgb + EvalSH_Compute(labelIdx, dir, _SHDegree));
+
+        uint3 qRgb = (uint3) round(saturate(finalRgb * (half) 0.5) * (half) 1023.0);
+        _EvaluatedColorBuffer[idx] = qRgb.r | (qRgb.g << 10u) | (qRgb.b << 20u);
+    }
+}
+
+// ============================================================================
+// 1. INIT GLOBAL HISTOGRAM (Dispatched: 4 x 1 x 1)
+// ============================================================================
+[numthreads(256, 1, 1)]
+void InitDeviceRadixSort(uint3 id : SV_DispatchThreadID)
+{
+    b_globalHist[id.x] = 0u;
+}
+
+// ============================================================================
+// 2. UPSWEEP: LOCAL BLOCK HISTOGRAMS (Dispatched: threadBlocksCount x 1 x 1)
+// ============================================================================
+[numthreads(256, 1, 1)]
+void Upsweep(uint3 gtid3 : SV_GroupThreadID, uint3 gid3 : SV_GroupID)
+{
+    uint gtid = gtid3.x;
+    uint gid = gid3.x;
+
+    g_smem[gtid] = 0u;
+    GroupMemoryBarrierWithGroupSync();
+
+    uint blockStart = gid * PART_SIZE;
+    for (uint i = 0u; i < KEYS_PER_THREAD; ++i)
+    {
+        uint idx = blockStart + i * 256u + gtid;
+        if (idx < e_numKeys)
+        {
+            uint keyUint = b_sort[idx];
+            uint digit = (keyUint >> e_radixShift) & 0xFFu;
+            InterlockedAdd(g_smem[digit], 1u);
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    uint count = g_smem[gtid];
+    b_passHist[gtid * e_threadBlocks + gid] = count;
+
+    uint globalOffset = (e_radixShift << 5u) + gtid;
+    InterlockedAdd(b_globalHist[globalOffset], count);
+}
+
+// ============================================================================
+// 3. SCAN: EXCLUSIVE PREFIX SUM OVER BLOCKS PER DIGIT (Dispatched: 256 x 1 x 1)
+// ============================================================================
+[numthreads(256, 1, 1)]
+void Scan(uint3 gtid3 : SV_GroupThreadID, uint3 gid3 : SV_GroupID)
+{
+    uint gtid = gtid3.x;
+    uint digit = gid3.x;
+    uint baseOffset = digit * e_threadBlocks;
+
+    uint runningTotal = 0u;
+    uint numChunks = (e_threadBlocks + 255u) / 256u;
+
+    for (uint chunk = 0u; chunk < numChunks; ++chunk)
+    {
+        uint idx = chunk * 256u + gtid;
+        uint val = (idx < e_threadBlocks) ? b_passHist[baseOffset + idx] : 0u;
+        g_smem[gtid] = val;
+        GroupMemoryBarrierWithGroupSync();
+
+        for (uint offset = 1u; offset < 256u; offset <<= 1u)
+        {
+            uint safeIdx = (gtid >= offset) ? (gtid - offset) : gtid;
+            uint addVal = (gtid >= offset) ? g_smem[safeIdx] : 0u;
+            GroupMemoryBarrierWithGroupSync();
+            g_smem[gtid] += addVal;
+            GroupMemoryBarrierWithGroupSync();
+        }
+
+        uint exclusiveVal = (g_smem[gtid] - val) + runningTotal;
+        if (idx < e_threadBlocks)
+        {
+            b_passHist[baseOffset + idx] = exclusiveVal;
+        }
+
+        runningTotal += g_smem[255u];
+        GroupMemoryBarrierWithGroupSync();
+    }
+}
+
+// ============================================================================
+// 4. DOWNSWEEP: PURE UINT ATOMIC-FREE LOCAL SORT & SCATTER
+// ============================================================================
+[numthreads(256, 1, 1)]
+void Downsweep(uint3 gtid3 : SV_GroupThreadID, uint3 gid3 : SV_GroupID)
+{
+    uint gtid = gtid3.x;
+    uint gid = gid3.x;
+
+    // Step 1: Exclusive prefix sum of global digit counts + this block's passHist offset
+    uint globalHistBase = (e_radixShift << 5u);
+    uint gHistVal = b_globalHist[globalHistBase + gtid];
+    g_smem[gtid] = gHistVal;
+    GroupMemoryBarrierWithGroupSync();
+
+    for (uint offset = 1u; offset < 256u; offset <<= 1u)
+    {
+        uint safeIdx = (gtid >= offset) ? (gtid - offset) : gtid;
+        uint addVal = (gtid >= offset) ? g_smem[safeIdx] : 0u;
+        GroupMemoryBarrierWithGroupSync();
+        g_smem[gtid] += addVal;
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    uint myDigitCursor = (g_smem[gtid] - gHistVal) + b_passHist[gtid * e_threadBlocks + gid];
+    GroupMemoryBarrierWithGroupSync();
+
+    // Step 2: Process 15 waves of 256 keys (4x unrolled inner loop, only 4 barriers per wave)
+    uint blockStart = gid * PART_SIZE;
+    for (uint i = 0u; i < KEYS_PER_THREAD; ++i)
+    {
+        uint idx = blockStart + i * 256u + gtid;
+        bool valid = (idx < e_numKeys);
+
+        uint keyUint = valid ? b_sort[idx] : 0u;
+        uint payload = valid ? b_sortPayload[idx] : 0u;
+        uint digit = valid ? ((keyUint >> e_radixShift) & 0xFFu) : 256u;
+
+        g_smem[gtid] = digit;
+        GroupMemoryBarrierWithGroupSync();
+
+        uint localRank = 0u;
+        uint countForMyBin = 0u;
+        for (uint j = 0u; j < 256u; j += 4u)
+        {
+            uint d0 = g_smem[j];
+            uint d1 = g_smem[j + 1u];
+            uint d2 = g_smem[j + 2u];
+            uint d3 = g_smem[j + 3u];
+
+            if (d0 == digit && (j) < gtid)
+                localRank++;
+            if (d1 == digit && (j + 1u) < gtid)
+                localRank++;
+            if (d2 == digit && (j + 2u) < gtid)
+                localRank++;
+            if (d3 == digit && (j + 3u) < gtid)
+                localRank++;
+
+            if (d0 == gtid)
+                countForMyBin++;
+            if (d1 == gtid)
+                countForMyBin++;
+            if (d2 == gtid)
+                countForMyBin++;
+            if (d3 == gtid)
+                countForMyBin++;
+        }
+        GroupMemoryBarrierWithGroupSync();
+
+        g_smem[gtid] = myDigitCursor;
+        myDigitCursor += countForMyBin;
+        GroupMemoryBarrierWithGroupSync();
+
+        if (valid)
+        {
+            uint destIdx = g_smem[digit] + localRank;
+            if (e_radixShift == 24u)
+            {
+                destIdx = e_numKeys - destIdx - 1u;
+            }
+            b_alt[destIdx] = keyUint;
+            b_altPayload[destIdx] = payload;
+        }
+        GroupMemoryBarrierWithGroupSync();
+    }
+}

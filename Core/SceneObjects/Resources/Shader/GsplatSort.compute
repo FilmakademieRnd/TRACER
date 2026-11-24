@@ -10,14 +10,10 @@
 #pragma kernel Scan
 #pragma kernel Downsweep
 
-//#pragma multi_compile _ VULKAN
-
 #pragma target 4.5
-
-#if !defined(SHADER_API_METAL)
-    #pragma use_dxc
-    #pragma require wavebasic waveballot
-#endif
+#pragma use_dxc
+#pragma require wavebasic waveballot
+#pragma exclude_renderers webgpu
 
 uint _SplatCount;
 int _SHDegree;
