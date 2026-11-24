@@ -13,6 +13,19 @@ public class GsplatRenderer : MonoBehaviour
         public static GraphicsBuffer PassHistBuffer { get; private set; }
         public static GraphicsBuffer GlobalHistBuffer { get; private set; }
 
+        private static GraphicsBuffer s_dummyBuffer;
+        public static GraphicsBuffer DummyBuffer
+        {
+            get
+            {
+                if (s_dummyBuffer == null || !s_dummyBuffer.IsValid())
+                {
+                    s_dummyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, 16);
+                }
+                return s_dummyBuffer;
+            }
+        }
+
         public static int CurrentCapacity { get; private set; }
 
         /// <summary>
@@ -30,8 +43,8 @@ public class GsplatRenderer : MonoBehaviour
             int threadBlocksCount = (requiredSplatCount + 3839) / 3840;
 
             GlobalHistBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 256 * 4, sizeof(uint));
-            PassHistBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Mathf.Max(1, 256 * threadBlocksCount), sizeof(uint));
-            AltKeysBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, requiredSplatCount, sizeof(uint));
+            PassHistBuffer   = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Mathf.Max(1, 256 * threadBlocksCount), sizeof(uint));
+            AltKeysBuffer    = new GraphicsBuffer(GraphicsBuffer.Target.Structured, requiredSplatCount, sizeof(uint));
             AltPayloadBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, requiredSplatCount, sizeof(uint));
         }
 
@@ -44,14 +57,89 @@ public class GsplatRenderer : MonoBehaviour
             if (AltPayloadBuffer != null && AltPayloadBuffer.IsValid()) AltPayloadBuffer.Dispose();
             if (PassHistBuffer != null && PassHistBuffer.IsValid()) PassHistBuffer.Dispose();
             if (GlobalHistBuffer != null && GlobalHistBuffer.IsValid()) GlobalHistBuffer.Dispose();
+            if (s_dummyBuffer != null && s_dummyBuffer.IsValid()) s_dummyBuffer.Dispose();
 
             AltKeysBuffer = null;
             AltPayloadBuffer = null;
             PassHistBuffer = null;
             GlobalHistBuffer = null;
+            s_dummyBuffer = null;
             CurrentCapacity = 0;
         }
     }
+
+
+    public class RenderResource : IDisposable
+    {
+        public uint SplatCount { get; private set; }
+        public Bounds Bounds { get; private set; }
+
+        // Persistent VRAM structured buffer references owned exclusively by this instance
+        public GraphicsBuffer PositionBuffer { get; private set; }       // _PositionBuffer (uint4)
+        public GraphicsBuffer ScaleBuffer { get; private set; }          // _ScaleBuffer (uint)
+        public GraphicsBuffer OrderBuffer { get; private set; }          // _OrderBuffer (uint)
+        public GraphicsBuffer DistanceBuffer { get; private set; }       // b_sort (uint)
+        public GraphicsBuffer SHCentroidsBuffer { get; private set; }    // _SHCentroidsBuffer (float4)
+        public GraphicsBuffer EvaluatedColorBuffer { get; private set; } // Pre-evaluated 10-10-10 HDR RGB color
+
+        public RenderResource(
+            NativeArray<uint4> packedSplats,
+            NativeArray<uint> shLabels,
+            NativeArray<float4> shCentroids,
+            int count,
+            Bounds bounds)
+        {
+            SplatCount = (uint)count;
+            Bounds = bounds;
+
+            PositionBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint) * 4);
+            OrderBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
+            DistanceBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
+
+            PositionBuffer.SetData(packedSplats);
+
+            // Allocate SH buffers ONLY if higher SH bands (1-3) are present
+            if (shLabels.IsCreated && shLabels.Length > 0 && shCentroids.IsCreated && shCentroids.Length > 0)
+            {
+                ScaleBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
+                ScaleBuffer.SetData(shLabels);
+
+                SHCentroidsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, shCentroids.Length, sizeof(float) * 4);
+                SHCentroidsBuffer.SetData(shCentroids);
+
+                EvaluatedColorBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
+            }
+
+            NativeArray<uint> initialOrder = new NativeArray<uint>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            try
+            {
+                for (int i = 0; i < count; i++) initialOrder[i] = (uint)i;
+                OrderBuffer.SetData(initialOrder);
+            }
+            finally
+            {
+                if (initialOrder.IsCreated) initialOrder.Dispose();
+            }
+        }
+
+        public void Dispose()
+        {
+            if (PositionBuffer != null && PositionBuffer.IsValid()) PositionBuffer.Dispose();
+            if (ScaleBuffer != null && ScaleBuffer.IsValid()) ScaleBuffer.Dispose();
+            if (SHCentroidsBuffer != null && SHCentroidsBuffer.IsValid()) SHCentroidsBuffer.Dispose();
+            if (EvaluatedColorBuffer != null && EvaluatedColorBuffer.IsValid()) EvaluatedColorBuffer.Dispose();
+            if (OrderBuffer != null && OrderBuffer.IsValid()) OrderBuffer.Dispose();
+            if (DistanceBuffer != null && DistanceBuffer.IsValid()) DistanceBuffer.Dispose();
+
+            PositionBuffer = null;
+            ScaleBuffer = null;
+            SHCentroidsBuffer = null;
+            EvaluatedColorBuffer = null;
+            OrderBuffer = null;
+            DistanceBuffer = null;
+        }
+    }
+
 
     private class GsplatSettings
     {
@@ -110,71 +198,6 @@ public class GsplatRenderer : MonoBehaviour
             return s_instancedMesh;
         }
     }
-    public class RenderResource : IDisposable
-    {
-        public uint SplatCount { get; private set; }
-        public Bounds Bounds { get; private set; }
-
-        // Persistent VRAM structured buffer references owned exclusively by this instance
-        public GraphicsBuffer PositionBuffer { get; private set; } // _PositionBuffer (uint4)
-        public GraphicsBuffer ScaleBuffer { get; private set; }    // _ScaleBuffer (uint2)
-        public GraphicsBuffer OrderBuffer { get; private set; }    // _OrderBuffer (uint)
-        public GraphicsBuffer DistanceBuffer { get; private set; } // b_sort (uint)
-        public GraphicsBuffer SHCentroidsBuffer { get; private set; }
-
-        public RenderResource(
-        NativeArray<uint4> packedSplats,
-        NativeArray<uint> shLabels,
-        NativeArray<float4> shCentroids,
-        int count,
-        Bounds bounds)
-        {
-            SplatCount = (uint)count;
-            Bounds = bounds;
-
-            PositionBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint) * 4);
-            OrderBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
-            DistanceBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
-
-            PositionBuffer.SetData(packedSplats);
-
-            // Allocate SH buffers ONLY if higher SH bands (1-3) are present
-            if (shLabels.IsCreated && shLabels.Length > 0 && shCentroids.IsCreated && shCentroids.Length > 0)
-            {
-                ScaleBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
-                ScaleBuffer.SetData(shLabels);
-
-                SHCentroidsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, shCentroids.Length, sizeof(float) * 4);
-                SHCentroidsBuffer.SetData(shCentroids);
-            }
-
-            NativeArray<uint> initialOrder = new NativeArray<uint>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-            try
-            {
-                for (int i = 0; i < count; i++) initialOrder[i] = (uint)i;
-                OrderBuffer.SetData(initialOrder);
-            }
-            finally
-            {
-                if (initialOrder.IsCreated) initialOrder.Dispose();
-            }
-        }
-
-        public void Dispose()
-        {
-            if (PositionBuffer != null && PositionBuffer.IsValid()) PositionBuffer.Dispose();
-            if (ScaleBuffer != null && ScaleBuffer.IsValid()) ScaleBuffer.Dispose();
-            if (SHCentroidsBuffer != null && SHCentroidsBuffer.IsValid()) SHCentroidsBuffer.Dispose();
-            if (OrderBuffer != null && OrderBuffer.IsValid()) OrderBuffer.Dispose();
-            if (DistanceBuffer != null && DistanceBuffer.IsValid()) DistanceBuffer.Dispose();
-
-            PositionBuffer = null;
-            ScaleBuffer = null;
-            SHCentroidsBuffer = null;
-            OrderBuffer = null;
-            DistanceBuffer = null;
-        }
-    }
 
     public float m_Brightness = 1.0f;
     public float m_ScaleFactor = 1.0f;
@@ -220,6 +243,7 @@ public class GsplatRenderer : MonoBehaviour
     private static readonly int k_altPayload = Shader.PropertyToID("b_altPayload");
     private static readonly int k_orderBuffer = Shader.PropertyToID("_OrderBuffer");
     private static readonly int k_scaleBuffer = Shader.PropertyToID("_ScaleBuffer");
+    private static readonly int k_evalColorBuffer   = Shader.PropertyToID("_EvaluatedColorBuffer");
     private static readonly int k_shCentroidsBuffer = Shader.PropertyToID("_SHCentroidsBuffer");
     private static readonly int k_shDegree = Shader.PropertyToID("_SHDegree");
     private static readonly int k_brightness = Shader.PropertyToID("_Brightness");
@@ -283,13 +307,14 @@ public class GsplatRenderer : MonoBehaviour
         m_propertyBlock.SetBuffer(k_posBuffer, m_gpuResource.PositionBuffer);
         m_propertyBlock.SetBuffer(k_orderBuffer, m_gpuResource.OrderBuffer);
 
-        // Conditionally bind higher Spherical Harmonics buffers (Bands 1-3)
-        if (m_shBands > 0 && m_gpuResource.ScaleBuffer != null && m_gpuResource.SHCentroidsBuffer != null)
-        {
-            m_propertyBlock.SetBuffer(k_scaleBuffer, m_gpuResource.ScaleBuffer);
-            m_propertyBlock.SetBuffer(k_shCentroidsBuffer, m_gpuResource.SHCentroidsBuffer);
-        }
+        // Bind pre-evaluated SH color buffer (with Metal dummy fallback when m_shBands == 0)
+        GraphicsBuffer evalColorBuf = (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null)
+            ? m_gpuResource.EvaluatedColorBuffer
+            : SortResource.DummyBuffer;
+
+        m_propertyBlock.SetBuffer(k_evalColorBuffer, evalColorBuf);
     }
+
 
     private void Update()
     {
@@ -331,31 +356,41 @@ public class GsplatRenderer : MonoBehaviour
         // Ensure shared scratch buffers exist and are large enough for this object
         SortResource.EnsureCapacity(count);
 
-        GraphicsBuffer srcKeys = m_gpuResource.DistanceBuffer;
-        GraphicsBuffer dstKeys = SortResource.AltKeysBuffer;
+        GraphicsBuffer srcKeys    = m_gpuResource.DistanceBuffer;
+        GraphicsBuffer dstKeys    = SortResource.AltKeysBuffer;
         GraphicsBuffer srcPayload = m_gpuResource.OrderBuffer;
         GraphicsBuffer dstPayload = SortResource.AltPayloadBuffer;
         GraphicsBuffer globalHist = SortResource.GlobalHistBuffer;
-        GraphicsBuffer passHist = SortResource.PassHistBuffer;
+        GraphicsBuffer passHist   = SortResource.PassHistBuffer;
 
         if (dstKeys == null || dstPayload == null || globalHist == null || passHist == null) return;
 
         int kernelCalcDepth = SortCompute.FindKernel("CalcDepth");
-        int kernelInitSort = SortCompute.FindKernel("InitDeviceRadixSort");
-        int kernelUpsweep = SortCompute.FindKernel("Upsweep");
-        int kernelScan = SortCompute.FindKernel("Scan");
+        int kernelInitSort  = SortCompute.FindKernel("InitDeviceRadixSort");
+        int kernelUpsweep   = SortCompute.FindKernel("Upsweep");
+        int kernelScan      = SortCompute.FindKernel("Scan");
         int kernelDownsweep = SortCompute.FindKernel("Downsweep");
 
         int threadBlocksCount = (count + 3839) / 3840;
         Matrix4x4 modelViewMatrix = m_mainCamera.worldToCameraMatrix * transform.localToWorldMatrix;
 
-        // --- STEP 1: CALCULATE VIEW-SPACE DEPTH KEYS & SEED PAYLOAD ---
+        // --- STEP 1: CALCULATE VIEW-SPACE DEPTH KEYS, SEED PAYLOAD & PRE-EVALUATE SH ---
         SortCompute.SetInt(k_splatCount, count);
+        SortCompute.SetInt(k_shDegree, m_shBands);
         SortCompute.SetMatrix(k_matrixMV, modelViewMatrix);
 
         SortCompute.SetBuffer(kernelCalcDepth, k_posBuffer, m_gpuResource.PositionBuffer);
         SortCompute.SetBuffer(kernelCalcDepth, k_sortPayload, srcPayload);
         SortCompute.SetBuffer(kernelCalcDepth, k_sort, srcKeys);
+
+        // Metal requires ALL declared buffers in CalcDepth to be bound, even when m_shBands == 0
+        bool hasSH = m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null;
+        GraphicsBuffer dummy = SortResource.DummyBuffer;
+
+        SortCompute.SetBuffer(kernelCalcDepth, k_scaleBuffer, hasSH ? m_gpuResource.ScaleBuffer : dummy);
+        SortCompute.SetBuffer(kernelCalcDepth, k_shCentroidsBuffer, hasSH ? m_gpuResource.SHCentroidsBuffer : dummy);
+        SortCompute.SetBuffer(kernelCalcDepth, k_evalColorBuffer, hasSH ? m_gpuResource.EvaluatedColorBuffer : dummy);
+
         SortCompute.Dispatch(kernelCalcDepth, (count + 255) / 256, 1, 1);
 
         // --- STEP 2: RUN 4-PASS LSD RADIX SORT WITH PING-PONG ---
@@ -394,6 +429,7 @@ public class GsplatRenderer : MonoBehaviour
             (srcPayload, dstPayload) = (dstPayload, srcPayload);
         }
     }
+
 
     private void LateUpdate()
     {

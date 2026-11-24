@@ -20,11 +20,58 @@
 #endif
 
 uint _SplatCount;
+int _SHDegree;
 float4x4 _MatrixMV;
 
 StructuredBuffer<uint4> _PositionBuffer;
+StructuredBuffer<uint> _ScaleBuffer;
+StructuredBuffer<float4> _SHCentroidsBuffer;
+RWStructuredBuffer<uint> _EvaluatedColorBuffer;
 
 #include "DeviceRadixSort.hlsl"
+
+half3 EvalSH_Compute(uint labelIdx, half3 dir, int degree)
+{
+    uint coeffsPerSplat = (degree == 1) ? 3u : ((degree == 2) ? 8u : 15u);
+    uint baseOffset = labelIdx * coeffsPerSplat;
+
+    half x = dir.x;
+    half y = dir.y;
+    half z = dir.z;
+
+    // Band 1
+    half3 result = (half)0.4886025119 * (
+        -y * (half3)_SHCentroidsBuffer[baseOffset + 0].xyz +
+         z * (half3)_SHCentroidsBuffer[baseOffset + 1].xyz -
+         x * (half3)_SHCentroidsBuffer[baseOffset + 2].xyz
+    );
+
+    if (degree >= 2)
+    {
+        half xx = x * x, yy = y * y, zz = z * z;
+        half xy = x * y, yz = y * z, xz = x * z;
+
+        result +=
+             (half)1.09254843059 * xy * (half3)_SHCentroidsBuffer[baseOffset + 3].xyz -
+             (half)1.09254843059 * yz * (half3)_SHCentroidsBuffer[baseOffset + 4].xyz +
+             (half)0.31539156525 * ((half)2.0 * zz - xx - yy) * (half3)_SHCentroidsBuffer[baseOffset + 5].xyz -
+             (half)1.09254843059 * xz * (half3)_SHCentroidsBuffer[baseOffset + 6].xyz +
+             (half)0.54627421530 * (xx - yy) * (half3)_SHCentroidsBuffer[baseOffset + 7].xyz;
+
+        if (degree >= 3)
+        {
+            result +=
+                -(half)0.59004358993 * y * ((half)3.0 * xx - yy) * (half3)_SHCentroidsBuffer[baseOffset + 8].xyz +
+                 (half)2.89061144264 * xy * z * (half3)_SHCentroidsBuffer[baseOffset + 9].xyz -
+                 (half)0.45704579946 * y * ((half)4.0 * zz - xx - yy) * (half3)_SHCentroidsBuffer[baseOffset + 10].xyz +
+                 (half)0.37317633259 * z * ((half)2.0 * zz - (half)3.0 * xx - (half)3.0 * yy) * (half3)_SHCentroidsBuffer[baseOffset + 11].xyz -
+                 (half)0.45704579946 * x * ((half)4.0 * zz - xx - yy) * (half3)_SHCentroidsBuffer[baseOffset + 12].xyz +
+                 (half)1.44530572132 * z * (xx - yy) * (half3)_SHCentroidsBuffer[baseOffset + 13].xyz -
+                 (half)0.59004358993 * x * (xx - (half)3.0 * yy) * (half3)_SHCentroidsBuffer[baseOffset + 14].xyz;
+        }
+    }
+    return result;
+}
 
 [numthreads(GROUP_SIZE, 1, 1)]
 void CalcDepth(uint3 id : SV_DispatchThreadID)
@@ -50,4 +97,24 @@ void CalcDepth(uint3 id : SV_DispatchThreadID)
     // Since #define SHOULD_ASCEND is disabled, DeviceRadixSort automatically sorts descending (Back-to-Front)!
     b_sort[idx] = distSqr;
     b_sortPayload[idx] = idx;
+
+    // 4. Pre-evaluate view-dependent SH color once per splat (Bands 1-3)
+    if (_SHDegree > 0)
+    {
+        half3 baseRgb = half3(
+            (word.x & 0xFFu),
+            ((word.x >> 8u) & 0xFFu),
+            ((word.x >> 16u) & 0xFFu)
+        ) * (half)(1.0 / 255.0);
+
+        half3 dir = (half3)normalize(mul(viewPos, (float3x3)_MatrixMV));
+        dir.z = -dir.z;
+
+        uint labelIdx = _ScaleBuffer[idx];
+        half3 finalRgb = max((half)0.0, baseRgb + EvalSH_Compute(labelIdx, dir, _SHDegree));
+
+        // Pack into 10-10-10 bits with [0.0 .. 2.0] HDR range
+        uint3 qRgb = (uint3)round(saturate(finalRgb * (half)0.5) * (half)1023.0);
+        _EvaluatedColorBuffer[idx] = qRgb.r | (qRgb.g << 10u) | (qRgb.b << 20u);
+    }
 }

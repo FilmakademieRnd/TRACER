@@ -65,7 +65,7 @@ namespace tracer
         //! The month of the time used to calculate the sun position.
         //!
         private Parameter<int> m_month;
-       
+
 
         //!
         //! Factory to create a new SceneObject and do it's initialisation.
