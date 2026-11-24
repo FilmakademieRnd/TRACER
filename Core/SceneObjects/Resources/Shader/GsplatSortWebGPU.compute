@@ -22,27 +22,21 @@ StructuredBuffer<uint> _ScaleBuffer;
 StructuredBuffer<float4> _SHCentroidsBuffer;
 RWStructuredBuffer<uint> _EvaluatedColorBuffer;
 
-// --- SORTING UNIFORMS & BUFFERS ---
+// --- SORTING UNIFORMS & BUFFERS (All pure uint - IEEE-754 positive floats sort identically as uint!) ---
 uint e_numKeys;
 uint e_radixShift;
 uint e_threadBlocks;
 uint padding;
 
-RWStructuredBuffer<float> b_sort;
-RWStructuredBuffer<float> b_alt;
+RWStructuredBuffer<uint> b_sort;
+RWStructuredBuffer<uint> b_alt;
 RWStructuredBuffer<uint> b_sortPayload;
 RWStructuredBuffer<uint> b_altPayload;
 RWStructuredBuffer<uint> b_globalHist;
 RWStructuredBuffer<uint> b_passHist;
 
-// Exact 16 KB (4096 uints) WebGPU guaranteed workgroup memory limit
-groupshared uint g_smem[4096];
+groupshared uint g_smem[GROUP_SIZE];
 
-inline uint FloatToUint(float f)
-{
-    uint mask = -((int) (asuint(f) >> 31u)) | 0x80000000u;
-    return asuint(f) ^ mask;
-}
 
 // ============================================================================
 // 0. CALC DEPTH & PRE-EVALUATE SH (1x per splat)
@@ -105,7 +99,8 @@ void CalcDepth(uint3 id : SV_DispatchThreadID)
     );
 
     float3 viewPos = mul(_MatrixMV, float4(pos, 1.0)).xyz;
-    b_sort[idx] = dot(viewPos, viewPos);
+    float distSqr = max(0.0, dot(viewPos, viewPos));
+    b_sort[idx] = asuint(distSqr);
     b_sortPayload[idx] = idx;
 
     if (_SHDegree > 0)
@@ -145,33 +140,23 @@ void Upsweep(uint3 gtid3 : SV_GroupThreadID, uint3 gid3 : SV_GroupID)
     uint gtid = gtid3.x;
     uint gid = gid3.x;
 
-    // 16 bank-separated histograms (16 * 256 = 4096 uints) to eliminate atomic contention
-    for (uint b = 0u; b < 16u; ++b)
-    {
-        g_smem[b * 256u + gtid] = 0u;
-    }
+    g_smem[gtid] = 0u;
     GroupMemoryBarrierWithGroupSync();
 
-    uint bankOffset = (gtid & 15u) * 256u;
     uint blockStart = gid * PART_SIZE;
     for (uint i = 0u; i < KEYS_PER_THREAD; ++i)
     {
         uint idx = blockStart + i * 256u + gtid;
         if (idx < e_numKeys)
         {
-            uint keyUint = FloatToUint(b_sort[idx]);
+            uint keyUint = b_sort[idx];
             uint digit = (keyUint >> e_radixShift) & 0xFFu;
-            InterlockedAdd(g_smem[bankOffset + digit], 1u);
+            InterlockedAdd(g_smem[digit], 1u);
         }
     }
     GroupMemoryBarrierWithGroupSync();
 
-    uint count = 0u;
-    for (uint b2 = 0u; b2 < 16u; ++b2)
-    {
-        count += g_smem[b2 * 256u + gtid];
-    }
-
+    uint count = g_smem[gtid];
     b_passHist[gtid * e_threadBlocks + gid] = count;
 
     uint globalOffset = (e_radixShift << 5u) + gtid;
@@ -219,7 +204,7 @@ void Scan(uint3 gtid3 : SV_GroupThreadID, uint3 gid3 : SV_GroupID)
 }
 
 // ============================================================================
-// 4. DOWNSWEEP: ATOMIC-FREE 2-BIT SUB-RADIX LOCAL SORT & SCATTER
+// 4. DOWNSWEEP: PURE UINT ATOMIC-FREE LOCAL SORT & SCATTER
 // ============================================================================
 [numthreads(256, 1, 1)]
 void Downsweep(uint3 gtid3 : SV_GroupThreadID, uint3 gid3 : SV_GroupID)
@@ -227,7 +212,7 @@ void Downsweep(uint3 gtid3 : SV_GroupThreadID, uint3 gid3 : SV_GroupID)
     uint gtid = gtid3.x;
     uint gid = gid3.x;
 
-    // Step 1: Compute exclusive prefix sum of global digit counts + block offset
+    // Step 1: Exclusive prefix sum of global digit counts + this block's passHist offset
     uint globalHistBase = (e_radixShift << 5u);
     uint gHistVal = b_globalHist[globalHistBase + gtid];
     g_smem[gtid] = gHistVal;
@@ -242,155 +227,66 @@ void Downsweep(uint3 gtid3 : SV_GroupThreadID, uint3 gid3 : SV_GroupID)
         GroupMemoryBarrierWithGroupSync();
     }
 
-    uint myDigitGlobalBase = (g_smem[gtid] - gHistVal) + b_passHist[gtid * e_threadBlocks + gid];
+    uint myDigitCursor = (g_smem[gtid] - gHistVal) + b_passHist[gtid * e_threadBlocks + gid];
     GroupMemoryBarrierWithGroupSync();
 
-    // Step 2: Load 15 keys per thread and pack (invalidFlag[31] | digit8[23:16] | localPos[11:0])
+    // Step 2: Process 15 waves of 256 keys (4x unrolled inner loop, only 4 barriers per wave)
     uint blockStart = gid * PART_SIZE;
-    uint validCount = (blockStart < e_numKeys) ? min(PART_SIZE, e_numKeys - blockStart) : 0u;
-
     for (uint i = 0u; i < KEYS_PER_THREAD; ++i)
     {
-        uint localPos = gtid * KEYS_PER_THREAD + i;
-        uint globalIdx = blockStart + localPos;
-        bool valid = (localPos < validCount);
-        uint keyUint = valid ? FloatToUint(b_sort[globalIdx]) : 0xFFFFFFFFu;
-        uint digit8 = valid ? ((keyUint >> e_radixShift) & 0xFFu) : 0xFFu;
-        g_smem[localPos] = (valid ? 0u : 0x80000000u) | (digit8 << 16u) | localPos;
-    }
-    GroupMemoryBarrierWithGroupSync();
+        uint idx = blockStart + i * 256u + gtid;
+        bool valid = (idx < e_numKeys);
 
-    // Step 3: Sort all 3840 packed items in shared memory via 4 atomic-free 2-bit passes
-    uint myItems[KEYS_PER_THREAD];
-    for (uint subShift = 16u; subShift <= 22u; subShift += 2u)
-    {
-        uint c0 = 0u, c1 = 0u, c2 = 0u, c3 = 0u;
-        for (uint i = 0u; i < KEYS_PER_THREAD; ++i)
-        {
-            uint item = g_smem[gtid * KEYS_PER_THREAD + i];
-            myItems[i] = item;
-            uint d2 = (item >> subShift) & 3u;
-            if (d2 == 0u)
-                c0++;
-            else if (d2 == 1u)
-                c1++;
-            else if (d2 == 2u)
-                c2++;
-            else
-                c3++;
-        }
+        uint keyUint = valid ? b_sort[idx] : 0u;
+        uint payload = valid ? b_sortPayload[idx] : 0u;
+        uint digit = valid ? ((keyUint >> e_radixShift) & 0xFFu) : 256u;
 
-        // Prefix sum for buckets 0 and 1 (packed 16-bit each, max sum 3840 < 65535)
-        uint packed01 = c0 | (c1 << 16u);
-        g_smem[3840u + gtid] = packed01;
-        GroupMemoryBarrierWithGroupSync();
-        for (uint off = 1u; off < 256u; off <<= 1u)
-        {
-            uint safeIdx = (gtid >= off) ? (gtid - off) : gtid;
-            uint addVal = (gtid >= off) ? g_smem[3840u + safeIdx] : 0u;
-            GroupMemoryBarrierWithGroupSync();
-            g_smem[3840u + gtid] += addVal;
-            GroupMemoryBarrierWithGroupSync();
-        }
-        uint inc01 = g_smem[3840u + gtid];
-        uint exc0 = (inc01 & 0xFFFFu) - c0;
-        uint exc1 = (inc01 >> 16u) - c1;
-        uint tot01 = g_smem[3840u + 255u];
-        uint tot0 = tot01 & 0xFFFFu;
-        uint tot1 = tot01 >> 16u;
-        GroupMemoryBarrierWithGroupSync();
-// Prefix sum for buckets 2 and 3
-        uint packed23 = c2 | (c3 << 16u);
-        g_smem[3840u + gtid] = packed23;
-        GroupMemoryBarrierWithGroupSync();
-        for (uint off2 = 1u; off2 < 256u; off2 <<= 1u)
-        {
-            uint safeIdx = (gtid >= off2) ? (gtid - off2) : gtid;
-            uint addVal = (gtid >= off2) ? g_smem[3840u + safeIdx] : 0u;
-            GroupMemoryBarrierWithGroupSync();
-            g_smem[3840u + gtid] += addVal;
-            GroupMemoryBarrierWithGroupSync();
-        }
-        uint inc23 = g_smem[3840u + gtid];
-        uint exc2 = (inc23 & 0xFFFFu) - c2;
-        uint exc3 = (inc23 >> 16u) - c3;
-        uint tot2 = g_smem[3840u + 255u] & 0xFFFFu;
+        g_smem[gtid] = digit;
         GroupMemoryBarrierWithGroupSync();
 
-        uint b0 = exc0;
-        uint b1 = tot0 + exc1;
-        uint b2 = tot0 + tot1 + exc2;
-        uint b3 = tot0 + tot1 + tot2 + exc3;
-
-        for (uint j = 0u; j < KEYS_PER_THREAD; ++j)
+        uint localRank = 0u;
+        uint countForMyBin = 0u;
+        for (uint j = 0u; j < 256u; j += 4u)
         {
-            uint item = myItems[j];
-            uint d2 = (item >> subShift) & 3u;
-            uint destLocal;
-            if (d2 == 0u)
-            {
-                destLocal = b0;
-                b0++;
-            }
-            else if (d2 == 1u)
-            {
-                destLocal = b1;
-                b1++;
-            }
-            else if (d2 == 2u)
-            {
-                destLocal = b2;
-                b2++;
-            }
-            else
-            {
-                destLocal = b3;
-                b3++;
-            }
-            g_smem[destLocal] = item;
+            uint d0 = g_smem[j];
+            uint d1 = g_smem[j + 1u];
+            uint d2 = g_smem[j + 2u];
+            uint d3 = g_smem[j + 3u];
+
+            if (d0 == digit && (j) < gtid)
+                localRank++;
+            if (d1 == digit && (j + 1u) < gtid)
+                localRank++;
+            if (d2 == digit && (j + 2u) < gtid)
+                localRank++;
+            if (d3 == digit && (j + 3u) < gtid)
+                localRank++;
+
+            if (d0 == gtid)
+                countForMyBin++;
+            if (d1 == gtid)
+                countForMyBin++;
+            if (d2 == gtid)
+                countForMyBin++;
+            if (d3 == gtid)
+                countForMyBin++;
         }
         GroupMemoryBarrierWithGroupSync();
-    }
 
-    // Step 4: Find start position of each 8-bit digit in sorted g_smem[0..validCount-1]
-    g_smem[3840u + gtid] = 0u;
-    GroupMemoryBarrierWithGroupSync();
+        g_smem[gtid] = myDigitCursor;
+        myDigitCursor += countForMyBin;
+        GroupMemoryBarrierWithGroupSync();
 
-    for (uint k = 0u; k < KEYS_PER_THREAD; ++k)
-    {
-        uint localPos = gtid * KEYS_PER_THREAD + k;
-        if (localPos < validCount)
+        if (valid)
         {
-            uint d = (g_smem[localPos] >> 16u) & 0xFFu;
-            uint prevPos = (localPos > 0u) ? (localPos - 1u) : 0u;
-            bool isStart = (localPos == 0u) || (((g_smem[prevPos] >> 16u) & 0xFFu) != d);
-            if (isStart)
-            {
-                g_smem[3840u + d] = localPos;
-            }
-        }
-    }
-    GroupMemoryBarrierWithGroupSync();
-// Thread d = gtid combines myDigitGlobalBase with startPos so each scatter thread needs 1 lookup
-    g_smem[3840u + gtid] = myDigitGlobalBase - g_smem[3840u + gtid];
-    GroupMemoryBarrierWithGroupSync();
-// Step 5: Scatter sorted keys & payloads to global buffers (Descending on pass 3: shift == 24)
-    for (uint s = 0u; s < KEYS_PER_THREAD; ++s)
-    {
-        uint localPos = gtid * KEYS_PER_THREAD + s;
-        if (localPos < validCount)
-        {
-            uint packed = g_smem[localPos];
-            uint d = (packed >> 16u) & 0xFFu;
-            uint origLocalPos = packed & 0xFFFu;
-            uint globalSrcIdx = blockStart + origLocalPos;
-            uint destIdx = g_smem[3840u + d] + localPos;
+            uint destIdx = g_smem[digit] + localRank;
             if (e_radixShift == 24u)
             {
                 destIdx = e_numKeys - destIdx - 1u;
             }
-            b_alt[destIdx] = b_sort[globalSrcIdx];
-            b_altPayload[destIdx] = b_sortPayload[globalSrcIdx];
+            b_alt[destIdx] = keyUint;
+            b_altPayload[destIdx] = payload;
         }
+        GroupMemoryBarrierWithGroupSync();
     }
 }

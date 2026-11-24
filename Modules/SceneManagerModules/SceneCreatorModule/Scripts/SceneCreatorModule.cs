@@ -566,6 +566,110 @@ private const string WEBP_DLL = "__Internal";
         }
 
 
+        public static class GsplatImportancePruner
+        {
+            public static int PruneInPlace(NativeArray<uint4> packedSplats, NativeArray<uint> shLabels, int totalCount, float keepRatio)
+            {
+                if (!packedSplats.IsCreated || totalCount <= 0)
+                    return 0;
+
+                keepRatio = Mathf.Clamp(keepRatio, 0.05f, 1.0f);
+                if (keepRatio >= 0.999f)
+                    return totalCount;
+
+                int targetCount = Mathf.Max(1, Mathf.RoundToInt(totalCount * keepRatio));
+
+                // 1. Precompute 256 scale values once (avoids 22M Exp calls)
+                NativeArray<float> scaleLUT = new NativeArray<float>(256, Allocator.Temp);
+                scaleLUT[0] = 0f;
+                float lnScaleStep = (9.0f - (-12.0f)) / 254.0f;
+                for (int i = 1; i < 256; i++)
+                {
+                    scaleLUT[i] = Mathf.Exp(-12.0f + (i - 1) * lnScaleStep);
+                }
+
+                // 2. Compute 2D surface-weighted opacity scores & 2048-bin histogram
+                NativeArray<float> scores = new NativeArray<float>(totalCount, Allocator.Temp);
+                NativeArray<int> histogram = new NativeArray<int>(2048, Allocator.Temp);
+                int nonZeroCount = 0;
+
+                for (int i = 0; i < totalCount; i++)
+                {
+                    uint4 p = packedSplats[i];
+                    float alpha = ((p.x >> 24) & 0xFFu) * (1f / 255f);
+                    if (alpha <= (1f / 255f))
+                        continue;
+
+                    float sx = scaleLUT[(int)(p.w & 0xFFu)];
+                    float sy = scaleLUT[(int)((p.w >> 8) & 0xFFu)];
+                    float sz = scaleLUT[(int)((p.w >> 16) & 0xFFu)];
+
+                    float area = (sx * sy) + (sy * sz) + (sx * sz);
+                    float score = alpha * area;
+
+                    if (score > 0f)
+                    {
+                        scores[i] = score;
+                        int bucket = (BitConverter.SingleToInt32Bits(score) >> 20) & 0x7FF;
+                        histogram[bucket]++;
+                        nonZeroCount++;
+                    }
+                }
+
+                int keptCount;
+                if (nonZeroCount <= targetCount)
+                {
+                    keptCount = CompactNativeArrays(packedSplats, shLabels, scores, 0f, totalCount);
+                }
+                else
+                {
+                    int accumulated = 0;
+                    int cutoffBucket = 0;
+                    for (int b = 2047; b >= 0; b--)
+                    {
+                        accumulated += histogram[b];
+                        if (accumulated >= targetCount)
+                        {
+                            cutoffBucket = b;
+                            break;
+                        }
+                    }
+
+                    float minThreshold = BitConverter.Int32BitsToSingle(cutoffBucket << 20);
+                    keptCount = CompactNativeArrays(packedSplats, shLabels, scores, minThreshold, totalCount);
+                }
+
+                scaleLUT.Dispose();
+                scores.Dispose();
+                histogram.Dispose();
+
+                Debug.Log($"[GsplatPruner] Pruned {totalCount:N0} -> {keptCount:N0} splats ({(keptCount * 100f / totalCount):F1}% kept).");
+                return keptCount;
+            }
+
+            private static int CompactNativeArrays(NativeArray<uint4> packedSplats, NativeArray<uint> shLabels, NativeArray<float> scores, float minThreshold, int totalCount)
+            {
+                bool hasSH = shLabels.IsCreated && shLabels.Length >= totalCount;
+                int writeIdx = 0;
+
+                for (int readIdx = 0; readIdx < totalCount; readIdx++)
+                {
+                    if (scores[readIdx] > minThreshold)
+                    {
+                        if (writeIdx != readIdx)
+                        {
+                            packedSplats[writeIdx] = packedSplats[readIdx];
+                            if (hasSH)
+                                shLabels[writeIdx] = shLabels[readIdx];
+                        }
+                        writeIdx++;
+                    }
+                }
+
+                return writeIdx;
+            }
+        }
+
         //!
         //!
         //!
@@ -715,6 +819,13 @@ private const string WEBP_DLL = "__Internal";
                     shLabels.Dispose();
                 }
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+                float keepRatio = 0.65f; // 65% im WebGPU-Build (~35% weniger Overdraw)
+#else
+                float keepRatio = 1.0f;  // 100% im Editor & auf nativem Desktop/iOS
+#endif
+                int finalCount = GsplatImportancePruner.PruneInPlace(packedSplats, packedSHLabels, count, keepRatio);
+
                 // 5. Compute world-space bounding box from header limits
                 float3 bMin = boundsMinVec;
                 float3 bMax = boundsMaxVec;
@@ -728,7 +839,7 @@ private const string WEBP_DLL = "__Internal";
                 Bounds bounds = new Bounds((finalMin + finalMax) * 0.5f, finalMax - finalMin);
 
                 // 6. Upload packed buffers to GPU and dispose temporary unmanaged memory
-                GsplatRenderer.RenderResource gpuResource = new GsplatRenderer.RenderResource(packedSplats, packedSHLabels, unpackedSHCentroids, count, bounds);
+                GsplatRenderer.RenderResource gpuResource = new GsplatRenderer.RenderResource(packedSplats, packedSHLabels, unpackedSHCentroids, finalCount, bounds);
                 SceneGplatResourceList.Add(gpuResource);
 
                 scaleRemapLUT.Dispose();

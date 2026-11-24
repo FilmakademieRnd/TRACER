@@ -28,6 +28,8 @@
             StructuredBuffer<uint4> _PositionBuffer;        // Remapped to hold the packed uint4 geometry records
             StructuredBuffer<uint>  _OrderBuffer;           // Sorted GPU indices array
             
+            StructuredBuffer<uint4> _ProjectedSplatBuffer;  // Compact 32-byte (2 x uint4) pre-projected splat buffer
+            
             #ifndef SH_BANDS_0
             StructuredBuffer<uint>  _EvaluatedColorBuffer;  // Pre-evaluated 10-10-10 HDR RGB color from CalcDepth
             #endif
@@ -100,67 +102,37 @@
 
                 uint subInstanceId = (uint)round(v.vertex.z);
                 uint globalSplatOrder = v.instanceID * 128U + subInstanceId;
-
-                if (globalSplatOrder >= _SplatCount) 
+                if (globalSplatOrder >= _SplatCount)
                     return o;
 
                 uint splatId = _OrderBuffer[globalSplatOrder];
-                uint4 packedSplat = _PositionBuffer[splatId];
-    
-                float3 modelCenter, scale;
-                float4 quat, color;
-                UnpackSplat(packedSplat, color, modelCenter, scale, quat);
+                uint baseIdx = splatId * 2u;
 
-                // 1. Early alpha cull
-                if (color.a < (1.0 / 255.0))
+                float4 centerClip = asfloat(_ProjectedSplatBuffer[baseIdx]);
+                if (centerClip.w <= 0.0)
                     return o;
 
-                float4x4 modelView = mul(UNITY_MATRIX_V, _MATRIX_M);
-                SplatCenter center;
-                if (!InitCenter(modelView, modelCenter, center)) 
-                    return o;
+                uint4 axesAndColor = _ProjectedSplatBuffer[baseIdx + 1u];
 
-                // 2. Early frustum culling (25% guard-band)
-                float guardW = center.proj.w * 1.25;
-                if (center.proj.w <= 0.0 ||
-                    abs(center.proj.x) > guardW ||
-                    abs(center.proj.y) > guardW)
-                {
-                    return o;
-                }
+                float2 axis1 = float2(f16tof32(axesAndColor.x & 0xFFFFu), f16tof32(axesAndColor.x >> 16u));
+                float2 axis2 = float2(f16tof32(axesAndColor.y & 0xFFFFu), f16tof32(axesAndColor.y >> 16u));
+                float uvScale = f16tof32(axesAndColor.z & 0xFFFFu);
 
-                SplatCovariance cov = CalcCovariance(quat, scale);
-                SplatCorner corner;
-                SplatSource src;
-                src.cornerUV = v.vertex.xy * _ScaleFactor;
+                float2 offset = v.vertex.x * axis1 + v.vertex.y * axis2;
+                o.vertex = centerClip + float4(offset.x, _ProjectionParams.x * offset.y, 0.0, 0.0);
+                o.uv = v.vertex.xy * uvScale;
 
-                if (!InitCorner(src, cov, center, false, corner)) 
-                    return o;
+                uint c = axesAndColor.w;
+                o.color = float4(
+                    (c & 0xFFu),
+                    ((c >> 8u) & 0xFFu),
+                    ((c >> 16u) & 0xFFu),
+                    ((c >> 24u) & 0xFFu)
+                ) * (1.0 / 255.0);
 
-                ClipCorner(corner, color.a);
-
-                // 3. Sub-pixel culling (skips splats smaller than ~0.7 pixels)
-                if (all(abs(corner.offset) * _ScreenParams.xy < (center.proj.w * 0.7)))
-                {
-                    return o;
-                }
-
-            #ifndef SH_BANDS_0
-                // Read pre-evaluated 10-10-10 HDR color (1 single uint fetch instead of 15 float4 fetches!)
-                uint packedEvalColor = _EvaluatedColorBuffer[splatId];
-                color.rgb = float3(
-                    (packedEvalColor & 0x3FFu),
-                    ((packedEvalColor >> 10u) & 0x3FFu),
-                    ((packedEvalColor >> 20u) & 0x3FFu)
-                ) * (2.0 / 1023.0);
-            #endif
-
-                o.vertex = center.proj + float4(corner.offset.x, _ProjectionParams.x * corner.offset.y, 0, 0);
-                float3 finalRgb = _GammaToLinear ? GammaToLinearSpace(color.rgb) : color.rgb;
-                o.color = float4(finalRgb * _Brightness, color.a);
-                o.uv = corner.uv;
                 return o;
             }
+
 
             // float4 frag(v2f i) : SV_Target
             // {
@@ -178,18 +150,17 @@
             //     return float4(color * alpha * _Brightness, alpha);
             // }
 
-            half4 frag(v2f i) : SV_Target
+           half4 frag(v2f i) : SV_Target
             {
                 half2 uv = (half2)i.uv;
                 half A = dot(uv, uv);
-                if (A > (half)1.0) discard;
 
-                // Single exp() with exact zero-cutoff at circle edge (exp(-4.0) = 0.0183156)
-                half gaussian = max((half)0.0, exp(-A * (half)4.0) - (half)0.0183156) * (half)1.018657;
+                // Pure FP16 Gaussian approximation (zero exp() SFU stalls, zero discard TBDR penalties)
+                half t = saturate((half)1.0 - A);
+                half t2 = t * t;
+                half gaussian = t2 * t2;
+
                 half alpha = gaussian * (half)i.color.a;
-
-                if (alpha < (half)(1.0 / 255.0)) discard;
-
                 return half4((half3)i.color.rgb * alpha, alpha);
             }
             ENDHLSL

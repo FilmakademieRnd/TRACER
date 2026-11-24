@@ -1,0 +1,244 @@
+#pragma kernel ProjectSplats
+#pragma target 4.5
+
+uint _SplatCount;
+uint _UseEvaluatedColor;
+uint _GammaToLinear;
+float _ScaleFactor;
+float _Brightness;
+
+float4 _ScreenParams;
+float4 _OrthoParams;
+float4x4 _MatrixMV;
+float4x4 _MatrixP;
+
+StructuredBuffer<uint4> _PositionBuffer;
+StructuredBuffer<uint> _EvaluatedColorBuffer;
+RWStructuredBuffer<uint4> _ProjectedSplatBuffer;
+
+float4 DecodeQuatSogV2(uint4 packedData)
+{
+    float qR = float((packedData.z >> 16u) & 0xFFu) / 255.0;
+    float qG = float((packedData.z >> 24u) & 0xFFu) / 255.0;
+    float qB = float((packedData.w >> 24u) & 0x3Fu) / 63.0;
+    uint mode = (packedData.w >> 30u) & 0x03u;
+
+    const float invSqrt2 = 0.70710678118;
+    float a = (qR * 2.0 - 1.0) * invSqrt2;
+    float b = (qG * 2.0 - 1.0) * invSqrt2;
+    float c = (qB * 2.0 - 1.0) * invSqrt2;
+    float d = sqrt(max(0.0, 1.0 - (a * a + b * b + c * c)));
+
+    float qw, qx, qy, qz;
+    if (mode == 0u)
+    {
+        qw = d;
+        qx = a;
+        qy = b;
+        qz = c;
+    }
+    else if (mode == 1u)
+    {
+        qw = a;
+        qx = d;
+        qy = b;
+        qz = c;
+    }
+    else if (mode == 2u)
+    {
+        qw = a;
+        qx = b;
+        qy = d;
+        qz = c;
+    }
+    else
+    {
+        qw = a;
+        qx = b;
+        qy = c;
+        qz = d;
+    }
+
+    return float4(qw, -qx, -qy, qz);
+}
+
+float3x3 QuatToMat3(float4 R)
+{
+    float4 R2 = R + R;
+    float X = R2.x * R.w;
+    float4 Y = R2.y * R;
+    float4 Z = R2.z * R;
+    float W = R2.w * R.w;
+
+    return float3x3(
+        1.0 - Z.z - W, Y.z + X, Y.w - Z.x,
+        Y.z - X, 1.0 - Y.y - W, Z.w + Y.x,
+        Y.w + Z.x, Z.w - Y.x, 1.0 - Y.y - Z.z
+    );
+}
+
+float3 GammaToLinearApprox(float3 sRGB)
+{
+    return sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);
+}
+
+[numthreads(256, 1, 1)]
+void ProjectSplats(uint3 id : SV_DispatchThreadID)
+{
+    uint splatId = id.x;
+    if (splatId >= _SplatCount)
+        return;
+
+    uint baseOut = splatId * 2u;
+    uint4 packedData = _PositionBuffer[splatId];
+
+    // 1. Early alpha cull
+    float alpha = float((packedData.x >> 24u) & 0xFFu) * (1.0 / 255.0);
+    if (alpha < (1.0 / 255.0))
+    {
+        _ProjectedSplatBuffer[baseOut] = uint4(0, 0, 0, 0); // w == 0.0 marks culled
+        return;
+    }
+
+    // 2. Transform center & near-lens / frustum cull
+    float3 modelCenter = float3(
+        f16tof32(packedData.y & 0xFFFFu),
+        f16tof32((packedData.y >> 16u) & 0xFFFFu),
+        f16tof32(packedData.z & 0xFFFFu)
+    );
+
+    float4 centerView = mul(_MatrixMV, float4(modelCenter, 1.0));
+    if (centerView.z > 0.0)
+    {
+        _ProjectedSplatBuffer[baseOut] = uint4(0, 0, 0, 0);
+        return;
+    }
+
+    float4 centerProj = mul(_MatrixP, centerView);
+    float w = centerProj.w;
+    float guardW = w * 1.25;
+    if (w <= 0.12 || abs(centerProj.x) > guardW || abs(centerProj.y) > guardW)
+    {
+        _ProjectedSplatBuffer[baseOut] = uint4(0, 0, 0, 0);
+        return;
+    }
+    centerProj.z = clamp(centerProj.z, -abs(w), abs(w));
+
+    // 3. Unpack scale & quaternion, compute 3D covariance
+    uint3 uScale = uint3(packedData.w & 0xFFu, (packedData.w >> 8u) & 0xFFu, (packedData.w >> 16u) & 0xFFu);
+    const float lnScaleScale = (9.0 - (-12.0)) / 254.0;
+    float3 scale = float3(
+        (uScale.x == 0u) ? 0.0 : exp(-12.0 + float(uScale.x - 1u) * lnScaleScale),
+        (uScale.y == 0u) ? 0.0 : exp(-12.0 + float(uScale.y - 1u) * lnScaleScale),
+        (uScale.z == 0u) ? 0.0 : exp(-12.0 + float(uScale.z - 1u) * lnScaleScale)
+    );
+    float4 quat = DecodeQuatSogV2(packedData);
+
+    float3x3 rot = QuatToMat3(quat);
+    float3x3 M = transpose(float3x3(scale.x * rot[0], scale.y * rot[1], scale.z * rot[2]));
+    float3 covA = float3(dot(M[0], M[0]), dot(M[0], M[1]), dot(M[0], M[2]));
+    float3 covB = float3(dot(M[1], M[1]), dot(M[1], M[2]), dot(M[2], M[2]));
+
+    float3x3 Vrk = float3x3(
+        covA.x, covA.y, covA.z,
+        covA.y, covB.x, covB.y,
+        covA.z, covB.y, covB.z
+    );
+
+    // 4. Project covariance to 2D screen-space ellipse
+    float3 viewDir = centerView.xyz / centerView.w;
+    float focal = _ScreenParams.x * _MatrixP[0][0];
+    float3 v = (_OrthoParams.w == 1.0) ? float3(0.0, 0.0, 1.0) : viewDir;
+
+    float J1 = focal / v.z;
+    float2 J2 = -J1 / v.z * v.xy;
+    float3x3 J = float3x3(J1, 0.0, J2.x, 0.0, J1, J2.y, 0.0, 0.0, 0.0);
+    float3x3 T = mul(J, (float3x3) _MatrixMV);
+    float3x3 cov2D = mul(mul(T, Vrk), transpose(T));
+
+    float diagonal1 = cov2D[0][0] + 0.3;
+    float offDiagonal = cov2D[0][1];
+    float diagonal2 = cov2D[1][1] + 0.3;
+
+    float mid = 0.5 * (diagonal1 + diagonal2);
+    float radius = length(float2((diagonal1 - diagonal2) * 0.5, offDiagonal));
+    float lambda1 = mid + radius;
+    float lambda2 = max(mid - radius, 0.1);
+
+    float vmin = min(1024.0, min(_ScreenParams.x, _ScreenParams.y));
+    float l1 = 2.0 * min(sqrt(2.0 * lambda1), vmin);
+    float l2 = 2.0 * min(sqrt(2.0 * lambda2), vmin);
+
+    if (l1 < 2.0 && l2 < 2.0)
+    {
+        _ProjectedSplatBuffer[baseOut] = uint4(0, 0, 0, 0);
+        return;
+    }
+
+    float2 c = float2(w, w) / _ScreenParams.xy;
+    float maxL = max(l1, l2);
+    if (any(abs(centerProj.xy) - float2(maxL, maxL) * c > float2(w, w)))
+    {
+        _ProjectedSplatBuffer[baseOut] = uint4(0, 0, 0, 0);
+        return;
+    }
+
+    float2 diagonalVector = normalize(float2(offDiagonal, lambda1 - diagonal1));
+    float clip = min(1.0, sqrt(-log((1.0 / 255.0) / alpha)) * 0.5);
+    float uvScale = _ScaleFactor * clip;
+
+    // Precompute the two 2D quad basis vectors in clip space
+    float2 axis1 = (l1 * diagonalVector) * c * uvScale;
+    float2 axis2 = (l2 * float2(diagonalVector.y, -diagonalVector.x)) * c * uvScale;
+
+    // 5. Sub-pixel cull & Close-Up Overdraw Clamp
+    float maxAxisNDC = max(length(axis1), length(axis2));
+    if (maxAxisNDC * max(_ScreenParams.x, _ScreenParams.y) * 0.5 < (w * 0.8))
+    {
+        _ProjectedSplatBuffer[baseOut] = uint4(0, 0, 0, 0);
+        return;
+    }
+
+    float maxRadiusNDC = w * 0.24;
+    if (maxAxisNDC > maxRadiusNDC)
+    {
+        float clampScale = maxRadiusNDC / maxAxisNDC;
+        axis1 *= clampScale;
+        axis2 *= clampScale;
+    }
+
+    // 6. Resolve final RGB color (SH0 base or SH1-3 evaluated)
+    float3 rgb;
+    if (_UseEvaluatedColor != 0u)
+    {
+        uint packedEval = _EvaluatedColorBuffer[splatId];
+        rgb = float3(
+            (packedEval & 0x3FFu),
+            ((packedEval >> 10u) & 0x3FFu),
+            ((packedEval >> 20u) & 0x3FFu)
+        ) * (2.0 / 1023.0);
+    }
+    else
+    {
+        rgb = float3(
+            (packedData.x & 0xFFu),
+            ((packedData.x >> 8u) & 0xFFu),
+            ((packedData.x >> 16u) & 0xFFu)
+        ) * (1.0 / 255.0);
+    }
+
+    if (_GammaToLinear != 0u)
+        rgb = GammaToLinearApprox(rgb);
+    rgb *= _Brightness;
+
+    // Pack output into compact 32 bytes (2 x uint4)
+    _ProjectedSplatBuffer[baseOut] = asuint(centerProj);
+
+    uint packedAxis1 = f32tof16(axis1.x) | (f32tof16(axis1.y) << 16u);
+    uint packedAxis2 = f32tof16(axis2.x) | (f32tof16(axis2.y) << 16u);
+    uint packedUVScale = f32tof16(uvScale);
+    uint4 qRGBA = (uint4) round(saturate(float4(rgb, alpha)) * 255.0);
+    uint packedColor = qRGBA.r | (qRGBA.g << 8u) | (qRGBA.b << 16u) | (qRGBA.a << 24u);
+
+    _ProjectedSplatBuffer[baseOut + 1u] = uint4(packedAxis1, packedAxis2, packedUVScale, packedColor);
+}

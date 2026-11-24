@@ -12,8 +12,8 @@ public class GsplatRenderer : MonoBehaviour
         public static GraphicsBuffer AltPayloadBuffer { get; private set; }
         public static GraphicsBuffer PassHistBuffer { get; private set; }
         public static GraphicsBuffer GlobalHistBuffer { get; private set; }
-
         private static GraphicsBuffer s_dummyBuffer;
+
         public static GraphicsBuffer DummyBuffer
         {
             get
@@ -96,6 +96,8 @@ public class GsplatRenderer : MonoBehaviour
         public GraphicsBuffer DistanceBuffer { get; private set; }       // b_sort (uint)
         public GraphicsBuffer SHCentroidsBuffer { get; private set; }    // _SHCentroidsBuffer (float4)
         public GraphicsBuffer EvaluatedColorBuffer { get; private set; } // Pre-evaluated 10-10-10 HDR RGB color
+        public GraphicsBuffer ProjectedSplatBuffer { get; private set; } // Pre-evaluated Splat projection
+
 
         public RenderResource(
             NativeArray<uint4> packedSplats,
@@ -110,14 +112,15 @@ public class GsplatRenderer : MonoBehaviour
             PositionBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint) * 4);
             OrderBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
             DistanceBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
+            ProjectedSplatBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count * 2, sizeof(uint) * 4);
 
-            PositionBuffer.SetData(packedSplats);
+            PositionBuffer.SetData(packedSplats, 0, 0, count);
 
             // Allocate SH buffers ONLY if higher SH bands (1-3) are present
             if (shLabels.IsCreated && shLabels.Length > 0 && shCentroids.IsCreated && shCentroids.Length > 0)
             {
                 ScaleBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, count, sizeof(uint));
-                ScaleBuffer.SetData(shLabels);
+                ScaleBuffer.SetData(shLabels, 0, 0, count);
 
                 SHCentroidsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, shCentroids.Length, sizeof(float) * 4);
                 SHCentroidsBuffer.SetData(shCentroids);
@@ -145,6 +148,7 @@ public class GsplatRenderer : MonoBehaviour
             if (EvaluatedColorBuffer != null && EvaluatedColorBuffer.IsValid()) EvaluatedColorBuffer.Dispose();
             if (OrderBuffer != null && OrderBuffer.IsValid()) OrderBuffer.Dispose();
             if (DistanceBuffer != null && DistanceBuffer.IsValid()) DistanceBuffer.Dispose();
+            if (ProjectedSplatBuffer != null && ProjectedSplatBuffer.IsValid()) ProjectedSplatBuffer.Dispose();
 
             PositionBuffer = null;
             ScaleBuffer = null;
@@ -152,6 +156,7 @@ public class GsplatRenderer : MonoBehaviour
             EvaluatedColorBuffer = null;
             OrderBuffer = null;
             DistanceBuffer = null;
+            ProjectedSplatBuffer = null;
         }
     }
 
@@ -219,6 +224,7 @@ public class GsplatRenderer : MonoBehaviour
 
     internal Material SplatMaterial;
     internal ComputeShader SortCompute;
+    internal ComputeShader ProjectCompute;
 
     // Explicit object ownership: This renderer alone owns and destroys its GPU data resource
     private RenderResource m_gpuResource;
@@ -257,6 +263,7 @@ public class GsplatRenderer : MonoBehaviour
     private static readonly int k_alt = Shader.PropertyToID("b_alt");
     private static readonly int k_altPayload = Shader.PropertyToID("b_altPayload");
     private static readonly int k_orderBuffer = Shader.PropertyToID("_OrderBuffer");
+    private static readonly int k_projectBuffer = Shader.PropertyToID("_ProjectedSplatBuffer");
     private static readonly int k_scaleBuffer = Shader.PropertyToID("_ScaleBuffer");
     private static readonly int k_evalColorBuffer   = Shader.PropertyToID("_EvaluatedColorBuffer");
     private static readonly int k_shCentroidsBuffer = Shader.PropertyToID("_SHCentroidsBuffer");
@@ -284,6 +291,8 @@ public class GsplatRenderer : MonoBehaviour
 #endif
         if (SortCompute == null)
             Debug.LogError("[GsplatRenderer] Critical: Sort ComputeShader could not be loaded from Resources.");
+        
+        if (ProjectCompute == null) ProjectCompute = Resources.Load<ComputeShader>("Shader/GsplatProject");
 
 
         if (m_mainCamera != null)
@@ -319,6 +328,7 @@ public class GsplatRenderer : MonoBehaviour
         // Core geometry and sorting index buffers
         m_propertyBlock.SetBuffer(k_posBuffer, m_gpuResource.PositionBuffer);
         m_propertyBlock.SetBuffer(k_orderBuffer, m_gpuResource.OrderBuffer);
+        m_propertyBlock.SetBuffer(k_projectBuffer, m_gpuResource.ProjectedSplatBuffer);
 
         // Bind pre-evaluated SH color buffer (with Metal dummy fallback when m_shBands == 0)
         GraphicsBuffer evalColorBuf = (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null)
@@ -326,36 +336,6 @@ public class GsplatRenderer : MonoBehaviour
             : SortResource.DummyBuffer;
 
         m_propertyBlock.SetBuffer(k_evalColorBuffer, evalColorBuf);
-    }
-
-
-    private void Update()
-    {
-        if (m_gpuResource == null || SortCompute == null) return;
-        if (m_mainCamera == null) m_mainCamera = Camera.main;
-        if (m_mainCamera == null) return;
-
-        // Protect framerate during rapid camera movements
-        if (Time.unscaledTime - m_lastSortTime < m_minSortInterval)
-            return;
-
-        Vector3 currentPos = m_mainCamera.transform.position;
-        Quaternion currentRot = m_mainCamera.transform.rotation;
-
-        // 1. Check linear movement distance (squared for performance)
-        float posThresholdSqr = m_positionThreshold * m_positionThreshold;
-        float travelDeltaSqr = (currentPos - m_lastCameraPos).sqrMagnitude;
-
-        // 2. Check true angular rotation without 360-degree Euler wrap-around bugs
-        float angleDelta = Quaternion.Angle(m_lastCameraRot, currentRot);
-
-        if (travelDeltaSqr > posThresholdSqr || angleDelta > m_rotationThreshold)
-        {
-            m_lastCameraPos = currentPos;
-            m_lastCameraRot = currentRot;
-            m_lastSortTime = Time.unscaledTime;
-            DispatchSort();
-        }
     }
 
     private void DispatchSort()
@@ -445,19 +425,38 @@ public class GsplatRenderer : MonoBehaviour
         }
     }
 
-
     private void LateUpdate()
     {
         if (m_gpuResource == null || SplatMaterial == null) return;
         if (m_mainCamera == null) m_mainCamera = Camera.main;
         if (m_mainCamera == null) return;
 
-        // 1. Update only per-frame dynamic uniforms (Buffers & SplatCount are already bound in SetupPropertyBlock!)
+        // 1. Sort & evaluate SH1-3 after all camera/object movements in Update() have finished
+        if (SortCompute != null && Time.unscaledTime - m_lastSortTime >= m_minSortInterval)
+        {
+            Vector3 currentPos = m_mainCamera.transform.position;
+            Quaternion currentRot = m_mainCamera.transform.rotation;
+
+            float posThresholdSqr = m_positionThreshold * m_positionThreshold;
+            float travelDeltaSqr = (currentPos - m_lastCameraPos).sqrMagnitude;
+            float angleDelta = Quaternion.Angle(m_lastCameraRot, currentRot);
+
+            if (travelDeltaSqr > posThresholdSqr || angleDelta > m_rotationThreshold || transform.hasChanged)
+            {
+                m_lastCameraPos = currentPos;
+                m_lastCameraRot = currentRot;
+                transform.hasChanged = false;
+                m_lastSortTime = Time.unscaledTime;
+                DispatchSort();
+            }
+        }
+
+        // 2. Update only per-frame dynamic uniforms
         m_propertyBlock.SetMatrix(k_matrixM, transform.localToWorldMatrix);
         m_propertyBlock.SetFloat(k_scaleFactor, m_ScaleFactor);
         m_propertyBlock.SetFloat(k_brightness, m_Brightness);
 
-        // 2. Setup RenderParams using pre-allocated batch mesh and world-space bounds
+        // 3. Setup RenderParams using pre-allocated batch mesh and world-space bounds
         RenderParams rp = new RenderParams(SplatMaterial)
         {
             worldBounds = CalcWorldBounds(m_gpuResource.Bounds, transform),
@@ -465,12 +464,39 @@ public class GsplatRenderer : MonoBehaviour
             layer = gameObject.layer
         };
 
-        // 3. Submit instanced draw call (128 splats per instance)
+        // 4. Submit instanced draw call (128 splats per instance)
         Mesh batchMesh = GsplatSettings.GetBatchMesh();
         int instanceCount = ((int)m_gpuResource.SplatCount + (int)GsplatSettings.SplatInstanceSize - 1) / (int)GsplatSettings.SplatInstanceSize;
 
+        if (ProjectCompute != null)
+        {
+            int kernelProj = 0;
+            int count = (int)m_gpuResource.SplatCount;
+            Matrix4x4 mv = m_mainCamera.worldToCameraMatrix * transform.localToWorldMatrix;
+            Matrix4x4 proj = GL.GetGPUProjectionMatrix(m_mainCamera.projectionMatrix, m_mainCamera.targetTexture != null);
+
+            ProjectCompute.SetInt("_SplatCount", count);
+            ProjectCompute.SetInt("_UseEvaluatedColor", (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null) ? 1 : 0);
+            ProjectCompute.SetInt("_GammaToLinear", QualitySettings.activeColorSpace == ColorSpace.Linear ? 1 : 0);
+            ProjectCompute.SetFloat("_ScaleFactor", m_ScaleFactor);
+            ProjectCompute.SetFloat("_Brightness", m_Brightness);
+            ProjectCompute.SetVector("_ScreenParams", new Vector4(m_mainCamera.pixelWidth, m_mainCamera.pixelHeight, 1f + 1f / m_mainCamera.pixelWidth, 1f + 1f / m_mainCamera.pixelHeight));
+            ProjectCompute.SetVector("_OrthoParams", new Vector4(m_mainCamera.orthographicSize * m_mainCamera.aspect, m_mainCamera.orthographicSize, 0f, m_mainCamera.orthographic ? 1f : 0f));
+            ProjectCompute.SetMatrix("_MatrixMV", mv);
+            ProjectCompute.SetMatrix("_MatrixP", proj);
+
+            ProjectCompute.SetBuffer(kernelProj, "_PositionBuffer", m_gpuResource.PositionBuffer);
+            ProjectCompute.SetBuffer(kernelProj, "_EvaluatedColorBuffer", (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null) ? m_gpuResource.EvaluatedColorBuffer : SortResource.DummyBuffer);
+            ProjectCompute.SetBuffer(kernelProj, "_ProjectedSplatBuffer", m_gpuResource.ProjectedSplatBuffer);
+
+            int groups = (count + 255) / 256;
+            ProjectCompute.Dispatch(kernelProj, groups, 1, 1);
+        }
+
+
         Graphics.RenderMeshPrimitives(rp, batchMesh, 0, instanceCount);
     }
+
 
     private Bounds CalcWorldBounds(Bounds localBounds, Transform trans)
     {
