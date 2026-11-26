@@ -59,7 +59,7 @@ namespace tracer
         //!
         public override void Awake(){
             base.Awake();
-            _core = GameObject.FindObjectOfType<Core>();
+            _core = FindFirstObjectByType<Core>();
             m_uiManager = _core.getManager<UIManager>();
         }
 

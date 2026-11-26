@@ -135,7 +135,7 @@ namespace tracer
             //base.Awake();
 
             if (_core == null)
-                _core = GameObject.FindObjectOfType<Core>();
+                _core = FindFirstObjectByType<Core>();
 
             _sceneID = 254;
 

@@ -1,19 +1,44 @@
 #pragma kernel ProjectSplats
 #pragma target 4.5
 
+struct SceneLightData
+{
+    float4 posAndRange; // xyz = world position, w = 1.0 / (range * range) (0 for directional)
+    float4 colorAndType; // rgb = linear color * intensity, a = 0 (directional), 1 (point/spot)
+    float4 dirAndSpot; // xyz = normalized direction toward light, w = cos(spotHalfAngle) (0 for point)
+};
+
 uint _SplatCount;
 uint _UseEvaluatedColor;
 uint _GammaToLinear;
 float _ScaleFactor;
 float _Brightness;
 
+// --- TOGGLEABLE LIGHTING & SHADOW UNIFORMS ---
+uint _EnableRelighting;
+float _RelightStrength;
+uint _LightCount;
+float3 _AmbientColor;
+float3 _WorldSpaceCameraPos;
+
+uint _ReceiveShadows;
+int _ShadowLightIndex;
+uint _ReversedZ;
+float _ShadowBias;
+float _ShadowStrength;
+float2 _ShadowMapSize;
+float4x4 _ShadowMatrixVP;
+
 float4 _ScreenParams;
 float4 _OrthoParams;
+float4x4 _MatrixM;
 float4x4 _MatrixMV;
 float4x4 _MatrixP;
 
 StructuredBuffer<uint4> _PositionBuffer;
 StructuredBuffer<uint> _EvaluatedColorBuffer;
+StructuredBuffer<SceneLightData> _SceneLightsBuffer;
+Texture2D<float> _SplatShadowMap;
 RWStructuredBuffer<uint4> _ProjectedSplatBuffer;
 
 float4 DecodeQuatSogV2(uint4 packedData)
@@ -82,6 +107,49 @@ float3 GammaToLinearApprox(float3 sRGB)
     return sRGB * (sRGB * (sRGB * 0.305306011 + 0.682171111) + 0.012522878);
 }
 
+float SampleSplatShadow(float3 worldPos)
+{
+    float4 shadowClip = mul(_ShadowMatrixVP, float4(worldPos, 1.0));
+    if (shadowClip.w <= 0.0001)
+        return 1.0;
+
+    float3 ndc = shadowClip.xyz / shadowClip.w;
+    float2 uv = ndc.xy * 0.5 + 0.5;
+
+    if (uv.x <= 0.01 || uv.x >= 0.99 || uv.y <= 0.01 || uv.y >= 0.99 || ndc.z <= 0.0 || ndc.z >= 1.0)
+        return 1.0;
+
+    int2 maxCoord = int2(_ShadowMapSize) - int2(1, 1);
+    int2 c0 = clamp(int2(uv * _ShadowMapSize), int2(0, 0), maxCoord);
+    int2 c1 = clamp(c0 + int2(1, 0), int2(0, 0), maxCoord);
+    int2 c2 = clamp(c0 + int2(0, 1), int2(0, 0), maxCoord);
+    int2 c3 = clamp(c0 + int2(1, 1), int2(0, 0), maxCoord);
+
+    float d0 = _SplatShadowMap.Load(int3(c0, 0));
+    float d1 = _SplatShadowMap.Load(int3(c1, 0));
+    float d2 = _SplatShadowMap.Load(int3(c2, 0));
+    float d3 = _SplatShadowMap.Load(int3(c3, 0));
+
+    float litSum = 0.0;
+    if (_ReversedZ != 0u)
+    {
+        litSum += ((ndc.z + _ShadowBias) >= d0) ? 1.0 : 0.0;
+        litSum += ((ndc.z + _ShadowBias) >= d1) ? 1.0 : 0.0;
+        litSum += ((ndc.z + _ShadowBias) >= d2) ? 1.0 : 0.0;
+        litSum += ((ndc.z + _ShadowBias) >= d3) ? 1.0 : 0.0;
+    }
+    else
+    {
+        litSum += ((ndc.z - _ShadowBias) <= d0) ? 1.0 : 0.0;
+        litSum += ((ndc.z - _ShadowBias) <= d1) ? 1.0 : 0.0;
+        litSum += ((ndc.z - _ShadowBias) <= d2) ? 1.0 : 0.0;
+        litSum += ((ndc.z - _ShadowBias) <= d3) ? 1.0 : 0.0;
+    }
+
+    float shadowFactor = litSum * 0.25;
+    return lerp(1.0, shadowFactor, _ShadowStrength);
+}
+
 [numthreads(256, 1, 1)]
 void ProjectSplats(uint3 id : SV_DispatchThreadID)
 {
@@ -96,7 +164,7 @@ void ProjectSplats(uint3 id : SV_DispatchThreadID)
     float alpha = float((packedData.x >> 24u) & 0xFFu) * (1.0 / 255.0);
     if (alpha < (1.0 / 255.0))
     {
-        _ProjectedSplatBuffer[baseOut] = uint4(0, 0, 0, 0); // w == 0.0 marks culled
+        _ProjectedSplatBuffer[baseOut] = uint4(0, 0, 0, 0);
         return;
     }
 
@@ -135,7 +203,12 @@ void ProjectSplats(uint3 id : SV_DispatchThreadID)
     float4 quat = DecodeQuatSogV2(packedData);
 
     float3x3 rot = QuatToMat3(quat);
-    float3x3 M = transpose(float3x3(scale.x * rot[0], scale.y * rot[1], scale.z * rot[2]));
+    float3x3 M = transpose(float3x3(
+        scale.x * rot[0],
+        scale.y * rot[1],
+        scale.z * rot[2]
+    ));
+
     float3 covA = float3(dot(M[0], M[0]), dot(M[0], M[1]), dot(M[0], M[2]));
     float3 covB = float3(dot(M[1], M[1]), dot(M[1], M[2]), dot(M[2], M[2]));
 
@@ -187,7 +260,6 @@ void ProjectSplats(uint3 id : SV_DispatchThreadID)
     float clip = min(1.0, sqrt(-log((1.0 / 255.0) / alpha)) * 0.5);
     float uvScale = _ScaleFactor * clip;
 
-    // Precompute the two 2D quad basis vectors in clip space
     float2 axis1 = (l1 * diagonalVector) * c * uvScale;
     float2 axis2 = (l2 * float2(diagonalVector.y, -diagonalVector.x)) * c * uvScale;
 
@@ -207,7 +279,7 @@ void ProjectSplats(uint3 id : SV_DispatchThreadID)
         axis2 *= clampScale;
     }
 
-    // 6. Resolve final RGB color (SH0 base or SH1-3 evaluated)
+    // 6. Resolve base RGB color (SH0 or SH1-3 evaluated)
     float3 rgb;
     if (_UseEvaluatedColor != 0u)
     {
@@ -229,16 +301,78 @@ void ProjectSplats(uint3 id : SV_DispatchThreadID)
 
     if (_GammaToLinear != 0u)
         rgb = GammaToLinearApprox(rgb);
+
+    // 7. OPTIONAL DYNAMIC RELIGHTING & SHADOW RECEIVING
+    // 7. OPTIONAL DYNAMIC RELIGHTING & SHADOW RECEIVING
+    if ((_EnableRelighting != 0u && _RelightStrength > 0.001) || _ReceiveShadows != 0u)
+    {
+        float3 worldPos = mul(_MatrixM, float4(modelCenter, 1.0)).xyz;
+        float shadowAtten = (_ReceiveShadows != 0u) ? SampleSplatShadow(worldPos) : 1.0;
+
+        if (_EnableRelighting != 0u && _RelightStrength > 0.001)
+        {
+            float3 localNormal;
+            if (scale.x <= scale.y && scale.x <= scale.z)
+                localNormal = rot[0];
+            else if (scale.y <= scale.z)
+                localNormal = rot[1];
+            else
+                localNormal = rot[2];
+
+            float3 worldNormal = normalize(mul((float3x3) _MatrixM, localNormal));
+            float3 toCam = normalize(_WorldSpaceCameraPos - worldPos);
+            if (dot(worldNormal, toCam) < 0.0)
+                worldNormal = -worldNormal;
+
+            float3 totalLight = _AmbientColor;
+
+            for (uint li = 0u; li < _LightCount; ++li)
+            {
+                SceneLightData lData = _SceneLightsBuffer[li];
+                float lightShadow = ((int) li == _ShadowLightIndex) ? shadowAtten : 1.0;
+
+                if (lData.colorAndType.a < 0.5)
+                {
+                    float ndotl = saturate(dot(worldNormal, lData.dirAndSpot.xyz));
+                    totalLight += lData.colorAndType.rgb * (ndotl * lightShadow);
+                }
+                else
+                {
+                    float3 toLight = lData.posAndRange.xyz - worldPos;
+                    float distSqr = dot(toLight, toLight);
+                    float3 lightDir = toLight * rsqrt(max(distSqr, 1e-6));
+
+                    float rangeFactor = saturate(1.0 - distSqr * lData.posAndRange.w);
+                    float atten = (rangeFactor * rangeFactor) / (1.0 + distSqr);
+
+                    if (lData.dirAndSpot.w > 0.0)
+                    {
+                        float cosAngle = dot(lightDir, lData.dirAndSpot.xyz);
+                        float spotCone = smoothstep(lData.dirAndSpot.w, lerp(lData.dirAndSpot.w, 1.0, 0.25), cosAngle);
+                        atten *= spotCone;
+                    }
+
+                    float ndotl = saturate(dot(worldNormal, lightDir));
+                    totalLight += lData.colorAndType.rgb * (ndotl * atten * lightShadow);
+                }
+            }
+
+            float3 relitRgb = rgb * totalLight;
+            rgb = lerp(rgb, relitRgb, _RelightStrength);
+        }
+        else
+        {
+            // Receive shadows directly onto original SOG lighting when full relighting is off
+            rgb *= shadowAtten;
+        }
+    }
     rgb *= _Brightness;
-
-    // Pack output into compact 32 bytes (2 x uint4)
+    // 8. Pack output into compact 32 bytes (2 x uint4)
     _ProjectedSplatBuffer[baseOut] = asuint(centerProj);
-
     uint packedAxis1 = f32tof16(axis1.x) | (f32tof16(axis1.y) << 16u);
     uint packedAxis2 = f32tof16(axis2.x) | (f32tof16(axis2.y) << 16u);
     uint packedUVScale = f32tof16(uvScale);
     uint4 qRGBA = (uint4) round(saturate(float4(rgb, alpha)) * 255.0);
     uint packedColor = qRGBA.r | (qRGBA.g << 8u) | (qRGBA.b << 16u) | (qRGBA.a << 24u);
-
     _ProjectedSplatBuffer[baseOut + 1u] = uint4(packedAxis1, packedAxis2, packedUVScale, packedColor);
 }

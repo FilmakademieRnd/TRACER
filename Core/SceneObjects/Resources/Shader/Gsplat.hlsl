@@ -189,6 +189,7 @@ void ClipCorner(inout SplatCorner corner, float alpha)
 #define SH_C4_8 0.6258357354491761f      // m=+4: +K_{4,4}
 
 // see https://github.com/graphdeco-inria/gaussian-splatting/blob/main/utils/sh_utils.py
+#if SH_COEFFS > 0
 float3 EvalSH(const inout float3 sh[SH_COEFFS], float3 dir, int degree = 3)
 {
     if (degree == 0)
@@ -202,6 +203,7 @@ float3 EvalSH(const inout float3 sh[SH_COEFFS], float3 dir, int degree = 3)
     float3 result = SH_C1 * (-sh[0] * y + sh[1] * z - sh[2] * x);
     if (degree == 1)
         return result;
+
 
 #if defined(SH_BANDS_2) || defined(SH_BANDS_3) || defined(SH_BANDS_4)
     // 2nd degree
@@ -258,6 +260,7 @@ float3 EvalSH(const inout float3 sh[SH_COEFFS], float3 dir, int degree = 3)
 
     return result;
 }
-#endif
+#endif // SH_COEFFS > 0
+#endif // !SH_BANDS_0
 
-#endif
+#endif // GSPLAT_CORE_INCLUDED
