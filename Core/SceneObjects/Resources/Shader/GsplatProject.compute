@@ -20,6 +20,7 @@ float _RelightStrength;
 uint _LightCount;
 float3 _AmbientColor;
 float3 _WorldSpaceCameraPos;
+float4 _HighlightColor; // rgb = color, a = strength 
 
 uint _ReceiveShadows;
 int _ShadowLightIndex;
@@ -37,6 +38,7 @@ float4x4 _MatrixP;
 
 StructuredBuffer<uint4> _PositionBuffer;
 StructuredBuffer<uint> _EvaluatedColorBuffer;
+StructuredBuffer<uint> _OrderBuffer;
 StructuredBuffer<SceneLightData> _SceneLightsBuffer;
 Texture2D<float> _SplatShadowMap;
 RWStructuredBuffer<uint4> _ProjectedSplatBuffer;
@@ -153,11 +155,12 @@ float SampleSplatShadow(float3 worldPos)
 [numthreads(256, 1, 1)]
 void ProjectSplats(uint3 id : SV_DispatchThreadID)
 {
-    uint splatId = id.x;
-    if (splatId >= _SplatCount)
+    uint orderId = id.x;
+    if (orderId >= _SplatCount)
         return;
 
-    uint baseOut = splatId * 2u;
+    uint baseOut = orderId * 2u; 
+    uint splatId = _OrderBuffer[orderId]; 
     uint4 packedData = _PositionBuffer[splatId];
 
     // 1. Early alpha cull
@@ -302,38 +305,61 @@ void ProjectSplats(uint3 id : SV_DispatchThreadID)
     if (_GammaToLinear != 0u)
         rgb = GammaToLinearApprox(rgb);
 
-    // 7. OPTIONAL DYNAMIC RELIGHTING & SHADOW RECEIVING
-    // 7. OPTIONAL DYNAMIC RELIGHTING & SHADOW RECEIVING
-    if ((_EnableRelighting != 0u && _RelightStrength > 0.001) || _ReceiveShadows != 0u)
+    // 7. OPTIONAL DYNAMIC RELIGHTING, SHADOW RECEIVING & PLANARITY-AWARE FRESNEL
+    bool hasRelight = (_EnableRelighting != 0u && _RelightStrength > 0.001);
+    bool hasShadow = (_ReceiveShadows != 0u);
+    bool hasHighlight = (_HighlightColor.a > 0.001);
+
+    if (hasRelight || hasShadow || hasHighlight)
     {
         float3 worldPos = mul(_MatrixM, float4(modelCenter, 1.0)).xyz;
-        float shadowAtten = (_ReceiveShadows != 0u) ? SampleSplatShadow(worldPos) : 1.0;
+        float shadowAtten = hasShadow ? SampleSplatShadow(worldPos) : 1.0;
 
-        if (_EnableRelighting != 0u && _RelightStrength > 0.001)
+        float3 worldNormal = float3(0.0, 1.0, 0.0);
+        float3 toCam = float3(0.0, 0.0, 1.0);
+        float planarity = 1.0;
+
+        if (hasRelight || hasHighlight)
         {
             float3 localNormal;
-            if (scale.x <= scale.y && scale.x <= scale.z)
-                localNormal = rot[0];
-            else if (scale.y <= scale.z)
-                localNormal = rot[1];
-            else
-                localNormal = rot[2];
+            float sMin, sMid;
 
-            float3 worldNormal = normalize(mul((float3x3) _MatrixM, localNormal));
-            float3 toCam = normalize(_WorldSpaceCameraPos - worldPos);
+            if (scale.x <= scale.y && scale.x <= scale.z)
+            {
+                localNormal = rot[0];
+                sMin = scale.x;
+                sMid = min(scale.y, scale.z);
+            }
+            else if (scale.y <= scale.z)
+            {
+                localNormal = rot[1];
+                sMin = scale.y;
+                sMid = min(scale.x, scale.z);
+            }
+            else
+            {
+                localNormal = rot[2];
+                sMin = scale.z;
+                sMid = min(scale.x, scale.y);
+            }
+            // Gentle planarity weight: only pure needles/spheres (sMin ~= sMid) are attenuated
+            planarity = saturate(1.0 - (sMin / max(sMid, 1e-5)) * 1.15);
+            worldNormal = normalize(mul((float3x3) _MatrixM, localNormal));
+            toCam = normalize(_WorldSpaceCameraPos - worldPos);
             if (dot(worldNormal, toCam) < 0.0)
                 worldNormal = -worldNormal;
-
+        }
+        if (hasRelight)
+        {
             float3 totalLight = _AmbientColor;
-
             for (uint li = 0u; li < _LightCount; ++li)
             {
                 SceneLightData lData = _SceneLightsBuffer[li];
                 float lightShadow = ((int) li == _ShadowLightIndex) ? shadowAtten : 1.0;
-
                 if (lData.colorAndType.a < 0.5)
                 {
-                    float ndotl = saturate(dot(worldNormal, lData.dirAndSpot.xyz));
+                    float rawNdotL = saturate(dot(worldNormal, lData.dirAndSpot.xyz));
+                    float ndotl = lerp(0.5, rawNdotL, planarity);
                     totalLight += lData.colorAndType.rgb * (ndotl * lightShadow);
                 }
                 else
@@ -341,32 +367,126 @@ void ProjectSplats(uint3 id : SV_DispatchThreadID)
                     float3 toLight = lData.posAndRange.xyz - worldPos;
                     float distSqr = dot(toLight, toLight);
                     float3 lightDir = toLight * rsqrt(max(distSqr, 1e-6));
-
                     float rangeFactor = saturate(1.0 - distSqr * lData.posAndRange.w);
                     float atten = (rangeFactor * rangeFactor) / (1.0 + distSqr);
-
                     if (lData.dirAndSpot.w > 0.0)
                     {
                         float cosAngle = dot(lightDir, lData.dirAndSpot.xyz);
                         float spotCone = smoothstep(lData.dirAndSpot.w, lerp(lData.dirAndSpot.w, 1.0, 0.25), cosAngle);
                         atten *= spotCone;
                     }
-
-                    float ndotl = saturate(dot(worldNormal, lightDir));
+                    float rawNdotL = saturate(dot(worldNormal, lightDir));
+                    float ndotl = lerp(0.5, rawNdotL, planarity);
                     totalLight += lData.colorAndType.rgb * (ndotl * atten * lightShadow);
                 }
             }
-
             float3 relitRgb = rgb * totalLight;
             rgb = lerp(rgb, relitRgb, _RelightStrength);
         }
-        else
+        else if (hasShadow)
         {
-            // Receive shadows directly onto original SOG lighting when full relighting is off
             rgb *= shadowAtten;
         }
+        if (hasHighlight)
+        {
+            float ndotv = saturate(dot(worldNormal, toCam));
+
+            // Crisp silhouette rim without squaring planarity or dimming by base tint alpha
+            float rim = smoothstep(0.42, 0.92, 1.0 - ndotv);
+            float fresnel = (rim * rim) * lerp(0.35, 1.0, planarity);
+
+            float highlightFactor = saturate(0.14 * _HighlightColor.a + fresnel * 0.85);
+            rgb = lerp(rgb, _HighlightColor.rgb * 1.35, highlightFactor);
+        }
     }
+    
+    //// 7. OPTIONAL DYNAMIC RELIGHTING, SHADOW RECEIVING & FRESNEL HIGHLIGHT
+    //bool hasRelight = (_EnableRelighting != 0u && _RelightStrength > 0.001);
+    //bool hasShadow = (_ReceiveShadows != 0u);
+    //bool hasHighlight = (_HighlightColor.a > 0.001);
+
+    //if (hasRelight || hasShadow || hasHighlight)
+    //{
+    //    float3 worldPos = mul(_MatrixM, float4(modelCenter, 1.0)).xyz;
+    //    float shadowAtten = hasShadow ? SampleSplatShadow(worldPos) : 1.0;
+
+    //    float3 worldNormal = float3(0.0, 1.0, 0.0);
+    //    float3 toCam = float3(0.0, 0.0, 1.0);
+
+    //    // Compute surface normal & view vector once for both relighting and Fresnel rim
+    //    if (hasRelight || hasHighlight)
+    //    {
+    //        float3 localNormal;
+    //        if (scale.x <= scale.y && scale.x <= scale.z)
+    //            localNormal = rot[0];
+    //        else if (scale.y <= scale.z)
+    //            localNormal = rot[1];
+    //        else
+    //            localNormal = rot[2];
+
+    //        worldNormal = normalize(mul((float3x3) _MatrixM, localNormal));
+    //        toCam = normalize(_WorldSpaceCameraPos - worldPos);
+    //        if (dot(worldNormal, toCam) < 0.0)
+    //            worldNormal = -worldNormal;
+    //    }
+
+    //    if (hasRelight)
+    //    {
+    //        float3 totalLight = _AmbientColor;
+
+    //        for (uint li = 0u; li < _LightCount; ++li)
+    //        {
+    //            SceneLightData lData = _SceneLightsBuffer[li];
+    //            float lightShadow = ((int) li == _ShadowLightIndex) ? shadowAtten : 1.0;
+
+    //            if (lData.colorAndType.a < 0.5)
+    //            {
+    //                float ndotl = saturate(dot(worldNormal, lData.dirAndSpot.xyz));
+    //                totalLight += lData.colorAndType.rgb * (ndotl * lightShadow);
+    //            }
+    //            else
+    //            {
+    //                float3 toLight = lData.posAndRange.xyz - worldPos;
+    //                float distSqr = dot(toLight, toLight);
+    //                float3 lightDir = toLight * rsqrt(max(distSqr, 1e-6));
+
+    //                float rangeFactor = saturate(1.0 - distSqr * lData.posAndRange.w);
+    //                float atten = (rangeFactor * rangeFactor) / (1.0 + distSqr);
+
+    //                if (lData.dirAndSpot.w > 0.0)
+    //                {
+    //                    float cosAngle = dot(lightDir, lData.dirAndSpot.xyz);
+    //                    float spotCone = smoothstep(lData.dirAndSpot.w, lerp(lData.dirAndSpot.w, 1.0, 0.25), cosAngle);
+    //                    atten *= spotCone;
+    //                }
+
+    //                float ndotl = saturate(dot(worldNormal, lightDir));
+    //                totalLight += lData.colorAndType.rgb * (ndotl * atten * lightShadow);
+    //            }
+    //        }
+
+    //        float3 relitRgb = rgb * totalLight;
+    //        rgb = lerp(rgb, relitRgb, _RelightStrength);
+    //    }
+    //    else if (hasShadow)
+    //    {
+    //        rgb *= shadowAtten;
+    //    }
+
+    //    // Fresnel Rim Highlight along silhouette edges (+ subtle 15% base tint for flat surfaces)
+    //    if (hasHighlight)
+    //    {
+    //        float ndotv = saturate(dot(worldNormal, toCam));
+    //        float rim = 1.0 - ndotv;
+    //        float fresnel = rim * rim * rim; // Crisp edge falloff (power of 3, zero pow() cost)
+
+    //        float highlightFactor = saturate((0.15 + fresnel * 1.35) * _HighlightColor.a);
+    //        rgb = lerp(rgb, _HighlightColor.rgb * 1.25, highlightFactor);
+    //    }
+    //}
+
     rgb *= _Brightness;
+    
     // 8. Pack output into compact 32 bytes (2 x uint4)
     _ProjectedSplatBuffer[baseOut] = asuint(centerProj);
     uint packedAxis1 = f32tof16(axis1.x) | (f32tof16(axis1.y) << 16u);

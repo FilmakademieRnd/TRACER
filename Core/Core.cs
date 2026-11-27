@@ -155,6 +155,14 @@ namespace tracer
         //! Event invoked every second.
         //!
         public event EventHandler<byte> syncEvent;
+        //!
+        //! Event invoked when a ParameterObject has been added.
+        //!
+        public event EventHandler<ParameterObject> parameterObjectAdded;
+        //!
+        //! Event invoked when a ParameterObject has been renoved.
+        //!
+        public event EventHandler<ParameterObject> parameterObjectRemoved;
 
         //public event  EventHandler<string> QrCodeReady;
         [SerializeField] public bool useRandomCID = false;
@@ -310,7 +318,7 @@ namespace tracer
 
             if (Interlocked.Decrement(ref m_fpsRequestCount) == 0)
             {
-                Application.targetFrameRate = 10;
+                Application.targetFrameRate = 60;
             }
         }
 
@@ -321,7 +329,7 @@ namespace tracer
 
         public void speedDownFPS()
         {
-            Application.targetFrameRate = 10;
+            Application.targetFrameRate = 60;
         }
 
 
@@ -431,6 +439,7 @@ namespace tracer
             }
 
             sceneObjects.Add(poID, parameterObject);
+            parameterObjectAdded?.Invoke(this, parameterObject);
         }
 
         public void removeParameterObject(ParameterObject parameterObject)
@@ -446,6 +455,8 @@ namespace tracer
 
             if (!sceneObjects.Remove(poID))
                 Helpers.Log($"Deletion of parameterObject (ID: {poID}) not possible, object cannot be found in Dictionary!", Helpers.logMsgType.WARNING);
+            else
+                parameterObjectRemoved?.Invoke(this, parameterObject);
         }
 
         //!

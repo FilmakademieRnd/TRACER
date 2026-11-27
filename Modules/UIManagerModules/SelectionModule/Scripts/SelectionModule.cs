@@ -113,16 +113,19 @@ namespace tracer{
 
             SceneObject sceneObject = GetSceneObjectAtPosition(evt.Position);
 
-            if (sceneObject != null){
+            if (sceneObject != null)
+            {
+                Debug.Log(sceneObject.name);
                 
-                if(manager.isThisOurSelectedObject(sceneObject)){
+                if(manager.isThisOurSelectedObject(sceneObject))
                     return;
-                }else{
+                else
                     manager.clearSelectedObjects();
-                }
 
                 manager.addSelectedObject(sceneObject);
-            }else{
+            }
+            else
+            {
                 Debug.Log("<color=red>no valid SceneObject to select</color>");
                 manager.clearSelectedObjects();
             }

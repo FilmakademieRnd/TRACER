@@ -75,6 +75,18 @@ namespace tracer
             manager.unhighlightLocked += DisableHighlightLocked;
         }
 
+        private void SetGsplatHighlight(SceneObject sceneObject, Color color, float strength)
+        {
+            GsplatRenderer[] gsplats = sceneObject.GetComponentsInChildren<GsplatRenderer>(true);
+            for (int i = 0; i < gsplats.Length; i++)
+            {
+                if (strength > 0f)
+                    gsplats[i].SetHighlight(color, strength);
+                else
+                    gsplats[i].ClearHighlight();
+            }
+        }
+
         //!
         //! Function that is called when the UIManager signals an selection.
         //! Will add the outline material to all renderes of the given scene object.
@@ -84,11 +96,11 @@ namespace tracer
         //!
         private void HighlightLocked(object sender, SceneObject sceneObject)
         {
-            if ((sceneObject is SceneObjectCamera) || sceneObject is SceneObjectLight){
-                //show 3d ui lock
-                
+            if ((sceneObject is SceneObjectCamera) || sceneObject is SceneObjectLight){               
                 return;
             }
+
+            SetGsplatHighlight(sceneObject, Color.red, 0.4f);
 
             Renderer[] renderers = sceneObject.GetComponentsInChildren<Renderer>();
 
@@ -112,6 +124,9 @@ namespace tracer
             if ((sceneObject is SceneObjectCamera) || sceneObject is SceneObjectLight)
                 return;
 
+            Color selColor = _outlineMaterial.HasProperty("_OutlineColor") ? _outlineMaterial.GetColor("_OutlineColor") : new Color(1f, 0.65f, 0f, 1f);
+            SetGsplatHighlight(sceneObject, selColor, 0.35f);
+
             Renderer[] renderers = sceneObject.GetComponentsInChildren<Renderer>();
 
             foreach (Renderer renderer in renderers)
@@ -134,7 +149,9 @@ namespace tracer
             if (sceneObject){
                 if ((sceneObject is SceneObjectCamera) || sceneObject is SceneObjectLight)
                     return;
-                
+
+                SetGsplatHighlight(sceneObject, Color.clear, 0f);
+
                 Renderer[] renderers = sceneObject.GetComponentsInChildren<Renderer>();
 
                 foreach (Renderer renderer in renderers)
@@ -158,6 +175,8 @@ namespace tracer
         {
             if ((sceneObject is SceneObjectCamera) || sceneObject is SceneObjectLight)
                 return;
+
+            SetGsplatHighlight(sceneObject, Color.clear, 0f);
 
             Renderer[] renderers = sceneObject.GetComponentsInChildren<Renderer>();
 

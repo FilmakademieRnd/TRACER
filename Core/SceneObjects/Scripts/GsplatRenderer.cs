@@ -167,9 +167,6 @@ public class GsplatRenderer : MonoBehaviour
     {
         // High-performance constant tweaks optimized for smooth WebGL WebGPU rendering
         public const uint SplatInstanceSize = 128; // Pack 128 splats into a single instanced mesh batch
-        public const float CameraTranslationThresholdSqr = 0.04f; // 0.2f * 0.2f (pre-squared for zero-allocation magnitude checks)
-        public const float CameraRotationThreshold = 10f; // Sort if camera rotates more than 10 degrees
-
         private static Mesh s_instancedMesh;
 
         /// <summary>
@@ -246,17 +243,27 @@ public class GsplatRenderer : MonoBehaviour
         public Vector4 dirAndSpot;
     }
 
+    private static int s_activeInstanceCount = 0;
+    private Core m_core;
+    private Camera m_lastSortCamera;
     private const int k_maxSceneLights = 16;
     private static GraphicsBuffer s_sceneLightsBuffer;
     private static readonly SceneLightData[] s_lightDataArray = new SceneLightData[k_maxSceneLights];
     private static int s_cachedLightCount = 0;
     private static List<Light> s_cachedLights;
+    private Color m_highlightColor = Color.clear;
 
     private static Light s_primaryShadowLight;
     private static int s_shadowLightIndex = -1;
     private static Camera s_shadowCam;
     private static RenderTexture s_shadowRT;
     private static int s_lastShadowFrame = -1;
+    private static Vector3 s_lastShadowCamPos;
+    private static Quaternion s_lastShadowCamRot;
+
+    private static readonly List<GsplatRenderer> s_activeRenderers = new List<GsplatRenderer>();
+    private bool m_isSelectable = false;
+    private static UnityEngine.Rendering.CommandBuffer s_idCmd;
 
     private float m_lastSortTime;
 
@@ -282,6 +289,31 @@ public class GsplatRenderer : MonoBehaviour
     private static readonly int k_brightness = Shader.PropertyToID("_Brightness");
     private static readonly int k_scaleFactor = Shader.PropertyToID("_ScaleFactor");
     private static readonly int k_matrixM = Shader.PropertyToID("_MATRIX_M");
+    private static readonly int k_highlightColor = Shader.PropertyToID("_HighlightColor");
+
+    // additional chached IDs for projection, relighting and shadows
+    private static readonly int k_matrixMCompute = Shader.PropertyToID("_MatrixM");
+    private static readonly int k_shadowViewMatrix = Shader.PropertyToID("_ShadowViewMatrix");
+    private static readonly int k_shadowProjMatrix = Shader.PropertyToID("_ShadowProjMatrix");
+    private static readonly int k_shadowMapSize = Shader.PropertyToID("_ShadowMapSize");
+    private static readonly int k_useEvaluatedColor = Shader.PropertyToID("_UseEvaluatedColor");
+    private static readonly int k_gammaToLinear = Shader.PropertyToID("_GammaToLinear");
+    private static readonly int k_enableRelighting = Shader.PropertyToID("_EnableRelighting");
+    private static readonly int k_relightStrength = Shader.PropertyToID("_RelightStrength");
+    private static readonly int k_lightCount = Shader.PropertyToID("_LightCount");
+    private static readonly int k_ambientColor = Shader.PropertyToID("_AmbientColor");
+    private static readonly int k_worldSpaceCameraPos = Shader.PropertyToID("_WorldSpaceCameraPos");
+    private static readonly int k_receiveShadows = Shader.PropertyToID("_ReceiveShadows");
+    private static readonly int k_shadowLightIndex = Shader.PropertyToID("_ShadowLightIndex");
+    private static readonly int k_reversedZ = Shader.PropertyToID("_ReversedZ");
+    private static readonly int k_shadowBias = Shader.PropertyToID("_ShadowBias");
+    private static readonly int k_shadowStrength = Shader.PropertyToID("_ShadowStrength");
+    private static readonly int k_shadowMatrixVP = Shader.PropertyToID("_ShadowMatrixVP");
+    private static readonly int k_screenParams = Shader.PropertyToID("_ScreenParams");
+    private static readonly int k_orthoParams = Shader.PropertyToID("_OrthoParams");
+    private static readonly int k_matrixP = Shader.PropertyToID("_MatrixP");
+    private static readonly int k_sceneLightsBuffer = Shader.PropertyToID("_SceneLightsBuffer");
+    private static readonly int k_splatShadowMap = Shader.PropertyToID("_SplatShadowMap");
 
     [Header("GSplat settings")]
     public float m_Brightness = 1.0f;
@@ -305,7 +337,7 @@ public class GsplatRenderer : MonoBehaviour
     public bool SelfShadows = true;
     [Range(0f, 1f)] public float ShadowStrength = 0.75f;
     [Range(0.005f, 0.6f)] public float ShadowBias = 0.3f; // Bias in Metern (unabhängig von ShadowRange!)
-    public float ShadowRange = 15f;
+    public float ShadowRange = 50f;
 
     public void Initialize(RenderResource allocatedResource, int shBands)
     {
@@ -349,7 +381,7 @@ public class GsplatRenderer : MonoBehaviour
         }
 
         SetupPropertyBlock();
-        DispatchSort();
+        DispatchSort(m_mainCamera);
     }
     private static void OnParameterObjectAdded(object sender, ParameterObject obj)
     {
@@ -381,26 +413,15 @@ public class GsplatRenderer : MonoBehaviour
         if (m_propertyBlock == null) m_propertyBlock = new MaterialPropertyBlock();
 
         m_propertyBlock.SetInt(k_splatCount, (int)m_gpuResource.SplatCount);
-        m_propertyBlock.SetInt(k_shDegree, m_shBands);
 
-        // Core geometry and sorting index buffers
-        m_propertyBlock.SetBuffer(k_posBuffer, m_gpuResource.PositionBuffer);
-        m_propertyBlock.SetBuffer(k_orderBuffer, m_gpuResource.OrderBuffer);
+        // Pass 1 reads _ProjectedSplatBuffer; Pass 2 & 3 (shadows) read _PositionBuffer
         m_propertyBlock.SetBuffer(k_projectBuffer, m_gpuResource.ProjectedSplatBuffer);
-
-        // Bind pre-evaluated SH color buffer (with Metal dummy fallback when m_shBands == 0)
-        GraphicsBuffer evalColorBuf = (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null)
-            ? m_gpuResource.EvaluatedColorBuffer
-            : SortResource.DummyBuffer;
-
-        m_propertyBlock.SetBuffer(k_evalColorBuffer, evalColorBuf);
+        m_propertyBlock.SetBuffer(k_posBuffer, m_gpuResource.PositionBuffer);
     }
 
-    private void DispatchSort()
+    private void DispatchSort(Camera cam)
     {
-        if (m_gpuResource == null || SortCompute == null) return;
-        if (m_mainCamera == null) m_mainCamera = Camera.main;
-        if (m_mainCamera == null) return;
+        if (m_gpuResource == null || SortCompute == null || cam == null) return;
 
         int count = (int)m_gpuResource.SplatCount;
 
@@ -423,7 +444,7 @@ public class GsplatRenderer : MonoBehaviour
         int kernelDownsweep = SortCompute.FindKernel("Downsweep");
 
         int threadBlocksCount = (count + 3839) / 3840;
-        Matrix4x4 modelViewMatrix = m_mainCamera.worldToCameraMatrix * transform.localToWorldMatrix;
+        Matrix4x4 modelViewMatrix = cam.worldToCameraMatrix * transform.localToWorldMatrix;
 
         // --- STEP 1: CALCULATE VIEW-SPACE DEPTH KEYS, SEED PAYLOAD & PRE-EVALUATE SH ---
         SortCompute.SetInt(k_splatCount, count);
@@ -483,53 +504,54 @@ public class GsplatRenderer : MonoBehaviour
         }
     }
 
-    private void LateUpdate()
+    private void OnCameraPreCull(Camera cam)
     {
-        if (m_gpuResource == null || SplatMaterial == null) return;
-        if (m_mainCamera == null) m_mainCamera = Camera.main;
-        if (m_mainCamera == null) return;
+        if (m_gpuResource == null || SplatMaterial == null || cam == null) return;
+        if (cam == s_shadowCam) return;
+        if (cam.cameraType != CameraType.Game && cam.cameraType != CameraType.SceneView) return;
 
-        // 1. Sort & evaluate SH1-3 after all camera/object movements in Update() have finished
+        // 1. Sort & evaluate SH1-3 for the currently rendering camera (Game OR Scene View)
         if (SortCompute != null && Time.unscaledTime - m_lastSortTime >= m_minSortInterval)
         {
-            Vector3 currentPos = m_mainCamera.transform.position;
-            Quaternion currentRot = m_mainCamera.transform.rotation;
+            Vector3 currentPos = cam.transform.position;
+            Quaternion currentRot = cam.transform.rotation;
 
             float posThresholdSqr = m_positionThreshold * m_positionThreshold;
             float travelDeltaSqr = (currentPos - m_lastCameraPos).sqrMagnitude;
             float angleDelta = Quaternion.Angle(m_lastCameraRot, currentRot);
 
-            if (travelDeltaSqr > posThresholdSqr || angleDelta > m_rotationThreshold || transform.hasChanged)
+            if (cam != m_lastSortCamera || travelDeltaSqr > posThresholdSqr || angleDelta > m_rotationThreshold || transform.hasChanged)
             {
+                m_lastSortCamera = cam;
                 m_lastCameraPos = currentPos;
                 m_lastCameraRot = currentRot;
                 transform.hasChanged = false;
                 m_lastSortTime = Time.unscaledTime;
-                DispatchSort();
+                DispatchSort(cam);
             }
         }
 
-        // 2. Update only per-frame dynamic uniforms
+        // 2. Update dynamic uniforms
         m_propertyBlock.SetMatrix(k_matrixM, transform.localToWorldMatrix);
         m_propertyBlock.SetFloat(k_scaleFactor, m_ScaleFactor);
         m_propertyBlock.SetFloat(k_brightness, m_Brightness);
 
-        // 3. Setup RenderParams (CastShadows can be toggled at any time)
+        // 3. Setup RenderParams scoped strictly to 'cam' (prevents double-drawing across cameras!)
         RenderParams rp = new RenderParams(SplatMaterial)
         {
+            camera = cam,
             worldBounds = CalcWorldBounds(m_gpuResource.Bounds, transform),
             matProps = m_propertyBlock,
             layer = gameObject.layer,
             shadowCastingMode = CastShadows ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.Off
         };
 
-        // 4. Pre-project 1x per splat (including optional dynamic relighting & shadow receiving)
+        // 4. Pre-project 1x per splat for 'cam'
         if (ProjectCompute != null)
         {
             if (s_sceneLightsBuffer == null || !s_sceneLightsBuffer.IsValid())
                 s_sceneLightsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, k_maxSceneLights, 48);
 
-            // Sync active lights from event-maintained s_cachedLights list (zero allocations)
             s_cachedLightCount = 0;
             s_primaryShadowLight = null;
             s_shadowLightIndex = -1;
@@ -591,7 +613,6 @@ public class GsplatRenderer : MonoBehaviour
                     s_sceneLightsBuffer.SetData(s_lightDataArray, 0, 0, s_cachedLightCount);
             }
 
-            // Render directional / spot shadow map once per frame (including optional splat self-shadows)
             bool activeShadowRecv = ReceiveShadows && s_primaryShadowLight != null;
             Matrix4x4 shadowVP = Matrix4x4.identity;
             float ndcShadowBias = 0.001f;
@@ -626,11 +647,10 @@ public class GsplatRenderer : MonoBehaviour
                     const float fixedDepthSpan = 100f;
                     const float shadowMapRes = 1024f;
 
-                    Vector3 focusCenter = m_mainCamera.transform.position + m_mainCamera.transform.forward * (ShadowRange * 0.5f);
+                    Vector3 focusCenter = cam.transform.position + cam.transform.forward * (ShadowRange * 0.5f);
                     Quaternion lightRot = s_primaryShadowLight.transform.rotation;
                     Vector3 lightDir = s_primaryShadowLight.transform.forward;
 
-                    // Texel-snapping prevents shadow swimming during camera movement
                     float texelSize = (ShadowRange * 2f) / shadowMapRes;
                     Vector3 lightSpacePos = Quaternion.Inverse(lightRot) * focusCenter;
                     lightSpacePos.x = Mathf.Floor(lightSpacePos.x / texelSize) * texelSize;
@@ -659,83 +679,133 @@ public class GsplatRenderer : MonoBehaviour
                 Matrix4x4 gpuShadowProj = GL.GetGPUProjectionMatrix(s_shadowCam.projectionMatrix, false);
                 shadowVP = gpuShadowProj * s_shadowCam.worldToCameraMatrix;
 
-                if (s_lastShadowFrame != Time.frameCount && s_shadowDepthShader != null)
+                // Polygon meshes render whenever frame or shadow camera transform changes (handles Game+SceneView & extra Editor repaints)
+                Vector3 shadowPos = s_shadowCam.transform.position;
+                Quaternion shadowRot = s_shadowCam.transform.rotation;
+
+                if ((s_lastShadowFrame != Time.frameCount || s_lastShadowCamPos != shadowPos || s_lastShadowCamRot != shadowRot) && s_shadowDepthShader != null)
                 {
                     s_lastShadowFrame = Time.frameCount;
+                    s_lastShadowCamPos = shadowPos;
+                    s_lastShadowCamRot = shadowRot;
                     s_shadowCam.RenderWithShader(s_shadowDepthShader, "RenderType");
+                }
 
-                    if (SelfShadows)
+                if (SelfShadows && s_shadowDepthShader != null)
+                {
+                    int selfShadowPass = SplatMaterial.FindPass("SplatShadowDepth");
+                    if (selfShadowPass >= 0)
                     {
-                        int selfShadowPass = SplatMaterial.FindPass("SplatShadowDepth");
-                        if (selfShadowPass >= 0)
-                        {
-                            if (s_selfShadowCmd == null)
-                                s_selfShadowCmd = new UnityEngine.Rendering.CommandBuffer { name = "GsplatSelfShadow" };
+                        if (s_selfShadowCmd == null)
+                            s_selfShadowCmd = new UnityEngine.Rendering.CommandBuffer { name = "GsplatSelfShadow" };
 
-                            s_selfShadowCmd.Clear();
-                            s_selfShadowCmd.SetRenderTarget(s_shadowRT);
+                        s_selfShadowCmd.Clear();
+                        s_selfShadowCmd.SetRenderTarget(s_shadowRT);
 
-                            Matrix4x4 shadowWriteProj = GL.GetGPUProjectionMatrix(s_shadowCam.projectionMatrix, true);
-                            m_propertyBlock.SetMatrix("_ShadowViewMatrix", s_shadowCam.worldToCameraMatrix);
-                            m_propertyBlock.SetMatrix("_ShadowProjMatrix", shadowWriteProj);
-                            m_propertyBlock.SetVector("_ShadowMapSize", new Vector2(1024f, 1024f));
+                        Matrix4x4 shadowWriteProj = GL.GetGPUProjectionMatrix(s_shadowCam.projectionMatrix, true);
+                        m_propertyBlock.SetMatrix(k_shadowViewMatrix, s_shadowCam.worldToCameraMatrix);
+                        m_propertyBlock.SetMatrix(k_shadowProjMatrix, shadowWriteProj);
+                        m_propertyBlock.SetVector(k_shadowMapSize, new Vector2(1024f, 1024f));
 
-                            Mesh shadowBatchMesh = GsplatSettings.GetBatchMesh();
-                            int shadowInstanceCount = ((int)m_gpuResource.SplatCount + (int)GsplatSettings.SplatInstanceSize - 1) / (int)GsplatSettings.SplatInstanceSize;
-
-                            s_selfShadowCmd.DrawMeshInstancedProcedural(shadowBatchMesh, 0, SplatMaterial, selfShadowPass, shadowInstanceCount, m_propertyBlock);
-                            Graphics.ExecuteCommandBuffer(s_selfShadowCmd);
-                        }
+                        Mesh shadowBatchMesh = GsplatSettings.GetBatchMesh();
+                        int shadowInstanceCount = ((int)m_gpuResource.SplatCount + (int)GsplatSettings.SplatInstanceSize - 1) / (int)GsplatSettings.SplatInstanceSize;
+                        s_selfShadowCmd.DrawMeshInstancedProcedural(shadowBatchMesh, 0, SplatMaterial, selfShadowPass, shadowInstanceCount, m_propertyBlock);
+                        Graphics.ExecuteCommandBuffer(s_selfShadowCmd);
                     }
                 }
             }
-
             int kernelProj = 0;
             int count = (int)m_gpuResource.SplatCount;
-            Matrix4x4 mv = m_mainCamera.worldToCameraMatrix * transform.localToWorldMatrix;
-            Matrix4x4 proj = GL.GetGPUProjectionMatrix(m_mainCamera.projectionMatrix, m_mainCamera.targetTexture != null);
-
-            ProjectCompute.SetInt("_SplatCount", count);
-            ProjectCompute.SetInt("_UseEvaluatedColor", (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null) ? 1 : 0);
-            ProjectCompute.SetInt("_GammaToLinear", QualitySettings.activeColorSpace == ColorSpace.Linear ? 1 : 0);
-            ProjectCompute.SetFloat("_ScaleFactor", m_ScaleFactor);
-            ProjectCompute.SetFloat("_Brightness", m_Brightness);
-
-            // Relighting & shadow receiving uniforms
-            ProjectCompute.SetInt("_EnableRelighting", EnableRelighting ? 1 : 0);
-            ProjectCompute.SetFloat("_RelightStrength", RelightStrength);
-            ProjectCompute.SetInt("_LightCount", EnableRelighting ? s_cachedLightCount : 0);
-            ProjectCompute.SetVector("_AmbientColor", RenderSettings.ambientLight.linear);
-            ProjectCompute.SetVector("_WorldSpaceCameraPos", m_mainCamera.transform.position);
-            ProjectCompute.SetMatrix("_MatrixM", transform.localToWorldMatrix);
-
-            ProjectCompute.SetInt("_ReceiveShadows", activeShadowRecv ? 1 : 0);
-            ProjectCompute.SetInt("_ShadowLightIndex", s_shadowLightIndex);
-            ProjectCompute.SetInt("_ReversedZ", SystemInfo.usesReversedZBuffer ? 1 : 0);
-            ProjectCompute.SetFloat("_ShadowBias", ndcShadowBias);
-            ProjectCompute.SetFloat("_ShadowStrength", ShadowStrength);
-            ProjectCompute.SetVector("_ShadowMapSize", new Vector2(1024f, 1024f));
-            ProjectCompute.SetMatrix("_ShadowMatrixVP", shadowVP);
-
-            ProjectCompute.SetVector("_ScreenParams", new Vector4(m_mainCamera.pixelWidth, m_mainCamera.pixelHeight, 1f + 1f / m_mainCamera.pixelWidth, 1f + 1f / m_mainCamera.pixelHeight));
-            ProjectCompute.SetVector("_OrthoParams", new Vector4(m_mainCamera.orthographicSize * m_mainCamera.aspect, m_mainCamera.orthographicSize, 0f, m_mainCamera.orthographic ? 1f : 0f));
-            ProjectCompute.SetMatrix("_MatrixMV", mv);
-            ProjectCompute.SetMatrix("_MatrixP", proj);
-
-            ProjectCompute.SetBuffer(kernelProj, "_PositionBuffer", m_gpuResource.PositionBuffer);
-            ProjectCompute.SetBuffer(kernelProj, "_EvaluatedColorBuffer", (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null) ? m_gpuResource.EvaluatedColorBuffer : SortResource.DummyBuffer);
-            ProjectCompute.SetBuffer(kernelProj, "_SceneLightsBuffer", s_sceneLightsBuffer);
-            ProjectCompute.SetTexture(kernelProj, "_SplatShadowMap", activeShadowRecv ? (Texture)s_shadowRT : Texture2D.blackTexture);
-            ProjectCompute.SetBuffer(kernelProj, "_ProjectedSplatBuffer", m_gpuResource.ProjectedSplatBuffer);
+            Matrix4x4 mv = cam.worldToCameraMatrix * transform.localToWorldMatrix;
+            Matrix4x4 proj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, cam.targetTexture != null);
+            ProjectCompute.SetVector(k_highlightColor, m_highlightColor);
+            ProjectCompute.SetInt(k_splatCount, count);
+            ProjectCompute.SetInt(k_useEvaluatedColor, (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null) ? 1 : 0);
+            ProjectCompute.SetInt(k_gammaToLinear, QualitySettings.activeColorSpace == ColorSpace.Linear ? 1 : 0);
+            ProjectCompute.SetFloat(k_scaleFactor, m_ScaleFactor);
+            ProjectCompute.SetFloat(k_brightness, m_Brightness);
+            ProjectCompute.SetInt(k_enableRelighting, EnableRelighting ? 1 : 0);
+            ProjectCompute.SetFloat(k_relightStrength, RelightStrength);
+            ProjectCompute.SetInt(k_lightCount, EnableRelighting ? s_cachedLightCount : 0);
+            ProjectCompute.SetVector(k_ambientColor, RenderSettings.ambientLight.linear);
+            ProjectCompute.SetVector(k_worldSpaceCameraPos, cam.transform.position);
+            ProjectCompute.SetMatrix(k_matrixMCompute, transform.localToWorldMatrix);
+            ProjectCompute.SetInt(k_receiveShadows, activeShadowRecv ? 1 : 0);
+            ProjectCompute.SetInt(k_shadowLightIndex, s_shadowLightIndex);
+            ProjectCompute.SetInt(k_reversedZ, SystemInfo.usesReversedZBuffer ? 1 : 0);
+            ProjectCompute.SetFloat(k_shadowBias, ndcShadowBias);
+            ProjectCompute.SetFloat(k_shadowStrength, ShadowStrength);
+            ProjectCompute.SetVector(k_shadowMapSize, new Vector2(1024f, 1024f));
+            ProjectCompute.SetMatrix(k_shadowMatrixVP, shadowVP);
+            ProjectCompute.SetVector(k_screenParams, new Vector4(cam.pixelWidth, cam.pixelHeight, 1f + 1f / cam.pixelWidth, 1f + 1f / cam.pixelHeight));
+            ProjectCompute.SetVector(k_orthoParams, new Vector4(cam.orthographicSize * cam.aspect, cam.orthographicSize, 0f, cam.orthographic ? 1f : 0f));
+            ProjectCompute.SetMatrix(k_matrixMV, mv);
+            ProjectCompute.SetMatrix(k_matrixP, proj);
+            ProjectCompute.SetBuffer(kernelProj, k_orderBuffer, m_gpuResource.OrderBuffer);
+            ProjectCompute.SetBuffer(kernelProj, k_posBuffer, m_gpuResource.PositionBuffer);
+            ProjectCompute.SetBuffer(kernelProj, k_evalColorBuffer, (m_shBands > 0 && m_gpuResource.EvaluatedColorBuffer != null) ? m_gpuResource.EvaluatedColorBuffer : SortResource.DummyBuffer);
+            ProjectCompute.SetBuffer(kernelProj, k_sceneLightsBuffer, s_sceneLightsBuffer);
+            ProjectCompute.SetTexture(kernelProj, k_splatShadowMap, activeShadowRecv ? (Texture)s_shadowRT : Texture2D.blackTexture);
+            ProjectCompute.SetBuffer(kernelProj, k_projectBuffer, m_gpuResource.ProjectedSplatBuffer);
             int groups = (count + 255) / 256;
             ProjectCompute.Dispatch(kernelProj, groups, 1, 1);
         }
-
-        // 5. Submit instanced draw call (128 splats per instance)
+        // 5. Submit instanced draw call exclusively for 'cam'
         Mesh batchMesh = GsplatSettings.GetBatchMesh();
         int instanceCount = ((int)m_gpuResource.SplatCount + (int)GsplatSettings.SplatInstanceSize - 1) / (int)GsplatSettings.SplatInstanceSize;
-
         Graphics.RenderMeshPrimitives(rp, batchMesh, 0, instanceCount);
+    }
+
+    public void AssignSelectableId(int selectableIdProperty, Color32 packedId)
+    {
+        if (m_propertyBlock == null) m_propertyBlock = new MaterialPropertyBlock();
+        m_propertyBlock.SetColor(selectableIdProperty, packedId);
+        m_isSelectable = true;
+    }
+
+    public static void RenderSelectableIds(Camera cam, RenderTexture targetRT, LayerMask layerMask)
+    {
+        if (cam == null || targetRT == null || s_activeRenderers.Count == 0) return;
+
+        if (s_idCmd == null)
+            s_idCmd = new UnityEngine.Rendering.CommandBuffer { name = "GsplatSelectableIds" };
+
+        s_idCmd.Clear();
+        s_idCmd.SetRenderTarget(targetRT);
+
+        Mesh batchMesh = GsplatSettings.GetBatchMesh();
+        bool hasAny = false;
+
+        for (int i = 0; i < s_activeRenderers.Count; i++)
+        {
+            GsplatRenderer r = s_activeRenderers[i];
+            if (r == null || !r.isActiveAndEnabled || !r.m_isSelectable || r.m_gpuResource == null || r.SplatMaterial == null)
+                continue;
+
+            if ((layerMask.value & (1 << r.gameObject.layer)) == 0)
+                continue;
+
+            int idPass = r.SplatMaterial.FindPass("SelectableId");
+            if (idPass < 0) continue;
+
+            int instanceCount = ((int)r.m_gpuResource.SplatCount + (int)GsplatSettings.SplatInstanceSize - 1) / (int)GsplatSettings.SplatInstanceSize;
+            s_idCmd.DrawMeshInstancedProcedural(batchMesh, 0, r.SplatMaterial, idPass, instanceCount, r.m_propertyBlock);
+            hasAny = true;
+        }
+
+        if (hasAny)
+            Graphics.ExecuteCommandBuffer(s_idCmd);
+    }
+
+    public void SetHighlight(Color color, float strength = 0.35f)
+    {
+        Color lin = color.linear;
+        m_highlightColor = new Color(lin.r, lin.g, lin.b, Mathf.Clamp01(strength));
+    }
+
+    public void ClearHighlight()
+    {
+        m_highlightColor = Color.clear;
     }
 
     private Bounds CalcWorldBounds(Bounds localBounds, Transform trans)
@@ -754,60 +824,83 @@ public class GsplatRenderer : MonoBehaviour
 
     private void OnEnable()
     {
+        s_activeInstanceCount++;
+        if (!s_activeRenderers.Contains(this))
+            s_activeRenderers.Add(this);
+
+        Camera.onPreCull += OnCameraPreCull; // for Unity Editor Viewport
+
         if (s_cachedLights == null)
             s_cachedLights = new List<Light>(FindObjectsByType<Light>(FindObjectsSortMode.None));
-        Core core = FindFirstObjectByType<Core>();
-        core.parameterObjectAdded += OnParameterObjectAdded;
-        core.parameterObjectRemoved += OnParameterObjectRemoved;
 
+        if (m_core == null)
+            m_core = FindFirstObjectByType<Core>();
+
+        if (m_core != null)
+        {
+            m_core.parameterObjectAdded += OnParameterObjectAdded;
+            m_core.parameterObjectRemoved += OnParameterObjectRemoved;
+        }
     }
 
 
     private void OnDisable()
     {
-        Core core = FindFirstObjectByType<Core>();
-        if (core != null)
+        s_activeRenderers.Remove(this);
+        Camera.onPreCull -= OnCameraPreCull;
+
+        if (m_core != null)
         {
-            core.parameterObjectAdded -= OnParameterObjectAdded;
-            core.parameterObjectRemoved -= OnParameterObjectRemoved;
+            m_core.parameterObjectAdded -= OnParameterObjectAdded;
+            m_core.parameterObjectRemoved -= OnParameterObjectRemoved;
         }
     }
 
     private void OnDestroy()
     {
-        // Shared scratch buffers (AltKeys, AltPayload, PassHist, GlobalHist) are managed 
-        // centrally by SortResource and must NOT be disposed per individual object.
-
-        // CRITICAL OWNERSHIP: This renderer instance is the sole keeper of its scene GPU buffers.
-        // Safely wipe the unmanaged VRAM memory blocks when this object gets destroyed.
         if (m_gpuResource != null)
         {
             m_gpuResource.Dispose();
             m_gpuResource = null;
         }
 
-        if (s_sceneLightsBuffer != null && s_sceneLightsBuffer.IsValid())
+        s_activeInstanceCount = Mathf.Max(0, s_activeInstanceCount - 1);
+        if (s_activeInstanceCount == 0)
         {
-            s_sceneLightsBuffer.Dispose();
-            s_sceneLightsBuffer = null;
-        }
+            if (s_sceneLightsBuffer != null && s_sceneLightsBuffer.IsValid())
+            {
+                s_sceneLightsBuffer.Dispose();
+                s_sceneLightsBuffer = null;
+            }
 
-        if (s_shadowRT != null)
-        {
-            s_shadowRT.Release();
-            Destroy(s_shadowRT);
-            s_shadowRT = null;
-        }
-        if (s_shadowCam != null)
-        {
-            Destroy(s_shadowCam.gameObject);
-            s_shadowCam = null;
-        }
+            if (s_shadowRT != null)
+            {
+                s_shadowRT.Release();
+                Destroy(s_shadowRT);
+                s_shadowRT = null;
+            }
 
-        if (s_selfShadowCmd != null) 
-        { 
-            s_selfShadowCmd.Release(); 
-            s_selfShadowCmd = null; 
+            if (s_shadowCam != null)
+            {
+                Destroy(s_shadowCam.gameObject);
+                s_shadowCam = null;
+            }
+
+            if (s_selfShadowCmd != null)
+            {
+                s_selfShadowCmd.Release();
+                s_selfShadowCmd = null;
+            }
+
+            if (s_idCmd != null)
+            {
+                s_idCmd.Release();
+                s_idCmd = null;
+            }
+
+            s_cachedLights = null;
+            s_primaryShadowLight = null;
+            s_lastShadowFrame = -1;
         }
     }
 }

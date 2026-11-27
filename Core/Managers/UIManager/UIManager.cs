@@ -392,7 +392,7 @@ namespace tracer
         //!
         private void updateCanvasScales(object sender, float e)
         {
-            CanvasScaler[] canvases = GameObject.FindObjectsOfType<CanvasScaler>();
+            CanvasScaler[] canvases = GameObject.FindObjectsByType<CanvasScaler>(FindObjectsSortMode.None);
 
             foreach (CanvasScaler canvas in canvases)
             {

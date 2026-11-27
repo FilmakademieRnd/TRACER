@@ -245,6 +245,25 @@ namespace tracer{
                 renderer.sharedMaterial = GetSelectableMaterial(renderer.sharedMaterial);
                 sceneObjectMatsChanged++;
             }
+
+            foreach (GsplatRenderer gsplat in core.getManager<SceneManager>().scnRoot.GetComponentsInChildren<GsplatRenderer>(true))
+            {
+                SceneObject sceneObject = gsplat.GetComponentInParent<SceneObject>(true);
+                if (sceneObject == null || sceneObject is SceneObjectCamera || sceneObject is SceneObjectLight)
+                    continue;
+
+                Color32 packedId = new Color32(
+                    0,
+                    sceneObject._sceneID,
+                    (byte)(sceneObject._id >> 8),
+                    (byte)(sceneObject._id >> 0)
+                );
+
+                gsplat.AssignSelectableId(m_selectableIdPropertyId, packedId);
+                sceneObjectMatsChanged++;
+            }
+
+
             Debug.Log("<color=green>IDExtractorModule modified <b>"+sceneObjectMatsChanged+"</b> sceneObject materials and <b>"+nonSceneObjectMatsChanged+"</b> non-so materials</color>");
         }
         #endregion
@@ -373,6 +392,10 @@ namespace tracer{
 
             // Perform the render
             mainCam.RenderWithShader(objectIdShader, SelectableTypeName);
+
+            // render splats for selection
+            mainCam.RenderWithShader(objectIdShader, SelectableTypeName);
+            GsplatRenderer.RenderSelectableIds(mainCam, gpuTexture, selectableLayer);
 
             // Restore camera state
             mainCam.targetTexture   = oldRenderTexture;
